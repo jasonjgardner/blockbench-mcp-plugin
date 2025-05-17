@@ -48,9 +48,6 @@ __`.vscode/mcp.json`__
 ### Contribution
 
 Addition or modification of tools, prompts and resources is welcome. It should be a relatively-familiar process for Blockbench contributor/plugin authors; however, does require TypeScript compilation. [Bun is recommended for the task.](https://bun.sh/)
-
-Create a feature branch and open a PR on the _[plugin's fork](https://github.com/jasonjgardner/blockbench-plugins)_ of the Blockbench plugins' repository: [github.com/__jasonjgardner__/blockbench-plugins](https://github.com/jasonjgardner/blockbench-plugins)
-
 ### Dev Setup
 
 ```sh
