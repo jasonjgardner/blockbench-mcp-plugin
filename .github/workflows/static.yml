@@ -31,7 +31,7 @@ jobs:
           bun-version: latest
           
       - name: Build Project
-        run: bun run ./build.ts
+        run: bun install && bun run ./build.ts
         
       - name: Setup Pages
         uses: actions/configure-pages@v5
