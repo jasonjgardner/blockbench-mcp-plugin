@@ -1,0 +1,30 @@
+{
+  "name": "blockbench-mcp",
+  "version": "1.0.0",
+  "description": "Blockbench MCP server plugin",
+  "keywords": [
+    "Blockbench",
+    "MCP"
+  ],
+  "license": "ISC",
+  "author": "Jason J. Gardner",
+  "type": "module",
+  "main": "../../plugins/mcp/mcp.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "bun run ./build.ts",
+    "dev:watch": "bun run ./build.ts --watch",
+    "compile": "bun run ./build.ts --minify",
+    "inspect": "bunx @modelcontextprotocol/inspector node ../../plugins/mcp/mcp.js"
+  },
+  "dependencies": {
+    "@types/bun": "^1.2.13",
+    "fastmcp": "^1.27.4",
+    "html2canvas": "^1.4.1",
+    "zod": "^3.24.3"
+  },
+  "devDependencies": {
+    "blockbench-types": "^4.12.2",
+    "typescript": "^5.8.3"
+  }
+}
