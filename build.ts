@@ -4,7 +4,7 @@ import { mkdir, access, copyFile, rename, rmdir } from "node:fs/promises";
 import path from "node:path";
 import { argv } from "node:process";
 
-const OUTPUT_DIR = "../../plugins/mcp";
+const OUTPUT_DIR = "./dist/plugins/mcp";
 const entryFile = path.resolve("./index.ts");
 const isWatchMode = argv.includes("--watch");
 const isCleanMode = argv.includes("--clean");
