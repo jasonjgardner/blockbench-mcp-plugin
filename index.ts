@@ -43,7 +43,7 @@ import { settingsSetup, settingsTeardown } from "./ui/settings";
     icon: "icon.svg",
     variant: "desktop",
     await_loading: true,
-    repository: "https://github.com/jasonjgardner/blockbench-plugins",
+    repository: "https://github.com/jasonjgardner/blockbench-mcp-server",
     min_version: "4.12.4",
     
     onload,
