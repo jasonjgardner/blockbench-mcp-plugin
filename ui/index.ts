@@ -48,7 +48,7 @@ export function uiSetup({
     name: "MCP",
     default_side: "right",
     resizable: true,
-    component: {
+     component: {
       beforeMount() {
         server.on("connect", () => {
           this.server.connected = true;
@@ -66,6 +66,8 @@ export function uiSetup({
         this.destroyInspector();
       },
       data: () => ({
+        inspector: null,
+        inspectorLink: "http://127.0.0.1:6274/",
         sessions: [],
         server: {
           connected: false,
@@ -79,6 +81,23 @@ export function uiSetup({
         resources: [],
         prompts: [],
       }),
+      methods: {
+        launchInspector() {
+          if (this.inspector) {
+            this.destroyInspector();
+          }
+          this.$emit("inspector:launch");
+          this.inspector = electron
+            .require("child_process")
+            .exec("npx @modelcontextprotocol/inspector");
+        },
+        destroyInspector() {
+          if (this.inspector) {
+            this.inspector.kill();
+            this.inspector = null;
+          }
+        },
+      },
       name: "mcp_panel",
       template: /*html*/ `<div class="mcp-panel">
         <details name="mcp_panel">
@@ -106,6 +125,15 @@ export function uiSetup({
             </div>
             <div v-else>
                 <p>No tools available.</p>
+            </div>
+        </details>
+        <details name="mcp_panel">
+            <summary>Development</summary>
+            <button v-if="!inspector" @click="launchInspector">Launch Inspector</button>
+            <div v-else>
+                <p>Inspector is running.</p>
+                <a :href="inspectorLink" target="_blank" style="margin-top: 10px; display: inline-block;">Open MCP Web UI</a>
+                <button @click="destroyInspector">Kill Inspector</button>
             </div>
         </details>
     </div>`,

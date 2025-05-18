@@ -12,3 +12,8 @@ export interface IMCPPrompt {
   arguments: PromptArgument[];
   enabled: boolean;
 }
+
+export interface IMCPResource {
+  name: string;
+  description: string;
+}
