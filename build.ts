@@ -4,7 +4,7 @@ import { mkdir, access, copyFile, rename, rmdir } from "node:fs/promises";
 import path from "node:path";
 import { argv } from "node:process";
 
-const OUTPUT_DIR = "./dist/plugins/mcp";
+const OUTPUT_DIR = "./dist";
 const entryFile = path.resolve("./index.ts");
 const isWatchMode = argv.includes("--watch");
 const isCleanMode = argv.includes("--clean");
@@ -38,7 +38,7 @@ async function buildPlugin(): Promise<boolean> {
     outdir: OUTPUT_DIR,
     target: "node",
     format: "cjs",
-    sourcemap: "external",
+    sourcemap: argv.includes("--sourcemap") ? "external" : "none",
     external: [
       //   "express",
       //     "zod",

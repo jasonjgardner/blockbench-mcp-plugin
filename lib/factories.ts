@@ -117,13 +117,16 @@ export function enableTool(name: string) {
  */
 export function createPrompt(
   name: string,
-  prompt: Prompt<PromptArgument[]>,
+  prompt:  Omit<Prompt<PromptArgument[]>, "name">,
   enabled = true
 ) {
-  server.addPrompt(prompt);
+  server.addPrompt({
+    name,
+    ...prompt
+  });
 
   return {
-    name: prompt.name,
+    name,
     arguments: prompt.arguments,
     description: prompt.description,
     enabled,

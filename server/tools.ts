@@ -64,7 +64,7 @@ createTool("trigger_action", {
     return await captureAppScreenshot();
   },
 });
-createTool("eval", {
+createTool("risky_eval", {
   description:
     "Evaluates the given expression and logs it to the console. Do not pass `console` commands as they will not work.",
   annotations: {
@@ -73,11 +73,14 @@ createTool("eval", {
     openWorldHint: true,
   },
   parameters: z.object({
-    code: z.string()
+    code: z
+      .string()
       .refine((val) => !/console\.|\/\/|\/\*/.test(val), {
         message: "Code must not include 'console.', '//' or '/* */' comments.",
       })
-    .describe("JavaScript code to evaluate. Do not pass `console` commands or comments."),
+      .describe(
+        "JavaScript code to evaluate. Do not pass `console` commands or comments."
+      ),
   }),
   async execute({ code }) {
     try {
@@ -87,9 +90,7 @@ createTool("eval", {
         collections: [],
       });
 
-      const result = await eval(
-        code.trim()
-      );
+      const result = await eval(code.trim());
 
       if (result !== undefined) {
         return JSON.stringify(result);
@@ -254,10 +255,9 @@ createTool("create_texture", {
               /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$/,
               "HEX color string (e.g. #RRGGBB or #RRGGBBAA)"
             ),
-          z.string().regex(
-            /^[a-z]{3,20}$/,
-            "Color name (e.g. 'red', 'blue', 'green')"
-          )
+          z
+            .string()
+            .regex(/^[a-z]{3,20}$/, "Color name (e.g. 'red', 'blue', 'green')"),
         ])
         .optional()
         .describe("RGBA color to fill the texture, as tuple or HEX string."),
@@ -321,9 +321,8 @@ createTool("create_texture", {
       height,
       group,
       pbr_channel,
-      internal: true
+      internal: true,
     });
-    
 
     if (data) {
       if (data.startsWith("data:image/")) {
@@ -341,12 +340,14 @@ createTool("create_texture", {
       texture.fillParticle();
       texture.layers_enabled = false;
     } else if (fill_color) {
-      const color = Array.isArray(fill_color) ? tinycolor({
-        r: Number(fill_color[0]),
-        g: Number(fill_color[1]),
-        b: Number(fill_color[2]),
-        a: Number(fill_color[3] ?? 255),
-      }) : tinycolor(fill_color); 
+      const color = Array.isArray(fill_color)
+        ? tinycolor({
+            r: Number(fill_color[0]),
+            g: Number(fill_color[1]),
+            b: Number(fill_color[2]),
+            a: Number(fill_color[3] ?? 255),
+          })
+        : tinycolor(fill_color);
       const { ctx } = texture.getActiveCanvas();
 
       console.log(color.toRgbString().toLowerCase());
@@ -354,9 +355,7 @@ createTool("create_texture", {
       ctx.fillStyle = color.toRgbString().toLowerCase();
       ctx.fillRect(0, 0, texture.width, texture.height);
 
-      texture.updateSource(
-        ctx.canvas.toDataURL("image/png", 1),
-      );
+      texture.updateSource(ctx.canvas.toDataURL("image/png", 1));
 
       texture.updateLayerChanges(true);
     }
@@ -831,7 +830,7 @@ createTool("list_textures", {
         name: texture.name,
         uuid: texture.uuid,
         id: texture.id,
-        group: texture.group
+        group: texture.group,
       }))
     );
   },
@@ -874,13 +873,17 @@ createTool("list_outline", {
   async execute() {
     const elements = Outliner.elements;
 
-    return JSON.stringify(elements.map((element) => {
-      const { name, uuid } = element;
-      return {
-        name,
-        uuid,
-      };
-    }), null, 2);
+    return JSON.stringify(
+      elements.map((element) => {
+        const { name, uuid } = element;
+        return {
+          name,
+          uuid,
+        };
+      }),
+      null,
+      2
+    );
   },
 });
 
@@ -969,7 +972,41 @@ createTool("set_camera_angle", {
 
     preview.loadAnglePreset(angle);
 
-    return `Camera angle set to ${JSON.stringify(angle)}.`;
+    return await captureScreenshot();
+  },
+});
+
+createTool("from_geo_json", {
+  description: "Imports a model from a GeoJSON file.",
+  annotations: {
+    title: "Import GeoJSON",
+    destructiveHint: true,
+  },
+  parameters: z.object({
+    geojson: z
+      .string()
+      .describe(
+        "Path to the GeoJSON file or data URL, or the GeoJSON string itself."
+      ),
+  }),
+  async execute({ geojson }) {
+    // Detect if the input is a URL or a string
+    if (!geojson.startsWith("{") && !geojson.startsWith("[")) {
+      // Assume it's a URL or file path
+      geojson = await fetch(geojson).then((res) => res.text());
+    }
+    // Parse the GeoJSON string
+    if (typeof geojson !== "string") {
+      throw new Error("Invalid GeoJSON input. Expected a string.");
+    }
+
+    Codecs.bedrock.parse!(JSON.parse(geojson), "");
+
+    return new Promise((resolve) => {
+      setTimeout(async () => {
+        resolve(await captureAppScreenshot());
+      }, 3000);
+    });
   },
 });
 

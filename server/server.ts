@@ -1,5 +1,5 @@
 /// <reference types="three" />
-/// <reference path="../../../types/index.d.ts" />
+/// <reference types="blockbench-types" />
 import { FastMCP } from "fastmcp";
 
 const server = new FastMCP({

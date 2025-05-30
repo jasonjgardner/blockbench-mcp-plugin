@@ -9,19 +9,19 @@
   "license": "ISC",
   "author": "Jason J. Gardner",
   "type": "module",
-  "main": "../../plugins/mcp/mcp.js",
+  "main": "dist/mcp.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "bun run ./build.ts",
-    "dev:watch": "bun run ./build.ts --watch",
+    "dev": "bun run ./build.ts --sourcemap",
+    "dev:watch": "bun run dev --watch",
     "compile": "bun run ./build.ts --minify",
-    "inspect": "bunx @modelcontextprotocol/inspector node ../../plugins/mcp/mcp.js"
+    "inspect": "bunx @modelcontextprotocol/inspector"
   },
   "dependencies": {
-    "@types/bun": "^1.2.13",
-    "fastmcp": "^1.27.4",
+    "@types/bun": "^1.2.15",
     "html2canvas": "^1.4.1",
-    "zod": "^3.24.3"
+    "fastmcp": "^1.27.7",
+    "zod": "^3.25.42"
   },
   "devDependencies": {
     "blockbench-types": "^4.12.2",

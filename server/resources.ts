@@ -1,43 +1,8 @@
 /// <reference types="three" />
-/// <reference path="../../../types/index.d.ts" />
+/// <reference types="blockbench-types" />
 import server from "./server";
 import { fixCircularReferences, getProjectTexture } from "../lib/util";
 import { ResourceTemplate } from "fastmcp";
-
-server.addResource({
-  name: "bar_items",
-  description:
-    "Returns the current toolbar options and actions in the Blockbench editor.",
-  uri: "bar_items://",
-  mimeType: "application/json",
-  async load() {
-    return await Promise.resolve([
-      {
-        type: "text",
-        text: JSON.stringify(Object.keys(BarItems)),
-      },
-    ]);
-  },
-});
-
-server.addResource({
-  name: "dialog",
-  description: "Returns the current dialogs in the Blockbench editor.",
-  uri: "dialog://",
-  mimeType: "application/json",
-  async load() {
-    return await Promise.resolve([
-      {
-        type: "text",
-        text: JSON.stringify(
-          Dialog.stack.map((d) => d.getFormResult()),
-          null,
-          2
-        ),
-      },
-    ]);
-  },
-});
 
 const nodesResource: ResourceTemplate = {
   name: "nodes",
@@ -143,3 +108,36 @@ const texturesResource: ResourceTemplate = {
 };
 
 server.addResourceTemplate(texturesResource);
+
+const referenceModelResource: ResourceTemplate = {
+  name: "reference_model",
+  description: "Returns the current reference model in the Blockbench editor.",
+  uriTemplate: "reference_model://{id}",
+  arguments: [
+    {
+      name: "id",
+    }
+  ],
+  async load({ id }) {
+    const reference = Project?.elements.find((element) => {
+      return element.mesh.type === 'reference_model' && (element.uuid === id || element.name === id);
+    });
+
+    if (!reference) {
+      throw new Error(`Reference model with ID "${id}" not found.`);
+    }
+
+    const { position, rotation, scale, ...rest } = reference.mesh;
+
+    return {
+      text: JSON.stringify({
+        ...rest,
+        position: position.toArray(),
+        rotation: rotation.toArray(),
+        scale: scale.toArray(),
+      }),
+    };
+  }
+};
+
+server.addResourceTemplate(referenceModelResource);
