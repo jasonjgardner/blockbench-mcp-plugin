@@ -6,9 +6,9 @@ https://github.com/user-attachments/assets/ab1b7e63-b6f0-4d5b-85ab-79d328de31db
 
 Open Blockbench, go to File > Plugins and click the "Load Plugin from URL" and paste in this URL:
 
-```
-https://jasonjgardner.github.io/blockbench-mcp-plugin/plugins/mcp/mcp.js
-```
+
+__[https://jasonjgardner.github.io/blockbench-mcp-plugin/mcp.js](https://jasonjgardner.github.io/blockbench-mcp-plugin/mcp.js)__
+
 
 ## Model Context Protocol Server
 Configure experimental MCP server under Blockbench settings: __Settings__ > __General__ > __MCP Server Port__ and __MCP Server Endpoint__
