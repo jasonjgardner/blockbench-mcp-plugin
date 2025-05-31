@@ -5,6 +5,7 @@
  */
 /// <reference types="three" />
 /// <reference types="blockbench-types" />
+import { VERSION } from "./lib/constants";
 import { server as mcp, tools, resources, prompts } from "./server"
 import { uiSetup, uiTeardown } from "./ui";
 import { settingsSetup, settingsTeardown } from "./ui/settings";
@@ -35,7 +36,7 @@ import { settingsSetup, settingsTeardown } from "./ui/settings";
   };
 
   BBPlugin.register("mcp", {
-    version: "1.1.0",
+    version: VERSION,
     title: "MCP Server",
     author: "Jason J. Gardner",
     description: "Adds a Model Context Protocol server to Blockbench, allowing for remote control of the editor by AI agents.",

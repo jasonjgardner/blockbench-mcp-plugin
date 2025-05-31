@@ -1,10 +1,11 @@
 /// <reference types="three" />
 /// <reference types="blockbench-types" />
+import { VERSION } from "@/lib/constants";
 import { FastMCP } from "fastmcp";
 
 const server = new FastMCP({
   name: "Blockbench MCP",
-  version: "1.0.0",
+  version: VERSION,
   instructions: Settings.get("mcp_instructions") || "",
 });
 
