@@ -1010,4 +1010,88 @@ createTool("from_geo_json", {
   },
 });
 
+createTool("create_animation", {
+  description: "Creates a new animation with keyframes for bones.",
+  annotations: {
+    title: "Create Animation",
+    destructiveHint: true,
+  },
+  parameters: z.object({
+    name: z.string().describe("Name of the animation"),
+    loop: z
+      .boolean()
+      .default(false)
+      .describe("Whether the animation should loop"),
+    animation_length: z
+      .number()
+      .optional()
+      .describe("Length of the animation in seconds"),
+    bones: z
+      .record(
+        z.array(
+          z.object({
+            time: z.number(),
+            position: z.tuple([z.number(), z.number(), z.number()]).optional(),
+            rotation: z.tuple([z.number(), z.number(), z.number()]).optional(),
+            scale: z
+              .union([
+                z.tuple([z.number(), z.number(), z.number()]),
+                z.number(),
+              ])
+              .optional(),
+          })
+        )
+      )
+      .describe("Keyframes for each bone"),
+    particle_effects: z
+      .record(
+        z.string().describe("Effect name")
+      )
+      .optional()
+      .describe("Particle effects with timestamps as keys")
+  }),
+  async execute({ name, loop, animation_length, bones, particle_effects }) {
+    const animationData = {
+      loop,
+      ...(animation_length && { animation_length }),
+      bones: Object.fromEntries(
+        Object.entries(bones).map(([boneName, keyframes]) => {
+          const boneData: Record<
+            string,
+            Record<string, number | number[]>
+          > = keyframes.reduce((acc, keyframe) => {
+            const timeKey = keyframe.time.toString();
+            if (keyframe.position) {
+              (acc.position ??= {})[timeKey] = keyframe.position;
+            }
+            if (keyframe.rotation) {
+              (acc.rotation ??= {})[timeKey] = keyframe.rotation;
+            }
+            if (keyframe.scale) {
+              (acc.scale ??= {})[timeKey] = keyframe.scale;
+            }
+            return acc;
+          }, {} as Record<string, Record<string, number | number[]>>);
+
+          return [boneName, boneData];
+        })
+      ),
+      ...(particle_effects && { particle_effects }),
+    };
+
+    Animator.loadFile({
+      content: JSON.stringify({
+        format_version: "1.8.0",
+        animations: {
+          [`animation.${name}`]: animationData,
+        },
+      }),
+    });
+
+    return `Created animation "${name}" with keyframes for ${
+      Object.keys(bones).length
+    } bones${particle_effects ? ` and ${Object.keys(particle_effects).length} particle effects` : ''}`;
+  },
+});
+
 export default tools;
