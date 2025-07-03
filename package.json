@@ -19,8 +19,8 @@
   },
   "dependencies": {
     "@types/bun": "^1.2.15",
+    "fastmcp": "^3.8.2",
     "html2canvas": "^1.4.1",
-    "fastmcp": "^1.27.7",
     "zod": "^3.25.42"
   },
   "devDependencies": {
