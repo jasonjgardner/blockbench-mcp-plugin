@@ -26,5 +26,8 @@
   "devDependencies": {
     "blockbench-types": "^4.12.2",
     "typescript": "^5.8.3"
+  },
+  "peerDependencies": {
+    "sury": "^10.0.4"
   }
 }
