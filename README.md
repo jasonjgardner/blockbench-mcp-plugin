@@ -2,6 +2,8 @@
 
 https://github.com/user-attachments/assets/ab1b7e63-b6f0-4d5b-85ab-79d328de31db
 
+[![MCP Badge](https://lobehub.com/badge/mcp/jasonjgardner-blockbench-mcp-plugin)](https://lobehub.com/mcp/jasonjgardner-blockbench-mcp-plugin)
+
 ## Plugin Installation
 
 Open Blockbench, go to File > Plugins and click the "Load Plugin from URL" and paste in this URL:
