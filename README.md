@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/jasonjgardner-blockbench-mcp-plugin-badge.png)](https://mseep.ai/app/jasonjgardner-blockbench-mcp-plugin)
+
 # Blockbench MCP
 
 https://github.com/user-attachments/assets/ab1b7e63-b6f0-4d5b-85ab-79d328de31db
