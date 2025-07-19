@@ -28,3 +28,6 @@ As an AI agent, you have access to a GitHub MCP server, which can be used to ref
 
 # TODO
 - [ ] Improve tree-shaking for unused code.
+- [ ] Add more tools for Blockbench MCP plugin.
+- [ ] Add more resources for Blockbench MCP plugin.
+- [ ] Add more prompts for Blockbench MCP plugin.
