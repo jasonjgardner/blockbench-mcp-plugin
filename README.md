@@ -1,7 +1,5 @@
 # Blockbench MCP
 
-https://github.com/user-attachments/assets/ab1b7e63-b6f0-4d5b-85ab-79d328de31db
-
 [![MCP Badge](https://lobehub.com/badge/mcp/jasonjgardner-blockbench-mcp-plugin)](https://lobehub.com/mcp/jasonjgardner-blockbench-mcp-plugin)
 
 ## Plugin Installation
@@ -15,7 +13,7 @@ __[https://jasonjgardner.github.io/blockbench-mcp-plugin/mcp.js](https://jasonjg
 ## Model Context Protocol Server
 Configure experimental MCP server under Blockbench settings: __Settings__ > __General__ > __MCP Server Port__ and __MCP Server Endpoint__
 
-The following examples use the default values of `:3000/mcp`
+The following examples use the default values of `:3000/bb-mcp`
 
 ### Installation
 
@@ -30,7 +28,7 @@ __`claude_desktop_config.json`__
       "command": "npx",
       "args": [
         "mcp-remote",
-        "http://localhost:3000/mcp"
+        "http://localhost:3000/bb-mcp"
       ]
     }
   }
@@ -45,7 +43,8 @@ __`.vscode/mcp.json`__
 {
     "servers": {
         "blockbench": {
-            "url": "http://localhost:3000/mcp"
+            "url": "http://localhost:3000/bb-mcp",
+            "type": "http"
         },
     }
 }
@@ -55,7 +54,7 @@ __`.vscode/mcp.json`__
 
 ### Contribution
 
-Addition or modification of tools, prompts and resources is welcome. It should be a relatively-familiar process for Blockbench contributor/plugin authors; however, does require TypeScript compilation. [Bun is recommended for the task.](https://bun.sh/)
+Addition or modification of tools, prompts and resources is welcome. It should be a relatively-familiar process for Blockbench contributor/plugin authors; however, does require TypeScript compilation. [Bun is ~~recommended~~ required for the task.](https://bun.sh/)
 ### Dev Setup
 
 ```sh

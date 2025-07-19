@@ -26,7 +26,7 @@ export function settingsSetup() {
             name: "MCP Server Endpoint",
             description: "Endpoint for the MCP server.",
             type: "text",
-            value: "/mcp",
+            value: "/bb-mcp",
             category,
             icon: "webhook"
         }),
