@@ -27,4 +27,4 @@ Blockbench TypeScript support is incomplete, so some workarounds are necessary:
 As an AI agent, you have access to a GitHub MCP server, which can be used to reference Blockbench's Electron source code to find missing types or understand how to interact with Blockbench's API or FastMCP's API.
 
 # TODO
-- [ ] 
+- [ ] Improve tree-shaking for unused code.
