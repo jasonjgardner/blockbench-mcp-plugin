@@ -2,6 +2,8 @@ import type { Tool, ToolParameters, Prompt, PromptArgument } from "fastmcp";
 import type { IMCPTool, IMCPPrompt } from "@/types";
 import { server } from "@/server";
 
+const TOOL_PREFIX = "blockbench";
+
 /**
  * User-visible list of tool details.
  */
@@ -49,17 +51,18 @@ export const prompts: Record<
  * ```
  */
 export function createTool<T extends ToolParameters>(
-    name: string,
-    tool: Omit<Tool<undefined, T>, "name">,
+    suffix: string,
+    tool: Omit<Tool<Record<string, unknown> | undefined, T>, "name">,
     enabled = true
 ) {
+  const name = `${TOOL_PREFIX}_${suffix}`;
   if (tools[name]) {
     throw new Error(`Tool with name "${name}" already exists.`);
   }
 
   server.addTool({
+    ...tool as Tool<Record<string, unknown> | undefined, T>,
     name,
-    ...tool
   });
 
   tools[name] = {
@@ -116,13 +119,19 @@ export function enableTool(name: string) {
  * @throws - If a prompt with the same name already exists.
  */
 export function createPrompt(
-  name: string,
-  prompt:  Omit<Prompt<PromptArgument[]>, "name">,
+  suffix: string,
+  prompt:  Omit<Prompt<Record<string, unknown> | undefined> , "name">,
   enabled = true
 ) {
+  const name = `${TOOL_PREFIX}_${suffix}`;
+
+  if (prompts[name]) {
+    throw new Error(`Prompt with name "${name}" already exists.`);
+  }
+
   server.addPrompt({
+    ...prompt,
     name,
-    ...prompt
   });
 
   return {

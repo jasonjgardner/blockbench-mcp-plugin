@@ -1,5 +1,7 @@
 ---
 mode: agent
+description: This is a Blockbench plugin that integrates with the Model Context Protocol (MCP) to allow AI models to interact with Blockbench (JannisX11/blockbench) through commands or directly execute JavaScript code in its context.
+tools: ['githubRepo', 'get_commit', 'get_file_contents', 'list_branches', 'search_code', 'search_repositories']
 ---
 
 # Project Overview
@@ -24,7 +26,7 @@ Blockbench TypeScript support is incomplete, so some workarounds are necessary:
 - Use TypeScript ignore or expect error comments (`// @ts-ignore`) to bypass missing types.
 
 ### MCP Resources
-As an AI agent, you have access to a GitHub MCP server, which can be used to reference Blockbench's Electron source code to find missing types or understand how to interact with Blockbench's API or FastMCP's API.
+As an AI agent, you have access to a GitHub MCP server, which should be used to reference [Blockbench's Electron source code](https://github.com/JannisX11/blockbench) to find missing types or understand how to interact with Blockbench's API or FastMCP's API. You can also reference the existing Blockbench plugins in the [Blockbench Plugin Repository](https://github.com/JannisX11/blockbench-plugins).
 
 # TODO
 - [ ] Improve tree-shaking for unused code.
