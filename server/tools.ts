@@ -4,11 +4,237 @@ import { z } from "zod";
 import { createTool, tools } from "@/lib/factories";
 import {
   getProjectTexture,
-  fixCircularReferences,
   captureScreenshot,
   captureAppScreenshot,
 } from "@/lib/util";
 import { imageContent } from "fastmcp";
+
+createTool("place_cube", {
+  description:
+    "Places a cube of the given size at the specified position. Texture and group are optional.",
+  annotations: {
+    title: "Place Cube",
+    destructiveHint: true,
+  },
+  parameters: z.object({
+    elements: z
+      .array(
+        z.object({
+          name: z.string(),
+          origin: z
+            .tuple([z.number(), z.number(), z.number()])
+            .describe("Pivot point of the cube."),
+          from: z
+            .tuple([z.number(), z.number(), z.number()])
+            .describe("Starting point of the cube."),
+          to: z
+            .tuple([z.number(), z.number(), z.number()])
+            .describe("Ending point of the cube."),
+          rotation: z
+            .tuple([z.number(), z.number(), z.number()])
+            .describe("Rotation of the cube."),
+        })
+      )
+      .min(1)
+      .describe("Array of cubes to place."),
+    texture: z
+      .string()
+      .optional()
+      .describe("Texture ID or name to apply to the cube."),
+    group: z
+      .string()
+      .optional()
+      .describe("Group/bone to which the cube belongs."),
+    faces: z
+      .union([
+        z
+          .array(z.enum(["north", "south", "east", "west", "up", "down"]))
+          .describe("Array of faces to apply the texture to."),
+        z
+          .boolean()
+          .optional()
+          .describe(
+            "Whether to apply the texture to all faces. Set to `true` to enable auto UV mapping."
+          ),
+        z
+          .array(
+            z.object({
+              face: z
+                .enum(["north", "south", "east", "west", "up", "down"])
+                .describe("Face to apply the texture to."),
+              uv: z
+                .tuple([z.number(), z.number(), z.number(), z.number()])
+                .describe("Custom UV mapping for the face."),
+            })
+          )
+          .describe("Array of faces with custom UV mapping."),
+      ])
+      .optional()
+      .default(true)
+      .describe(
+        "Faces to apply the texture to. Set to `true` to enable auto UV mapping."
+      ),
+  }),
+  async execute({ elements, texture, faces, group }, { reportProgress }) {
+    Undo.initEdit({
+      elements: [],
+      outliner: true,
+      collections: [],
+    });
+    const total = elements.length;
+
+    const projectTexture = texture
+      ? getProjectTexture(texture)
+      : Texture.getDefault();
+
+    if (!projectTexture) {
+      throw new Error(`No texture found for "${texture}".`);
+    }
+
+    const groups = getAllGroups();
+    const outlinerGroup = groups.find(
+      (g) => g.name === group || g.uuid === group
+    );
+
+    const autouv =
+      faces === true ||
+      (Array.isArray(faces) && faces.every((face) => typeof face === "string"));
+
+    const cubes = elements.map((element, progress) => {
+      const cube = new Cube({
+        autouv: autouv ? 1 : 0,
+        name: element.name,
+        from: element.from,
+        to: element.to,
+        origin: element.origin,
+        rotation: element.rotation,
+      }).init();
+
+      cube.addTo(outlinerGroup);
+
+      if (!autouv && Array.isArray(faces)) {
+        faces.forEach(({ face, uv }) => {
+          cube.faces[face].extend({
+            uv,
+          });
+        });
+      } else {
+        cube.applyTexture(projectTexture, faces !== false ? faces : undefined);
+        cube.mapAutoUV();
+      }
+
+      reportProgress({
+        progress,
+        total,
+      });
+
+      return cube;
+    });
+
+    Undo.finishEdit("Agent placed cubes");
+    Canvas.updateAll();
+
+    return await Promise.resolve(
+      JSON.stringify(
+        cubes.map((cube) => `Added cube ${cube.name} with ID ${cube.uuid}`)
+      )
+    );
+  },
+});
+
+createTool("place_mesh", {
+  description:
+    "Places a mesh at the specified position. Texture and group are optional.",
+  annotations: {
+    title: "Place Mesh",
+    destructiveHint: true,
+  },
+  parameters: z.object({
+    elements: z
+      .array(
+        z.object({
+          name: z.string(),
+          position: z
+            .tuple([z.number(), z.number(), z.number()])
+            .describe("Position of the mesh."),
+          rotation: z
+            .tuple([z.number(), z.number(), z.number()])
+            .describe("Rotation of the mesh."),
+          scale: z
+            .tuple([z.number(), z.number(), z.number()])
+            .describe("Scale of the mesh."),
+          vertices: z
+            .array(
+              z
+                .tuple([z.number(), z.number(), z.number()])
+                .describe("Vertex coordinates in the mesh.")
+            )
+            .describe("Vertices of the mesh."),
+        })
+      )
+      .min(1)
+      .describe("Array of meshes to place."),
+    texture: z
+      .string()
+      .optional()
+      .describe("Texture ID or name to apply to the mesh."),
+    group: z
+      .string()
+      .optional()
+      .describe("Group/bone to which the mesh belongs."),
+  }),
+  async execute({ elements, texture, group }, { reportProgress }) {
+    Undo.initEdit({
+      elements: [],
+      outliner: true,
+      collections: [],
+    });
+    const total = elements.length;
+
+    const projectTexture = texture
+      ? getProjectTexture(texture)
+      : Texture.getDefault();
+
+    if (!projectTexture) {
+      throw new Error(`No texture found for "${texture}".`);
+    }
+
+    const groups = getAllGroups();
+    const outlinerGroup = groups.find(
+      (g) => g.name === group || g.uuid === group
+    );
+
+    const meshes = elements.map((element, progress) => {
+      const mesh = new Mesh({
+        name: element.name,
+        vertices: {},
+      }).init();
+
+      element.vertices.forEach((vertex) => {
+        mesh.addVertices(vertex);
+      });
+
+      mesh.addTo(outlinerGroup);
+      mesh.applyTexture(projectTexture);
+
+      reportProgress({
+        progress,
+        total,
+      });
+
+      return mesh;
+    });
+
+    Undo.finishEdit("Agent placed meshes");
+    Canvas.updateAll();
+
+    return await Promise.resolve(
+      JSON.stringify(
+        meshes.map((mesh) => `Added mesh ${mesh.name} with ID ${mesh.uuid}`)
+      )
+    );
+  },
+});
 
 createTool("trigger_action", {
   description: "Triggers an action in the Blockbench editor.",
@@ -64,6 +290,7 @@ createTool("trigger_action", {
     return await captureAppScreenshot();
   },
 });
+
 createTool("risky_eval", {
   description:
     "Evaluates the given expression and logs it to the console. Do not pass `console` commands as they will not work.",
@@ -104,6 +331,7 @@ createTool("risky_eval", {
     }
   },
 });
+
 createTool("emulate_clicks", {
   description: "Emulates clicks on the given interface elements.",
   annotations: {
@@ -509,139 +737,6 @@ createTool("add_texture_group", {
     Canvas.updateAll();
 
     return `Added texture group ${textureGroup.name} with ID ${textureGroup.uuid}`;
-  },
-});
-
-createTool("place_cube", {
-  description:
-    "Places a cube of the given size at the specified position. Texture and group are optional.",
-  annotations: {
-    title: "Place Cube",
-    destructiveHint: true,
-  },
-  parameters: z.object({
-    elements: z
-      .array(
-        z.object({
-          name: z.string(),
-          origin: z
-            .tuple([z.number(), z.number(), z.number()])
-            .describe("Pivot point of the cube."),
-          from: z
-            .tuple([z.number(), z.number(), z.number()])
-            .describe("Starting point of the cube."),
-          to: z
-            .tuple([z.number(), z.number(), z.number()])
-            .describe("Ending point of the cube."),
-          rotation: z
-            .tuple([z.number(), z.number(), z.number()])
-            .describe("Rotation of the cube."),
-        })
-      )
-      .min(1)
-      .describe("Array of cubes to place."),
-    texture: z
-      .string()
-      .optional()
-      .describe("Texture ID or name to apply to the cube."),
-    group: z
-      .string()
-      .optional()
-      .describe("Group/bone to which the cube belongs."),
-    faces: z
-      .union([
-        z
-          .array(z.enum(["north", "south", "east", "west", "up", "down"]))
-          .describe("Array of faces to apply the texture to."),
-        z
-          .boolean()
-          .optional()
-          .describe(
-            "Whether to apply the texture to all faces. Set to `true` to enable auto UV mapping."
-          ),
-        z
-          .array(
-            z.object({
-              face: z
-                .enum(["north", "south", "east", "west", "up", "down"])
-                .describe("Face to apply the texture to."),
-              uv: z
-                .tuple([z.number(), z.number(), z.number(), z.number()])
-                .describe("Custom UV mapping for the face."),
-            })
-          )
-          .describe("Array of faces with custom UV mapping."),
-      ])
-      .optional()
-      .default(true)
-      .describe(
-        "Faces to apply the texture to. Set to `true` to enable auto UV mapping."
-      ),
-  }),
-  async execute({ elements, texture, faces, group }, { reportProgress }) {
-    Undo.initEdit({
-      elements: [],
-      outliner: true,
-      collections: [],
-    });
-    const total = elements.length;
-
-    const projectTexture = texture
-      ? getProjectTexture(texture)
-      : Texture.getDefault();
-
-    if (!projectTexture) {
-      throw new Error(`No texture found for "${texture}".`);
-    }
-
-    const groups = getAllGroups();
-    const outlinerGroup = groups.find(
-      (g) => g.name === group || g.uuid === group
-    );
-
-    const autouv =
-      faces === true ||
-      (Array.isArray(faces) && faces.every((face) => typeof face === "string"));
-
-    const cubes = elements.map((element, progress) => {
-      const cube = new Cube({
-        autouv: autouv ? 1 : 0,
-        name: element.name,
-        from: element.from,
-        to: element.to,
-        origin: element.origin,
-        rotation: element.rotation,
-      }).init();
-
-      cube.addTo(outlinerGroup);
-
-      if (!autouv && Array.isArray(faces)) {
-        faces.forEach(({ face, uv }) => {
-          cube.faces[face].extend({
-            uv,
-          });
-        });
-      } else {
-        cube.applyTexture(projectTexture, faces !== false ? faces : undefined);
-        cube.mapAutoUV();
-      }
-
-      reportProgress({
-        progress,
-        total,
-      });
-
-      return cube;
-    });
-
-    Undo.finishEdit("Agent placed cubes");
-    Canvas.updateAll();
-
-    return await Promise.resolve(
-      JSON.stringify(
-        cubes.map((cube) => `Added cube ${cube.name} with ID ${cube.uuid}`)
-      )
-    );
   },
 });
 

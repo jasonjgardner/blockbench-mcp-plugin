@@ -131,9 +131,9 @@ export function uiSetup({
             <summary>Development</summary>
             <button v-if="!inspector" @click="launchInspector">Launch Inspector</button>
             <div v-else>
-                <p>Inspector is running.</p>
+                <p>Inspector started.</p>
                 <a :href="inspectorLink" target="_blank" style="margin-top: 10px; display: inline-block;">Open MCP Web UI</a>
-                <button @click="destroyInspector">Kill Inspector</button>
+                <button @click="destroyInspector">Stop Inspector</button>
             </div>
         </details>
     </div>`,
