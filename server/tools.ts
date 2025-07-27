@@ -199,6 +199,7 @@ createTool("place_mesh", {
       throw new Error(`No texture found for "${texture}".`);
     }
 
+    // @ts-expect-error getAllGroups is a utility function that returns all groups in the project
     const groups = getAllGroups();
     const outlinerGroup = groups.find(
       (g) => g.name === group || g.uuid === group
@@ -577,8 +578,6 @@ createTool("create_texture", {
           })
         : tinycolor(fill_color);
       const { ctx } = texture.getActiveCanvas();
-
-      console.log(color.toRgbString().toLowerCase());
 
       ctx.fillStyle = color.toRgbString().toLowerCase();
       ctx.fillRect(0, 0, texture.width, texture.height);
@@ -1139,11 +1138,9 @@ createTool("create_animation", {
       )
       .describe("Keyframes for each bone"),
     particle_effects: z
-      .record(
-        z.string().describe("Effect name")
-      )
+      .record(z.string().describe("Effect name"))
       .optional()
-      .describe("Particle effects with timestamps as keys")
+      .describe("Particle effects with timestamps as keys"),
   }),
   async execute({ name, loop, animation_length, bones, particle_effects }) {
     const animationData = {
@@ -1185,7 +1182,192 @@ createTool("create_animation", {
 
     return `Created animation "${name}" with keyframes for ${
       Object.keys(bones).length
-    } bones${particle_effects ? ` and ${Object.keys(particle_effects).length} particle effects` : ''}`;
+    } bones${
+      particle_effects
+        ? ` and ${Object.keys(particle_effects).length} particle effects`
+        : ""
+    }`;
+  },
+});
+
+createTool("create_sphere", {
+  description:
+    "Creates a sphere mesh at the specified position with the given parameters. The sphere is created as a mesh with vertices and faces using spherical coordinates.",
+  annotations: {
+    title: "Create Sphere",
+    destructiveHint: true,
+  },
+  parameters: z.object({
+    elements: z
+      .array(
+        z.object({
+          name: z.string().describe("Name of the sphere."),
+          position: z
+            .tuple([z.number(), z.number(), z.number()])
+            .describe("Position of the sphere center."),
+          diameter: z
+            .number()
+            .min(1)
+            .max(64)
+            .default(16)
+            .describe("Diameter of the sphere."),
+          sides: z
+            .number()
+            .min(3)
+            .max(48)
+            .default(12)
+            .describe(
+              "Number of horizontal divisions (affects sphere quality)."
+            ),
+          rotation: z
+            .tuple([z.number(), z.number(), z.number()])
+            .optional()
+            .default([0, 0, 0])
+            .describe("Rotation of the sphere."),
+          align_edges: z
+            .boolean()
+            .optional()
+            .default(true)
+            .describe("Whether to align edges for better geometry."),
+        })
+      )
+      .min(1)
+      .describe("Array of spheres to create."),
+    texture: z
+      .string()
+      .optional()
+      .describe("Texture ID or name to apply to the sphere."),
+    group: z
+      .string()
+      .optional()
+      .describe("Group/bone to which the sphere belongs."),
+  }),
+  async execute({ elements, texture, group }, { reportProgress }) {
+    Undo.initEdit({
+      elements: [],
+      outliner: true,
+      collections: [],
+    });
+    const total = elements.length;
+
+    const projectTexture = texture
+      ? getProjectTexture(texture)
+      : Texture.getDefault();
+
+    if (!projectTexture) {
+      throw new Error(`No texture found for "${texture}".`);
+    }
+
+    const groups = getAllGroups();
+    const outlinerGroup = groups.find(
+      (g) => g.name === group || g.uuid === group
+    );
+
+    const spheres = elements.map((element, progress) => {
+      const mesh = new Mesh({
+        name: element.name,
+        vertices: {},
+        origin: element.position,
+        rotation: element.rotation || [0, 0, 0],
+      }).init();
+
+      // Create sphere vertices using spherical coordinates
+      const radius = element.diameter / 2;
+      const sides = Math.round(element.sides / 2) * 2; // Ensure even number for symmetry
+
+      // Add top and bottom vertices
+      const [bottom] = mesh.addVertices([0, -radius, 0]);
+      const [top] = mesh.addVertices([0, radius, 0]);
+
+      const rings = [];
+      const off_ang = element.align_edges ? 0.5 : 0;
+
+      // Create rings of vertices
+      for (let i = 0; i < element.sides; i++) {
+        const circle_x = Math.sin(
+          ((i + off_ang) / element.sides) * Math.PI * 2
+        );
+        const circle_z = Math.cos(
+          ((i + off_ang) / element.sides) * Math.PI * 2
+        );
+
+        const vertices = [];
+        for (let j = 1; j < sides / 2; j++) {
+          const slice_x = Math.sin((j / sides) * Math.PI * 2) * radius;
+          const x = circle_x * slice_x;
+          const y = Math.cos((j / sides) * Math.PI * 2) * radius;
+          const z = circle_z * slice_x;
+          vertices.push(...mesh.addVertices([x, y, z]));
+        }
+        rings.push(vertices);
+      }
+
+      // Create faces
+      for (let i = 0; i < element.sides; i++) {
+        const this_ring = rings[i];
+        const next_ring = rings[i + 1] || rings[0];
+
+        for (let j = 0; j < sides / 2; j++) {
+          if (j == 0) {
+            // Connect to top vertex
+            mesh.addFaces(
+              new MeshFace(mesh, {
+                vertices: [this_ring[j], next_ring[j], top],
+                uv: {},
+              })
+            );
+            continue;
+          }
+
+          if (!this_ring[j]) {
+            // Connect to bottom vertex
+            mesh.addFaces(
+              new MeshFace(mesh, {
+                vertices: [next_ring[j - 1], this_ring[j - 1], bottom],
+                uv: {},
+              })
+            );
+            continue;
+          }
+
+          // Connect ring segments
+          mesh.addFaces(
+            new MeshFace(mesh, {
+              vertices: [
+                this_ring[j],
+                next_ring[j],
+                this_ring[j - 1],
+                next_ring[j - 1],
+              ],
+              uv: {},
+            })
+          );
+        }
+      }
+
+      mesh.addTo(outlinerGroup);
+      if (projectTexture) {
+        mesh.applyTexture(projectTexture);
+      }
+
+      reportProgress({
+        progress,
+        total,
+      });
+
+      return mesh;
+    });
+
+    Undo.finishEdit("Agent created spheres");
+    Canvas.updateAll();
+
+    return await Promise.resolve(
+      JSON.stringify(
+        spheres.map(
+          (sphere) => `Added sphere ${sphere.name} with ID ${sphere.uuid}`
+        )
+      )
+    );
   },
 });
 

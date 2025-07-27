@@ -1,10 +1,11 @@
 /// <reference types="three" />
 /// <reference types="blockbench-types" />
 import server from "./server";
-import { fixCircularReferences, getProjectTexture } from "../lib/util";
-import { ResourceTemplate } from "fastmcp";
+import { getProjectTexture } from "../lib/util";
+import type { ResourceTemplate } from "fastmcp";
+import type { BlockbenchSessionAuth } from "./types";
 
-const nodesResource: ResourceTemplate = {
+const nodesResource: ResourceTemplate<BlockbenchSessionAuth> = {
   name: "nodes",
   description: "Returns the current nodes in the Blockbench editor.",
   uriTemplate: "nodes://{id}",
@@ -63,7 +64,7 @@ const nodesResource: ResourceTemplate = {
 };
 server.addResourceTemplate(nodesResource);
 
-const texturesResource: ResourceTemplate = {
+const texturesResource: ResourceTemplate<BlockbenchSessionAuth> = {
   name: "textures",
   description: "Returns the current textures in the Blockbench editor.",
   uriTemplate: "textures://{id}",
@@ -109,18 +110,21 @@ const texturesResource: ResourceTemplate = {
 
 server.addResourceTemplate(texturesResource);
 
-const referenceModelResource: ResourceTemplate = {
+const referenceModelResource: ResourceTemplate<BlockbenchSessionAuth> = {
   name: "reference_model",
   description: "Returns the current reference model in the Blockbench editor.",
   uriTemplate: "reference_model://{id}",
   arguments: [
     {
       name: "id",
-    }
+    },
   ],
   async load({ id }) {
     const reference = Project?.elements.find((element) => {
-      return element.mesh.type === 'reference_model' && (element.uuid === id || element.name === id);
+      return (
+        element.mesh.type === "reference_model" &&
+        (element.uuid === id || element.name === id)
+      );
     });
 
     if (!reference) {
@@ -137,7 +141,7 @@ const referenceModelResource: ResourceTemplate = {
         scale: scale.toArray(),
       }),
     };
-  }
+  },
 };
 
 server.addResourceTemplate(referenceModelResource);
