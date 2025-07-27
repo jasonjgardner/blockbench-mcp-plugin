@@ -1371,4 +1371,749 @@ createTool("create_sphere", {
   },
 });
 
+createTool("select_mesh_elements", {
+  description: "Selects vertices, edges, or faces of a mesh for manipulation.",
+  annotations: {
+    title: "Select Mesh Elements",
+    destructiveHint: true,
+  },
+  parameters: z.object({
+    mesh_id: z
+      .string()
+      .describe("ID or name of the mesh to select elements from."),
+    mode: z.enum(["vertex", "edge", "face"]).describe("Selection mode."),
+    elements: z
+      .array(
+        z.union([
+          z.string().describe("Vertex key, edge as 'vkey1-vkey2', or face key"),
+          z.number().describe("Index of the element"),
+        ])
+      )
+      .optional()
+      .describe("Specific elements to select. If not provided, selects all."),
+    action: z
+      .enum(["select", "add", "remove", "toggle"])
+      .default("select")
+      .describe("Selection action: select (replace), add, remove, or toggle."),
+  }),
+  async execute({ mesh_id, mode, elements, action }) {
+    const mesh = Mesh.all.find((m) => m.uuid === mesh_id || m.name === mesh_id);
+    if (!mesh) {
+      throw new Error(`Mesh with ID "${mesh_id}" not found.`);
+    }
+
+    Undo.initEdit({
+      elements: [mesh],
+      selection: true,
+    });
+
+    // Set selection mode
+    BarItems.selection_mode.set(mode);
+
+    const selection = Project.mesh_selection[mesh.uuid];
+    if (!selection) {
+      Project.mesh_selection[mesh.uuid] = {
+        vertices: [],
+        edges: [],
+        faces: [],
+      };
+    }
+
+    if (action === "select") {
+      // Clear existing selection
+      selection.vertices = [];
+      selection.edges = [];
+      selection.faces = [];
+    }
+
+    if (!elements || elements.length === 0) {
+      // Select all elements of the specified type
+      if (mode === "vertex") {
+        selection.vertices = Object.keys(mesh.vertices);
+      } else if (mode === "face") {
+        selection.faces = Object.keys(mesh.faces);
+      } else if (mode === "edge") {
+        // @ts-ignore
+        selection.edges = mesh.getEdges();
+      }
+    } else {
+      // Select specific elements
+      elements.forEach((element) => {
+        if (mode === "vertex") {
+          const vkey = String(element);
+          if (action === "add" || action === "select") {
+            selection.vertices.safePush(vkey);
+          } else if (action === "remove") {
+            selection.vertices.remove(vkey);
+          } else if (action === "toggle") {
+            selection.vertices.toggle(vkey);
+          }
+        } else if (mode === "face") {
+          const fkey = String(element);
+          if (action === "add" || action === "select") {
+            selection.faces.safePush(fkey);
+          } else if (action === "remove") {
+            selection.faces.remove(fkey);
+          } else if (action === "toggle") {
+            selection.faces.toggle(fkey);
+          }
+        } else if (mode === "edge") {
+          // Parse edge format "vkey1-vkey2"
+          const edgeParts = String(element).split("-");
+          if (edgeParts.length === 2) {
+            const edge = [edgeParts[0], edgeParts[1]];
+            if (action === "add" || action === "select") {
+              selection.edges.push(edge);
+            } else if (action === "remove") {
+              selection.edges = selection.edges.filter(
+                (e) =>
+                  !(e[0] === edge[0] && e[1] === edge[1]) &&
+                  !(e[0] === edge[1] && e[1] === edge[0])
+              );
+            }
+          }
+        }
+      });
+    }
+
+    mesh.select();
+    Canvas.updateView({
+      elements: [mesh],
+      selection: true,
+    });
+
+    Undo.finishEdit("Select mesh elements");
+
+    return JSON.stringify({
+      mesh: mesh.name,
+      mode,
+      selected: {
+        vertices: selection.vertices.length,
+        edges: selection.edges.length,
+        faces: selection.faces.length,
+      },
+    });
+  },
+});
+
+createTool("move_mesh_vertices", {
+  description: "Moves selected vertices of a mesh by the specified offset.",
+  annotations: {
+    title: "Move Mesh Vertices",
+    destructiveHint: true,
+  },
+  parameters: z.object({
+    mesh_id: z
+      .string()
+      .optional()
+      .describe("ID or name of the mesh. If not provided, uses selected mesh."),
+    offset: z
+      .tuple([z.number(), z.number(), z.number()])
+      .describe("Offset to move vertices by [x, y, z]."),
+    vertices: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "Specific vertex keys to move. If not provided, moves all selected vertices."
+      ),
+  }),
+  async execute({ mesh_id, offset, vertices }) {
+    const mesh = mesh_id
+      ? Mesh.all.find((m) => m.uuid === mesh_id || m.name === mesh_id)
+      : Mesh.selected[0];
+
+    if (!mesh) {
+      throw new Error(
+        mesh_id ? `Mesh with ID "${mesh_id}" not found.` : "No mesh selected."
+      );
+    }
+
+    Undo.initEdit({
+      elements: [mesh],
+      element_aspects: {
+        geometry: true,
+        uv: true,
+        faces: true,
+      },
+    });
+
+    const verticesToMove = vertices || mesh.getSelectedVertices();
+
+    verticesToMove.forEach((vkey) => {
+      if (mesh.vertices[vkey]) {
+        mesh.vertices[vkey][0] += offset[0];
+        mesh.vertices[vkey][1] += offset[1];
+        mesh.vertices[vkey][2] += offset[2];
+      }
+    });
+
+    mesh.preview_controller.updateGeometry(mesh);
+
+    Undo.finishEdit("Move mesh vertices");
+    Canvas.updateView({
+      elements: [mesh],
+      element_aspects: {
+        geometry: true,
+        uv: true,
+        faces: true,
+      },
+    });
+
+    return `Moved ${verticesToMove.length} vertices of mesh "${mesh.name}"`;
+  },
+});
+
+createTool("extrude_mesh", {
+  description: "Extrudes selected faces or edges of a mesh.",
+  annotations: {
+    title: "Extrude Mesh",
+    destructiveHint: true,
+  },
+  parameters: z.object({
+    mesh_id: z
+      .string()
+      .optional()
+      .describe("ID or name of the mesh. If not provided, uses selected mesh."),
+    distance: z.number().default(1).describe("Distance to extrude."),
+    mode: z
+      .enum(["faces", "edges", "vertices"])
+      .default("faces")
+      .describe("What to extrude: faces, edges, or vertices."),
+  }),
+  async execute({ mesh_id, distance, mode }) {
+    const mesh = mesh_id
+      ? Mesh.all.find((m) => m.uuid === mesh_id || m.name === mesh_id)
+      : Mesh.selected[0];
+
+    if (!mesh) {
+      throw new Error(
+        mesh_id ? `Mesh with ID "${mesh_id}" not found.` : "No mesh selected."
+      );
+    }
+
+    // Use the extrude tool
+    const tool =
+      mode === "faces"
+        ? BarItems.extrude_mesh_selection
+        : mode === "edges"
+        ? BarItems.extrude_mesh_selection
+        : BarItems.extrude_mesh_selection;
+
+    if (!tool) {
+      throw new Error(`Extrude tool for ${mode} not found.`);
+    }
+
+    // @ts-ignore
+    tool.click({}, distance);
+
+    return `Extruded ${mode} of mesh "${mesh.name}" by ${distance} units`;
+  },
+});
+
+createTool("subdivide_mesh", {
+  description: "Subdivides selected faces of a mesh to create more geometry.",
+  annotations: {
+    title: "Subdivide Mesh",
+    destructiveHint: true,
+  },
+  parameters: z.object({
+    mesh_id: z
+      .string()
+      .optional()
+      .describe("ID or name of the mesh. If not provided, uses selected mesh."),
+    cuts: z
+      .number()
+      .min(1)
+      .max(10)
+      .default(1)
+      .describe("Number of subdivision cuts to make."),
+  }),
+  async execute({ mesh_id, cuts }) {
+    const mesh = mesh_id
+      ? Mesh.all.find((m) => m.uuid === mesh_id || m.name === mesh_id)
+      : Mesh.selected[0];
+
+    if (!mesh) {
+      throw new Error(
+        mesh_id ? `Mesh with ID "${mesh_id}" not found.` : "No mesh selected."
+      );
+    }
+
+    // Use the loop cut tool with subdivision
+    const tool = BarItems.loop_cut;
+    if (!tool) {
+      throw new Error("Loop cut tool not found.");
+    }
+
+    // @ts-ignore
+    tool.click({}, undefined, undefined, cuts);
+
+    return `Subdivided mesh "${mesh.name}" with ${cuts} cuts`;
+  },
+});
+
+createTool("knife_tool", {
+  description: "Uses the knife tool to cut custom edges into mesh faces.",
+  annotations: {
+    title: "Knife Tool",
+    destructiveHint: true,
+  },
+  parameters: z.object({
+    mesh_id: z.string().describe("ID or name of the mesh to cut."),
+    points: z
+      .array(
+        z.object({
+          position: z
+            .tuple([z.number(), z.number(), z.number()])
+            .describe("3D position of the cut point."),
+          face: z
+            .string()
+            .optional()
+            .describe("Face key to attach the point to."),
+        })
+      )
+      .min(2)
+      .describe("Points defining the cut path."),
+  }),
+  async execute({ mesh_id, points }) {
+    const mesh = Mesh.all.find((m) => m.uuid === mesh_id || m.name === mesh_id);
+    if (!mesh) {
+      throw new Error(`Mesh with ID "${mesh_id}" not found.`);
+    }
+
+    Undo.initEdit({
+      elements: [mesh],
+      element_aspects: {
+        geometry: true,
+        uv: true,
+        faces: true,
+      },
+    });
+
+    // Create knife tool context
+    // @ts-ignore
+    const knifeContext = new KnifeToolContext(mesh);
+
+    // Add points to the knife path
+    points.forEach((point) => {
+      knifeContext.points.push({
+        position: new THREE.Vector3(...point.position),
+        fkey: point.face,
+        type: point.face ? "face" : "edge",
+      });
+    });
+
+    // Apply the knife cut
+    knifeContext.apply();
+
+    Undo.finishEdit("Knife cut mesh");
+    Canvas.updateView({
+      elements: [mesh],
+      element_aspects: {
+        geometry: true,
+        uv: true,
+        faces: true,
+      },
+    });
+
+    return `Applied knife cut to mesh "${mesh.name}" with ${points.length} points`;
+  },
+});
+
+createTool("set_mesh_uv", {
+  description: "Sets UV coordinates for mesh faces or vertices.",
+  annotations: {
+    title: "Set Mesh UV",
+    destructiveHint: true,
+  },
+  parameters: z.object({
+    mesh_id: z.string().describe("ID or name of the mesh."),
+    face_key: z.string().describe("Face key to set UV for."),
+    uv_mapping: z
+      .record(
+        z.string(), // vertex key
+        z.tuple([z.number(), z.number()]) // UV coordinates
+      )
+      .describe("UV coordinates for each vertex of the face."),
+  }),
+  async execute({ mesh_id, face_key, uv_mapping }) {
+    const mesh = Mesh.all.find((m) => m.uuid === mesh_id || m.name === mesh_id);
+    if (!mesh) {
+      throw new Error(`Mesh with ID "${mesh_id}" not found.`);
+    }
+
+    Undo.initEdit({
+      elements: [mesh],
+      uv_only: true,
+    });
+
+    const face = mesh.faces[face_key];
+    if (!face) {
+      throw new Error(`Face with key "${face_key}" not found in mesh.`);
+    }
+
+    // Set UV coordinates for each vertex
+    Object.entries(uv_mapping).forEach(([vkey, uv]) => {
+      if (face.vertices.includes(vkey)) {
+        face.uv[vkey] = uv;
+      }
+    });
+
+    mesh.preview_controller.updateUV(mesh);
+    UVEditor.loadData();
+
+    Undo.finishEdit("Set mesh UV");
+
+    return `Set UV mapping for face "${face_key}" of mesh "${mesh.name}"`;
+  },
+});
+
+createTool("auto_uv_mesh", {
+  description: "Automatically generates UV mapping for selected mesh faces.",
+  annotations: {
+    title: "Auto UV Mesh",
+    destructiveHint: true,
+  },
+  parameters: z.object({
+    mesh_id: z
+      .string()
+      .optional()
+      .describe("ID or name of the mesh. If not provided, uses selected mesh."),
+    mode: z
+      .enum(["project", "unwrap", "cylinder", "sphere"])
+      .default("project")
+      .describe(
+        "UV mapping mode: project from view, unwrap, cylinder, or sphere mapping."
+      ),
+    faces: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "Specific face keys to UV map. If not provided, maps all selected faces."
+      ),
+  }),
+  async execute({ mesh_id, mode, faces }) {
+    const mesh = mesh_id
+      ? Mesh.all.find((m) => m.uuid === mesh_id || m.name === mesh_id)
+      : Mesh.selected[0];
+
+    if (!mesh) {
+      throw new Error(
+        mesh_id ? `Mesh with ID "${mesh_id}" not found.` : "No mesh selected."
+      );
+    }
+
+    Undo.initEdit({
+      elements: [mesh],
+      uv_only: true,
+    });
+
+    const selectedFaces = faces || UVEditor.getSelectedFaces(mesh);
+
+    if (mode === "project") {
+      // Use project from view
+      BarItems.uv_project_from_view.click();
+    } else {
+      // Manual UV mapping based on mode
+      selectedFaces.forEach((fkey) => {
+        const face = mesh.faces[fkey];
+        if (!face) return;
+
+        if (mode === "unwrap") {
+          // Simple planar unwrap
+          UVEditor.setAutoSize(null, true, [fkey]);
+        } else if (mode === "cylinder") {
+          // Cylindrical mapping
+          const vertices = face.getSortedVertices();
+          vertices.forEach((vkey, i) => {
+            const vertex = mesh.vertices[vkey];
+            const angle = Math.atan2(vertex[0], vertex[2]);
+            const u =
+              ((angle + Math.PI) / (2 * Math.PI)) * Project.texture_width;
+            const v = ((vertex[1] + 8) / 16) * Project.texture_height;
+            face.uv[vkey] = [u, v];
+          });
+        } else if (mode === "sphere") {
+          // Spherical mapping
+          const vertices = face.getSortedVertices();
+          vertices.forEach((vkey) => {
+            const vertex = mesh.vertices[vkey];
+            const length = Math.sqrt(
+              vertex[0] ** 2 + vertex[1] ** 2 + vertex[2] ** 2
+            );
+            const theta = Math.acos(vertex[1] / length);
+            const phi = Math.atan2(vertex[0], vertex[2]);
+            const u = ((phi + Math.PI) / (2 * Math.PI)) * Project.texture_width;
+            const v = (theta / Math.PI) * Project.texture_height;
+            face.uv[vkey] = [u, v];
+          });
+        }
+      });
+    }
+
+    mesh.preview_controller.updateUV(mesh);
+    UVEditor.loadData();
+
+    Undo.finishEdit("Auto UV mesh");
+
+    return `Applied ${mode} UV mapping to ${selectedFaces.length} faces of mesh "${mesh.name}"`;
+  },
+});
+
+createTool("rotate_mesh_uv", {
+  description: "Rotates UV coordinates of selected mesh faces.",
+  annotations: {
+    title: "Rotate Mesh UV",
+    destructiveHint: true,
+  },
+  parameters: z.object({
+    mesh_id: z
+      .string()
+      .optional()
+      .describe("ID or name of the mesh. If not provided, uses selected mesh."),
+    angle: z
+      .enum(["-90", "90", "180"])
+      .default("90")
+      .describe("Rotation angle in degrees."),
+    faces: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "Specific face keys to rotate UV for. If not provided, rotates all selected faces."
+      ),
+  }),
+  async execute({ mesh_id, angle, faces }) {
+    const mesh = mesh_id
+      ? Mesh.all.find((m) => m.uuid === mesh_id || m.name === mesh_id)
+      : Mesh.selected[0];
+
+    if (!mesh) {
+      throw new Error(
+        mesh_id ? `Mesh with ID "${mesh_id}" not found.` : "No mesh selected."
+      );
+    }
+
+    Undo.initEdit({
+      elements: [mesh],
+      uv_only: true,
+    });
+
+    const rotation = parseInt(angle);
+    UVEditor.rotate(rotation);
+
+    Undo.finishEdit("Rotate mesh UV");
+
+    return `Rotated UV by ${angle} degrees for mesh "${mesh.name}"`;
+  },
+});
+
+createTool("merge_mesh_vertices", {
+  description:
+    "Merges vertices that are within a specified distance of each other.",
+  annotations: {
+    title: "Merge Mesh Vertices",
+    destructiveHint: true,
+  },
+  parameters: z.object({
+    mesh_id: z.string().describe("ID or name of the mesh."),
+    threshold: z
+      .number()
+      .min(0)
+      .max(10)
+      .default(0.1)
+      .describe("Maximum distance between vertices to merge."),
+    selected_only: z
+      .boolean()
+      .default(true)
+      .describe("Whether to only merge selected vertices."),
+  }),
+  async execute({ mesh_id, threshold, selected_only }) {
+    const mesh = Mesh.all.find((m) => m.uuid === mesh_id || m.name === mesh_id);
+    if (!mesh) {
+      throw new Error(`Mesh with ID "${mesh_id}" not found.`);
+    }
+
+    Undo.initEdit({
+      elements: [mesh],
+      element_aspects: {
+        geometry: true,
+        uv: true,
+        faces: true,
+      },
+    });
+
+    const verticesToCheck = selected_only
+      ? mesh.getSelectedVertices()
+      : Object.keys(mesh.vertices);
+
+    let mergedCount = 0;
+    const mergeMap: Record<string, string> = {};
+
+    // Find vertices to merge
+    for (let i = 0; i < verticesToCheck.length; i++) {
+      const vkey1 = verticesToCheck[i];
+      if (mergeMap[vkey1]) continue;
+
+      for (let j = i + 1; j < verticesToCheck.length; j++) {
+        const vkey2 = verticesToCheck[j];
+        if (mergeMap[vkey2]) continue;
+
+        const v1 = mesh.vertices[vkey1];
+        const v2 = mesh.vertices[vkey2];
+        const distance = Math.sqrt(
+          (v1[0] - v2[0]) ** 2 + (v1[1] - v2[1]) ** 2 + (v1[2] - v2[2]) ** 2
+        );
+
+        if (distance <= threshold) {
+          mergeMap[vkey2] = vkey1;
+          mergedCount++;
+        }
+      }
+    }
+
+    // Apply merges
+    Object.entries(mergeMap).forEach(([oldKey, newKey]) => {
+      // Update faces
+      for (const fkey in mesh.faces) {
+        const face = mesh.faces[fkey];
+        const index = face.vertices.indexOf(oldKey);
+        if (index !== -1) {
+          face.vertices[index] = newKey;
+          face.uv[newKey] = face.uv[oldKey] || [0, 0];
+          delete face.uv[oldKey];
+        }
+      }
+      // Remove merged vertex
+      delete mesh.vertices[oldKey];
+    });
+
+    mesh.preview_controller.updateGeometry(mesh);
+
+    Undo.finishEdit("Merge mesh vertices");
+    Canvas.updateView({
+      elements: [mesh],
+      element_aspects: {
+        geometry: true,
+        uv: true,
+        faces: true,
+      },
+    });
+
+    return `Merged ${mergedCount} vertices in mesh "${mesh.name}"`;
+  },
+});
+
+createTool("create_mesh_face", {
+  description: "Creates a new face from selected vertices.",
+  annotations: {
+    title: "Create Mesh Face",
+    destructiveHint: true,
+  },
+  parameters: z.object({
+    mesh_id: z
+      .string()
+      .optional()
+      .describe("ID or name of the mesh. If not provided, uses selected mesh."),
+    vertices: z
+      .array(z.string())
+      .min(3)
+      .max(4)
+      .describe("Vertex keys to create face from. Must be 3 or 4 vertices."),
+    texture: z
+      .string()
+      .optional()
+      .describe("Texture ID or name to apply to the new face."),
+  }),
+  async execute({ mesh_id, vertices, texture }) {
+    const mesh = mesh_id
+      ? Mesh.all.find((m) => m.uuid === mesh_id || m.name === mesh_id)
+      : Mesh.selected[0];
+
+    if (!mesh) {
+      throw new Error(
+        mesh_id ? `Mesh with ID "${mesh_id}" not found.` : "No mesh selected."
+      );
+    }
+
+    Undo.initEdit({
+      elements: [mesh],
+      element_aspects: {
+        geometry: true,
+        uv: true,
+        faces: true,
+      },
+    });
+
+    // Create the face
+    const face = new MeshFace(mesh, {
+      vertices,
+      texture: texture ? getProjectTexture(texture)?.uuid : undefined,
+    });
+
+    const [faceKey] = mesh.addFaces(face);
+
+    // Auto UV the new face
+    UVEditor.setAutoSize(null, true, [faceKey]);
+
+    mesh.preview_controller.updateGeometry(mesh);
+    mesh.preview_controller.updateUV(mesh);
+
+    Undo.finishEdit("Create mesh face");
+    Canvas.updateView({
+      elements: [mesh],
+      element_aspects: {
+        geometry: true,
+        uv: true,
+        faces: true,
+      },
+    });
+
+    return `Created face with ${vertices.length} vertices in mesh "${mesh.name}"`;
+  },
+});
+
+createTool("delete_mesh_elements", {
+  description: "Deletes selected vertices, edges, or faces from a mesh.",
+  annotations: {
+    title: "Delete Mesh Elements",
+    destructiveHint: true,
+  },
+  parameters: z.object({
+    mesh_id: z
+      .string()
+      .optional()
+      .describe("ID or name of the mesh. If not provided, uses selected mesh."),
+    mode: z
+      .enum(["vertices", "edges", "faces"])
+      .default("faces")
+      .describe("What to delete: vertices, edges, or faces."),
+    keep_vertices: z
+      .boolean()
+      .default(false)
+      .describe("When deleting faces/edges, whether to keep the vertices."),
+  }),
+  async execute({ mesh_id, mode, keep_vertices }) {
+    const mesh = mesh_id
+      ? Mesh.all.find((m) => m.uuid === mesh_id || m.name === mesh_id)
+      : Mesh.selected[0];
+
+    if (!mesh) {
+      throw new Error(
+        mesh_id ? `Mesh with ID "${mesh_id}" not found.` : "No mesh selected."
+      );
+    }
+
+    // Use the delete tool
+    const tool = BarItems.delete_mesh_selection;
+    if (!tool) {
+      throw new Error("Delete mesh selection tool not found.");
+    }
+
+    // @ts-ignore
+    tool.click({}, keep_vertices);
+
+    return `Deleted selected ${mode} from mesh "${mesh.name}"`;
+  },
+});
+
 export default tools;
