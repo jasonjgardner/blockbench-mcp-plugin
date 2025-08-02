@@ -9,6 +9,7 @@ The code is written in TypeScript and follows a consistent style. It uses modern
 - Avoid using `if/else` statements for flow control; prefer early returns to reduce nesting.
 - Never use `any` type; always specify a more specific type.
 - Prefer TypeScript interfaces over types for defining object shapes.
+- Never implement placeholder functions, always provide a complete implementation.
 
 This project uses Bun to compile the code into JavaScript for Blockbench to execute in its Electron Node.js environment. The plugin utilizes FastMCP for handling the MCP protocol in TypeScript.
 
