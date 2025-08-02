@@ -85,7 +85,7 @@ BBPlugin.register("mcp", {
       transportType: "httpStream",
       httpStream: {
         port: Settings.get("mcp_port") || 3000,
-        endpoint: Settings.get("mcp_endpoint") || "/mcp",
+        endpoint: Settings.get("mcp_endpoint") || "/bb-mcp",
       },
     });
   },
