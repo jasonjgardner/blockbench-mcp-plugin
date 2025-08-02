@@ -114,49 +114,6 @@ export function uiSetup({
     }
 `);
 
-  // Helper functions for managing enabled tools setting
-  const getEnabledTools = (): string[] => {
-    try {
-      const setting = (globalThis as any).settings?.mcp_enabled_tools;
-      if (!setting) return Object.keys(tools); // Default to all enabled if setting doesn't exist
-      const value = setting.value || "[]";
-      const parsed = typeof value === "string" ? JSON.parse(value) : value;
-      return Array.isArray(parsed) ? parsed : Object.keys(tools);
-    } catch (e) {
-      console.warn("Failed to parse enabled tools setting:", e);
-      return Object.keys(tools); // Default to all enabled on error
-    }
-  };
-
-  const setEnabledTools = (enabledTools: string[]) => {
-    try {
-      const setting = (globalThis as any).settings?.mcp_enabled_tools;
-      if (setting) {
-        setting.set(JSON.stringify(enabledTools));
-      }
-    } catch (e) {
-      console.warn("Failed to save enabled tools setting:", e);
-    }
-  };
-
-  // Initialize tool states from settings
-  const initializeToolStates = () => {
-    const enabledTools = getEnabledTools();
-
-    Object.keys(tools).forEach((toolName) => {
-      if (enabledTools.includes(toolName)) {
-        enableTool(toolName);
-        tools[toolName].enabled = true;
-      } else {
-        disableTool(toolName);
-        tools[toolName].enabled = false;
-      }
-    });
-  };
-
-  // Initialize tool states on setup
-  initializeToolStates();
-
   panel = new Panel("mcp_panel", {
     id: "mcp_panel",
     icon: "robot",
@@ -201,10 +158,6 @@ export function uiSetup({
           uriTemplate: resource.uriTemplate,
         }));
       },
-      beforeDestroy() {
-        // @ts-ignore
-        this.destroyInspector();
-      },
       data: () => ({
         inspector: null,
         inspectorLink: "http://127.0.0.1:6274/",
@@ -228,55 +181,6 @@ export function uiSetup({
         prompts: [],
       }),
       methods: {
-        launchInspector() {
-          // @ts-ignore
-          if (this.inspector) {
-            // @ts-ignore
-            this.destroyInspector();
-          }
-          // @ts-ignore
-          this.$emit("inspector:launch");
-          // @ts-ignore
-          this.inspector = electron
-            .require("child_process")
-            .exec("npx @modelcontextprotocol/inspector");
-        },
-        destroyInspector() {
-          // @ts-ignore
-          if (this.inspector) {
-            // @ts-ignore
-            this.inspector.kill();
-            // @ts-ignore
-            this.inspector = null;
-          }
-        },
-        async toggleTool(toolName: string) {
-          // @ts-ignore
-          const tool = this.tools.find((t: any) => t.name === toolName);
-          if (!tool) return;
-
-          tool.enabled = !tool.enabled;
-
-          // Update the actual tool state
-          if (tool.enabled) {
-            enableTool(toolName);
-            tools[toolName].enabled = true;
-          } else {
-            disableTool(toolName);
-            tools[toolName].enabled = false;
-          }
-
-          // Save to settings
-          // @ts-ignore
-          const enabledTools = this.tools
-            .filter((t: any) => t.enabled)
-            .map((t: any) => t.name);
-          setEnabledTools(enabledTools);
-
-          Blockbench.showQuickMessage(
-            "Restart Blockbench to apply MCP server changes."
-          );
-        },
         getDisplayName(toolName: string): string {
           return toolName.replace("blockbench_", "");
         },
@@ -309,14 +213,6 @@ export function uiSetup({
                         </div>
                         <div class="tool-description" :title="tool.description">{{tool.description}}</div>
                     </div>
-                    <div class="tool-toggle" :title="tool.enabled ? 'Disable tool' : 'Enable tool'">
-                        <input 
-                            type="checkbox" 
-                            :checked="tool.enabled" 
-                            @change="toggleTool(tool.name)"
-                            :id="'tool_toggle_' + tool.name"
-                        />
-                    </div>
                 </div>
             </div>
             <div v-else>
@@ -337,15 +233,6 @@ export function uiSetup({
             </div>
             <div v-else>
                 <p>No resources available.</p>
-            </div>
-        </details>
-        <details name="mcp_panel">
-            <summary>Development</summary>
-            <button v-if="!inspector" @click="launchInspector">Launch Inspector</button>
-            <div v-else>
-                <p>Inspector started.</p>
-                <a :href="inspectorLink" target="_blank" style="margin-top: 10px; display: inline-block;">Open MCP Web UI</a>
-                <button @click="destroyInspector">Stop Inspector</button>
             </div>
         </details>
     </div>`,
