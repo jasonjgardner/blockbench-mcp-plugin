@@ -192,6 +192,14 @@ export function uiSetup({
           enabled: tool.enabled,
           status: tool.status,
         }));
+
+        // Initialize resources data
+        // @ts-ignore
+        this.resources = Object.values(resources).map((resource) => ({
+          name: resource.name,
+          description: resource.description,
+          uriTemplate: resource.uriTemplate,
+        }));
       },
       beforeDestroy() {
         // @ts-ignore
@@ -212,7 +220,11 @@ export function uiSetup({
           enabled: tool.enabled,
           status: tool.status,
         })),
-        resources: [],
+        resources: Object.values(resources).map((resource) => ({
+          name: resource.name,
+          description: resource.description,
+          uriTemplate: resource.uriTemplate,
+        })),
         prompts: [],
       }),
       methods: {
@@ -225,7 +237,7 @@ export function uiSetup({
           // @ts-ignore
           this.$emit("inspector:launch");
           // @ts-ignore
-          this.inspector = (globalThis as any)
+          this.inspector = electron
             .require("child_process")
             .exec("npx @modelcontextprotocol/inspector");
         },
@@ -261,14 +273,9 @@ export function uiSetup({
             .map((t: any) => t.name);
           setEnabledTools(enabledTools);
 
-          // Rebuild the server with the new tool configuration
-          try {
-            if ((globalThis as any).rebuildMCPServer) {
-              (globalThis as any).rebuildMCPServer();
-            }
-          } catch (error) {
-            console.error("Failed to rebuild MCP server:", error);
-          }
+          Blockbench.showQuickMessage(
+            "Restart Blockbench to apply MCP server changes."
+          );
         },
         getDisplayName(toolName: string): string {
           return toolName.replace("blockbench_", "");
@@ -314,6 +321,22 @@ export function uiSetup({
             </div>
             <div v-else>
                 <p>No tools available.</p>
+            </div>
+        </details>
+        <details name="mcp_panel">
+            <summary>Resources</summary>
+
+            <div v-if="resources.length > 0">
+                <div v-for="resource in resources" :key="resource.name" class="tool-toggle-row">
+                    <div class="tool-info">
+                        <div class="tool-name">{{getDisplayName(resource.name)}}</div>
+                        <div class="tool-description" :title="resource.description">{{resource.description}}</div>
+                        <div class="tool-description" style="font-style: italic; margin-top: 2px;" :title="resource.uriTemplate">{{resource.uriTemplate}}</div>
+                    </div>
+                </div>
+            </div>
+            <div v-else>
+                <p>No resources available.</p>
             </div>
         </details>
         <details name="mcp_panel">
