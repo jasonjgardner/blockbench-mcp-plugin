@@ -88,25 +88,6 @@ export function createTool<T extends ToolParameters>(
 }
 
 /**
- * Rebuilds the server with only enabled tools.
- * This is necessary because FastMCP doesn't support runtime tool removal.
- */
-export function rebuildServerWithEnabledTools() {
-  // Note: This is a placeholder implementation
-  // The actual server rebuild will need to be handled at a higher level
-  // because we can't recreate the FastMCP server instance from here
-
-  // For now, we'll just update the tool registry
-  Object.keys(tools).forEach((name) => {
-    const tool = tools[name];
-    if (!tool.enabled) {
-      // Mark as disabled in our registry
-      tool.enabled = false;
-    }
-  });
-}
-
-/**
  * Gets all tool definitions for server reconstruction
  */
 export function getAllToolDefinitions() {
