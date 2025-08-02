@@ -104,42 +104,6 @@ export function getEnabledToolDefinitions() {
 }
 
 /**
- * Disables a tool by name.
- * @param name - The name of the tool to disable.
- * @throws - If the tool does not exist.
- * @example
- * ```ts
- * disableTool("my_tool");
- * ```
- */
-export function disableTool(name: string) {
-  if (!tools[name]) {
-    throw new Error(`Tool with name "${name}" does not exist.`);
-  }
-
-  tools[name].enabled = false;
-  // Note: The server will need to be rebuilt to reflect this change
-}
-
-/**
- * Enables a tool by name.
- * @param name - The name of the tool to enable.
- * @throws - If the tool does not exist.
- * @example
- * ```ts
- * enableTool("my_tool");
- * ```
- */
-export function enableTool(name: string) {
-  if (!tools[name]) {
-    throw new Error(`Tool with name "${name}" does not exist.`);
-  }
-
-  tools[name].enabled = true;
-  // Note: The server will need to be rebuilt to reflect this change
-}
-
-/**
  * Creates a new MCP prompt and adds it to the server.
  * @param name - The name of the prompt.
  * @param prompt - The prompt to add.
