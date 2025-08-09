@@ -1,6 +1,5 @@
 import type { FastMCP } from "fastmcp";
 import type { IMCPTool, IMCPPrompt, IMCPResource } from "@/types";
-import { enableTool, disableTool } from "@/lib/factories";
 let panel: Panel | undefined;
 
 export function uiSetup({
