@@ -6,7 +6,7 @@ export function uiSetup({
   server,
   tools,
   resources,
-  prompts
+  prompts,
 }: {
   server: FastMCP;
   tools: Record<string, IMCPTool>;
@@ -16,8 +16,14 @@ export function uiSetup({
   Blockbench.addCSS(/* css */ `
     .mcp-panel {
         display: grid;
+        grid-template-rows: auto 1fr auto;
+        max-block-size: 66vh;
         overflow: auto;
         padding: 10px;
+
+        details {
+          overflow: auto;
+        }
 
         dl {
             display: grid;
@@ -40,30 +46,116 @@ export function uiSetup({
                 padding: 0;
             }
         }
+
+        .stable {
+          border: 1px solid green;
+          border-radius: 4px;
+          background: hsla(from green h 90% 80% / 0.5);
+          color: hsl(from green h 30% 20%);
+        }
+
+        .experimental {
+          border: 1px solid orange;
+          border-radius: 4px;
+          background: hsla(from orange h 90% 80% / 0.5);
+          color: hsl(from orange h 30% 20%);
+        }
+
+        .tool-toggle-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 8px 0;
+          border-bottom: 1px solid var(--color-border);
+        }
+
+        .tool-toggle-row:last-child {
+          border-bottom: none;
+        }
+
+        .tool-info {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .tool-name {
+          font-weight: bold;
+          font-size: 0.9em;
+          margin-bottom: 2px;
+        }
+
+        .tool-description {
+          font-size: 0.8em;
+          color: var(--color-subtle_text);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .tool-toggle {
+          margin-left: 12px;
+          flex-shrink: 0;
+
+          label {
+            font-size: 0.9em;
+          }
+        }
+
+        .tool-status {
+          display: inline-block;
+          padding: 2px 4px;
+          border-radius: 3px;
+          font-size: 0.666em;
+          font-weight: bold;
+          text-transform: uppercase;
+          margin-left: 8px;
+        }
     }
 `);
+
   panel = new Panel("mcp_panel", {
     id: "mcp_panel",
     icon: "robot",
     name: "MCP",
     default_side: "right",
     resizable: true,
-     component: {
+    component: {
       beforeMount() {
+        // @ts-ignore
         server.on("connect", () => {
+          // @ts-ignore
           this.server.connected = true;
+          // @ts-ignore
           this.sessions = server.sessions ?? [];
 
+          // @ts-ignore
           console.log(this.sessions);
         });
 
+        // @ts-ignore
         server.on("disconnect", () => {
+          // @ts-ignore
           this.server.connected = false;
+          // @ts-ignore
           this.sessions = [];
         });
-      },
-      beforeDestroy() {
-        this.destroyInspector();
+
+        // Initialize tools data with current enabled state
+        // @ts-ignore
+        this.tools = Object.values(tools).map((tool) => ({
+          name: tool.name,
+          description: tool.description,
+          enabled: tool.enabled,
+          status: tool.status,
+        }));
+
+        // Initialize resources data
+        // @ts-ignore
+        this.resources = Object.values(resources).map((resource) => ({
+          name: resource.name,
+          description: resource.description,
+          uriTemplate: resource.uriTemplate,
+        }));
       },
       data: () => ({
         inspector: null,
@@ -77,25 +169,19 @@ export function uiSetup({
         tools: Object.values(tools).map((tool) => ({
           name: tool.name,
           description: tool.description,
+          enabled: tool.enabled,
+          status: tool.status,
         })),
-        resources: [],
+        resources: Object.values(resources).map((resource) => ({
+          name: resource.name,
+          description: resource.description,
+          uriTemplate: resource.uriTemplate,
+        })),
         prompts: [],
       }),
       methods: {
-        launchInspector() {
-          if (this.inspector) {
-            this.destroyInspector();
-          }
-          this.$emit("inspector:launch");
-          this.inspector = electron
-            .require("child_process")
-            .exec("npx @modelcontextprotocol/inspector");
-        },
-        destroyInspector() {
-          if (this.inspector) {
-            this.inspector.kill();
-            this.inspector = null;
-          }
+        getDisplayName(toolName: string): string {
+          return toolName.replace("blockbench_", "");
         },
       },
       name: "mcp_panel",
@@ -114,26 +200,38 @@ export function uiSetup({
                 </dd>
             </dl>
         </details>
-        <details name="mcp_panel">
+        <details name="mcp_panel" open>
             <summary>Tools</summary>
 
-            <div v-for="tool in tools" :key="tool.name">
-                <dl :title="tool.description">
-                    <dt>{{tool.name}}</dt>
-                    <dd>{{tool.description}}</dd>
-                </dl>
+            <div v-if="tools.length > 0">
+                <div v-for="tool in tools" :key="tool.name" class="tool-toggle-row">
+                    <div class="tool-info">
+                        <div class="tool-name">
+                            {{getDisplayName(tool.name)}}
+                            <span :class="['tool-status', tool.status]">{{tool.status}}</span>
+                        </div>
+                        <div class="tool-description" :title="tool.description">{{tool.description}}</div>
+                    </div>
+                </div>
             </div>
             <div v-else>
                 <p>No tools available.</p>
             </div>
         </details>
         <details name="mcp_panel">
-            <summary>Development</summary>
-            <button v-if="!inspector" @click="launchInspector">Launch Inspector</button>
+            <summary>Resources</summary>
+
+            <div v-if="resources.length > 0">
+                <div v-for="resource in resources" :key="resource.name" class="tool-toggle-row">
+                    <div class="tool-info">
+                        <div class="tool-name">{{getDisplayName(resource.name)}}</div>
+                        <div class="tool-description" :title="resource.description">{{resource.description}}</div>
+                        <div class="tool-description" style="font-style: italic; margin-top: 2px;" :title="resource.uriTemplate">{{resource.uriTemplate}}</div>
+                    </div>
+                </div>
+            </div>
             <div v-else>
-                <p>Inspector started.</p>
-                <a :href="inspectorLink" target="_blank" style="margin-top: 10px; display: inline-block;">Open MCP Web UI</a>
-                <button @click="destroyInspector">Stop Inspector</button>
+                <p>No resources available.</p>
             </div>
         </details>
     </div>`,
