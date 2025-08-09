@@ -1,6 +1,6 @@
 const settings: Setting[] = [];
 
-export function settingsSetup(enabledTools: string[]) {
+export function settingsSetup() {
   const category = "general";
 
   settings.push(
@@ -29,14 +29,6 @@ export function settingsSetup(enabledTools: string[]) {
       value: "/bb-mcp",
       category,
       icon: "webhook",
-    }),
-    new Setting("mcp_enabled_tools", {
-      name: "Enabled MCP Tools",
-      description: "Select which MCP tools are available for use.",
-      type: "text",
-      value: JSON.stringify(enabledTools),
-      category,
-      icon: "build_circle",
     })
   );
 }

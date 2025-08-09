@@ -1,64 +1,76 @@
 # Contributing to Blockbench MCP Plugin
 
-## Getting Started
+Thank you for improving the Blockbench MCP plugin. This project uses TypeScript and Bun. Please keep changes focused, documented, and easy to verify inside Blockbench.
 
-Addition or modification of tools, prompts and resources is welcome. It should be a relatively-familiar process for Blockbench contributor/plugin authors; however, does require TypeScript compilation. [Bun is required for the task.](https://bun.sh/)
+## Prerequisites
+- Bun installed: https://bun.sh/
+- Blockbench (desktop) for local testing.
 
-### Dev Setup
+## Setup & Development
+```sh
+bun install                # install deps
+bun run dev                # build once with sourcemaps
+bun run dev:watch          # rebuild on change (watch mode)
+bun run compile            # minified production build to dist/mcp.js
+bun run ./build.ts --clean # remove dist/ for a fresh build
+```
 
+For MCP Inspector (optional):
 ```sh
 bunx @modelcontextprotocol/inspector
 ```
-The Streamable HTTP transport URL defaults to __http://localhost:3000/bb-mcp__
+Default server transport (when plugin is loaded): `http://localhost:3000/bb-mcp`.
 
-```sh
-cd ./src/mcp
-bun install
-bun run build
-```
+Local testing in Blockbench: File → Plugins → Load Plugin from File → select `dist/mcp.js`.
 
-### Adding Tools
+## Project Structure
+- `index.ts`: Plugin entry; registers server, UI, settings.
+- `server/`: FastMCP integration (`server.ts`), tools, resources, prompts.
+- `ui/`: Panel and settings UI.
+- `lib/`: Shared utilities and factories.
+- `dist/`: Build outputs (`mcp.js`, maps, copied assets).
 
-```typescript
-// ./src/mcp/server/tools.ts
+## Adding Tools
+Use the factory in `lib/factories.ts`. Tools are automatically registered with the server and surfaced in the UI.
+```ts
+// server/tools.ts
 import { z } from "zod";
 import { createTool } from "@/lib/factories";
 
-createTool({
-    name: "tool_name",
-    description: "Tool description for the AI agent"
-    parameters: z.object({
-        // Parameters required to execute your tool:
-        examples: z.array({
-            // Zod schema to collect arguments.
-            // Does not have to be 1:1 with Blockbench
-        })
-    }),
-    async execute({ examples }, { reportProgress }) {
-        return JSON.stringify(examples.map((example, idx) => {
-            reportProgress({
-                progress: idx,
-                total: examples.length
-            });
-
-            // Do something with parameters within current context.
-            // Has access to Blockbench, electron, FastMCP, and other API
-            // Return stringified results to report to AI agent context.
-
-            return myExampleTransformFunction(example);
-        }));
-    }
+createTool("example", {
+  description: "Does something useful",
+  annotations: { title: "Example" },
+  parameters: z.object({ name: z.string() }),
+  async execute({ name }) {
+    return `Hello, ${name}!`;
+  },
 });
 ```
+- Naming: Tools are prefixed automatically as `blockbench_<suffix>`; the UI hides this prefix.
+- Validate inputs with `zod`. Avoid blocking UI during execution.
 
-### Adding Resources
+## Adding Resources
+There is no resource factory; add templates directly in `server/resources.ts` and register via `server.addResourceTemplate(...)`. See existing `nodes`, `textures`, and `reference_model` examples.
 
-No factory function has been created yet. Refer to [FactMCP's documentation for Resource examples](https://github.com/punkpeye/fastmcp?tab=readme-ov-file#resources).
+## Adding Prompts
+Use `createPrompt` from `lib/factories.ts`. See `server/prompts.ts` for a complete example including `arguments` autocompletion and `load` logic.
 
-Add resource-related code to `./src/mcp/server/resources.ts`
+## Style & Commits
+- TypeScript strict mode; ESNext modules; use the `@/*` path alias.
+- 2-space indentation; explicit return types where reasonable.
+- Conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`. Be specific.
 
-### Adding Prompts
+## Pull Requests
+- Describe scope and intent, link related issues.
+- Add repro and verification steps; include screenshots/GIFs for UI changes.
+- Call out new tools, resources, settings, or breaking changes.
 
-No factory function has been created yet. Refer to [FactMCP's documentation for Prompts examples](https://github.com/punkpeye/fastmcp?tab=readme-ov-file#prompts).
-
-Add prompt-related code to `./src/mcp/server/prompts.ts`
+## Manual Verification Checklist
+- Build: `bun run compile` (or `bun run dev`) and confirm `dist/mcp.js` updates.
+- Load: In Blockbench → File → Plugins → Load Plugin from File → pick `dist/mcp.js`.
+- Settings: Confirm MCP port/endpoint under Settings → General (defaults `3000` and `/bb-mcp`).
+- Server: Open the MCP panel; ensure server shows connected when a client attaches.
+- Tools: Verify new tool appears with a readable title. Using MCP Inspector, call the tool with a small sample payload; confirm no errors and expected side effects (and Undo works when applicable).
+- Resources: In Inspector, resolve a sample URI (e.g., `nodes://<id>` or `textures://<name>`); confirm autocompletion and returned data.
+- Prompts: Load the prompt; check argument autocompletion and that `load` returns content without errors.
+- UI: Sanity check layout in light/dark themes; verify tool status badges and descriptions render and truncate gracefully.

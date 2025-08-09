@@ -4856,4 +4856,238 @@ createTool(
   STATUS_EXPERIMENTAL
 );
 
+createTool(
+  "duplicate_element",
+  {
+    description:
+      "Duplicates a cube, mesh or group by ID or name.  You may offset the duplicate or assign a new name.",
+    annotations: { title: "Duplicate Element", destructiveHint: true },
+    parameters: z.object({
+      id: z.string().describe("ID or name of the element to duplicate."),
+      offset: z
+        .tuple([z.number(), z.number(), z.number()])
+        .optional()
+        .default([0, 0, 0]),
+      newName: z.string().optional(),
+    }),
+    async execute({ id, offset, newName }) {
+      const element =
+        Outliner.root.find((el) => el.uuid === id || el.name === id) ?? null;
+      if (!element) throw new Error(`Element "${id}" not found.`);
+
+      // Helper functions for each type; match patterns used in existing tools:contentReference[oaicite:5]{index=5}.
+      function cloneCube(cube: Cube, parent: any) {
+        const dupe = new Cube({
+          name: newName || `${cube.name}_copy`,
+          from: cube.from.map((v, i) => v + offset[i]),
+          to: cube.to.map((v, i) => v + offset[i]),
+          origin: cube.origin.map((v, i) => v + offset[i]),
+          rotation: cube.rotation,
+          autouv: cube.autouv,
+          uv_offset: cube.uv_offset,
+          mirror_uv: cube.mirror_uv,
+          shade: cube.shade,
+          inflate: cube.inflate,
+          color: cube.color,
+          visibility: cube.visibility,
+        }).init();
+        dupe.addTo(parent);
+        return dupe;
+      }
+
+      function cloneGroup(group: Group, parent: any) {
+        const dupeGroup = new Group({
+          name: newName || `${group.name}_copy`,
+          origin: group.origin.map((v, i) => v + offset[i]),
+          rotation: group.rotation,
+          autouv: group.autouv,
+          selected: group.selected,
+          shade: group.shade,
+          visibility: group.visibility,
+        }).init();
+        dupeGroup.addTo(parent);
+        group.children.forEach((child: any) => cloneElement(child, dupeGroup));
+        return dupeGroup;
+      }
+
+      function cloneMesh(mesh: Mesh, parent: any) {
+        const dupe = new Mesh({
+          name: newName || `${mesh.name}_copy`,
+          vertices: {},
+          origin: mesh.origin.map((v, i) => v + offset[i]),
+          rotation: mesh.rotation,
+        }).init();
+        const map: Record<string, any> = {};
+        Object.entries(mesh.vertices).forEach(([key, coords]: [any, any]) => {
+          map[key] = dupe.addVertices([
+            coords[0] + offset[0],
+            coords[1] + offset[1],
+            coords[2] + offset[2],
+          ])[0];
+        });
+        mesh.faces.forEach((face: any) => {
+          dupe.addFaces(
+            new MeshFace(dupe, {
+              vertices: face.vertices.map((v: any) => map[v]),
+              uv: face.uv,
+            })
+          );
+        });
+        dupe.addTo(parent);
+        if ((mesh as any).material) dupe.applyTexture((mesh as any).material);
+        return dupe;
+      }
+
+      function cloneElement(el: any, parent: any) {
+        if (el instanceof Cube) return cloneCube(el, parent);
+        if (el instanceof Group) return cloneGroup(el, parent);
+        if (el instanceof Mesh) return cloneMesh(el, parent);
+        throw new Error("Unsupported element type.");
+      }
+
+      Undo.initEdit({ elements: [], outliner: true, collections: [] });
+      const dup = cloneElement(element, element.parent ?? Outliner);
+      Undo.finishEdit("Agent duplicated element");
+      Canvas.updateAll();
+      return `Duplicated "${element.name}" as "${dup.name}" (ID: ${dup.uuid}).`;
+    },
+  },
+  STATUS_EXPERIMENTAL
+);
+
+/**
+ * Create a cylinder mesh.  The implementation follows the pattern of `create_sphere`:contentReference[oaicite:6]{index=6},
+ * but constructs vertices around two circles and optionally caps them.
+ */
+createTool(
+  "create_cylinder",
+  {
+    description: "Creates one or more cylinder meshes with optional end caps.",
+    annotations: { title: "Create Cylinder", destructiveHint: true },
+    parameters: z.object({
+      elements: z
+        .array(
+          z.object({
+            name: z.string(),
+            position: z.tuple([z.number(), z.number(), z.number()]),
+            height: z.number().min(1).max(64).default(16),
+            diameter: z.number().min(1).max(64).default(16),
+            sides: z.number().min(3).max(64).default(12),
+            rotation: z
+              .tuple([z.number(), z.number(), z.number()])
+              .optional()
+              .default([0, 0, 0]),
+            capped: z.boolean().optional().default(true),
+          })
+        )
+        .min(1),
+      texture: z.string().optional(),
+      group: z.string().optional(),
+    }),
+    async execute({ elements, texture, group }, { reportProgress }) {
+      Undo.initEdit({ elements: [], outliner: true, collections: [] });
+      const total = elements.length;
+      const projectTexture = texture
+        ? getProjectTexture(texture)
+        : Texture.getDefault();
+      if (!projectTexture) throw new Error(`Texture "${texture}" not found.`);
+      const outlinerGroup = getAllGroups().find(
+        (g) => g.name === group || g.uuid === group
+      );
+      const cylinders = elements.map((element, progress) => {
+        const mesh = new Mesh({
+          name: element.name,
+          vertices: {},
+          origin: element.position,
+          rotation: element.rotation || [0, 0, 0],
+        }).init();
+        const radius = element.diameter / 2;
+        const height = element.height;
+        const sides = Math.round(element.sides);
+        // centres for the caps
+        const topCenter = mesh.addVertices([0, height / 2, 0])[0];
+        const bottomCenter = mesh.addVertices([0, -height / 2, 0])[0];
+        const topRing: any[] = [];
+        const bottomRing: any[] = [];
+        for (let i = 0; i < sides; i++) {
+          const ang = (i / sides) * Math.PI * 2;
+          const x = Math.cos(ang) * radius;
+          const z = Math.sin(ang) * radius;
+          topRing.push(mesh.addVertices([x, height / 2, z])[0]);
+          bottomRing.push(mesh.addVertices([x, -height / 2, z])[0]);
+        }
+        for (let i = 0; i < sides; i++) {
+          const next = (i + 1) % sides;
+          // side face
+          mesh.addFaces(
+            new MeshFace(mesh, {
+              vertices: [
+                bottomRing[i],
+                bottomRing[next],
+                topRing[next],
+                topRing[i],
+              ],
+              uv: {},
+            })
+          );
+          if (element.capped) {
+            // top cap (triangle fan)
+            mesh.addFaces(
+              new MeshFace(mesh, {
+                vertices: [topRing[i], topRing[next], topCenter],
+                uv: {},
+              })
+            );
+            // bottom cap
+            mesh.addFaces(
+              new MeshFace(mesh, {
+                vertices: [bottomRing[next], bottomRing[i], bottomCenter],
+                uv: {},
+              })
+            );
+          }
+        }
+        mesh.addTo(outlinerGroup);
+        if (projectTexture) mesh.applyTexture(projectTexture);
+        reportProgress({ progress, total });
+        return mesh;
+      });
+      Undo.finishEdit("Agent created cylinders");
+      Canvas.updateAll();
+      return JSON.stringify(
+        cylinders.map((c) => `Added cylinder ${c.name} (ID ${c.uuid})`)
+      );
+    },
+  },
+  STATUS_EXPERIMENTAL
+);
+
+/**
+ * Rename an element.  Mirrors the simple property change seen in the existing tools,
+ * using `extend` to apply the change and updating the editor.
+ */
+createTool(
+  "rename_element",
+  {
+    description: "Renames a cube, mesh or group by ID or name.",
+    annotations: { title: "Rename Element", destructiveHint: true },
+    parameters: z.object({
+      id: z.string().describe("ID or name of the element to rename."),
+      new_name: z.string().describe("New name to assign."),
+    }),
+    async execute({ id, new_name }) {
+      const element = Outliner.root.find(
+        (el) => el.uuid === id || el.name === id
+      );
+      if (!element) throw new Error(`Element "${id}" not found.`);
+      Undo.initEdit({ elements: [element], outliner: true, collections: [] });
+      element.extend({ name: new_name });
+      Undo.finishEdit("Agent renamed element");
+      Canvas.updateAll();
+      return `Renamed element "${id}" to "${new_name}".`;
+    },
+  },
+  STATUS_EXPERIMENTAL
+);
+
 export default tools;
