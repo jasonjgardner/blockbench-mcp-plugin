@@ -40,6 +40,8 @@ async function buildPlugin(): Promise<boolean> {
     format: "cjs",
     sourcemap: argv.includes("--sourcemap") ? "external" : "none",
     external: [
+      "three",
+      "tinycolor2",
       //   "express",
       //     "zod",
       //     "@modelcontextprotocol/*"
@@ -149,7 +151,7 @@ async function main() {
     await cleanOutputDir();
     console.log("✅ Cleaned output directory!");
   }
-  
+
   if (isWatchMode) {
     console.log("🏗️ Building MCP plugin with Bun (watch mode)...");
     const success = await buildPlugin();

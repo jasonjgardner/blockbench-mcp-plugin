@@ -30,6 +30,8 @@ BBPlugin.register("mcp", {
 
     currentServer = getServer();
 
+    settingsSetup();
+
     uiSetup({
       server: currentServer,
       tools,

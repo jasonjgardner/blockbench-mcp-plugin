@@ -62,6 +62,8 @@ const nodesResource: ResourceTemplate<BlockbenchSessionAuth> = {
     };
   },
 };
+
+// @ts-expect-error Blockbench does not need authentication
 server.addResourceTemplate(nodesResource);
 
 const texturesResource: ResourceTemplate<BlockbenchSessionAuth> = {
@@ -108,6 +110,7 @@ const texturesResource: ResourceTemplate<BlockbenchSessionAuth> = {
   },
 };
 
+// @ts-expect-error Blockbench does not need authentication
 server.addResourceTemplate(texturesResource);
 
 const referenceModelResource: ResourceTemplate<BlockbenchSessionAuth> = {
@@ -144,4 +147,102 @@ const referenceModelResource: ResourceTemplate<BlockbenchSessionAuth> = {
   },
 };
 
+// @ts-expect-error Blockbench does not need authentication
 server.addResourceTemplate(referenceModelResource);
+
+const projectListResource: ResourceTemplate<BlockbenchSessionAuth> = {
+  name: "project",
+  description: "Returns a list of all projects in the Blockbench editor.",
+  uriTemplate: "project://{name}",
+  arguments: [
+    {
+      name: "name",
+      description: "The name of the project.",
+      complete: async (value: string) => {
+        const projects = ModelProject.all;
+
+        if (value.length > 0) {
+          const filteredProjects = projects.filter((project) =>
+            project.name.includes(value)
+          );
+
+          return {
+            values: filteredProjects.map((project) => project.name),
+          };
+        }
+
+        return {
+          values: projects.map((project) => project.name),
+        };
+      },
+    },
+  ],
+  async load({ name }) {
+    const projects = ModelProject.all;
+
+    let project;
+
+    if (name) {
+      project = projects.find((project) => project.name === name);
+    }
+
+    // TODO: Fix circular references and return more than just name
+    return {
+      text: JSON.stringify(
+        project ? [project.name] : projects.map((project) => project.name)
+      ),
+    };
+  },
+};
+
+// @ts-expect-error Blockbench does not need authentication
+server.addResourceTemplate(projectListResource);
+
+// Adds tools to better expose Blockbench scope, context, functions, etc.
+// Check what variables are available in `globalThis` and report back the scope.
+const scopeResource: ResourceTemplate<BlockbenchSessionAuth> = {
+  name: "scope",
+  description: "Returns the current scope in the Blockbench editor.",
+  uriTemplate: "scope://{name}",
+  arguments: [
+    {
+      name: "name",
+      description: "The name of the scope.",
+      complete: async (value: string) => {
+        const scopes = Object.keys(globalThis);
+
+        if (value.length > 0) {
+          const filteredScopes = scopes.filter((scope) =>
+            scope.includes(value)
+          );
+
+          return {
+            values: filteredScopes,
+          };
+        }
+
+        return {
+          values: scopes,
+        };
+      },
+    },
+  ],
+  async load({ name }) {
+    const scopes = Object.keys(globalThis);
+
+    let scope;
+
+    if (name) {
+      scope = scopes.find((scope) => scope === name);
+    }
+
+    return {
+      text: JSON.stringify(
+        scope ? [scope] : scopes
+      ),
+    };
+  },
+};
+
+// @ts-expect-error Blockbench does not need authentication
+server.addResourceTemplate(scopeResource);
