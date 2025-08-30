@@ -1,12 +1,12 @@
 {
   "name": "blockbench-mcp",
-  "version": "1.0.0",
+  "version": "1.2.1",
   "description": "Blockbench MCP server plugin",
   "keywords": [
     "Blockbench",
     "MCP"
   ],
-  "license": "ISC",
+  "license": "GPL-3.0-only",
   "author": "Jason J. Gardner",
   "type": "module",
   "main": "dist/mcp.js",
@@ -14,7 +14,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "bun run ./build.ts --sourcemap",
     "dev:watch": "bun run dev --watch",
-    "compile": "bun run ./build.ts --minify",
+    "build": "bun run ./build.ts --minify",
     "inspect": "bunx @modelcontextprotocol/inspector"
   },
   "dependencies": {
