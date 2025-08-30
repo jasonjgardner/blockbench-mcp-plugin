@@ -68,7 +68,7 @@ createTool(
         : Texture.getDefault();
 
       if (!projectTexture) {
-        throw new Error(`No texture found for "${texture}".`);
+        console.warn(`No texture found for "${texture}"`);
       }
 
       // @ts-expect-error Blockbench global utility available at runtime
@@ -92,19 +92,27 @@ createTool(
           rotation: element.rotation as [number, number, number],
         }).init();
 
-        cube.addTo(outlinerGroup);
+        cube.addTo(outlinerGroup ?? Outliner.root);
 
-        if (!autouv && Array.isArray(faces)) {
+        if (faces !== false && Array.isArray(faces) && !autouv) {
           faces.forEach(({ face, uv }) => {
             cube.faces[face].extend({
               uv: uv as [number, number, number, number],
             });
           });
-        } else {
-          cube.applyTexture(
-            projectTexture,
-            faces !== false ? faces : undefined
-          );
+          if (projectTexture) {
+            cube.applyTexture(
+              projectTexture,
+              faces.map((f) => f.face)
+            );
+          }
+        } else if (faces !== false) {
+          if (projectTexture) {
+            cube.applyTexture(
+              projectTexture,
+              Array.isArray(faces) ? faces : undefined
+            );
+          }
           cube.mapAutoUV();
         }
 
