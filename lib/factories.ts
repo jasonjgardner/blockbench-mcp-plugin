@@ -1,6 +1,6 @@
-import type { Tool, ToolParameters, Prompt, PromptArgument } from "fastmcp";
 import type { IMCPTool, IMCPPrompt } from "@/types";
 import { getServer } from "@/server/server";
+import { z } from "zod";
 
 const TOOL_PREFIX = "blockbench";
 
@@ -17,45 +17,44 @@ export const prompts: Record<string, IMCPPrompt> = {};
 /**
  * Store tool definitions for dynamic server reconstruction
  */
-const toolDefinitions: Record<
-  string,
-  Tool<Record<string, unknown> | undefined, any>
-> = {};
+const toolDefinitions: Record<string, any> = {};
 
 /**
  * Creates a new MCP tool and stores it for server registration.
- * @param name - The name of the tool.
- * @param tool - The tool to add.
+ * @param suffix - The suffix for the tool name (will be prefixed with "blockbench_").
+ * @param tool - The tool configuration.
  * @param tool.description - The description of the tool.
- * @param tool.annotations - Annotations for the tool.
- * @param tool.parameters - The parameters for the tool.
+ * @param tool.annotations - Annotations for the tool (including title).
+ * @param tool.parameters - The Zod schema for parameters.
  * @param tool.execute - The function to execute when the tool is called.
  * @param status - The status of the tool.
  * @param enabled - Whether the tool is enabled.
- * @returns - The created tool.
+ * @returns - The created tool metadata.
  * @throws - If a tool with the same name already exists.
  * @example
  * ```ts
- * createTool({
- *   name: "my_tool",
+ * createTool("my_tool", {
  *   description: "My tool description for the AI to read.",
  *   annotations: {
  *     title: "My tool description for the Human to read.",
- *     destructiveHint: true,
- *     openWorldHint: true,
  *   },
  *   parameters: z.object({
  *     name: z.string(),
  *   }),
  *   async execute({ name }) {
- *     console.log(`Hello, ${name}!`);
+ *     return { message: `Hello, ${name}!` };
  *   },
  * });
  * ```
  */
-export function createTool<T extends ToolParameters>(
+export function createTool<T extends z.ZodRawShape>(
   suffix: string,
-  tool: Omit<Tool<Record<string, unknown> | undefined, T>, "name">,
+  tool: {
+    description: string;
+    annotations?: { title?: string; [key: string]: any };
+    parameters?: z.ZodObject<T>;
+    execute: (args: T extends z.ZodRawShape ? z.infer<z.ZodObject<T>> : any) => Promise<any>;
+  },
   status: IMCPTool["status"] = "stable",
   enabled: boolean = true
 ) {
@@ -64,17 +63,25 @@ export function createTool<T extends ToolParameters>(
     throw new Error(`Tool with name "${name}" already exists.`);
   }
 
-  const fullTool = {
-    ...(tool as Tool<Record<string, unknown> | undefined, T>),
-    name,
-  };
-
   // Store tool definition for later use
-  toolDefinitions[name] = fullTool;
+  toolDefinitions[name] = tool;
 
   // Add to server if enabled
   if (enabled) {
-    getServer().addTool(fullTool);
+    getServer().registerTool(
+      name,
+      {
+        title: tool.annotations?.title,
+        description: tool.description,
+        inputSchema: tool.parameters,
+      },
+      async (args: any) => {
+        const result = await tool.execute(args || {});
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result) }],
+        };
+      }
+    );
   }
 
   tools[name] = {
@@ -105,18 +112,23 @@ export function getEnabledToolDefinitions() {
 
 /**
  * Creates a new MCP prompt and adds it to the server.
- * @param name - The name of the prompt.
- * @param prompt - The prompt to add.
+ * @param suffix - The suffix for the prompt name (will be prefixed with "blockbench_").
+ * @param prompt - The prompt configuration.
  * @param prompt.description - The description of the prompt.
- * @param prompt.arguments - The arguments for the prompt.
- * @param enabled - Whether the prompt is enabled.
+ * @param prompt.argsSchema - The Zod schema for arguments.
+ * @param prompt.callback - The function to execute when the prompt is loaded.
  * @param status - The status of the prompt.
- * @returns - The created prompt.
+ * @param enabled - Whether the prompt is enabled.
+ * @returns - The created prompt metadata.
  * @throws - If a prompt with the same name already exists.
  */
-export function createPrompt(
+export function createPrompt<T extends z.ZodRawShape>(
   suffix: string,
-  prompt: Omit<Prompt<Record<string, unknown> | undefined>, "name">,
+  prompt: {
+    description: string;
+    argsSchema?: z.ZodObject<T>;
+    callback: (args: T extends z.ZodRawShape ? z.infer<z.ZodObject<T>> : any) => Promise<any>;
+  },
   status: IMCPPrompt["status"] = "stable",
   enabled: boolean = true
 ) {
@@ -126,16 +138,24 @@ export function createPrompt(
     throw new Error(`Prompt with name "${name}" already exists.`);
   }
 
-  getServer().addPrompt({
-    ...prompt,
-    name,
-  });
+  if (enabled) {
+    getServer().registerPrompt(
+      name,
+      {
+        title: name,
+        description: prompt.description,
+        argsSchema: prompt.argsSchema,
+      },
+      prompt.callback
+    );
+  }
 
-  return {
+  prompts[name] = {
     name,
-    arguments: prompt.arguments,
     description: prompt.description,
     enabled,
     status,
   };
+
+  return prompts[name];
 }

@@ -1,44 +1,40 @@
 import { createPrompt, prompts } from "@/lib/factories";
 import { readPrompt } from "@/macros/readPrompt" with { type: 'macro' };
+import { completable } from "@modelcontextprotocol/sdk/server/completable.js";
+import { z } from "zod";
 
 createPrompt("model_creation_strategy", {
     description: "A strategy for creating a new 3D model in Blockbench.",
-    arguments: [
-        {
-            name: "format",
-            description: "The format of the model to create.",
-            required: false,
-            enum: ["java_block", "bedrock"],
-            complete: async (value) => {
+    argsSchema: z.object({
+        format: completable(
+            z.enum(["java_block", "bedrock"]).optional(),
+            (value) => {
                 if (value.startsWith("java")) {
-                    return { values: ["java_block"] };
+                    return ["java_block"];
                 }
                 if (value.startsWith("b")) {
-                    return { values: ["bedrock"] };
+                    return ["bedrock"];
                 }
-                return { values: ["java_block", "bedrock"] };
+                return ["java_block", "bedrock"];
             }
-        },
-        {
-            name: "approach",
-            description: "The approach to use for creating the model.",
-            required: false,
-            enum: ["ui", "programmatic", "import"],
-            complete: async (value) => {
+        ),
+        approach: completable(
+            z.enum(["ui", "programmatic", "import"]).optional(),
+            (value) => {
                 if (value.startsWith("u")) {
-                    return { values: ["ui"] };
+                    return ["ui"];
                 }
                 if (value.startsWith("p")) {
-                    return { values: ["programmatic"] };
+                    return ["programmatic"];
                 }
                 if (value.startsWith("i")) {
-                    return { values: ["import"] };
+                    return ["import"];
                 }
-                return { values: ["ui", "programmatic", "import"] };
+                return ["ui", "programmatic", "import"];
             }
-        }
-    ],
-    load: async (args) => {
+        )
+    }),
+    callback: async (args) => {
         const { format, approach } = args;
         const result: string[] = [];
 
@@ -58,7 +54,17 @@ createPrompt("model_creation_strategy", {
             result.push(await readPrompt("model_creation_import"));
         }
 
-        return result.join("\n");
+        return {
+            messages: [
+                {
+                    role: "user" as const,
+                    content: {
+                        type: "text" as const,
+                        text: result.join("\n")
+                    }
+                }
+            ]
+        };
     }
 });
 

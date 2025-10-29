@@ -11,11 +11,15 @@ import { tools } from "@/lib/factories";
 import { resources, prompts } from "@/server";
 import { uiSetup, uiTeardown } from "@/ui";
 import { settingsSetup, settingsTeardown } from "@/ui/settings";
+import express from "express";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import type { Server as HttpServer } from "http";
 
 // Import tools to ensure they're registered
 import "@/server/tools";
 
 let currentServer: any = null;
+let httpServer: HttpServer | null = null;
 
 BBPlugin.register("mcp", {
   version: VERSION,
@@ -30,8 +34,6 @@ BBPlugin.register("mcp", {
 
     currentServer = getServer();
 
-    settingsSetup();
-
     uiSetup({
       server: currentServer,
       tools,
@@ -39,20 +41,57 @@ BBPlugin.register("mcp", {
       prompts,
     });
 
-    currentServer.start({
-      transportType: "httpStream",
-      httpStream: {
-        port: Settings.get("mcp_port") || 3000,
-        endpoint: Settings.get("mcp_endpoint") || "/bb-mcp",
-      },
+    const app = express();
+    app.use(express.json());
+
+    const port = Settings.get("mcp_port") || 3000;
+    const endpoint = Settings.get("mcp_endpoint") || "/bb-mcp";
+
+    app.post(endpoint, async (req, res) => {
+      try {
+        const transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: undefined,
+          enableJsonResponse: true,
+        });
+
+        res.on("close", () => {
+          transport.close();
+        });
+
+        await currentServer.connect(transport);
+        await transport.handleRequest(req, res, req.body);
+      } catch (error) {
+        console.error("Error handling MCP request:", error);
+        if (!res.headersSent) {
+          res.status(500).json({
+            jsonrpc: "2.0",
+            error: {
+              code: -32603,
+              message: "Internal server error",
+            },
+            id: null,
+          });
+        }
+      }
+    });
+
+    httpServer = app.listen(port, () => {
+      console.log(`MCP Server running on http://localhost:${port}${endpoint}`);
+    });
+
+    httpServer.on("error", (error) => {
+      console.error("HTTP Server error:", error);
     });
   },
 
   onunload() {
-    // Shutdown the server
     if (currentServer) {
-      currentServer.stop();
+      currentServer.close();
       currentServer = null;
+    }
+    if (httpServer) {
+      httpServer.close();
+      httpServer = null;
     }
     uiTeardown();
     settingsTeardown();

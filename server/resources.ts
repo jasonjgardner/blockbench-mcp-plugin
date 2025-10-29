@@ -2,41 +2,34 @@
 /// <reference types="blockbench-types" />
 import server from "./server";
 import { getProjectTexture } from "../lib/util";
-import type { ResourceTemplate } from "fastmcp";
+import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { BlockbenchSessionAuth } from "./types";
 
-const nodesResource: ResourceTemplate<BlockbenchSessionAuth> = {
-  name: "nodes",
-  description: "Returns the current nodes in the Blockbench editor.",
-  uriTemplate: "nodes://{id}",
-  arguments: [
-    {
-      name: "id",
-      description: "The ID of the node. Could be a UUID, name, or numeric ID.",
-      complete: async (value: string) => {
+server.registerResource(
+  "nodes",
+  new ResourceTemplate("nodes://{id}", {
+    list: undefined,
+    complete: {
+      id: async (value: string) => {
         if (!Project?.nodes_3d) {
-          return {
-            values: [],
-          };
+          return [];
         }
 
         const nodeKeys = Object.keys(Project.nodes_3d);
 
         if (value.length > 0) {
-          const filteredKeys = nodeKeys.filter((key) => key.includes(value));
-
-          return {
-            values: filteredKeys,
-          };
+          return nodeKeys.filter((key) => key.includes(value));
         }
 
-        return {
-          values: nodeKeys,
-        };
+        return nodeKeys;
       },
     },
-  ],
-  async load({ id }) {
+  }),
+  {
+    title: "Nodes",
+    description: "Returns the current nodes in the Blockbench editor.",
+  },
+  async (uri, { id }) => {
     if (!Project?.nodes_3d) {
       throw new Error("No nodes found in the Blockbench editor.");
     }
@@ -53,48 +46,45 @@ const nodesResource: ResourceTemplate<BlockbenchSessionAuth> = {
 
     const { position, rotation, scale, ...rest } = node;
     return {
-      text: JSON.stringify({
-        ...rest,
-        position: position.toArray(),
-        rotation: rotation.toArray(),
-        scale: scale.toArray(),
-      }),
+      contents: [
+        {
+          uri: uri.href,
+          text: JSON.stringify({
+            ...rest,
+            position: position.toArray(),
+            rotation: rotation.toArray(),
+            scale: scale.toArray(),
+          }),
+        },
+      ],
     };
-  },
-};
+  }
+);
 
-// @ts-expect-error Blockbench does not need authentication
-server.addResourceTemplate(nodesResource);
-
-const texturesResource: ResourceTemplate<BlockbenchSessionAuth> = {
-  name: "textures",
-  description: "Returns the current textures in the Blockbench editor.",
-  uriTemplate: "textures://{id}",
-  arguments: [
-    {
-      name: "id",
-      description:
-        "The ID of the texture. Could be a UUID, name, or numeric ID.",
-      complete: async (value: string) => {
+server.registerResource(
+  "textures",
+  new ResourceTemplate("textures://{id}", {
+    list: undefined,
+    complete: {
+      id: async (value: string) => {
         const textures = Project?.textures ?? Texture.all;
 
         if (value.length > 0) {
           const filteredTextures = textures.filter((texture) =>
             texture.name.includes(value)
           );
-
-          return {
-            values: filteredTextures.map((texture) => texture.name),
-          };
+          return filteredTextures.map((texture) => texture.name);
         }
 
-        return {
-          values: textures.map((texture) => texture.name),
-        };
+        return textures.map((texture) => texture.name);
       },
     },
-  ],
-  async load({ id }) {
+  }),
+  {
+    title: "Textures",
+    description: "Returns the current textures in the Blockbench editor.",
+  },
+  async (uri, { id }) => {
     const texture = getProjectTexture(id);
 
     if (!texture) {
@@ -102,27 +92,29 @@ const texturesResource: ResourceTemplate<BlockbenchSessionAuth> = {
     }
 
     return {
-      name: texture.name,
-      blob: await new Promise((resolve) => {
-        resolve(texture.getBase64());
-      }),
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: "image/png",
+          blob: await new Promise((resolve) => {
+            resolve(texture.getBase64());
+          }),
+        },
+      ],
     };
+  }
+);
+
+server.registerResource(
+  "reference_model",
+  new ResourceTemplate("reference_model://{id}", {
+    list: undefined,
+  }),
+  {
+    title: "Reference Model",
+    description: "Returns the current reference model in the Blockbench editor.",
   },
-};
-
-// @ts-expect-error Blockbench does not need authentication
-server.addResourceTemplate(texturesResource);
-
-const referenceModelResource: ResourceTemplate<BlockbenchSessionAuth> = {
-  name: "reference_model",
-  description: "Returns the current reference model in the Blockbench editor.",
-  uriTemplate: "reference_model://{id}",
-  arguments: [
-    {
-      name: "id",
-    },
-  ],
-  async load({ id }) {
+  async (uri, { id }) => {
     const reference = Project?.elements.find((element) => {
       return (
         element.mesh.type === "reference_model" &&
@@ -137,47 +129,45 @@ const referenceModelResource: ResourceTemplate<BlockbenchSessionAuth> = {
     const { position, rotation, scale, ...rest } = reference.mesh;
 
     return {
-      text: JSON.stringify({
-        ...rest,
-        position: position.toArray(),
-        rotation: rotation.toArray(),
-        scale: scale.toArray(),
-      }),
+      contents: [
+        {
+          uri: uri.href,
+          text: JSON.stringify({
+            ...rest,
+            position: position.toArray(),
+            rotation: rotation.toArray(),
+            scale: scale.toArray(),
+          }),
+        },
+      ],
     };
-  },
-};
+  }
+);
 
-// @ts-expect-error Blockbench does not need authentication
-server.addResourceTemplate(referenceModelResource);
-
-const projectListResource: ResourceTemplate<BlockbenchSessionAuth> = {
-  name: "project",
-  description: "Returns a list of all projects in the Blockbench editor.",
-  uriTemplate: "project://{name}",
-  arguments: [
-    {
-      name: "name",
-      description: "The name of the project.",
-      complete: async (value: string) => {
+server.registerResource(
+  "project",
+  new ResourceTemplate("project://{name}", {
+    list: undefined,
+    complete: {
+      name: async (value: string) => {
         const projects = ModelProject.all;
 
         if (value.length > 0) {
           const filteredProjects = projects.filter((project) =>
             project.name.includes(value)
           );
-
-          return {
-            values: filteredProjects.map((project) => project.name),
-          };
+          return filteredProjects.map((project) => project.name);
         }
 
-        return {
-          values: projects.map((project) => project.name),
-        };
+        return projects.map((project) => project.name);
       },
     },
-  ],
-  async load({ name }) {
+  }),
+  {
+    title: "Project",
+    description: "Returns a list of all projects in the Blockbench editor.",
+  },
+  async (uri, { name }) => {
     const projects = ModelProject.all;
 
     let project;
@@ -186,48 +176,40 @@ const projectListResource: ResourceTemplate<BlockbenchSessionAuth> = {
       project = projects.find((project) => project.name === name);
     }
 
-    // TODO: Fix circular references and return more than just name
     return {
-      text: JSON.stringify(
-        project ? [project.name] : projects.map((project) => project.name)
-      ),
+      contents: [
+        {
+          uri: uri.href,
+          text: JSON.stringify(
+            project ? [project.name] : projects.map((project) => project.name)
+          ),
+        },
+      ],
     };
-  },
-};
+  }
+);
 
-// @ts-expect-error Blockbench does not need authentication
-server.addResourceTemplate(projectListResource);
-
-// Adds tools to better expose Blockbench scope, context, functions, etc.
-// Check what variables are available in `globalThis` and report back the scope.
-const scopeResource: ResourceTemplate<BlockbenchSessionAuth> = {
-  name: "scope",
-  description: "Returns the current scope in the Blockbench editor.",
-  uriTemplate: "scope://{name}",
-  arguments: [
-    {
-      name: "name",
-      description: "The name of the scope.",
-      complete: async (value: string) => {
+server.registerResource(
+  "scope",
+  new ResourceTemplate("scope://{name}", {
+    list: undefined,
+    complete: {
+      name: async (value: string) => {
         const scopes = Object.keys(globalThis);
 
         if (value.length > 0) {
-          const filteredScopes = scopes.filter((scope) =>
-            scope.includes(value)
-          );
-
-          return {
-            values: filteredScopes,
-          };
+          return scopes.filter((scope) => scope.includes(value));
         }
 
-        return {
-          values: scopes,
-        };
+        return scopes;
       },
     },
-  ],
-  async load({ name }) {
+  }),
+  {
+    title: "Scope",
+    description: "Returns the current scope in the Blockbench editor.",
+  },
+  async (uri, { name }) => {
     const scopes = Object.keys(globalThis);
 
     let scope;
@@ -237,12 +219,12 @@ const scopeResource: ResourceTemplate<BlockbenchSessionAuth> = {
     }
 
     return {
-      text: JSON.stringify(
-        scope ? [scope] : scopes
-      ),
+      contents: [
+        {
+          uri: uri.href,
+          text: JSON.stringify(scope ? [scope] : scopes),
+        },
+      ],
     };
-  },
-};
-
-// @ts-expect-error Blockbench does not need authentication
-server.addResourceTemplate(scopeResource);
+  }
+);
