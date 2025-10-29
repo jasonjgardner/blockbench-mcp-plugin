@@ -25,7 +25,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "blockbench-types": "^4.12.2",
+    "blockbench-types": "^5.0.0",
     "typescript": "^5.9.2"
   },
   "peerDependencies": {
