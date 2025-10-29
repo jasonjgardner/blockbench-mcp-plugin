@@ -802,3 +802,599 @@ createTool(
     },
     STATUS_EXPERIMENTAL
   );
+
+createTool(
+  "paint_with_brush",
+  {
+    description:
+      "Paints on textures using the brush tool with customizable settings.",
+    annotations: {
+      title: "Paint with Brush",
+      destructiveHint: true,
+    },
+    parameters: z.object({
+      texture_id: z
+        .string()
+        .optional()
+        .describe(
+          "Texture ID or name. If not provided, uses selected texture."
+        ),
+      coordinates: z
+        .array(
+          z.object({
+            x: z.number().describe("X coordinate on texture."),
+            y: z.number().describe("Y coordinate on texture."),
+          })
+        )
+        .describe("Array of coordinates to paint at."),
+      brush_settings: z
+        .object({
+          size: z.number().min(1).max(100).optional().describe("Brush size."),
+          opacity: z
+            .number()
+            .min(0)
+            .max(255)
+            .optional()
+            .describe("Brush opacity (0-255)."),
+          softness: z
+            .number()
+            .min(0)
+            .max(100)
+            .optional()
+            .describe("Brush softness percentage."),
+          shape: z
+            .enum(["square", "circle"])
+            .optional()
+            .describe("Brush shape."),
+          color: z.string().optional().describe("Brush color as hex string."),
+          blend_mode: z
+            .enum([
+              "default",
+              "set_opacity",
+              "color",
+              "behind",
+              "multiply",
+              "add",
+              "screen",
+              "overlay",
+              "difference",
+            ])
+            .optional()
+            .describe("Brush blend mode."),
+        })
+        .optional()
+        .describe("Brush settings to apply."),
+      connect_strokes: z
+        .boolean()
+        .optional()
+        .default(true)
+        .describe("Whether to connect paint strokes with lines."),
+    }),
+    async execute({
+      texture_id,
+      coordinates,
+      brush_settings,
+      connect_strokes,
+    }) {
+      const texture = texture_id
+        ? getProjectTexture(texture_id)
+        : Texture.getDefault();
+
+      if (!texture) {
+        throw new Error(
+          texture_id
+            ? `Texture with ID "${texture_id}" not found.`
+            : "No texture available."
+        );
+      }
+
+      Undo.initEdit({
+        textures: [texture],
+        selected_texture: true,
+        bitmap: true,
+      });
+
+      // Apply brush settings using .value assignment
+      BarItems.slider_brush_size.value = brush_settings.size;
+      BarItems.slider_brush_opacity.value = brush_settings.opacity;
+      BarItems.slider_brush_softness.value = brush_settings.softness;
+      BarItems.brush_shape.value = brush_settings.shape;
+      ColorPanel.set(brush_settings.color);
+
+      // Paint using Painter.edit() method
+      texture.edit(
+        (canvas) => {
+          const ctx = canvas.getContext("2d");
+          for (const coord of coordinates) {
+            if (brush_settings.shape === "circle") {
+              Painter.editCircle(
+                ctx,
+                coord.x,
+                coord.y,
+                brush_settings.size,
+                brush_settings.softness,
+                (r, g, b, a) => [red, green, blue, alpha]
+              );
+            } else {
+              Painter.editSquare(
+                ctx,
+                coord.x,
+                coord.y,
+                brush_settings.size,
+                brush_settings.softness,
+                (r, g, b, a) => [red, green, blue, alpha]
+              );
+            }
+          }
+        },
+        { edit_name: "Paint with brush" }
+      );
+
+      Undo.finishEdit("Paint with brush");
+      Canvas.updateAll();
+
+      return `Painted ${coordinates.length} points on texture "${texture.name}"`;
+    },
+  },
+  STATUS_EXPERIMENTAL
+);
+
+createTool(
+  "create_brush_preset",
+  {
+    description: "Creates a custom brush preset with specified settings.",
+    annotations: {
+      title: "Create Brush Preset",
+      destructiveHint: true,
+    },
+    parameters: z.object({
+      name: z.string().describe("Name of the brush preset."),
+      size: z.number().min(1).max(100).optional().describe("Brush size."),
+      opacity: z
+        .number()
+        .min(0)
+        .max(255)
+        .optional()
+        .describe("Brush opacity (0-255)."),
+      softness: z
+        .number()
+        .min(0)
+        .max(100)
+        .optional()
+        .describe("Brush softness percentage."),
+      shape: z.enum(["square", "circle"]).optional().describe("Brush shape."),
+      color: z.string().optional().describe("Brush color as hex string."),
+      blend_mode: z
+        .enum([
+          "default",
+          "set_opacity",
+          "color",
+          "behind",
+          "multiply",
+          "add",
+          "screen",
+          "overlay",
+          "difference",
+        ])
+        .optional()
+        .describe("Brush blend mode."),
+      pixel_perfect: z
+        .boolean()
+        .optional()
+        .describe("Enable pixel perfect drawing."),
+    }),
+    async execute({
+      name,
+      size,
+      opacity,
+      softness,
+      shape,
+      color,
+      blend_mode,
+      pixel_perfect,
+    }) {
+      const preset = {
+        name,
+        size: size || null,
+        opacity: opacity || null,
+        softness: softness || null,
+        shape: shape || "square",
+        color: color || null,
+        blend_mode: blend_mode || "default",
+        pixel_perfect: pixel_perfect || false,
+      };
+
+      // @ts-ignore
+      StateMemory.brush_presets.push(preset);
+      // @ts-ignore
+      StateMemory.save("brush_presets");
+
+      return `Created brush preset "${name}" with settings: ${JSON.stringify(
+        preset
+      )}`;
+    },
+  },
+  STATUS_EXPERIMENTAL
+);
+
+createTool(
+  "load_brush_preset",
+  {
+    description: "Loads and applies a brush preset by name.",
+    annotations: {
+      title: "Load Brush Preset",
+      destructiveHint: true,
+    },
+    parameters: z.object({
+      preset_name: z.string().describe("Name of the brush preset to load."),
+    }),
+    async execute({ preset_name }) {
+      // @ts-ignore
+      const preset = StateMemory.brush_presets.find(
+        (p) => p.name === preset_name
+      );
+
+      if (!preset) {
+        throw new Error(`Brush preset "${preset_name}" not found.`);
+      }
+
+      // @ts-ignore
+      Painter.loadBrushPreset(preset);
+
+      return `Loaded brush preset "${preset_name}"`;
+    },
+  },
+  STATUS_EXPERIMENTAL
+);
+
+createTool(
+  "texture_selection",
+  {
+    description:
+      "Creates, modifies, or manipulates texture selections for painting.",
+    annotations: {
+      title: "Texture Selection",
+      destructiveHint: true,
+    },
+    parameters: z.object({
+      action: z
+        .enum([
+          "select_rectangle",
+          "select_ellipse",
+          "select_all",
+          "clear_selection",
+          "invert_selection",
+          "expand_selection",
+          "contract_selection",
+          "feather_selection",
+        ])
+        .describe("Selection action to perform."),
+      texture_id: z
+        .string()
+        .optional()
+        .describe(
+          "Texture ID or name. If not provided, uses selected texture."
+        ),
+      coordinates: z
+        .object({
+          x1: z.number().describe("Start X coordinate."),
+          y1: z.number().describe("Start Y coordinate."),
+          x2: z.number().describe("End X coordinate."),
+          y2: z.number().describe("End Y coordinate."),
+        })
+        .optional()
+        .describe("Selection area coordinates."),
+      radius: z
+        .number()
+        .optional()
+        .describe("Radius for expand/contract/feather operations."),
+      mode: z
+        .enum(["create", "add", "subtract", "intersect"])
+        .optional()
+        .default("create")
+        .describe("Selection mode."),
+    }),
+    async execute({ action, texture_id, coordinates, radius, mode }) {
+      const texture = texture_id
+        ? getProjectTexture(texture_id)
+        : Texture.getDefault();
+
+      if (!texture) {
+        throw new Error(
+          texture_id
+            ? `Texture with ID "${texture_id}" not found.`
+            : "No texture available."
+        );
+      }
+
+      Undo.initEdit({
+        textures: [texture],
+        bitmap: true,
+      });
+
+      const selection = texture.selection;
+
+      switch (action) {
+        case "select_rectangle":
+          if (!coordinates) {
+            throw new Error("Coordinates required for rectangle selection.");
+          }
+          selection.clear();
+          selection.start_x = coordinates.x1;
+          selection.start_y = coordinates.y1;
+          selection.end_x = coordinates.x2;
+          selection.end_y = coordinates.y2;
+          selection.is_custom = false;
+          break;
+
+        case "select_ellipse":
+          if (!coordinates) {
+            throw new Error("Coordinates required for ellipse selection.");
+          }
+          selection.clear();
+          // Create elliptical selection
+          selection.is_custom = true;
+          const centerX = (coordinates.x1 + coordinates.x2) / 2;
+          const centerY = (coordinates.y1 + coordinates.y2) / 2;
+          const radiusX = Math.abs(coordinates.x2 - coordinates.x1) / 2;
+          const radiusY = Math.abs(coordinates.y2 - coordinates.y1) / 2;
+
+          for (
+            let x = Math.floor(centerX - radiusX);
+            x <= Math.ceil(centerX + radiusX);
+            x++
+          ) {
+            for (
+              let y = Math.floor(centerY - radiusY);
+              y <= Math.ceil(centerY + radiusY);
+              y++
+            ) {
+              const dx = (x - centerX) / radiusX;
+              const dy = (y - centerY) / radiusY;
+              if (dx * dx + dy * dy <= 1) {
+                selection.set(x, y, true);
+              }
+            }
+          }
+          break;
+
+        case "select_all":
+          selection.selectAll();
+          break;
+
+        case "clear_selection":
+          selection.clear();
+          break;
+
+        case "invert_selection":
+          selection.invert();
+          break;
+
+        case "expand_selection":
+          if (radius === undefined) {
+            throw new Error("Radius required for expand selection.");
+          }
+          selection.expand(radius);
+          break;
+
+        case "contract_selection":
+          if (radius === undefined) {
+            throw new Error("Radius required for contract selection.");
+          }
+          selection.contract(radius);
+          break;
+
+        case "feather_selection":
+          if (radius === undefined) {
+            throw new Error("Radius required for feather selection.");
+          }
+          selection.feather(radius);
+          break;
+      }
+
+      // Update UI
+      UVEditor.vue.updateTexture();
+
+      Undo.finishEdit("Texture selection");
+
+      return `Applied ${action} to texture "${texture.name}"`;
+    },
+  },
+  STATUS_EXPERIMENTAL
+);
+
+createTool(
+  "texture_layer_management",
+  {
+    description: "Creates, manages, and manipulates texture layers.",
+    annotations: {
+      title: "Texture Layer Management",
+      destructiveHint: true,
+    },
+    parameters: z.object({
+      action: z
+        .enum([
+          "create_layer",
+          "delete_layer",
+          "duplicate_layer",
+          "merge_down",
+          "set_opacity",
+          "set_blend_mode",
+          "move_layer",
+          "rename_layer",
+          "flatten_layers",
+        ])
+        .describe("Layer management action."),
+      texture_id: z
+        .string()
+        .optional()
+        .describe(
+          "Texture ID or name. If not provided, uses selected texture."
+        ),
+      layer_name: z.string().optional().describe("Name of the layer."),
+      opacity: z
+        .number()
+        .min(0)
+        .max(100)
+        .optional()
+        .describe("Layer opacity percentage."),
+      blend_mode: z
+        .enum([
+          "normal",
+          "multiply",
+          "screen",
+          "overlay",
+          "soft_light",
+          "hard_light",
+          "color_dodge",
+          "color_burn",
+          "darken",
+          "lighten",
+          "difference",
+          "exclusion",
+        ])
+        .optional()
+        .describe("Layer blend mode."),
+      target_index: z
+        .number()
+        .optional()
+        .describe("Target position for moving layers."),
+    }),
+    async execute({
+      action,
+      texture_id,
+      layer_name,
+      opacity,
+      blend_mode,
+      target_index,
+    }) {
+      const texture = texture_id
+        ? getProjectTexture(texture_id)
+        : Texture.selected;
+
+      if (!texture) {
+        throw new Error(
+          texture_id
+            ? `Texture with ID "${texture_id}" not found.`
+            : "No texture selected."
+        );
+      }
+
+      Undo.initEdit({
+        textures: [texture],
+        layers: texture.layers,
+        bitmap: true,
+      });
+
+      let result = "";
+
+      switch (action) {
+        case "create_layer":
+          if (!texture.layers_enabled) {
+            texture.activateLayers(true);
+          }
+          const newLayer = new TextureLayer(
+            {
+              name: layer_name || `Layer ${texture.layers.length + 1}`,
+            },
+            texture
+          );
+          newLayer.setSize(texture.width, texture.height);
+          newLayer.addForEditing();
+          result = `Created layer "${newLayer.name}"`;
+          break;
+
+        case "delete_layer":
+          if (!TextureLayer.selected) {
+            throw new Error("No layer selected.");
+          }
+          const layerToDelete = TextureLayer.selected;
+          layerToDelete.remove();
+          result = `Deleted layer "${layerToDelete.name}"`;
+          break;
+
+        case "duplicate_layer":
+          if (!TextureLayer.selected) {
+            throw new Error("No layer selected.");
+          }
+          const layerToDuplicate = TextureLayer.selected;
+          const duplicatedLayer = layerToDuplicate.duplicate();
+          duplicatedLayer.name = `${layerToDuplicate.name} copy`;
+          result = `Duplicated layer "${duplicatedLayer.name}"`;
+          break;
+
+        case "merge_down":
+          if (!TextureLayer.selected) {
+            throw new Error("No layer selected.");
+          }
+          TextureLayer.selected.mergeDown(true);
+          result = "Merged layer down";
+          break;
+
+        case "set_opacity":
+          if (!TextureLayer.selected) {
+            throw new Error("No layer selected.");
+          }
+          if (opacity === undefined) {
+            throw new Error("Opacity value required.");
+          }
+          TextureLayer.selected.opacity = opacity / 100;
+          texture.updateChangesAfterEdit();
+          result = `Set layer opacity to ${opacity}%`;
+          break;
+
+        case "set_blend_mode":
+          if (!TextureLayer.selected) {
+            throw new Error("No layer selected.");
+          }
+          if (!blend_mode) {
+            throw new Error("Blend mode required.");
+          }
+          TextureLayer.selected.blend_mode = blend_mode;
+          texture.updateChangesAfterEdit();
+          result = `Set layer blend mode to ${blend_mode}`;
+          break;
+
+        case "move_layer":
+          if (!TextureLayer.selected) {
+            throw new Error("No layer selected.");
+          }
+          if (target_index === undefined) {
+            throw new Error("Target index required.");
+          }
+          const layerToMove = TextureLayer.selected;
+          texture.layers.remove(layerToMove);
+          texture.layers.splice(target_index, 0, layerToMove);
+          result = `Moved layer to position ${target_index}`;
+          break;
+
+        case "rename_layer":
+          if (!TextureLayer.selected) {
+            throw new Error("No layer selected.");
+          }
+          if (!layer_name) {
+            throw new Error("New layer name required.");
+          }
+          const oldName = TextureLayer.selected.name;
+          TextureLayer.selected.name = layer_name;
+          result = `Renamed layer from "${oldName}" to "${layer_name}"`;
+          break;
+
+        case "flatten_layers":
+          if (!texture.layers_enabled) {
+            throw new Error("Texture has no layers to flatten.");
+          }
+          texture.flattenLayers();
+          result = "Flattened all layers";
+          break;
+      }
+
+      texture.updateChangesAfterEdit();
+      Undo.finishEdit(`Layer management: ${action}`);
+      updateInterfacePanels();
+
+      return result;
+    },
+  },
+  STATUS_EXPERIMENTAL
+);
