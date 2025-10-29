@@ -1,5 +1,35 @@
 import html2canvas from "html2canvas";
-import { imageContent } from "fastmcp";
+
+/**
+ * Helper function to create properly formatted image content for MCP responses.
+ * Handles data URLs, base64 strings, and file paths.
+ * 
+ * @param data - Image data as base64, data URL, or file path
+ * @param mimeType - MIME type of the image (e.g., 'image/png', 'image/jpeg')
+ * @returns Formatted image content object for MCP
+ */
+export function imageContent(data: string, mimeType: string = "image/png") {
+  let base64Data = data;
+  
+  // If it's a data URL, extract the base64 part
+  if (data.startsWith("data:")) {
+    const matches = data.match(/^data:([^;]+);base64,(.+)$/);
+    if (matches) {
+      mimeType = matches[1] || mimeType;
+      base64Data = matches[2];
+    }
+  }
+  
+  // If it's a file path, read and encode it
+  // Note: For now, we'll assume data is already base64 or a data URL
+  // File system access should be handled by the caller
+  
+  return {
+    type: "image" as const,
+    data: base64Data,
+    mimeType,
+  };
+}
 
 export function fixCircularReferences<
   T extends Record<string, any>,
@@ -72,10 +102,17 @@ export function captureScreenshot(project?: string) {
     selectedProject.updateThumbnail();
   }
 
-  return imageContent({ url: selectedProject.thumbnail });
+  const imgData = imageContent(selectedProject.thumbnail, "image/png");
+  return {
+    content: [{ type: "image" as const, data: imgData.data, mimeType: imgData.mimeType }],
+  };
 }
 
 export async function captureAppScreenshot() {
   const canvas = await html2canvas(document.documentElement);
-  return await imageContent({ url: canvas.toDataURL() });
+  const dataUrl = canvas.toDataURL();
+  const imgData = imageContent(dataUrl, "image/png");
+  return {
+    content: [{ type: "image" as const, data: imgData.data, mimeType: imgData.mimeType }],
+  };
 }

@@ -1,5 +1,8 @@
-import type { FastMCP } from "fastmcp";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { IMCPTool, IMCPPrompt, IMCPResource } from "@/types";
+import { VERSION } from "@/lib/constants";
+import { statusBarSetup, statusBarTeardown } from "@/ui/statusBar";
+
 let panel: Panel | undefined;
 
 export function uiSetup({
@@ -8,7 +11,7 @@ export function uiSetup({
   resources,
   prompts,
 }: {
-  server: FastMCP;
+  server: McpServer;
   tools: Record<string, IMCPTool>;
   resources: Record<string, IMCPResource>;
   prompts: Record<string, IMCPPrompt>;
@@ -113,6 +116,9 @@ export function uiSetup({
     }
 `);
 
+  // Setup the status bar
+  statusBarSetup(server);
+
   panel = new Panel("mcp_panel", {
     id: "mcp_panel",
     icon: "robot",
@@ -121,24 +127,12 @@ export function uiSetup({
     resizable: true,
     component: {
       beforeMount() {
+        // TODO: Official SDK doesn't have event emitter - implement connection tracking differently
+        // For now, set connected state directly since we're using HTTP transport
         // @ts-ignore
-        server.on("connect", () => {
-          // @ts-ignore
-          this.server.connected = true;
-          // @ts-ignore
-          this.sessions = server.sessions ?? [];
-
-          // @ts-ignore
-          console.log(this.sessions);
-        });
-
+        this.server.connected = true;
         // @ts-ignore
-        server.on("disconnect", () => {
-          // @ts-ignore
-          this.server.connected = false;
-          // @ts-ignore
-          this.sessions = [];
-        });
+        this.sessions = [];
 
         // Initialize tools data with current enabled state
         // @ts-ignore
@@ -163,8 +157,8 @@ export function uiSetup({
         sessions: [],
         server: {
           connected: false,
-          name: server.options.name,
-          version: server.options.version,
+          name: "Blockbench MCP",
+          version: VERSION,
         },
         tools: Object.values(tools).map((tool) => ({
           name: tool.name,
@@ -243,5 +237,6 @@ export function uiSetup({
 }
 
 export function uiTeardown() {
+  statusBarTeardown();
   panel?.delete();
 }

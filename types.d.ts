@@ -20,4 +20,5 @@ export interface IMCPPrompt {
 export interface IMCPResource {
   name: string;
   description: string;
+  uriTemplate: string;
 }

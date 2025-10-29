@@ -2,47 +2,28 @@
 /// <reference types="blockbench-types" />
 import server from "./server";
 import { getProjectTexture } from "../lib/util";
-import type { ResourceTemplate } from "fastmcp";
-import type { BlockbenchSessionAuth } from "./types";
+import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 
-const nodesResource: ResourceTemplate<BlockbenchSessionAuth> = {
-  name: "nodes",
-  description: "Returns the current nodes in the Blockbench editor.",
-  uriTemplate: "nodes://{id}",
-  arguments: [
-    {
-      name: "id",
-      description: "The ID of the node. Could be a UUID, name, or numeric ID.",
-      complete: async (value: string) => {
-        if (!Project?.nodes_3d) {
-          return {
-            values: [],
-          };
-        }
+// TODO: Refactor resources to use official SDK registerResource API
+// Resources are currently disabled - they need to be updated to match the official SDK API
 
-        const nodeKeys = Object.keys(Project.nodes_3d);
-
-        if (value.length > 0) {
-          const filteredKeys = nodeKeys.filter((key) => key.includes(value));
-
-          return {
-            values: filteredKeys,
-          };
-        }
-
-        return {
-          values: nodeKeys,
-        };
-      },
-    },
-  ],
-  async load({ id }) {
+// Register nodes resource with official SDK
+server.registerResource(
+  "nodes",
+  new ResourceTemplate("nodes://{id}", {
+    list: undefined,
+  }),
+  {
+    title: "Blockbench Nodes",
+    description: "Returns the current nodes in the Blockbench editor.",
+  },
+  async (uri, { id }) => {
     if (!Project?.nodes_3d) {
       throw new Error("No nodes found in the Blockbench editor.");
     }
 
     const node =
-      Project.nodes_3d[id] ??
+      Project.nodes_3d[id as string] ??
       Object.values(Project.nodes_3d).find(
         (node) => node.name === id || node.uuid === id
       );
@@ -53,18 +34,23 @@ const nodesResource: ResourceTemplate<BlockbenchSessionAuth> = {
 
     const { position, rotation, scale, ...rest } = node;
     return {
-      text: JSON.stringify({
-        ...rest,
-        position: position.toArray(),
-        rotation: rotation.toArray(),
-        scale: scale.toArray(),
-      }),
+      contents: [
+        {
+          uri: uri.href,
+          text: JSON.stringify({
+            ...rest,
+            position: position.toArray(),
+            rotation: rotation.toArray(),
+            scale: scale.toArray(),
+          }),
+        },
+      ],
     };
-  },
-};
+  }
+);
 
-// @ts-expect-error Blockbench does not need authentication
-server.addResourceTemplate(nodesResource);
+/*
+// Resources below are commented out pending refactoring to official SDK API
 
 const texturesResource: ResourceTemplate<BlockbenchSessionAuth> = {
   name: "textures",
@@ -246,3 +232,4 @@ const scopeResource: ResourceTemplate<BlockbenchSessionAuth> = {
 
 // @ts-expect-error Blockbench does not need authentication
 server.addResourceTemplate(scopeResource);
+*/

@@ -2,8 +2,7 @@
 /// <reference types="blockbench-types" />
 import { z } from "zod";
 import { createTool } from "@/lib/factories";
-import { getProjectTexture } from "@/lib/util";
-import { imageContent } from "fastmcp";
+import { getProjectTexture, imageContent } from "@/lib/util";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
 
 createTool(

@@ -1,4 +1,4 @@
-import type { Tool, ToolParameters, Prompt, PromptArgument } from "fastmcp";
+import { z } from "zod";
 import type { IMCPTool, IMCPPrompt } from "@/types";
 import { getServer } from "@/server/server";
 
@@ -14,72 +14,90 @@ export const tools: Record<string, IMCPTool> = {};
  */
 export const prompts: Record<string, IMCPPrompt> = {};
 
+interface ToolDefinition {
+  title: string;
+  description: string;
+  inputSchema: Record<string, z.ZodType>;
+  outputSchema?: Record<string, z.ZodType> | z.ZodType;
+  execute: (args: any) => Promise<{ content: Array<{ type: string; text: string }>; structuredContent?: any }>;
+  annotations?: {
+    title?: string;
+    destructiveHint?: boolean;
+    openWorldHint?: boolean;
+  };
+}
+
 /**
  * Store tool definitions for dynamic server reconstruction
  */
-const toolDefinitions: Record<
-  string,
-  Tool<Record<string, unknown> | undefined, any>
-> = {};
+const toolDefinitions: Record<string, ToolDefinition> = {};
 
 /**
- * Creates a new MCP tool and stores it for server registration.
- * @param name - The name of the tool.
- * @param tool - The tool to add.
+ * Creates a new MCP tool and registers it with the server using the official SDK.
+ * @param suffix - The tool name suffix (will be prefixed with "blockbench_").
+ * @param tool - The tool configuration.
  * @param tool.description - The description of the tool.
- * @param tool.annotations - Annotations for the tool.
- * @param tool.parameters - The parameters for the tool.
- * @param tool.execute - The function to execute when the tool is called.
- * @param status - The status of the tool.
+ * @param tool.annotations - Annotations for the tool (title, hints).
+ * @param tool.parameters - Zod schema for input parameters.
+ * @param tool.execute - The async function to execute when the tool is called.
+ * @param status - The status of the tool (stable, experimental, deprecated).
  * @param enabled - Whether the tool is enabled.
- * @returns - The created tool.
+ * @returns - The created tool metadata.
  * @throws - If a tool with the same name already exists.
- * @example
- * ```ts
- * createTool({
- *   name: "my_tool",
- *   description: "My tool description for the AI to read.",
- *   annotations: {
- *     title: "My tool description for the Human to read.",
- *     destructiveHint: true,
- *     openWorldHint: true,
- *   },
- *   parameters: z.object({
- *     name: z.string(),
- *   }),
- *   async execute({ name }) {
- *     console.log(`Hello, ${name}!`);
- *   },
- * });
- * ```
  */
-export function createTool<T extends ToolParameters>(
+export function createTool<T extends z.ZodRawShape>(
   suffix: string,
-  tool: Omit<Tool<Record<string, unknown> | undefined, T>, "name">,
+  tool: {
+    description: string;
+    annotations?: {
+      title?: string;
+      destructiveHint?: boolean;
+      openWorldHint?: boolean;
+    };
+    parameters: z.ZodObject<T>;
+    execute: (args: z.infer<z.ZodObject<T>>) => Promise<{
+      content: Array<{ type: string; text: string }>;
+      structuredContent?: any;
+    }>;
+  },
   status: IMCPTool["status"] = "stable",
   enabled: boolean = true
 ) {
   const name = `${TOOL_PREFIX}_${suffix}`;
+  
   if (tools[name]) {
     throw new Error(`Tool with name "${name}" already exists.`);
   }
 
-  const fullTool = {
-    ...(tool as Tool<Record<string, unknown> | undefined, T>),
-    name,
+  const toolDef: ToolDefinition = {
+    title: tool.annotations?.title ?? tool.description,
+    description: tool.description,
+    inputSchema: tool.parameters.shape,
+    execute: tool.execute,
+    annotations: tool.annotations,
   };
 
-  // Store tool definition for later use
-  toolDefinitions[name] = fullTool;
+  // Store tool definition
+  toolDefinitions[name] = toolDef;
 
-  // Add to server if enabled
+  // Register with server if enabled
   if (enabled) {
-    getServer().addTool(fullTool);
+    getServer().registerTool(
+      name,
+      {
+        title: toolDef.title,
+        description: toolDef.description,
+        inputSchema: tool.parameters.shape,
+      },
+      async (args: z.infer<typeof tool.parameters>) => {
+        return await tool.execute(args);
+      }
+    );
   }
 
   tools[name] = {
     name,
-    description: tool.annotations?.title ?? tool.description ?? `${name} tool`,
+    description: toolDef.title,
     enabled,
     status,
   };
@@ -104,19 +122,30 @@ export function getEnabledToolDefinitions() {
 }
 
 /**
- * Creates a new MCP prompt and adds it to the server.
- * @param name - The name of the prompt.
- * @param prompt - The prompt to add.
+ * Creates a new MCP prompt and registers it with the server using the official SDK.
+ * @param suffix - The prompt name suffix (will be prefixed with "blockbench_").
+ * @param prompt - The prompt configuration.
  * @param prompt.description - The description of the prompt.
- * @param prompt.arguments - The arguments for the prompt.
- * @param enabled - Whether the prompt is enabled.
+ * @param prompt.arguments - Zod schema for prompt arguments.
+ * @param prompt.generate - Function to generate prompt messages from arguments.
  * @param status - The status of the prompt.
- * @returns - The created prompt.
+ * @param enabled - Whether the prompt is enabled.
+ * @returns - The created prompt metadata.
  * @throws - If a prompt with the same name already exists.
  */
-export function createPrompt(
+export function createPrompt<T extends z.ZodRawShape = Record<string, never>>(
   suffix: string,
-  prompt: Omit<Prompt<Record<string, unknown> | undefined>, "name">,
+  prompt: {
+    title?: string;
+    description: string;
+    argsSchema?: z.ZodObject<T>;
+    generate?: (args: z.infer<z.ZodObject<T>>) => {
+      messages: Array<{
+        role: "user" | "assistant";
+        content: { type: string; text: string };
+      }>;
+    };
+  },
   status: IMCPPrompt["status"] = "stable",
   enabled: boolean = true
 ) {
@@ -126,16 +155,29 @@ export function createPrompt(
     throw new Error(`Prompt with name "${name}" already exists.`);
   }
 
-  getServer().addPrompt({
-    ...prompt,
-    name,
-  });
+  // For now, skip registration if no generate function provided (legacy prompts)
+  // TODO: Refactor legacy prompts to use new API
+  if (enabled && prompt.generate && prompt.argsSchema) {
+    getServer().registerPrompt(
+      name,
+      {
+        title: prompt.title || prompt.description,
+        description: prompt.description,
+        argsSchema: prompt.argsSchema.shape,
+      },
+      (args: z.infer<z.ZodObject<T>>) => {
+        return prompt.generate!(args);
+      }
+    );
+  }
 
-  return {
+  prompts[name] = {
     name,
-    arguments: prompt.arguments,
+    arguments: prompt.argsSchema?.shape || {},
     description: prompt.description,
     enabled,
     status,
   };
+
+  return prompts[name];
 }
