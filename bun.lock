@@ -11,7 +11,7 @@
         "zod": "^3.25.76",
       },
       "devDependencies": {
-        "blockbench-types": "^4.12.2",
+        "blockbench-types": "^5.0.0",
         "typescript": "^5.9.2",
       },
       "optionalDependencies": {
@@ -94,7 +94,7 @@
 
     "base64-arraybuffer": ["base64-arraybuffer@1.0.2", "", {}, "sha512-I3yl4r9QB5ZRY3XuJVEPfc2XhZO6YweFPI+UovAzn+8/hb3oJ6lnysaFcjVpkCPfVWFUDvoZ8kmVDP7WyRtYtQ=="],
 
-    "blockbench-types": ["blockbench-types@4.12.2", "", { "dependencies": { "@babel/types": "^7.20.7", "@types/dompurify": "^3.0.5", "@types/jquery": "^3.5.32", "@types/prismjs": "^1.26.0", "@types/three": "^0.129.2", "@types/tinycolor2": "^1.4.6", "dompurify": "^3.0.1", "electron": "^33.3.1", "prismjs": "^1.29.0", "tinycolor2": "^1.6.0", "typescript": "^4.9.5", "vue": "2.7.14", "wintersky": "^1.3.0" } }, "sha512-OkqlV5RO5PAV7fkix9MfVZD1bomJpw33q7vUwA0Otekd3N2Cf+f0im0diHjsZiFACmvApMfa60jajNlD6Cqj3A=="],
+    "blockbench-types": ["blockbench-types@5.0.0", "", { "dependencies": { "@babel/types": "^7.20.7", "@types/dompurify": "^3.0.5", "@types/jquery": "^3.5.32", "@types/prismjs": "^1.26.0", "@types/three": "^0.129.2", "@types/tinycolor2": "^1.4.6", "dompurify": "^3.0.1", "electron": "^33.3.1", "prismjs": "^1.29.0", "tinycolor2": "^1.6.0", "typescript": "^5.8.3", "vue": "2.7.14", "wintersky": "^1.3.0" } }, "sha512-auHeFsFZOSnYgPTumkhP6mjOJ9uPzmtOHwCrQRQCiHNZ7pZqhoF2VM8d15KJxVjzyPL9sYtYLxoKpRHvJkDTuA=="],
 
     "body-parser": ["body-parser@2.2.0", "", { "dependencies": { "bytes": "^3.1.2", "content-type": "^1.0.5", "debug": "^4.4.0", "http-errors": "^2.0.0", "iconv-lite": "^0.6.3", "on-finished": "^2.4.1", "qs": "^6.14.0", "raw-body": "^3.0.0", "type-is": "^2.0.0" } }, "sha512-02qvAaxv8tp7fBa/mw1ga98OGm+eCbqzJOKoRt70sLmfEEi+jyBYVTDGfCL/k06/4EMk/z01gCe7HoCH/f2LTg=="],
 
@@ -489,8 +489,6 @@
     "zod": ["zod@3.25.76", "", {}, "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="],
 
     "zod-to-json-schema": ["zod-to-json-schema@3.24.6", "", { "peerDependencies": { "zod": "^3.24.1" } }, "sha512-h/z3PKvcTcTetyjl1fkj79MHNEjm+HpD6NXheWjzOekY7kV+lwDYnHw+ivHkijnCSMz1yJaWBD9vu/Fcmk+vEg=="],
-
-    "blockbench-types/typescript": ["typescript@4.9.5", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-1FXk9E2Hm+QzZQ7z+McJiHL4NW1F2EzMu9Nq9i3zAaGqibafqYwCVU6WyWAuyQRRzOlxou8xZSyXLEN8oKj24g=="],
 
     "cacheable-request/get-stream": ["get-stream@5.2.0", "", { "dependencies": { "pump": "^3.0.0" } }, "sha512-nBF+F1rAZVCu/p7rjzgA+Yb4lfYXrpl7a6VmJrU8wF9I1CKvP/QwPNZHnOlwbTkY6dvtFIzFMSyQXbLoTQPRpA=="],
 
