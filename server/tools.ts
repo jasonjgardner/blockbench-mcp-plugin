@@ -5,6 +5,7 @@
 import "./tools/animation";
 import "./tools/camera";
 import "./tools/cubes";
+import "./tools/edit_session";
 import "./tools/element";
 import "./tools/import";
 import "./tools/mesh";

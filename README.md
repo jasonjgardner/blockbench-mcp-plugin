@@ -54,6 +54,27 @@ __`claude_desktop_config.json`__
 
 [See sample project](https://github.com/jasonjgardner/blockbench-mcp-project) for prompt examples.
 
+### Edit Session Integration
+
+The MCP server can hook into Blockbench's Edit Session feature to enable remote collaboration and automation. Edit Sessions use Peer.js to create P2P connections between Blockbench instances.
+
+**Available Edit Session Tools:**
+- `edit_session_start` - Start a new session as host
+- `edit_session_join` - Join an existing session with a token
+- `edit_session_status` - Get current session status
+- `edit_session_send_command` - Send commands (undo/redo/quit) to all clients
+- `edit_session_send_data` - Send custom data through the P2P connection
+- `edit_session_send_chat` - Send chat messages to session participants
+- `edit_session_quit` - Leave or close the session
+
+**Use Cases:**
+- Remote automation of collaborative modeling sessions
+- Programmatic control of multi-user workflows
+- Integration with external tools and CI/CD pipelines
+- Custom synchronization and data sharing between Blockbench instances
+
+See [docs/tools.md](docs/tools.md) for detailed documentation of all available tools.
+
 ## Plugin Development
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed instructions on setting up the development environment and how to add new tools, resources, and prompts.

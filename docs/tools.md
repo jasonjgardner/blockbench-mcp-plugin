@@ -490,6 +490,81 @@ Fills and submits dialog forms programmatically.
 
 ---
 
+## Edit Session (Collaboration)
+
+### edit_session_start
+#### ⚠️ Experimental
+Starts a new Edit Session as the host, creating a P2P connection that other users can join.
+
+**Parameters:**
+- `username`: Optional username to use in the session (random name assigned if not provided)
+
+**Returns:** Session token that others can use to join, along with username and success status
+
+**Note:** Requires an open project. The session uses Peer.js to create a collaborative environment where multiple users can work on the same model simultaneously.
+
+### edit_session_join
+#### ⚠️ Experimental
+Joins an existing Edit Session using a token provided by the host.
+
+**Parameters:**
+- `token`: 16-character session token from the host
+- `username`: Optional username to use in the session
+
+**Returns:** Connection status, username, and session details
+
+**Note:** Connects as a client to the host's session. The host's model will be loaded into your Blockbench instance.
+
+### edit_session_status
+#### ⚠️ Experimental
+Gets the current status of the Edit Session.
+
+**Returns:** JSON object with:
+- `active`: Whether a session is active
+- `hosting`: Whether this instance is hosting
+- `client_count`: Number of connected clients
+- `token`: Session token (if hosting)
+- `username`: Current username
+- `has_project`: Whether a project is loaded
+
+### edit_session_send_command
+#### ⚠️ Experimental
+Sends a command through an active Edit Session to all connected clients.
+
+**Parameters:**
+- `command`: Command to send (undo/redo/quit_session)
+
+**Note:** Only the host can send commands. Commands are broadcast to all clients in the session.
+
+### edit_session_send_data
+#### ⚠️ Experimental
+Sends custom data through an active Edit Session with a specified type identifier.
+
+**Parameters:**
+- `type`: Type identifier for the data (e.g., 'custom_action', 'mcp_command')
+- `data`: JSON-serializable data payload (string, number, object, array, etc.)
+
+**Note:** Only the host can send data. Avoid using reserved type names: 'edit', 'init_model', 'command', 'chat_message', 'chat_input', 'client_count', 'change_project_meta'.
+
+**Use Case:** This tool allows the MCP server to emit custom commands through the Peer.js Edit Session connection, enabling external automation and control of collaborative sessions.
+
+### edit_session_send_chat
+#### ⚠️ Experimental
+Sends a chat message through the Edit Session visible to all connected clients.
+
+**Parameters:**
+- `message`: Chat message to send (max 512 characters)
+
+**Note:** Messages appear in the chat panel for all session participants.
+
+### edit_session_quit
+#### ⚠️ Experimental
+Quits the current Edit Session.
+
+**Note:** If hosting, this closes the session for all clients. If joined as a client, this disconnects from the host.
+
+---
+
 ## Screenshots and Visualization
 
 ### capture_screenshot
