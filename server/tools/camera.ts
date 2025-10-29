@@ -1,0 +1,85 @@
+/// <reference types="three" />
+/// <reference types="blockbench-types" />
+import { z } from "zod";
+import { createTool } from "@/lib/factories";
+import { captureScreenshot, captureAppScreenshot } from "@/lib/util";
+import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
+
+createTool(
+  "capture_screenshot",
+  {
+    description: "Returns the image data of the current view.",
+    annotations: {
+      title: "Capture Screenshot",
+      readOnlyHint: true,
+      destructiveHint: true,
+    },
+    parameters: z.object({
+      project: z.string().optional().describe("Project name or UUID."),
+    }),
+    async execute({ project }) {
+      return captureScreenshot(project);
+    },
+  },
+  STATUS_STABLE
+);
+
+createTool(
+  "capture_app_screenshot",
+  {
+    description: "Returns the image data of the Blockbench app.",
+    annotations: {
+      title: "Capture App Screenshot",
+      readOnlyHint: true,
+    },
+    parameters: z.object({}),
+    async execute() {
+      return captureAppScreenshot();
+    },
+  },
+  STATUS_STABLE
+);
+
+createTool(
+  "set_camera_angle",
+  {
+    description: "Sets the camera angle to the specified value.",
+    annotations: {
+      title: "Set Camera Angle",
+      destructiveHint: true,
+    },
+    parameters: z.object({
+      angle: z.object({
+        position: z
+          .array(z.number())
+          .length(3)
+          .describe("Camera position."),
+        target: z
+          .array(z.number())
+          .length(3)
+          .optional()
+          .describe("Camera target position."),
+        rotation: z
+          .array(z.number())
+          .length(3)
+          .optional()
+          .describe("Camera rotation."),
+        projection: z
+          .enum(["unset", "orthographic", "perspective"])
+          .describe("Camera projection type."),
+      }),
+    }),
+    async execute({ angle }) {
+      const preview = Preview.selected;
+
+      if (!preview) {
+        throw new Error("No preview found in the Blockbench editor.");
+      }
+
+      preview.loadAnglePreset(angle);
+
+      return await captureScreenshot();
+    },
+  },
+  STATUS_EXPERIMENTAL
+);

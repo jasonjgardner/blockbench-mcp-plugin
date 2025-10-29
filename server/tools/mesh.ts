@@ -974,3 +974,78 @@ createTool(
     },
     STATUS_EXPERIMENTAL
 );
+
+createTool(
+  "knife_tool",
+  {
+    description: "Uses the knife tool to cut custom edges into mesh faces.",
+    annotations: {
+      title: "Knife Tool",
+      destructiveHint: true,
+    },
+    parameters: z.object({
+      mesh_id: z.string().describe("ID or name of the mesh to cut."),
+      points: z
+        .array(
+          z.object({
+            position: z
+              .array(z.number())
+              .length(3)
+              .describe("3D position of the cut point."),
+            face: z
+              .string()
+              .optional()
+              .describe("Face key to attach the point to."),
+          })
+        )
+        .min(2)
+        .describe("Points defining the cut path."),
+    }),
+    async execute({ mesh_id, points }) {
+      const mesh = Mesh.all.find(
+        (m) => m.uuid === mesh_id || m.name === mesh_id
+      );
+      if (!mesh) {
+        throw new Error(`Mesh with ID "${mesh_id}" not found.`);
+      }
+
+      Undo.initEdit({
+        elements: [mesh],
+        element_aspects: {
+          geometry: true,
+          uv: true,
+          faces: true,
+        },
+      });
+
+      // Create knife tool context
+      // @ts-ignore
+      const knifeContext = new KnifeToolContext(mesh);
+
+      // Add points to the knife path
+      points.forEach((point) => {
+        knifeContext.points.push({
+          position: new THREE.Vector3(...point.position),
+          fkey: point.face,
+          type: point.face ? "face" : "edge",
+        });
+      });
+
+      // Apply the knife cut
+      knifeContext.apply();
+
+      Undo.finishEdit("Knife cut mesh");
+      Canvas.updateView({
+        elements: [mesh],
+        element_aspects: {
+          geometry: true,
+          uv: true,
+          faces: true,
+        },
+      });
+
+      return `Applied knife cut to mesh "${mesh.name}" with ${points.length} points`;
+    },
+  },
+  STATUS_EXPERIMENTAL
+);
