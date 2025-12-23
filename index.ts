@@ -95,8 +95,8 @@ BBPlugin.register("mcp", {
           
           try {
             const jsonBody = JSON.parse(bodySection);
-            
-            // Create mock req/res objects for transport with more complete API
+
+            // Create Node.js HTTP-compatible req/res objects for StreamableHTTPServerTransport
             const req: any = {
               method,
               url: path,
@@ -106,51 +106,121 @@ BBPlugin.register("mcp", {
               httpVersionMinor: 1,
               complete: true,
               socket,
-              on: () => {},
-              once: () => {},
-              emit: () => {},
-              removeListener: () => {},
+              connection: socket,
+              on: (_event: string, _cb: Function) => req,
+              once: (_event: string, _cb: Function) => req,
+              off: (_event: string, _cb: Function) => req,
+              emit: () => false,
+              removeListener: (_event: string, _cb: Function) => req,
+              addListener: (_event: string, _cb: Function) => req,
             };
-            
+
+            // Track response state
             let headersSent = false;
-            const res = {
-              writeHead: (status: number, headers?: any) => {
-                if (headersSent) return;
+            let finished = false;
+            const responseHeaders: Record<string, string> = {};
+            let statusCode = 200;
+
+            const res: any = {
+              socket,
+              connection: socket,
+              statusCode: 200,
+              statusMessage: "OK",
+              headersSent: false,
+              finished: false,
+              writableEnded: false,
+              writableFinished: false,
+
+              setHeader: (name: string, value: string) => {
+                responseHeaders[name.toLowerCase()] = value;
+              },
+              getHeader: (name: string) => responseHeaders[name.toLowerCase()],
+              hasHeader: (name: string) => name.toLowerCase() in responseHeaders,
+              removeHeader: (name: string) => { delete responseHeaders[name.toLowerCase()]; },
+              getHeaders: () => ({ ...responseHeaders }),
+              getHeaderNames: () => Object.keys(responseHeaders),
+
+              writeHead: (status: number, reasonOrHeaders?: string | Record<string, any>, headersArg?: Record<string, any>) => {
+                if (headersSent) return res;
+                statusCode = status;
+                res.statusCode = status;
+
+                // Handle overloaded signatures
+                let hdrs: Record<string, any> = {};
+                if (typeof reasonOrHeaders === "string") {
+                  res.statusMessage = reasonOrHeaders;
+                  hdrs = headersArg || {};
+                } else if (reasonOrHeaders) {
+                  hdrs = reasonOrHeaders;
+                }
+
+                // Merge headers
+                for (const [key, value] of Object.entries(hdrs)) {
+                  responseHeaders[key.toLowerCase()] = String(value);
+                }
+
                 headersSent = true;
-                
-                const statusText = status === 200 ? "OK" : status === 404 ? "Not Found" : "Internal Server Error";
+                res.headersSent = true;
+
+                const statusText = res.statusMessage || (status === 200 ? "OK" : status === 404 ? "Not Found" : "Error");
                 let response = `HTTP/1.1 ${status} ${statusText}\r\n`;
-                
-                if (headers) {
-                  for (const [key, value] of Object.entries(headers)) {
-                    response += `${key}: ${value}\r\n`;
-                  }
+                for (const [key, value] of Object.entries(responseHeaders)) {
+                  response += `${key}: ${value}\r\n`;
                 }
                 response += "\r\n";
                 socket.write(response);
+                return res;
               },
-              write: (data: string) => socket.write(data),
-              end: (data?: string) => {
-                if (data) socket.write(data);
+
+              write: (chunk: any, encodingOrCb?: string | Function, cb?: Function) => {
+                if (!headersSent) {
+                  res.writeHead(statusCode);
+                }
+                const callback = typeof encodingOrCb === "function" ? encodingOrCb : cb;
+                socket.write(chunk, callback);
+                return true;
+              },
+
+              end: (chunk?: any, encodingOrCb?: string | Function, cb?: Function) => {
+                if (finished) return res;
+                if (!headersSent) {
+                  res.writeHead(statusCode);
+                }
+                const callback = typeof encodingOrCb === "function" ? encodingOrCb : cb;
+                if (chunk) {
+                  socket.write(chunk);
+                }
                 socket.end();
+                finished = true;
+                res.finished = true;
+                res.writableEnded = true;
+                res.writableFinished = true;
+                if (callback) callback();
+                return res;
               },
-              on: () => {},
-              setHeader: () => {},
-              getHeader: () => undefined,
+
+              on: (_event: string, _cb: Function) => res,
+              once: (_event: string, _cb: Function) => res,
+              off: (_event: string, _cb: Function) => res,
+              emit: () => false,
+              removeListener: (_event: string, _cb: Function) => res,
+              addListener: (_event: string, _cb: Function) => res,
+              flushHeaders: () => {
+                if (!headersSent) res.writeHead(statusCode);
+              },
             };
-            
+
             // Create transport for this request
             const transport = new StreamableHTTPServerTransport({
               sessionIdGenerator: undefined,
               enableJsonResponse: true,
             });
-            
+
             socket.on("close", () => {
               transport.close();
             });
-            
+
             await currentServer?.connect(transport);
-            // @ts-ignore - Our mocks have enough for the transport to work
             await transport.handleRequest(req, res, jsonBody);
           } catch (error) {
             console.error("Request handling error:", error);
