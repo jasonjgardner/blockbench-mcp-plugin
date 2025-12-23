@@ -274,25 +274,122 @@ async function buildPlugin(): Promise<boolean> {
       return getCachedModule('dialog', options);
     }
 
-    // Handle http module (stub - only https is available in Blockbench)
+    // Handle http module - implement using net module for functional HTTP server
     if (normalizedId === 'http') {
+      var netModule = getCachedModule('net', { message: 'HTTP server requires network access' });
+
+      // HTTP status codes
+      var STATUS_CODES = {
+        100: 'Continue', 101: 'Switching Protocols', 200: 'OK', 201: 'Created',
+        204: 'No Content', 301: 'Moved Permanently', 302: 'Found', 304: 'Not Modified',
+        400: 'Bad Request', 401: 'Unauthorized', 403: 'Forbidden', 404: 'Not Found',
+        405: 'Method Not Allowed', 500: 'Internal Server Error', 502: 'Bad Gateway',
+        503: 'Service Unavailable'
+      };
+
+      // Create a functional HTTP server using net module
+      function createServer(requestListener) {
+        if (!netModule) {
+          throw new Error('HTTP server requires network permission. Use requireNativeModule("net") first.');
+        }
+
+        var server = netModule.createServer(function(socket) {
+          var buffer = '';
+
+          socket.on('data', function(chunk) {
+            buffer += chunk.toString();
+
+            // Check for complete HTTP headers
+            var headerEnd = buffer.indexOf('\\r\\n\\r\\n');
+            if (headerEnd === -1) return;
+
+            var headerSection = buffer.substring(0, headerEnd);
+            var bodySection = buffer.substring(headerEnd + 4);
+            var lines = headerSection.split('\\r\\n');
+            var requestLine = lines[0].split(' ');
+
+            // Parse headers
+            var headers = {};
+            for (var i = 1; i < lines.length; i++) {
+              var colonIdx = lines[i].indexOf(':');
+              if (colonIdx > 0) {
+                var key = lines[i].substring(0, colonIdx).trim().toLowerCase();
+                var value = lines[i].substring(colonIdx + 1).trim();
+                headers[key] = value;
+              }
+            }
+
+            // Create request object
+            var req = {
+              method: requestLine[0],
+              url: requestLine[1],
+              httpVersion: '1.1',
+              headers: headers,
+              socket: socket,
+              body: bodySection,
+              on: function(event, cb) { if (event === 'data' && bodySection) cb(bodySection); return this; },
+              once: function() { return this; },
+              emit: function() { return this; }
+            };
+
+            // Create response object
+            var res = {
+              statusCode: 200,
+              statusMessage: 'OK',
+              headersSent: false,
+              _headers: { 'Content-Type': 'text/plain' },
+              setHeader: function(name, value) { this._headers[name.toLowerCase()] = value; },
+              getHeader: function(name) { return this._headers[name.toLowerCase()]; },
+              writeHead: function(status, reasonOrHeaders, headers) {
+                if (this.headersSent) return this;
+                this.statusCode = status;
+                this.statusMessage = STATUS_CODES[status] || 'Unknown';
+                var hdrs = typeof reasonOrHeaders === 'object' ? reasonOrHeaders : headers || {};
+                for (var k in hdrs) { this._headers[k.toLowerCase()] = hdrs[k]; }
+                this.headersSent = true;
+                var headerStr = 'HTTP/1.1 ' + status + ' ' + this.statusMessage + '\\r\\n';
+                for (var h in this._headers) { headerStr += h + ': ' + this._headers[h] + '\\r\\n'; }
+                headerStr += '\\r\\n';
+                socket.write(headerStr);
+                return this;
+              },
+              write: function(data) {
+                if (!this.headersSent) this.writeHead(this.statusCode);
+                socket.write(data);
+                return true;
+              },
+              end: function(data) {
+                if (!this.headersSent) this.writeHead(this.statusCode);
+                if (data) socket.write(data);
+                socket.end();
+              },
+              on: function() { return this; }
+            };
+
+            if (requestListener) {
+              requestListener(req, res);
+            }
+
+            buffer = '';
+          });
+
+          socket.on('error', function() {});
+        });
+
+        return server;
+      }
+
       return {
         METHODS: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'],
-        STATUS_CODES: {},
+        STATUS_CODES: STATUS_CODES,
         Agent: function() {},
         ClientRequest: function() {},
         IncomingMessage: function() {},
         ServerResponse: function() {},
-        Server: function() { return { listen: function() { return this; }, on: function() { return this; } }; },
-        createServer: function() {
-          return {
-            listen: function() { return this; },
-            on: function() { return this; },
-            close: function() {}
-          };
-        },
-        request: function() {},
-        get: function() {}
+        Server: function() { return createServer(); },
+        createServer: createServer,
+        request: function() { console.warn('http.request not implemented - use https via requireNativeModule'); },
+        get: function() { console.warn('http.get not implemented - use https via requireNativeModule'); }
       };
     }
 
