@@ -19,8 +19,8 @@ import "@/server/tools";
 
 let currentServer: McpServer | null = null;
 let currentTransport: StreamableHTTPServerTransport | null = null;
-let expressApp: any = null;
 let httpServer: any = null;
+let isConnected = false;
 
 BBPlugin.register("mcp", {
   version: VERSION,
@@ -42,7 +42,7 @@ BBPlugin.register("mcp", {
       prompts,
     });
 
-    // Start TCP server using net module (HTTP over raw TCP)
+    // Start HTTP server using net module
     // Uses requireNativeModule with options for Blockbench v5.0+ compatibility
     try {
       const net = requireNativeModule("net", {
@@ -53,28 +53,39 @@ BBPlugin.register("mcp", {
       if (!net) {
         throw new Error("Net module not available - permission may have been denied");
       }
-      
+
       const port = Settings.get("mcp_port") || 3000;
       const endpoint = Settings.get("mcp_endpoint") || "/bb-mcp";
+
+      // Create a single transport instance for the server
+      currentTransport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: undefined,
+        enableJsonResponse: true,
+      });
+
+      // Connect transport to server ONCE
+      await currentServer.connect(currentTransport);
+      isConnected = true;
+      console.log("MCP transport connected to server");
 
       // Create TCP server and manually handle HTTP
       httpServer = net.createServer((socket: any) => {
         let buffer = "";
-        
+
         socket.on("data", async (chunk: Buffer) => {
           buffer += chunk.toString();
-          
+
           // Check if we have complete HTTP request (ends with \r\n\r\n for headers)
           const headerEndIndex = buffer.indexOf("\r\n\r\n");
           if (headerEndIndex === -1) return; // Wait for more data
-          
+
           const headerSection = buffer.substring(0, headerEndIndex);
           const bodySection = buffer.substring(headerEndIndex + 4);
-          
+
           // Parse HTTP request line and headers
           const lines = headerSection.split("\r\n");
           const [method, path] = lines[0].split(" ");
-          
+
           // Parse headers
           const headers: Record<string, string> = {};
           for (let i = 1; i < lines.length; i++) {
@@ -85,14 +96,29 @@ BBPlugin.register("mcp", {
               headers[key] = value;
             }
           }
-          
+
+          // Reset buffer for next request
+          buffer = "";
+
+          // Handle GET requests for server info
+          if (method === "GET" && path === endpoint) {
+            const info = JSON.stringify({
+              name: "Blockbench MCP",
+              version: VERSION,
+              status: "running",
+            });
+            socket.write(`HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${info.length}\r\n\r\n${info}`);
+            socket.end();
+            return;
+          }
+
           // Only handle POST to our endpoint
           if (method !== "POST" || path !== endpoint) {
             socket.write("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n");
             socket.end();
             return;
           }
-          
+
           try {
             const jsonBody = JSON.parse(bodySection);
 
@@ -210,26 +236,18 @@ BBPlugin.register("mcp", {
               },
             };
 
-            // Create transport for this request
-            const transport = new StreamableHTTPServerTransport({
-              sessionIdGenerator: undefined,
-              enableJsonResponse: true,
-            });
-
-            socket.on("close", () => {
-              transport.close();
-            });
-
-            await currentServer?.connect(transport);
-            await transport.handleRequest(req, res, jsonBody);
+            // Use the shared transport to handle this request
+            await currentTransport!.handleRequest(req, res, jsonBody);
           } catch (error) {
             console.error("Request handling error:", error);
-            socket.write("HTTP/1.1 500 Internal Server Error\r\nContent-Type: application/json\r\n\r\n");
-            socket.write(JSON.stringify({ error: "Internal server error" }));
-            socket.end();
+            if (!socket.destroyed) {
+              socket.write("HTTP/1.1 500 Internal Server Error\r\nContent-Type: application/json\r\n\r\n");
+              socket.write(JSON.stringify({ error: String(error) }));
+              socket.end();
+            }
           }
         });
-        
+
         socket.on("error", (error: Error) => {
           console.error("Socket error:", error);
         });
@@ -267,15 +285,15 @@ BBPlugin.register("mcp", {
       httpServer.close();
       httpServer = null;
     }
-    
+
     if (currentTransport) {
       currentTransport.close();
       currentTransport = null;
     }
-    
+
+    isConnected = false;
     currentServer = null;
-    expressApp = null;
-    
+
     uiTeardown();
     settingsTeardown();
   },
