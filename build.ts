@@ -150,76 +150,132 @@ async function buildPlugin(): Promise<boolean> {
   // Inject Blockbench-compatible require shims at the top of the bundle
   try {
     const mcpContent = await readFile(mcpFile, "utf-8");
-    
-    const shims = `// Blockbench-compatible module shims
+
+    const shims = `// Blockbench v5.0+ compatible module shims
+// Uses requireNativeModule() API for proper permission handling
 (function() {
   // Provide minimal process shim for Blockbench
+  // Note: For full process module, use requireNativeModule('process')
   if (typeof process === 'undefined') {
     globalThis.process = {
       env: {},
       version: 'blockbench',
       versions: {},
       platform: typeof SystemInfo !== 'undefined' ? SystemInfo.platform : 'unknown',
-      arch: 'unknown',
+      arch: typeof SystemInfo !== 'undefined' ? SystemInfo.arch : 'unknown',
       argv: [],
       cwd: function() { return ''; },
       nextTick: function(cb) { setTimeout(cb, 0); },
-      on: function() {},
-      once: function() {},
-      off: function() {},
-      emit: function() {},
+      on: function() { return this; },
+      once: function() { return this; },
+      off: function() { return this; },
+      emit: function() { return false; },
+      removeListener: function() { return this; },
       browser: true
     };
   }
-  
+
   // Cache original require
   var originalRequire = typeof require !== 'undefined' ? require : function() { throw new Error('require is not defined'); };
-  
-  // Module cache for lazy loading
+
+  // Module cache for lazy loading (keyed by module id + options hash)
   var moduleCache = {};
-  
+
+  // Requestable modules that require user permission in Blockbench v5.0+
+  // Reference: https://github.com/JannisX11/blockbench/blob/master/js/native_apis.ts
+  var REQUESTABLE_APIS = ['fs', 'process', 'child_process', 'https', 'net', 'tls', 'util', 'os', 'v8', 'dialog'];
+
   // Shim for node:module
   var moduleShim = {
     createRequire: function() { return require; },
     builtinModules: [],
     isBuiltin: function() { return false; }
   };
-  
-  // Helper to get or create cached module using requireNativeModule
-  function getCachedModule(id) {
-    if (moduleCache[id]) {
-      return moduleCache[id];
+
+  // Helper to get cache key for module with options
+  function getCacheKey(id, options) {
+    if (!options || !options.scope) {
+      return id;
     }
-    
+    return id + ':' + options.scope;
+  }
+
+  // Helper to get or create cached module using requireNativeModule
+  // Supports options: { scope, message, optional, show_permission_dialog }
+  function getCachedModule(id, options) {
+    var cacheKey = getCacheKey(id, options);
+
+    if (moduleCache[cacheKey]) {
+      return moduleCache[cacheKey];
+    }
+
     if (typeof requireNativeModule !== 'undefined') {
       try {
-        moduleCache[id] = requireNativeModule(id);
-        return moduleCache[id];
+        var result = requireNativeModule(id, options);
+        if (result) {
+          moduleCache[cacheKey] = result;
+        }
+        return result;
       } catch (e) {
         console.error('Failed to load native module ' + id + ':', e);
-        return null;
+        return undefined;
       }
     }
-    
-    return null;
+
+    return undefined;
   }
-  
-  // Create shimmed require function
-  var shimmedRequire = function(id) {
+
+  // Create shimmed require function that uses requireNativeModule for restricted APIs
+  var shimmedRequire = function(id, options) {
+    // Normalize module id (strip node: prefix)
+    var normalizedId = id.replace(/^node:/, '');
+
     // Handle shimmed modules
-    if (id === 'node:module' || id === 'module') return moduleShim;
-    
-    // Handle fs modules
-    if (id === 'node:fs' || id === 'fs') {
-      return getCachedModule('fs');
+    if (normalizedId === 'module') return moduleShim;
+
+    // Handle fs modules - requires scope option for scoped access
+    if (normalizedId === 'fs') {
+      return getCachedModule('fs', options);
     }
-    if (id === 'node:fs/promises' || id === 'fs/promises') {
-      var fs = getCachedModule('fs');
-      return fs ? (fs.promises || fs) : null;
+    if (normalizedId === 'fs/promises') {
+      var fs = getCachedModule('fs', options);
+      return fs ? fs.promises : undefined;
     }
-    
-    // Handle http module (stub - not available in Blockbench)
-    if (id === 'http' || id === 'node:http') {
+
+    // Handle process module via requireNativeModule
+    if (normalizedId === 'process') {
+      var processModule = getCachedModule('process', options);
+      // Fall back to global process shim if not available
+      return processModule || globalThis.process;
+    }
+
+    // Handle child_process module
+    if (normalizedId === 'child_process') {
+      return getCachedModule('child_process', options);
+    }
+
+    // Handle os module via requireNativeModule
+    if (normalizedId === 'os') {
+      return getCachedModule('os', options);
+    }
+
+    // Handle util module via requireNativeModule
+    if (normalizedId === 'util') {
+      return getCachedModule('util', options);
+    }
+
+    // Handle v8 module via requireNativeModule
+    if (normalizedId === 'v8') {
+      return getCachedModule('v8', options);
+    }
+
+    // Handle dialog module (Blockbench-specific)
+    if (normalizedId === 'dialog') {
+      return getCachedModule('dialog', options);
+    }
+
+    // Handle http module (stub - only https is available in Blockbench)
+    if (normalizedId === 'http') {
       return {
         METHODS: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'],
         STATUS_CODES: {},
@@ -228,72 +284,78 @@ async function buildPlugin(): Promise<boolean> {
         IncomingMessage: function() {},
         ServerResponse: function() {},
         Server: function() { return { listen: function() { return this; }, on: function() { return this; } }; },
-        createServer: function() { 
-          return { 
-            listen: function() { return this; }, 
+        createServer: function() {
+          return {
+            listen: function() { return this; },
             on: function() { return this; },
             close: function() {}
-          }; 
+          };
         },
         request: function() {},
         get: function() {}
       };
     }
-    
-    // Handle https module (stub - not available in Blockbench)
-    if (id === 'https' || id === 'node:https') {
-      return {
-        Agent: function() {},
-        Server: function() { return { listen: function() { return this; }, on: function() { return this; } }; },
-        createServer: function() { 
-          return { 
-            listen: function() { return this; }, 
-            on: function() { return this; },
-            close: function() {}
-          }; 
-        },
-        request: function() {},
-        get: function() {}
-      };
+
+    // Handle https module via requireNativeModule
+    if (normalizedId === 'https') {
+      return getCachedModule('https', options);
     }
-    
-    // Handle net and tls (try to load via requireNativeModule)
-    if (id === 'net' || id === 'node:net') {
-      return getCachedModule('net');
+
+    // Handle net module via requireNativeModule
+    if (normalizedId === 'net') {
+      return getCachedModule('net', options);
     }
-    if (id === 'tls' || id === 'node:tls') {
-      return getCachedModule('tls');
+
+    // Handle tls module via requireNativeModule
+    if (normalizedId === 'tls') {
+      return getCachedModule('tls', options);
     }
-    
+
     // Handle tty (return stub - not available in Blockbench)
-    if (id === 'tty' || id === 'node:tty') {
+    if (normalizedId === 'tty') {
       return {
         isatty: function() { return false; },
         ReadStream: function() {},
         WriteStream: function() {}
       };
     }
-    
-    // Fall through to original require
+
+    // Handle path module - available as PathModule global
+    if (normalizedId === 'path') {
+      return typeof PathModule !== 'undefined' ? PathModule : originalRequire('path');
+    }
+
+    // Handle safe modules that don't require permission
+    var safeModules = ['crypto', 'events', 'zlib', 'timers', 'url', 'string_decoder', 'querystring', 'buffer', 'stream', 'assert'];
+    if (safeModules.indexOf(normalizedId) !== -1) {
+      return originalRequire.call(this, id);
+    }
+
+    // Fall through to original require for other modules
     return originalRequire.apply(this, arguments);
   };
-  
+
   // Copy all properties from original require
   for (var key in originalRequire) {
     if (originalRequire.hasOwnProperty(key)) {
       shimmedRequire[key] = originalRequire[key];
     }
   }
-  
+
   // Override global require
   if (typeof require !== 'undefined') {
     require = shimmedRequire;
   }
-  
+
   // Also try to override module.require if available
   if (typeof module !== 'undefined' && module.require) {
     module.require = shimmedRequire;
   }
+
+  // Expose helper for direct requireNativeModule access with options
+  globalThis.__bbRequireNative = function(id, options) {
+    return getCachedModule(id, options);
+  };
 })();
 
 `;

@@ -43,11 +43,15 @@ BBPlugin.register("mcp", {
     });
 
     // Start TCP server using net module (HTTP over raw TCP)
+    // Uses requireNativeModule with options for Blockbench v5.0+ compatibility
     try {
-      const net = requireNativeModule("net");
-      
+      const net = requireNativeModule("net", {
+        message: "Network access is required to run the MCP server and accept connections from AI assistants.",
+        optional: false,
+      });
+
       if (!net) {
-        throw new Error("Net module not available");
+        throw new Error("Net module not available - permission may have been denied");
       }
       
       const port = Settings.get("mcp_port") || 3000;
@@ -175,9 +179,14 @@ BBPlugin.register("mcp", {
       });
     } catch (error) {
       console.error("Failed to start MCP server:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const isPermissionError = errorMessage.includes("permission") || errorMessage.includes("denied");
+
       Blockbench.showMessageBox({
         title: "MCP Server Error",
-        message: `Failed to initialize server: ${error}`,
+        message: isPermissionError
+          ? "Network permission is required for the MCP server to function. Please enable the permission and reload the plugin."
+          : `Failed to initialize server: ${errorMessage}`,
       });
     }
   },
