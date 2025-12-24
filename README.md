@@ -50,6 +50,12 @@ __`claude_desktop_config.json`__
 }
 ```
 
+#### Claude Code
+
+```bash
+claude mcp add blockbench --transport http http://localhost:3000/bb-mcp
+```
+
 ## Usage
 
 [See sample project](https://github.com/jasonjgardner/blockbench-mcp-project) for prompt examples.

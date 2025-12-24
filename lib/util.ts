@@ -2,13 +2,18 @@ import html2canvas from "html2canvas";
 
 /**
  * Helper function to create properly formatted image content for MCP responses.
- * Handles data URLs, base64 strings, and file paths.
+ * Handles data URLs, base64 strings, and objects with url property.
  *
- * @param data - Image data as base64, data URL, or file path
+ * @param dataOrOptions - Image data as base64/data URL string, or object with { url: string }
  * @param mimeType - MIME type of the image (e.g., 'image/png', 'image/jpeg')
- * @returns Formatted image content object for MCP
+ * @returns Formatted MCP tool result with image content
  */
-export function imageContent(data: string, mimeType: string = "image/png") {
+export function imageContent(
+  dataOrOptions: string | { url: string },
+  mimeType: string = "image/png"
+): { content: Array<{ type: "image"; data: string; mimeType: string }> } {
+  // Handle object with url property
+  const data = typeof dataOrOptions === "string" ? dataOrOptions : dataOrOptions.url;
   let base64Data = data;
 
   // If it's a data URL, extract the base64 part
@@ -20,14 +25,14 @@ export function imageContent(data: string, mimeType: string = "image/png") {
     }
   }
 
-  // If it's a file path, read and encode it
-  // Note: For now, we'll assume data is already base64 or a data URL
-  // File system access should be handled by the caller
-
   return {
-    type: "image" as const,
-    data: base64Data,
-    mimeType,
+    content: [
+      {
+        type: "image" as const,
+        data: base64Data,
+        mimeType,
+      },
+    ],
   };
 }
 
@@ -102,10 +107,7 @@ export function captureScreenshot(project?: string) {
     selectedProject.updateThumbnail();
   }
 
-  const imgData = imageContent(selectedProject.thumbnail, "image/png");
-  return {
-    content: [{ type: "image" as const, data: imgData.data, mimeType: imgData.mimeType }],
-  };
+  return imageContent(selectedProject.thumbnail, "image/png");
 }
 
 /**
@@ -124,10 +126,7 @@ export async function captureAppScreenshot() {
         const win = electronModule.remote.getCurrentWindow();
         const image = await win.webContents.capturePage();
         const dataUrl = image.toDataURL();
-        const imgData = imageContent(dataUrl, "image/png");
-        return {
-          content: [{ type: "image" as const, data: imgData.data, mimeType: imgData.mimeType }],
-        };
+        return imageContent(dataUrl, "image/png");
       }
     } catch (electronError) {
       console.warn("Electron capture not available, trying html2canvas:", electronError);
@@ -157,10 +156,7 @@ export async function captureAppScreenshot() {
       },
     });
     const dataUrl = canvas.toDataURL();
-    const imgData = imageContent(dataUrl, "image/png");
-    return {
-      content: [{ type: "image" as const, data: imgData.data, mimeType: imgData.mimeType }],
-    };
+    return imageContent(dataUrl, "image/png");
   } catch (html2canvasError) {
     // If html2canvas still fails, try a more aggressive approach
     console.warn("html2canvas failed, trying simplified capture:", html2canvasError);
@@ -170,11 +166,11 @@ export async function captureAppScreenshot() {
       const previewCanvas = document.querySelector('#preview canvas') as HTMLCanvasElement;
       if (previewCanvas) {
         const dataUrl = previewCanvas.toDataURL('image/png');
-        const imgData = imageContent(dataUrl, "image/png");
+        const imgResult = imageContent(dataUrl, "image/png");
         return {
           content: [
             { type: "text" as const, text: "Note: Full app screenshot failed due to CSS compatibility. Returning preview canvas only." },
-            { type: "image" as const, data: imgData.data, mimeType: imgData.mimeType },
+            ...imgResult.content,
           ],
         };
       }

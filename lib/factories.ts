@@ -14,12 +14,19 @@ export const tools: Record<string, IMCPTool> = {};
  */
 export const prompts: Record<string, IMCPPrompt> = {};
 
+export interface ToolContext {
+  reportProgress: (progress: { progress: number; total: number }) => void;
+}
+
 interface ToolDefinition {
   title: string;
   description: string;
   inputSchema: Record<string, z.ZodType>;
   outputSchema?: Record<string, z.ZodType> | z.ZodType;
-  execute: (args: any) => Promise<{ content: Array<{ type: string; text: string }>; structuredContent?: any }>;
+  execute: (args: any, context?: ToolContext) => Promise<
+    | string
+    | { content: Array<{ type: string; text: string }>; structuredContent?: any }
+  >;
   annotations?: {
     title?: string;
     destructiveHint?: boolean;
@@ -55,10 +62,10 @@ export function createTool<T extends z.ZodRawShape>(
       openWorldHint?: boolean;
     };
     parameters: z.ZodObject<T>;
-    execute: (args: z.infer<z.ZodObject<T>>) => Promise<{
-      content: Array<{ type: string; text: string }>;
-      structuredContent?: any;
-    }>;
+    execute: (args: z.infer<z.ZodObject<T>>, context?: ToolContext) => Promise<
+      | string
+      | { content: Array<{ type: string; text: string }>; structuredContent?: any }
+    >;
   },
   status: IMCPTool["status"] = "stable",
   enabled: boolean = true
@@ -89,8 +96,32 @@ export function createTool<T extends z.ZodRawShape>(
         description: toolDef.description,
         inputSchema: tool.parameters.shape,
       },
-      async (args: z.infer<typeof tool.parameters>) => {
-        return await tool.execute(args);
+      async (args: z.infer<typeof tool.parameters>, extra) => {
+        // Provide a no-op reportProgress function
+        // Note: Progress notifications require SSE streaming which is not enabled
+        // in the current StreamableHTTPServerTransport configuration (enableJsonResponse: true)
+        const reportProgress: ToolContext["reportProgress"] = () => {};
+
+        const context: ToolContext = { reportProgress };
+        const result = await tool.execute(args, context);
+
+        // Normalize result to MCP CallToolResult format
+        // Tools may return plain strings for convenience, convert to proper format
+        if (typeof result === "string") {
+          return {
+            content: [{ type: "text", text: result }],
+          };
+        }
+
+        // If result already has content array, return as-is
+        if (result && typeof result === "object" && "content" in result) {
+          return result;
+        }
+
+        // Fallback: stringify any other result
+        return {
+          content: [{ type: "text", text: JSON.stringify(result) }],
+        };
       }
     );
   }
