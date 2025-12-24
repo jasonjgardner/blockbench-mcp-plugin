@@ -1,15 +1,10 @@
-import type { FastMCP } from "fastmcp";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { sessionManager, type Session } from "@/lib/sessions";
 
 let statusBarElement: HTMLDivElement | undefined;
+let unsubscribe: (() => void) | undefined;
 
-interface StatusBarData {
-  connected: boolean;
-  serverName: string;
-  port: number;
-  endpoint: string;
-}
-
-export function statusBarSetup(server: FastMCP): void {
+export function statusBarSetup(server: McpServer): void {
   const port = Settings.get("mcp_port") || 3000;
   const endpoint = Settings.get("mcp_endpoint") || "/bb-mcp";
 
@@ -105,22 +100,24 @@ export function statusBarSetup(server: FastMCP): void {
   
   statusBarElement.appendChild(statusIndicator);
 
-  // Function to update status
-  const updateStatus = (connected: boolean) => {
-    if (connected) {
+  // Function to update status based on sessions
+  const updateStatus = (sessions: Session[]) => {
+    const count = sessions.length;
+    if (count > 0) {
       statusDot.classList.remove("disconnected");
       statusDot.classList.add("connected");
-      statusText.textContent = "MCP Server Connected";
+      statusText.textContent = count === 1
+        ? "MCP Server (1 client)"
+        : `MCP Server (${count} clients)`;
     } else {
       statusDot.classList.remove("connected");
       statusDot.classList.add("disconnected");
-      statusText.textContent = "MCP Server Disconnected";
+      statusText.textContent = "MCP Server";
     }
   };
 
-  // TODO: Official SDK doesn't have event emitter - implement connection tracking differently
-  // For now, assume connected since we're using HTTP transport
-  updateStatus(true);
+  // Subscribe to session changes
+  unsubscribe = sessionManager.subscribe(updateStatus);
 
   // Click handler to open the MCP panel
   statusIndicator.addEventListener("click", () => {
@@ -152,16 +149,17 @@ export function statusBarSetup(server: FastMCP): void {
   }
 
   existingStatusBar.appendChild(statusBarElement);
-  
-  // Set initial status (disconnected by default until first connect event)
-  updateStatus(false);
 }
 
 export function statusBarTeardown(): void {
-  if (!statusBarElement) {
-    return;
+  // Unsubscribe from session changes
+  if (unsubscribe) {
+    unsubscribe();
+    unsubscribe = undefined;
   }
 
-  statusBarElement.remove();
-  statusBarElement = undefined;
+  if (statusBarElement) {
+    statusBarElement.remove();
+    statusBarElement = undefined;
+  }
 }

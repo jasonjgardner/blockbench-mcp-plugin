@@ -5,6 +5,7 @@ import { createTool } from "@/lib/factories";
 import { meshSchema } from "@/lib/zodObjects";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
 
+export function registerMeshTools() {
 createTool(
     "place_mesh",
     {
@@ -1049,3 +1050,4 @@ createTool(
   },
   STATUS_EXPERIMENTAL
 );
+}

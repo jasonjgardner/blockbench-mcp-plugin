@@ -4,7 +4,8 @@ import { z } from "zod";
 import { createTool } from "@/lib/factories";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
 
-createTool(
+export function registerElementTools() {
+  createTool(
   "remove_element",
   {
     description: "Removes the element with the given ID.",
@@ -39,99 +40,99 @@ createTool(
     },
   },
   STATUS_EXPERIMENTAL
-);
+  );
 
-createTool(
-  "add_group",
-  {
-    description: "Adds a new group with the given name and options.",
-    annotations: {
-      title: "Add Group",
-      destructiveHint: true,
-    },
-    parameters: z.object({
-      name: z.string(),
-      origin: z.array(z.number()).length(3),
-      rotation: z.array(z.number()).length(3),
-      parent: z.string().optional().default("root"),
-      visibility: z.boolean().optional().default(true),
-      autouv: z
-        .enum(["0", "1", "2"])
-        .optional()
-        .default("0")
-        .describe(
-          "Auto UV setting. 0 = disabled, 1 = enabled, 2 = relative auto UV."
-        ),
-      selected: z.boolean().optional().default(false),
-      shade: z.boolean().optional().default(false),
-    }),
-    async execute({
-      name,
-      origin,
-      rotation,
-      parent,
-      visibility,
-      autouv,
-      selected,
-      shade,
-    }) {
-      Undo.initEdit({
-        elements: [],
-        outliner: true,
-        collections: [],
-      });
-
-      const group = new Group({
+  createTool(
+    "add_group",
+    {
+      description: "Adds a new group with the given name and options.",
+      annotations: {
+        title: "Add Group",
+        destructiveHint: true,
+      },
+      parameters: z.object({
+        name: z.string(),
+        origin: z.array(z.number()).length(3),
+        rotation: z.array(z.number()).length(3),
+        parent: z.string().optional().default("root"),
+        visibility: z.boolean().optional().default(true),
+        autouv: z
+          .enum(["0", "1", "2"])
+          .optional()
+          .default("0")
+          .describe(
+            "Auto UV setting. 0 = disabled, 1 = enabled, 2 = relative auto UV."
+          ),
+        selected: z.boolean().optional().default(false),
+        shade: z.boolean().optional().default(false),
+      }),
+      async execute({
         name,
         origin,
         rotation,
-        autouv: Number(autouv) as 0 | 1 | 2,
-        visibility: Boolean(visibility),
-        selected: Boolean(selected),
-        shade: Boolean(shade),
-      }).init();
+        parent,
+        visibility,
+        autouv,
+        selected,
+        shade,
+      }) {
+        Undo.initEdit({
+          elements: [],
+          outliner: true,
+          collections: [],
+        });
 
-      group.addTo(
-        getAllGroups().find((g) => g.name === parent || g.uuid === parent)
-      );
+        const group = new Group({
+          name,
+          origin,
+          rotation,
+          autouv: Number(autouv) as 0 | 1 | 2,
+          visibility: Boolean(visibility),
+          selected: Boolean(selected),
+          shade: Boolean(shade),
+        }).init();
 
-      Undo.finishEdit("Agent added group");
-      Canvas.updateAll();
+        group.addTo(
+          getAllGroups().find((g) => g.name === parent || g.uuid === parent)
+        );
 
-      return `Added group ${group.name} with ID ${group.uuid}`;
+        Undo.finishEdit("Agent added group");
+        Canvas.updateAll();
+
+        return `Added group ${group.name} with ID ${group.uuid}`;
+      },
     },
-  },
-  STATUS_STABLE
-);
+    STATUS_STABLE
+  );
 
-createTool(
-  "list_outline",
-  {
-    description:
-      "Returns a list of all groups and their children in the Blockbench editor.",
-    annotations: {
-      title: "List Outline",
-      readOnlyHint: true,
-    },
-    parameters: z.object({}),
-    async execute() {
-      const elements = Outliner.elements;
+  createTool(
+    "list_outline",
+    {
+      description:
+        "Returns a list of all groups and their children in the Blockbench editor.",
+      annotations: {
+        title: "List Outline",
+        readOnlyHint: true,
+      },
+      parameters: z.object({}),
+      async execute() {
+        const elements = Outliner.elements;
 
-      return JSON.stringify(
-        elements.map((element) => {
-          const { name, uuid } = element;
-          return {
-            name,
-            uuid,
-          };
-        }),
-        null,
-        2
-      );
+        return JSON.stringify(
+          elements.map((element) => {
+            const { name, uuid } = element;
+            return {
+              name,
+              uuid,
+            };
+          }),
+          null,
+          2
+        );
+      },
     },
-  },
-  STATUS_STABLE
-);
+    STATUS_STABLE
+  );
 
 createTool(
   "duplicate_element",
@@ -260,3 +261,4 @@ createTool(
   },
   STATUS_EXPERIMENTAL
 );
+}

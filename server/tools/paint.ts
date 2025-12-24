@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createTool } from "@/lib/factories";
 import { STATUS_EXPERIMENTAL } from "@/lib/constants";
 
+export function registerPaintTools() {
 createTool(
     "paint_fill_tool",
     {
@@ -1398,3 +1399,4 @@ createTool(
   },
   STATUS_EXPERIMENTAL
 );
+}

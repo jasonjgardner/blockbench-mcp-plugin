@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createTool, tools } from "@/lib/factories";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
 
+export function registerAnimationTools() {
 createTool(
   "create_animation",
   {
@@ -1270,3 +1271,4 @@ createTool(
   },
   STATUS_EXPERIMENTAL
 );
+}
