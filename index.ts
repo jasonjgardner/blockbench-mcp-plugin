@@ -53,7 +53,9 @@ function createResponseWrapper(socket: any) {
 
     writeHead: (status: number, reasonOrHeaders?: string | Record<string, any>, headersArg?: Record<string, any>) => {
       if (headersSent || ended) {
-        console.log("Response.writeHead called but already sent/ended");
+        console.groupCollapsed("[MCP] Response Warning");
+        console.warn("Response.writeHead called but already sent/ended");
+        console.groupEnd();
         return res;
       }
       statusCode = status;
@@ -81,40 +83,51 @@ function createResponseWrapper(socket: any) {
         response += `${key}: ${value}\r\n`;
       }
       response += "\r\n";
-      console.log("Response.writeHead:", status, JSON.stringify(responseHeaders));
+      console.groupCollapsed("[MCP] Response.writeHead");
+      console.log("Status:", status);
+      console.log("Headers:", JSON.stringify(responseHeaders));
+      console.groupEnd();
       socket.write(response);
       return res;
     },
 
     write: (chunk: any, encodingOrCb?: string | Function, cb?: Function) => {
       if (ended) {
-        console.log("Response.write called but already ended");
+        console.groupCollapsed("[MCP] Response Warning");
+        console.warn("Response.write called but already ended");
+        console.groupEnd();
         return false;
       }
       if (!headersSent) {
         res.writeHead(statusCode);
       }
       const callback = typeof encodingOrCb === "function" ? encodingOrCb : cb;
-      console.log("Response.write:", typeof chunk === "string" ? chunk.substring(0, 200) : "[Buffer]");
+      console.groupCollapsed("[MCP] Response.write");
+      console.log("Chunk:", typeof chunk === "string" ? chunk.substring(0, 200) : "[Buffer]");
+      console.groupEnd();
       socket.write(chunk, callback);
       return true;
     },
 
     end: (chunk?: any, encodingOrCb?: string | Function, cb?: Function) => {
       if (ended) {
-        console.log("Response.end called but already ended");
+        console.groupCollapsed("[MCP] Response Warning");
+        console.warn("Response.end called but already ended");
+        console.groupEnd();
         return res;
       }
       if (!headersSent) {
         res.writeHead(statusCode);
       }
       const callback = typeof encodingOrCb === "function" ? encodingOrCb : cb;
+      console.groupCollapsed("[MCP] Response.end");
       if (chunk) {
-        console.log("Response.end with chunk:", typeof chunk === "string" ? chunk.substring(0, 200) : "[Buffer]");
+        console.log("Chunk:", typeof chunk === "string" ? chunk.substring(0, 200) : "[Buffer]");
         socket.write(chunk);
       } else {
-        console.log("Response.end (no chunk)");
+        console.log("No chunk");
       }
+      console.groupEnd();
       socket.end();
       ended = true;
       res.finished = true;
@@ -221,7 +234,8 @@ BBPlugin.register("mcp", {
       // Connect transport to server ONCE
       await currentServer.connect(currentTransport);
       isConnected = true;
-      console.log("MCP transport connected to server");
+      console.group("[MCP] Server Startup");
+      console.log("Transport connected to server");
 
       // Create TCP server and manually handle HTTP
       httpServer = net.createServer((socket: any) => {
@@ -280,64 +294,80 @@ BBPlugin.register("mcp", {
               return;
             }
 
+            // Ensure required headers for StreamableHTTPServerTransport
+            // MCP Inspector may not send all required headers
+            if (!headers["accept"]) {
+              headers["accept"] = "application/json, text/event-stream";
+            } else if (!headers["accept"].includes("text/event-stream")) {
+              headers["accept"] += ", text/event-stream";
+            }
+            if (!headers["content-type"]) {
+              headers["content-type"] = "application/json";
+            }
+
+            const req = createRequestWrapper(socket, method, path, headers);
+            const res = createResponseWrapper(socket);
+
             try {
               const jsonBody = JSON.parse(bodySection);
-              console.log("MCP Request:", JSON.stringify(jsonBody).substring(0, 200));
-              console.log("Request headers:", JSON.stringify(headers));
-
-              // Ensure required headers for StreamableHTTPServerTransport
-              // MCP Inspector may not send all required headers
-              if (!headers["accept"]) {
-                headers["accept"] = "application/json, text/event-stream";
-              } else if (!headers["accept"].includes("text/event-stream")) {
-                headers["accept"] += ", text/event-stream";
-              }
-              if (!headers["content-type"]) {
-                headers["content-type"] = "application/json";
-              }
-
-              const req = createRequestWrapper(socket, method, path, headers);
-              const res = createResponseWrapper(socket);
+              console.group("[MCP] Request");
+              console.log("Body:", JSON.stringify(jsonBody).substring(0, 200));
+              console.log("Headers:", JSON.stringify(headers));
 
               // Use the shared transport to handle this request
               await currentTransport!.handleRequest(req, res, jsonBody);
-              console.log("MCP Request handled");
+              console.log("Request handled successfully");
+              console.groupEnd();
             } catch (error) {
               console.error("Request handling error:", error);
-              if (!socket.destroyed) {
-                const errorJson = JSON.stringify({
-                  jsonrpc: "2.0",
-                  error: { code: -32603, message: String(error) },
-                  id: null,
-                });
-                socket.write(
-                  `HTTP/1.1 500 Internal Server Error\r\nContent-Type: application/json\r\nContent-Length: ${Buffer.byteLength(errorJson)}\r\n\r\n${errorJson}`,
-                );
+              console.groupEnd();
+              if (socket.destroyed) return;
+              if (res.headersSent) {
                 socket.end();
+                return;
               }
+
+              const errorJson = JSON.stringify({
+                jsonrpc: "2.0",
+                error: { code: -32603, message: String(error) },
+                id: null,
+              });
+
+              res.writeHead(500, {
+                "Content-Type": "application/json",
+                "Content-Length": String(Buffer.byteLength(errorJson)),
+              });
+              res.end(errorJson);
             }
           }
         });
 
         socket.on("error", (error: Error) => {
-          console.error("Socket error:", error);
+          console.group("[MCP] Socket Error");
+          console.error(error);
+          console.groupEnd();
         });
       });
 
       httpServer.listen(port, () => {
-        console.log(`Blockbench MCP Server running on http://localhost:${port}${endpoint}`);
+        console.log(`Server running on http://localhost:${port}${endpoint}`);
+        console.groupEnd();
         Blockbench.showQuickMessage(`MCP Server started on port ${port}`, 2000);
       });
 
       httpServer.on("error", (error: Error) => {
-        console.error("MCP Server error:", error);
+        console.group("[MCP] Server Error");
+        console.error(error);
+        console.groupEnd();
         Blockbench.showMessageBox({
           title: "MCP Server Error",
           message: `Failed to start server: ${error.message}`,
         });
       });
     } catch (error) {
+      console.group("[MCP] Startup Error");
       console.error("Failed to start MCP server:", error);
+      console.groupEnd();
       const errorMessage = error instanceof Error ? error.message : String(error);
       const isPermissionError = errorMessage.includes("permission") || errorMessage.includes("denied");
 

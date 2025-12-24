@@ -26,11 +26,13 @@ const blockbenchCompatPlugin: BunPlugin = {
 async function cleanOutputDir() {
   try {
     await access(OUTPUT_DIR);
-    console.log(`🗑️ Cleaning output directory: ${OUTPUT_DIR}`);
+    console.group("[Build] Clean");
+    console.log(`Cleaning output directory: ${OUTPUT_DIR}`);
     await rmdir(OUTPUT_DIR, { recursive: true });
+    console.groupEnd();
   } catch (error) {
     // Directory doesn't exist, no need to clean
-    console.log(`🗑️ Output directory does not exist, no need to clean.`);
+    console.log(`[Build] Output directory does not exist, no need to clean.`);
   }
 }
 
@@ -41,7 +43,9 @@ async function buildPlugin(): Promise<boolean> {
     await mkdir(OUTPUT_DIR, { recursive: true });
   } catch (error: unknown) {
     if (error && typeof error === "object" && "code" in error && error.code !== "EEXIST") {
+      console.group("[Build] Error");
       console.error("Error creating output directory:", error);
+      console.groupEnd();
       return false;
     }
   }
@@ -91,12 +95,15 @@ async function buildPlugin(): Promise<boolean> {
   });
 
   if (!result.success) {
-    console.error("❌ Build failed:");
+    console.group("[Build] Failed");
     for (const message of result.logs) {
       console.error(message);
     }
+    console.groupEnd();
     return false;
   }
+
+  console.group("[Build] Assets");
 
   const iconSource = path.resolve("./icon.svg");
   const iconDest = path.join(OUTPUT_DIR, "icon.svg");
@@ -105,7 +112,7 @@ async function buildPlugin(): Promise<boolean> {
     // Check if icon exists and copy it
     await access(iconSource);
     await copyFile(iconSource, iconDest);
-    console.log("📁 Copied icon.svg");
+    console.log("Copied icon.svg");
   } catch (error) {
     // File doesn't exist or couldn't be copied, just continue
   }
@@ -117,7 +124,7 @@ async function buildPlugin(): Promise<boolean> {
     // Check if index file exists and rename it
     await access(indexFile);
     await rename(indexFile, mcpFile);
-    console.log("📁 Renamed index.js to mcp.js");
+    console.log("Renamed index.js to mcp.js");
   } catch (error) {
     // File doesn't exist or couldn't be renamed
   }
@@ -130,7 +137,7 @@ async function buildPlugin(): Promise<boolean> {
     // Check if map file exists and rename it
     await access(indexMapFile);
     await rename(indexMapFile, mcpMapFile);
-    console.log("📁 Renamed index.js.map to mcp.js.map");
+    console.log("Renamed index.js.map to mcp.js.map");
   } catch (error) {
     // File doesn't exist or couldn't be renamed
   }
@@ -142,10 +149,12 @@ async function buildPlugin(): Promise<boolean> {
   try {
     await access(readmeSource);
     await copyFile(readmeSource, readmeDest);
-    console.log("📁 Copied about.md");
+    console.log("Copied about.md");
   } catch (error) {
     // File doesn't exist or couldn't be copied
   }
+
+  console.groupEnd();
 
   // Inject Blockbench-compatible require shims at the top of the bundle
   try {
@@ -217,7 +226,9 @@ async function buildPlugin(): Promise<boolean> {
         }
         return result;
       } catch (e) {
-        console.error('Failed to load native module ' + id + ':', e);
+        console.group('[MCP] Native Module Error');
+        console.error('Failed to load module ' + id + ':', e);
+        console.groupEnd();
         return undefined;
       }
     }
@@ -327,6 +338,28 @@ async function buildPlugin(): Promise<boolean> {
               var bodySection = buffer.subarray(bodyStart, requestEnd).toString();
               buffer = buffer.subarray(requestEnd);
 
+              var _dataListeners = [];
+              var _endListeners = [];
+              var _flushed = false;
+
+              function flushReqEvents() {
+                if (_flushed) return;
+                _flushed = true;
+
+                // Emit asynchronously to better match Node.js stream behavior
+                setTimeout(function() {
+                  if (bodySection !== '') {
+                    for (var i = 0; i < _dataListeners.length; i++) {
+                      try { _dataListeners[i](bodySection); } catch (e) {}
+                    }
+                  }
+
+                  for (var j = 0; j < _endListeners.length; j++) {
+                    try { _endListeners[j](); } catch (e2) {}
+                  }
+                }, 0);
+              }
+
               // Create request object
               var req = {
                 method: requestLine[0],
@@ -335,9 +368,38 @@ async function buildPlugin(): Promise<boolean> {
                 headers: headers,
                 socket: socket,
                 body: bodySection,
-                on: function(event, cb) { if (event === 'data' && bodySection) cb(bodySection); return this; },
-                once: function() { return this; },
-                emit: function() { return this; }
+                on: function(event, cb) {
+                  if (event === 'data') {
+                    _dataListeners.push(cb);
+                    flushReqEvents();
+                    return this;
+                  }
+                  if (event === 'end') {
+                    _endListeners.push(cb);
+                    flushReqEvents();
+                    return this;
+                  }
+                  return this;
+                },
+                once: function(event, cb) {
+                  var self = this;
+                  function wrapped() {
+                    try { cb.apply(null, arguments); } finally { self.off(event, wrapped); }
+                  }
+                  return this.on(event, wrapped);
+                },
+                off: function(event, cb) {
+                  var arr = event === 'data' ? _dataListeners : event === 'end' ? _endListeners : null;
+                  if (!arr) return this;
+                  for (var i = arr.length - 1; i >= 0; i--) {
+                    if (arr[i] === cb) arr.splice(i, 1);
+                  }
+                  return this;
+                },
+                emit: function(event) {
+                  flushReqEvents();
+                  return this;
+                }
               };
 
               // Create response object
@@ -395,8 +457,8 @@ async function buildPlugin(): Promise<boolean> {
         ServerResponse: function() {},
         Server: function() { return createServer(); },
         createServer: createServer,
-        request: function() { console.warn('http.request not implemented - use https via requireNativeModule'); },
-        get: function() { console.warn('http.get not implemented - use https via requireNativeModule'); }
+        request: function() { console.group('[MCP] HTTP Warning'); console.warn('http.request not implemented - use https via requireNativeModule'); console.groupEnd(); },
+        get: function() { console.group('[MCP] HTTP Warning'); console.warn('http.get not implemented - use https via requireNativeModule'); console.groupEnd(); }
       };
     }
 
@@ -465,9 +527,11 @@ async function buildPlugin(): Promise<boolean> {
 `;
     
     await writeFile(mcpFile, shims + mcpContent, "utf-8");
-    console.log("✨ Injected Blockbench compatibility shims");
+    console.log("[Build] Injected Blockbench compatibility shims");
   } catch (error: unknown) {
-    console.error("⚠️ Failed to inject shims:", error);
+    console.group("[Build] Shim Error");
+    console.error("Failed to inject shims:", error);
+    console.groupEnd();
   }
 
   return true;
@@ -475,7 +539,7 @@ async function buildPlugin(): Promise<boolean> {
 
 // Function to watch for file changes
 function watchFiles() {
-  console.log("👀 Watching for changes...");
+  console.log("[Build] Watching for changes...");
 
   const watcher = watch(
     "./",
@@ -494,49 +558,56 @@ function watchFiles() {
         return;
       }
 
-      console.log(`📄 File changed: ${filename}. Rebuilding...`);
+      console.group("[Build] Rebuild");
+      console.log(`File changed: ${filename}`);
       await cleanOutputDir();
       await buildPlugin();
-      console.log("✅ Rebuild complete! Watching for more changes...");
+      console.log("Rebuild complete");
+      console.groupEnd();
     }
   );
 
   // Handle process termination
   process.on("SIGINT", () => {
     watcher.close();
-    console.log("\n🛑 Watch mode stopped");
+    console.log("[Build] Watch mode stopped");
     process.exit(0);
   });
 }
 
 async function main() {
+  console.group("[Build] MCP Plugin");
+
   if (isCleanMode) {
-    console.log("🗑️ Cleaning output directory...");
     await cleanOutputDir();
-    console.log("✅ Cleaned output directory!");
   }
 
   if (isWatchMode) {
-    console.log("🏗️ Building MCP plugin with Bun (watch mode)...");
+    console.log("Building with watch mode...");
     const success = await buildPlugin();
     if (success) {
-      console.log(
-        `✅ Initial build completed successfully! Output in ${OUTPUT_DIR}`
-      );
+      console.log(`Initial build completed. Output in ${OUTPUT_DIR}`);
+      console.groupEnd();
       watchFiles();
+    } else {
+      console.groupEnd();
     }
   } else {
-    console.log("🏗️ Building MCP plugin with Bun...");
+    console.log("Building...");
     const success = await buildPlugin();
     if (success) {
-      console.log(`✅ Build completed successfully! Output in ${OUTPUT_DIR}`);
-    } else {
+      console.log(`Build completed. Output in ${OUTPUT_DIR}`);
+    }
+    console.groupEnd();
+    if (!success) {
       process.exit(1);
     }
   }
 }
 
 main().catch((err) => {
-  console.error("💥 Build error:", err);
+  console.group("[Build] Fatal Error");
+  console.error(err);
+  console.groupEnd();
   process.exit(1);
 });
