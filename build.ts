@@ -294,83 +294,90 @@ async function buildPlugin(): Promise<boolean> {
         }
 
         var server = netModule.createServer(function(socket) {
-          var buffer = '';
+          var buffer = Buffer.alloc(0);
 
           socket.on('data', function(chunk) {
-            buffer += chunk.toString();
+            buffer = Buffer.concat([buffer, chunk]);
 
-            // Check for complete HTTP headers
-            var headerEnd = buffer.indexOf('\\r\\n\\r\\n');
-            if (headerEnd === -1) return;
+            while (true) {
+              // Check for complete HTTP headers
+              var headerEnd = buffer.indexOf('\\r\\n\\r\\n');
+              if (headerEnd === -1) return;
 
-            var headerSection = buffer.substring(0, headerEnd);
-            var bodySection = buffer.substring(headerEnd + 4);
-            var lines = headerSection.split('\\r\\n');
-            var requestLine = lines[0].split(' ');
+              var headerSection = buffer.subarray(0, headerEnd).toString();
+              var lines = headerSection.split('\\r\\n');
+              var requestLine = lines[0].split(' ');
 
-            // Parse headers
-            var headers = {};
-            for (var i = 1; i < lines.length; i++) {
-              var colonIdx = lines[i].indexOf(':');
-              if (colonIdx > 0) {
-                var key = lines[i].substring(0, colonIdx).trim().toLowerCase();
-                var value = lines[i].substring(colonIdx + 1).trim();
-                headers[key] = value;
+              // Parse headers
+              var headers = {};
+              for (var i = 1; i < lines.length; i++) {
+                var colonIdx = lines[i].indexOf(':');
+                if (colonIdx > 0) {
+                  var key = lines[i].substring(0, colonIdx).trim().toLowerCase();
+                  var value = lines[i].substring(colonIdx + 1).trim();
+                  headers[key] = value;
+                }
+              }
+
+              var bodyStart = headerEnd + 4;
+              var contentLength = parseInt(headers['content-length'] || '0', 10) || 0;
+              var requestEnd = bodyStart + contentLength;
+              if (buffer.length < requestEnd) return;
+
+              var bodySection = buffer.subarray(bodyStart, requestEnd).toString();
+              buffer = buffer.subarray(requestEnd);
+
+              // Create request object
+              var req = {
+                method: requestLine[0],
+                url: requestLine[1],
+                httpVersion: '1.1',
+                headers: headers,
+                socket: socket,
+                body: bodySection,
+                on: function(event, cb) { if (event === 'data' && bodySection) cb(bodySection); return this; },
+                once: function() { return this; },
+                emit: function() { return this; }
+              };
+
+              // Create response object
+              var res = {
+                statusCode: 200,
+                statusMessage: 'OK',
+                headersSent: false,
+                _headers: { 'Content-Type': 'text/plain' },
+                setHeader: function(name, value) { this._headers[name.toLowerCase()] = value; },
+                getHeader: function(name) { return this._headers[name.toLowerCase()]; },
+                writeHead: function(status, reasonOrHeaders, headers) {
+                  if (this.headersSent) return this;
+                  this.statusCode = status;
+                  this.statusMessage = STATUS_CODES[status] || 'Unknown';
+                  var hdrs = typeof reasonOrHeaders === 'object' ? reasonOrHeaders : headers || {};
+                  for (var k in hdrs) { this._headers[k.toLowerCase()] = hdrs[k]; }
+                  this.headersSent = true;
+                  var headerStr = 'HTTP/1.1 ' + status + ' ' + this.statusMessage + '\\r\\n';
+                  for (var h in this._headers) { headerStr += h + ': ' + this._headers[h] + '\\r\\n'; }
+                  headerStr += '\\r\\n';
+                  socket.write(headerStr);
+                  return this;
+                },
+                write: function(data) {
+                  if (!this.headersSent) this.writeHead(this.statusCode);
+                  socket.write(data);
+                  return true;
+                },
+                end: function(data) {
+                  if (!this.headersSent) this.writeHead(this.statusCode);
+                  if (data) socket.write(data);
+                  socket.end();
+                },
+                on: function() { return this; }
+              };
+
+              if (requestListener) {
+                requestListener(req, res);
               }
             }
-
-            // Create request object
-            var req = {
-              method: requestLine[0],
-              url: requestLine[1],
-              httpVersion: '1.1',
-              headers: headers,
-              socket: socket,
-              body: bodySection,
-              on: function(event, cb) { if (event === 'data' && bodySection) cb(bodySection); return this; },
-              once: function() { return this; },
-              emit: function() { return this; }
-            };
-
-            // Create response object
-            var res = {
-              statusCode: 200,
-              statusMessage: 'OK',
-              headersSent: false,
-              _headers: { 'Content-Type': 'text/plain' },
-              setHeader: function(name, value) { this._headers[name.toLowerCase()] = value; },
-              getHeader: function(name) { return this._headers[name.toLowerCase()]; },
-              writeHead: function(status, reasonOrHeaders, headers) {
-                if (this.headersSent) return this;
-                this.statusCode = status;
-                this.statusMessage = STATUS_CODES[status] || 'Unknown';
-                var hdrs = typeof reasonOrHeaders === 'object' ? reasonOrHeaders : headers || {};
-                for (var k in hdrs) { this._headers[k.toLowerCase()] = hdrs[k]; }
-                this.headersSent = true;
-                var headerStr = 'HTTP/1.1 ' + status + ' ' + this.statusMessage + '\\r\\n';
-                for (var h in this._headers) { headerStr += h + ': ' + this._headers[h] + '\\r\\n'; }
-                headerStr += '\\r\\n';
-                socket.write(headerStr);
-                return this;
-              },
-              write: function(data) {
-                if (!this.headersSent) this.writeHead(this.statusCode);
-                socket.write(data);
-                return true;
-              },
-              end: function(data) {
-                if (!this.headersSent) this.writeHead(this.statusCode);
-                if (data) socket.write(data);
-                socket.end();
-              },
-              on: function() { return this; }
-            };
-
-            if (requestListener) {
-              requestListener(req, res);
-            }
-
-            buffer = '';
           });
 
           socket.on('error', function() {});

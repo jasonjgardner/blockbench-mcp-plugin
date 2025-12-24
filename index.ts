@@ -225,87 +225,96 @@ BBPlugin.register("mcp", {
 
       // Create TCP server and manually handle HTTP
       httpServer = net.createServer((socket: any) => {
-        let buffer = "";
+        let buffer = Buffer.alloc(0);
 
         socket.on("data", async (chunk: Buffer) => {
-          buffer += chunk.toString();
+          buffer = Buffer.concat([buffer, chunk]);
 
-          // Check if we have complete HTTP request (headers end with \r\n\r\n)
-          const headerEndIndex = buffer.indexOf("\r\n\r\n");
-          if (headerEndIndex === -1) return;
+          while (true) {
+            // Check if we have complete HTTP request headers (headers end with \r\n\r\n)
+            const headerEndIndex = buffer.indexOf("\r\n\r\n");
+            if (headerEndIndex === -1) return;
 
-          const headerSection = buffer.substring(0, headerEndIndex);
-          const bodySection = buffer.substring(headerEndIndex + 4);
+            const headerSection = buffer.subarray(0, headerEndIndex).toString("utf8");
+            const lines = headerSection.split("\r\n");
+            const [method, path] = lines[0].split(" ");
 
-          const lines = headerSection.split("\r\n");
-          const [method, path] = lines[0].split(" ");
-
-          // Parse headers
-          const headers: Record<string, string> = {};
-          for (let i = 1; i < lines.length; i++) {
-            const colonIndex = lines[i].indexOf(":");
-            if (colonIndex > 0) {
-              const key = lines[i].substring(0, colonIndex).trim().toLowerCase();
-              const value = lines[i].substring(colonIndex + 1).trim();
-              headers[key] = value;
-            }
-          }
-
-          // Reset buffer for next request
-          buffer = "";
-
-          // Handle GET requests for server info
-          if (method === "GET" && path === endpoint) {
-            const info = JSON.stringify({
-              name: "Blockbench MCP",
-              version: VERSION,
-              status: "running",
-              transport: "streamable-http",
-            });
-            socket.write(`HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${Buffer.byteLength(info)}\r\n\r\n${info}`);
-            socket.end();
-            return;
-          }
-
-          // Only handle POST to our endpoint
-          if (method !== "POST" || path !== endpoint) {
-            socket.write("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n");
-            socket.end();
-            return;
-          }
-
-          try {
-            const jsonBody = JSON.parse(bodySection);
-            console.log("MCP Request:", JSON.stringify(jsonBody).substring(0, 200));
-            console.log("Request headers:", JSON.stringify(headers));
-
-            // Ensure required headers for StreamableHTTPServerTransport
-            // MCP Inspector may not send all required headers
-            if (!headers["accept"]) {
-              headers["accept"] = "application/json, text/event-stream";
-            } else if (!headers["accept"].includes("text/event-stream")) {
-              headers["accept"] += ", text/event-stream";
-            }
-            if (!headers["content-type"]) {
-              headers["content-type"] = "application/json";
+            // Parse headers
+            const headers: Record<string, string> = {};
+            for (let i = 1; i < lines.length; i++) {
+              const colonIndex = lines[i].indexOf(":");
+              if (colonIndex > 0) {
+                const key = lines[i].substring(0, colonIndex).trim().toLowerCase();
+                const value = lines[i].substring(colonIndex + 1).trim();
+                headers[key] = value;
+              }
             }
 
-            const req = createRequestWrapper(socket, method, path, headers);
-            const res = createResponseWrapper(socket);
+            const bodyStartIndex = headerEndIndex + 4;
+            const contentLength = Number.parseInt(headers["content-length"] || "0", 10) || 0;
+            const requestEndIndex = bodyStartIndex + contentLength;
+            if (buffer.length < requestEndIndex) return;
 
-            // Use the shared transport to handle this request
-            await currentTransport!.handleRequest(req, res, jsonBody);
-            console.log("MCP Request handled");
-          } catch (error) {
-            console.error("Request handling error:", error);
-            if (!socket.destroyed) {
-              const errorJson = JSON.stringify({
-                jsonrpc: "2.0",
-                error: { code: -32603, message: String(error) },
-                id: null
+            const bodySection = buffer.subarray(bodyStartIndex, requestEndIndex).toString("utf8");
+            buffer = buffer.subarray(requestEndIndex);
+
+            // Handle GET requests for server info
+            if (method === "GET" && path === endpoint) {
+              const info = JSON.stringify({
+                name: "Blockbench MCP",
+                version: VERSION,
+                status: "running",
+                transport: "streamable-http",
               });
-              socket.write(`HTTP/1.1 500 Internal Server Error\r\nContent-Type: application/json\r\nContent-Length: ${Buffer.byteLength(errorJson)}\r\n\r\n${errorJson}`);
+              socket.write(
+                `HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${Buffer.byteLength(info)}\r\n\r\n${info}`,
+              );
               socket.end();
+              return;
+            }
+
+            // Only handle POST to our endpoint
+            if (method !== "POST" || path !== endpoint) {
+              socket.write("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n");
+              socket.end();
+              return;
+            }
+
+            try {
+              const jsonBody = JSON.parse(bodySection);
+              console.log("MCP Request:", JSON.stringify(jsonBody).substring(0, 200));
+              console.log("Request headers:", JSON.stringify(headers));
+
+              // Ensure required headers for StreamableHTTPServerTransport
+              // MCP Inspector may not send all required headers
+              if (!headers["accept"]) {
+                headers["accept"] = "application/json, text/event-stream";
+              } else if (!headers["accept"].includes("text/event-stream")) {
+                headers["accept"] += ", text/event-stream";
+              }
+              if (!headers["content-type"]) {
+                headers["content-type"] = "application/json";
+              }
+
+              const req = createRequestWrapper(socket, method, path, headers);
+              const res = createResponseWrapper(socket);
+
+              // Use the shared transport to handle this request
+              await currentTransport!.handleRequest(req, res, jsonBody);
+              console.log("MCP Request handled");
+            } catch (error) {
+              console.error("Request handling error:", error);
+              if (!socket.destroyed) {
+                const errorJson = JSON.stringify({
+                  jsonrpc: "2.0",
+                  error: { code: -32603, message: String(error) },
+                  id: null,
+                });
+                socket.write(
+                  `HTTP/1.1 500 Internal Server Error\r\nContent-Type: application/json\r\nContent-Length: ${Buffer.byteLength(errorJson)}\r\n\r\n${errorJson}`,
+                );
+                socket.end();
+              }
             }
           }
         });
