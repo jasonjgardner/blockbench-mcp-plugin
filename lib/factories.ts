@@ -1,6 +1,7 @@
 import { z } from "zod";
-import type { IMCPTool, IMCPPrompt } from "@/types";
+import type { IMCPTool, IMCPPrompt, IMCPResource } from "@/types";
 import { getServer } from "@/server/server";
+import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 const TOOL_PREFIX = "blockbench";
 
@@ -13,6 +14,11 @@ export const tools: Record<string, IMCPTool> = {};
  * User-visible list of prompt details.
  */
 export const prompts: Record<string, IMCPPrompt> = {};
+
+/**
+ * User-visible list of resource details.
+ */
+export const resources: Record<string, IMCPResource> = {};
 
 export interface ToolContext {
   reportProgress: (progress: { progress: number; total: number }) => void;
@@ -158,7 +164,7 @@ export function getEnabledToolDefinitions() {
  */
 export function registerToolsOnServer(server: any) {
   const enabledDefs = getEnabledToolDefinitions();
-  
+
   for (const [name, toolDef] of Object.entries(enabledDefs)) {
     server.registerTool(
       name,
@@ -185,6 +191,107 @@ export function registerToolsOnServer(server: any) {
         return {
           content: [{ type: "text", text: JSON.stringify(result) }],
         };
+      }
+    );
+  }
+}
+
+/**
+ * Resource definition storage for dynamic server reconstruction
+ */
+interface ResourceDefinition {
+  name: string;
+  uriTemplate: string;
+  metadata: {
+    title?: string;
+    description?: string;
+  };
+  readCallback: (uri: URL, variables: Record<string, string>) => Promise<{
+    contents: Array<{ uri: string; text?: string; blob?: string }>;
+  }>;
+}
+
+const resourceDefinitions: Record<string, ResourceDefinition> = {};
+
+/**
+ * Creates a new MCP resource and registers it with the server using the official SDK.
+ * @param name - The resource name.
+ * @param config - The resource configuration.
+ * @param config.uriTemplate - The URI template pattern (e.g., "nodes://{id}").
+ * @param config.title - Optional title for the resource.
+ * @param config.description - The description of the resource.
+ * @param config.readCallback - Async function to read the resource.
+ * @returns - The created resource metadata.
+ */
+export function createResource(
+  name: string,
+  config: {
+    uriTemplate: string;
+    title?: string;
+    description: string;
+    readCallback: (uri: URL, variables: Record<string, string>) => Promise<{
+      contents: Array<{ uri: string; text?: string; blob?: string }>;
+    }>;
+  }
+) {
+  if (resources[name]) {
+    throw new Error(`Resource with name "${name}" already exists.`);
+  }
+
+  const resourceDef: ResourceDefinition = {
+    name,
+    uriTemplate: config.uriTemplate,
+    metadata: {
+      title: config.title,
+      description: config.description,
+    },
+    readCallback: config.readCallback,
+  };
+
+  // Store resource definition for session reconstruction
+  resourceDefinitions[name] = resourceDef;
+
+  // Register with the current server instance
+  getServer().registerResource(
+    name,
+    new ResourceTemplate(config.uriTemplate, { list: undefined }),
+    {
+      title: config.title,
+      description: config.description,
+    },
+    async (uri, variables) => {
+      return config.readCallback(uri, variables as Record<string, string>);
+    }
+  );
+
+  resources[name] = {
+    name,
+    description: config.description,
+    uriTemplate: config.uriTemplate,
+  };
+
+  return resources[name];
+}
+
+/**
+ * Gets all resource definitions for server reconstruction
+ */
+export function getAllResourceDefinitions() {
+  return resourceDefinitions;
+}
+
+/**
+ * Registers all resources on a server instance
+ * Used to set up new session servers with the same resources
+ */
+export function registerResourcesOnServer(server: any) {
+  for (const [name, resourceDef] of Object.entries(resourceDefinitions)) {
+    server.registerResource(
+      name,
+      new ResourceTemplate(resourceDef.uriTemplate, { list: undefined }),
+      resourceDef.metadata,
+      async (uri: URL, variables: Record<string, string>) => {
+        return resourceDef.readCallback(uri, variables);
       }
     );
   }

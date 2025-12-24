@@ -9,7 +9,7 @@ import { VERSION } from "@/lib/constants";
 import { createServer } from "@/server/server";
 // Import tools from the tools module which re-exports from factories after registration
 import { tools, prompts, getToolCount } from "@/server/tools";
-import { registerToolsOnServer } from "@/lib/factories";
+import { registerToolsOnServer, registerResourcesOnServer } from "@/lib/factories";
 import { resources } from "@/server";
 import { uiSetup, uiTeardown } from "@/ui";
 import { settingsSetup, settingsTeardown } from "@/ui/settings";
@@ -158,9 +158,10 @@ BBPlugin.register("mcp", {
             // If no session exists, create a new one with its own server and transport
             if (!session) {
               const sessionServer = createServer();
-              
-              // Register all tools on this session's server
+
+              // Register all tools and resources on this session's server
               registerToolsOnServer(sessionServer);
+              registerResourcesOnServer(sessionServer);
               
               const transport = new WebStandardStreamableHTTPServerTransport({
                 sessionIdGenerator: () => crypto.randomUUID(),

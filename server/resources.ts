@@ -1,23 +1,13 @@
 /// <reference types="three" />
 /// <reference types="blockbench-types" />
-import server from "./server";
-import { getProjectTexture } from "../lib/util";
-import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { createResource } from "@/lib/factories";
 
-// TODO: Refactor resources to use official SDK registerResource API
-// Resources are currently disabled - they need to be updated to match the official SDK API
-
-// Register nodes resource with official SDK
-server.registerResource(
-  "nodes",
-  new ResourceTemplate("nodes://{id}", {
-    list: undefined,
-  }),
-  {
-    title: "Blockbench Nodes",
-    description: "Returns the current nodes in the Blockbench editor.",
-  },
-  async (uri, { id }) => {
+// Register nodes resource using the factory pattern
+createResource("nodes", {
+  uriTemplate: "nodes://{id}",
+  title: "Blockbench Nodes",
+  description: "Returns the current nodes in the Blockbench editor.",
+  async readCallback(uri, { id }) {
     if (!Project?.nodes_3d) {
       throw new Error("No nodes found in the Blockbench editor.");
     }
@@ -46,8 +36,8 @@ server.registerResource(
         },
       ],
     };
-  }
-);
+  },
+});
 
 /*
 // Resources below are commented out pending refactoring to official SDK API
