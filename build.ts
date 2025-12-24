@@ -270,11 +270,9 @@ async function buildPlugin(): Promise<boolean> {
     const mcpContent = await readFile(mcpFile, "utf-8");
     const banner = "let process = requireNativeModule('process');\n";
 
-    if (mcpContent.startsWith(banner)) {
-      return true;
+    if (!mcpContent.startsWith(banner)) {
+      await writeFile(mcpFile, banner + mcpContent, "utf-8");
     }
-
-    await writeFile(mcpFile, banner + mcpContent, "utf-8");
   } catch (error) {
     // If the bundle doesn't exist or can't be edited, just continue.
   }
