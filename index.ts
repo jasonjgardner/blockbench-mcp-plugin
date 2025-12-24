@@ -6,7 +6,7 @@
 /// <reference types="three" />
 /// <reference types="blockbench-types" />
 import { VERSION } from "@/lib/constants";
-import { getServer } from "@/server/server";
+import { createServer } from "@/server/server";
 // Import tools from the tools module which re-exports from factories after registration
 import { tools, prompts, getToolCount } from "@/server/tools";
 import { resources } from "@/server";
@@ -17,9 +17,9 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Server as NetServer, Socket } from "net";
 
-let currentServer: McpServer | null = null;
-let currentTransport: WebStandardStreamableHTTPServerTransport | null = null;
 let httpServer: NetServer | null = null;
+// Map of session ID to transport and server instances
+const sessionTransports = new Map<string, { transport: WebStandardStreamableHTTPServerTransport; server: McpServer }>();
 
 BBPlugin.register("mcp", {
   version: VERSION,
@@ -49,24 +49,7 @@ BBPlugin.register("mcp", {
     const port = Settings.get("mcp_port") || 3000;
     const endpoint = Settings.get("mcp_endpoint") || "/bb-mcp";
 
-    currentServer = getServer();
-
     console.log(`[MCP] Loaded ${getToolCount()} tools`);
-
-    // Create transport with session support for multiple connections
-    currentTransport = new WebStandardStreamableHTTPServerTransport({
-      sessionIdGenerator: () => crypto.randomUUID(),
-      enableJsonResponse: true,
-      onsessioninitialized: (sessionId: string) => {
-        sessionManager.add(sessionId);
-      },
-      onsessionclosed: (sessionId: string) => {
-        sessionManager.remove(sessionId);
-      },
-    });
-
-    // Connect server to transport
-    await currentServer.connect(currentTransport);
 
     // Create TCP server to handle HTTP requests
     httpServer = net.createServer((socket: Socket) => {
@@ -78,7 +61,17 @@ BBPlugin.register("mcp", {
       });
 
       socket.on("error", (err: Error) => {
-        console.error("[MCP] Socket error:", err.message);
+        // ECONNRESET is common when clients disconnect abruptly - don't spam logs
+        if (err.message !== "read ECONNRESET") {
+          console.error("[MCP] Socket error:", err.message);
+        }
+        // Clean up the socket
+        socket.destroy();
+      });
+
+      socket.on("close", () => {
+        // Clean up buffer when socket closes
+        buffer = Buffer.alloc(0);
       });
 
       async function processHttpRequests() {
@@ -132,12 +125,6 @@ BBPlugin.register("mcp", {
 
           const webRequest = new Request(url, requestInit);
 
-          // Update session activity
-          const sessionId = headers["mcp-session-id"];
-          if (sessionId) {
-            sessionManager.updateActivity(sessionId);
-          }
-
           // Check endpoint
           if (!path.startsWith(endpoint)) {
             sendResponse(socket, 404, { "content-type": "text/plain" }, "Not Found", headers["connection"]);
@@ -145,12 +132,43 @@ BBPlugin.register("mcp", {
           }
 
           try {
+            // Get or create transport for this session
+            const sessionId = headers["mcp-session-id"];
+            let session = sessionId ? sessionTransports.get(sessionId) : null;
+
+            // If no session exists, create a new one with its own server and transport
+            if (!session) {
+              const sessionServer = createServer();
+              const transport = new WebStandardStreamableHTTPServerTransport({
+                sessionIdGenerator: () => crypto.randomUUID(),
+                enableJsonResponse: true,
+                onsessioninitialized: (newSessionId: string) => {
+                  sessionManager.add(newSessionId);
+                  sessionTransports.set(newSessionId, { transport, server: sessionServer });
+                },
+                onsessionclosed: (closedSessionId: string) => {
+                  sessionManager.remove(closedSessionId);
+                  sessionTransports.delete(closedSessionId);
+                },
+              });
+
+              // Connect this session's server to its transport
+              await sessionServer.connect(transport);
+              
+              session = { transport, server: sessionServer };
+            }
+
+            // Update session activity
+            if (sessionId) {
+              sessionManager.updateActivity(sessionId);
+            }
+
             // Let the transport handle the MCP protocol
-            const webResponse = await currentTransport!.handleRequest(webRequest);
+            const webResponse = await session.transport.handleRequest(webRequest);
 
             // Convert Web Standard Response to HTTP
             const responseHeaders: Record<string, string> = {};
-            webResponse.headers.forEach((value, key) => {
+            webResponse.headers.forEach((value: string, key: string) => {
               responseHeaders[key] = value;
             });
 
@@ -214,8 +232,10 @@ BBPlugin.register("mcp", {
       Blockbench.showQuickMessage(`MCP Server error: ${err.message}`, 3000);
     });
 
+    // Create a reference server for UI display purposes
+    const referenceServer = createServer();
     uiSetup({
-      server: currentServer,
+      server: referenceServer,
       tools,
       resources,
       prompts,
@@ -229,16 +249,14 @@ BBPlugin.register("mcp", {
       httpServer = null;
     }
 
-    // Close transport
-    if (currentTransport) {
-      currentTransport.close();
-      currentTransport = null;
+    // Close all session transports
+    for (const session of sessionTransports.values()) {
+      session.transport.close();
     }
+    sessionTransports.clear();
 
     // Clear all sessions
     sessionManager.clear();
-
-    currentServer = null;
 
     uiTeardown();
     settingsTeardown();
