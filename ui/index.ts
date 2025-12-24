@@ -2,8 +2,10 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { IMCPTool, IMCPPrompt, IMCPResource } from "@/types";
 import { VERSION } from "@/lib/constants";
 import { statusBarSetup, statusBarTeardown } from "@/ui/statusBar";
+import { sessionManager, type Session } from "@/lib/sessions";
 
 let panel: Panel | undefined;
+let unsubscribe: (() => void) | undefined;
 
 export function uiSetup({
   server,
@@ -113,6 +115,35 @@ export function uiSetup({
           text-transform: uppercase;
           margin-left: 8px;
         }
+
+        .session-item {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 6px 0;
+          border-bottom: 1px solid var(--color-border);
+          font-size: 0.85em;
+        }
+
+        .session-item:last-child {
+          border-bottom: none;
+        }
+
+        .session-id {
+          font-family: monospace;
+          color: var(--color-text);
+        }
+
+        .session-time {
+          color: var(--color-subtle_text);
+          font-size: 0.9em;
+        }
+
+        .no-sessions {
+          color: var(--color-subtle_text);
+          font-style: italic;
+          padding: 8px 0;
+        }
     }
 `);
 
@@ -126,35 +157,27 @@ export function uiSetup({
     default_side: "right",
     resizable: true,
     component: {
-      beforeMount() {
-        // TODO: Official SDK doesn't have event emitter - implement connection tracking differently
-        // For now, set connected state directly since we're using HTTP transport
+      mounted() {
+        // Subscribe to session changes
         // @ts-ignore
-        this.server.connected = true;
-        // @ts-ignore
-        this.sessions = [];
-
-        // Initialize tools data with current enabled state
-        // @ts-ignore
-        this.tools = Object.values(tools).map((tool) => ({
-          name: tool.name,
-          description: tool.description,
-          enabled: tool.enabled,
-          status: tool.status,
-        }));
-
-        // Initialize resources data
-        // @ts-ignore
-        this.resources = Object.values(resources).map((resource) => ({
-          name: resource.name,
-          description: resource.description,
-          uriTemplate: resource.uriTemplate,
-        }));
+        const vm = this;
+        unsubscribe = sessionManager.subscribe((sessions: Session[]) => {
+          vm.sessions = sessions.map((s: Session) => ({
+            id: s.id,
+            connectedAt: s.connectedAt,
+            lastActivity: s.lastActivity,
+          }));
+          vm.server.connected = sessions.length > 0;
+        });
+      },
+      beforeDestroy() {
+        if (unsubscribe) {
+          unsubscribe();
+          unsubscribe = undefined;
+        }
       },
       data: () => ({
-        inspector: null,
-        inspectorLink: "http://127.0.0.1:6274/",
-        sessions: [],
+        sessions: [] as Array<{ id: string; connectedAt: Date; lastActivity: Date }>,
         server: {
           connected: false,
           name: "Blockbench MCP",
@@ -171,15 +194,32 @@ export function uiSetup({
           description: resource.description,
           uriTemplate: resource.uriTemplate,
         })),
-        prompts: [],
       }),
       methods: {
         getDisplayName(toolName: string): string {
           return toolName.replace("blockbench_", "");
         },
+        formatSessionId(id: string): string {
+          return id.slice(0, 8) + "...";
+        },
+        formatTime(date: Date): string {
+          return new Date(date).toLocaleTimeString();
+        },
       },
       name: "mcp_panel",
       template: /*html*/ `<div class="mcp-panel">
+        <details name="mcp_panel" open>
+          <summary>Sessions ({{sessions.length}})</summary>
+          <div v-if="sessions.length > 0">
+            <div v-for="session in sessions" :key="session.id" class="session-item">
+              <span class="session-id">{{formatSessionId(session.id)}}</span>
+              <span class="session-time">{{formatTime(session.connectedAt)}}</span>
+            </div>
+          </div>
+          <div v-else class="no-sessions">
+            No clients connected
+          </div>
+        </details>
         <details name="mcp_panel">
           <summary>Server</summary>
             <dl>
@@ -187,14 +227,11 @@ export function uiSetup({
                 <dd>{{server.name}}</dd>
                 <dt>Server Version</dt>
                 <dd>{{server.version}}</dd>
-                <dt>Server Status</dt>
-                <dd>
-                    <span v-if="server.connected" class="connected">Connected</span>
-                    <span v-else class="disconnected">Disconnected</span>
-                </dd>
+                <dt>Connected Clients</dt>
+                <dd>{{sessions.length}}</dd>
             </dl>
         </details>
-        <details name="mcp_panel" open>
+        <details name="mcp_panel">
             <summary>Tools</summary>
 
             <div v-if="tools.length > 0">
