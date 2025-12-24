@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createTool } from "@/lib/factories";
 import { STATUS_STABLE } from "@/lib/constants";
 
+export function registerProjectTools() {
 createTool(
   "create_project",
   {
@@ -33,3 +34,4 @@ createTool(
   },
   STATUS_STABLE
 );
+}

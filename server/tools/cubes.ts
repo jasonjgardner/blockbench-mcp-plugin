@@ -5,6 +5,7 @@ import { createTool } from "@/lib/factories";
 import { cubeSchema } from "@/lib/zodObjects";
 import { STATUS_STABLE } from "@/lib/constants";
 
+export function registerCubesTools() {
 createTool(
   "place_cube",
   {
@@ -234,3 +235,4 @@ createTool(
   },
   STATUS_STABLE
 );
+}

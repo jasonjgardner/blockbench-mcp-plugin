@@ -5,6 +5,7 @@ import { createTool } from "@/lib/factories";
 import { getProjectTexture, imageContent } from "@/lib/util";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
 
+export function registerTextureTools() {
 createTool(
   "create_texture",
   {
@@ -325,3 +326,4 @@ createTool(
   },
   STATUS_STABLE
 );
+}

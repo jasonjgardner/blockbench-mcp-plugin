@@ -5,6 +5,7 @@ import { createTool } from "@/lib/factories";
 import { captureAppScreenshot } from "@/lib/util";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
 
+export function registerUITools() {
 createTool(
   "trigger_action",
   {
@@ -237,3 +238,4 @@ createTool(
   },
   STATUS_EXPERIMENTAL
 );
+}
