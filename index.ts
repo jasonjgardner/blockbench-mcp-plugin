@@ -9,6 +9,7 @@ import { VERSION } from "@/lib/constants";
 import { createServer } from "@/server/server";
 // Import tools from the tools module which re-exports from factories after registration
 import { tools, prompts, getToolCount } from "@/server/tools";
+import { registerToolsOnServer } from "@/lib/factories";
 import { resources } from "@/server";
 import { uiSetup, uiTeardown } from "@/ui";
 import { settingsSetup, settingsTeardown } from "@/ui/settings";
@@ -57,7 +58,24 @@ BBPlugin.register("mcp", {
 
       socket.on("data", (chunk: Buffer) => {
         buffer = Buffer.concat([buffer, chunk]);
-        processHttpRequests();
+        processHttpRequests().catch((err) => {
+          console.error("[MCP] Unhandled error in processHttpRequests:", err);
+          // Try to send error response if socket is still writable
+          if (!socket.destroyed) {
+            try {
+              sendResponse(
+                socket,
+                500,
+                { "content-type": "application/json" },
+                JSON.stringify({ error: "Internal server error" }),
+                undefined
+              );
+            } catch (sendErr) {
+              console.error("[MCP] Failed to send error response:", sendErr);
+              socket.destroy();
+            }
+          }
+        });
       });
 
       socket.on("error", (err: Error) => {
@@ -125,8 +143,9 @@ BBPlugin.register("mcp", {
 
           const webRequest = new Request(url, requestInit);
 
-          // Check endpoint
-          if (!path.startsWith(endpoint)) {
+          // Check endpoint - must match exactly or have query string/trailing content
+          const pathWithoutQuery = path.split("?")[0];
+          if (pathWithoutQuery !== endpoint && !path.startsWith(endpoint + "/") && !path.startsWith(endpoint + "?")) {
             sendResponse(socket, 404, { "content-type": "text/plain" }, "Not Found", headers["connection"]);
             continue;
           }
@@ -139,14 +158,25 @@ BBPlugin.register("mcp", {
             // If no session exists, create a new one with its own server and transport
             if (!session) {
               const sessionServer = createServer();
+              
+              // Register all tools on this session's server
+              registerToolsOnServer(sessionServer);
+              
               const transport = new WebStandardStreamableHTTPServerTransport({
                 sessionIdGenerator: () => crypto.randomUUID(),
                 enableJsonResponse: true,
                 onsessioninitialized: (newSessionId: string) => {
+                  console.log(`[MCP] Session initialized: ${newSessionId.slice(0, 8)}...`);
                   sessionManager.add(newSessionId);
-                  sessionTransports.set(newSessionId, { transport, server: sessionServer });
+                  // Update the map with the actual session ID
+                  const sess = sessionTransports.get("__pending__");
+                  if (sess) {
+                    sessionTransports.delete("__pending__");
+                    sessionTransports.set(newSessionId, sess);
+                  }
                 },
                 onsessionclosed: (closedSessionId: string) => {
+                  console.log(`[MCP] Session closed: ${closedSessionId.slice(0, 8)}...`);
                   sessionManager.remove(closedSessionId);
                   sessionTransports.delete(closedSessionId);
                 },
@@ -156,6 +186,11 @@ BBPlugin.register("mcp", {
               await sessionServer.connect(transport);
               
               session = { transport, server: sessionServer };
+              
+              // Store with a temporary key if no session ID yet (will be updated in callback)
+              if (!sessionId) {
+                sessionTransports.set("__pending__", session);
+              }
             }
 
             // Update session activity
@@ -166,19 +201,74 @@ BBPlugin.register("mcp", {
             // Let the transport handle the MCP protocol
             const webResponse = await session.transport.handleRequest(webRequest);
 
+            console.log(`[MCP] Response: ${webResponse.status} ${webResponse.headers.get("content-type")}`);
+
             // Convert Web Standard Response to HTTP
             const responseHeaders: Record<string, string> = {};
             webResponse.headers.forEach((value: string, key: string) => {
               responseHeaders[key] = value;
             });
 
-            const responseBody = await webResponse.text();
-            sendResponse(socket, webResponse.status, responseHeaders, responseBody, headers["connection"]);
+            const contentType = webResponse.headers.get("content-type") || "";
+            
+            // Handle SSE streams differently from regular responses
+            if (contentType.includes("text/event-stream")) {
+              // Send headers for SSE
+              sendSSEHeaders(socket, webResponse.status, responseHeaders);
+              
+              // Stream the body
+              if (webResponse.body) {
+                const reader = webResponse.body.getReader();
+                const decoder = new TextDecoder();
+                
+                try {
+                  while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value, { stream: true });
+                    socket.write(chunk);
+                  }
+                } catch (streamError) {
+                  console.error("[MCP] SSE stream error:", streamError);
+                } finally {
+                  socket.end();
+                }
+              } else {
+                socket.end();
+              }
+            } else {
+              // Regular response
+              const responseBody = await webResponse.text();
+              sendResponse(socket, webResponse.status, responseHeaders, responseBody, headers["connection"]);
+            }
           } catch (error) {
             console.error("[MCP] Request handler error:", error);
             sendResponse(socket, 500, { "content-type": "application/json" }, JSON.stringify({ error: String(error) }), headers["connection"]);
           }
         }
+      }
+
+      function sendSSEHeaders(
+        sock: Socket,
+        status: number,
+        headers: Record<string, string>
+      ) {
+        let response = `HTTP/1.1 ${status} ${getStatusText(status)}\r\n`;
+
+        // Remove content-length for SSE streams
+        delete headers["content-length"];
+        
+        // Ensure proper SSE headers
+        headers["cache-control"] = "no-cache";
+        headers["connection"] = "keep-alive";
+
+        for (const [key, value] of Object.entries(headers)) {
+          response += `${key}: ${value}\r\n`;
+        }
+        response += "\r\n";
+
+        sock.write(response);
       }
 
       function sendResponse(

@@ -153,6 +153,44 @@ export function getEnabledToolDefinitions() {
 }
 
 /**
+ * Registers all enabled tools on a server instance
+ * Used to set up new session servers with the same tools
+ */
+export function registerToolsOnServer(server: any) {
+  const enabledDefs = getEnabledToolDefinitions();
+  
+  for (const [name, toolDef] of Object.entries(enabledDefs)) {
+    server.registerTool(
+      name,
+      {
+        title: toolDef.title,
+        description: toolDef.description,
+        inputSchema: toolDef.inputSchema,
+      },
+      async (args: any, extra: any) => {
+        const reportProgress: ToolContext["reportProgress"] = () => {};
+        const context: ToolContext = { reportProgress };
+        const result = await toolDef.execute(args, context);
+
+        if (typeof result === "string") {
+          return {
+            content: [{ type: "text", text: result }],
+          };
+        }
+
+        if (result && typeof result === "object" && "content" in result) {
+          return result;
+        }
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(result) }],
+        };
+      }
+    );
+  }
+}
+
+/**
  * Creates a new MCP prompt and registers it with the server using the official SDK.
  * @param suffix - The prompt name suffix (will be prefixed with "blockbench_").
  * @param prompt - The prompt configuration.
