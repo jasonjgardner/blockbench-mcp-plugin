@@ -140,3 +140,93 @@ createResource("nodes", {
     };
   },
 });
+
+createResource("textures", {
+  uriTemplate: "textures://{id}",
+  title: "Blockbench Textures",
+  description:
+    "Returns information about textures in the current Blockbench project. Use without an ID to list all textures, or provide a texture UUID/name to get details about a specific texture.",
+  async listCallback() {
+    const textures = Project?.textures ?? [];
+    if (textures.length === 0) {
+      return { resources: [] };
+    }
+    return {
+      resources: textures.map((texture) => ({
+        uri: `textures://${texture.uuid}`,
+        name: texture.name || texture.uuid,
+        mimeType: "application/json",
+        description: texture.path ? `Texture from ${texture.path}` : "Embedded texture",
+      })),
+    };
+  },
+  async readCallback(uri, { id }) {
+    const textures = Project?.textures ?? [];
+
+    if (textures.length === 0) {
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            text: JSON.stringify({ textures: [], count: 0 }),
+          },
+        ],
+      };
+    }
+
+    // Helper to extract texture info
+    const getTextureInfo = (texture: Texture) => ({
+      uuid: texture.uuid,
+      name: texture.name,
+      id: texture.id,
+      width: texture.width,
+      height: texture.height,
+      frameCount: texture.frameCount,
+      // @ts-ignore - ratio property exists at runtime
+      ratio: texture.ratio,
+      path: texture.path || null,
+      folder: texture.folder || null,
+      namespace: texture.namespace || null,
+      particle: texture.particle ?? false,
+      render_mode: texture.render_mode || "default",
+      render_sides: texture.render_sides || "auto",
+      visible: texture.visible ?? true,
+      saved: texture.saved ?? false,
+      selected: texture.selected ?? false,
+      source: texture.source || null,
+    });
+
+    // If ID provided, find specific texture
+    if (id) {
+      const texture = textures.find(
+        (t) => t.uuid === id || t.name === id || t.id === id
+      );
+
+      if (!texture) {
+        throw new Error(`Texture with ID "${id}" not found.`);
+      }
+
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            text: JSON.stringify(getTextureInfo(texture)),
+          },
+        ],
+      };
+    }
+
+    // Return all textures
+    return {
+      contents: [
+        {
+          uri: uri.href,
+          text: JSON.stringify({
+            textures: textures.map(getTextureInfo),
+            count: textures.length,
+          }),
+        },
+      ],
+    };
+  },
+});

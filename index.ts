@@ -8,7 +8,7 @@
 import { VERSION } from "@/lib/constants";
 import { createServer } from "@/server/server";
 import { tools, prompts, getToolCount } from "@/server/tools";
-import { registerToolsOnServer, registerResourcesOnServer } from "@/lib/factories";
+import { registerToolsOnServer, registerResourcesOnServer, registerPromptsOnServer } from "@/lib/factories";
 import { resources } from "@/server";
 import { uiSetup, uiTeardown } from "@/ui";
 import { settingsSetup, settingsTeardown } from "@/ui/settings";
@@ -158,9 +158,10 @@ BBPlugin.register("mcp", {
             if (!session) {
               const sessionServer = createServer();
 
-              // Register all tools and resources on this session's server
+              // Register all tools, resources, and prompts on this session's server
               registerToolsOnServer(sessionServer);
               registerResourcesOnServer(sessionServer);
+              registerPromptsOnServer(sessionServer);
               
               const transport = new WebStandardStreamableHTTPServerTransport({
                 sessionIdGenerator: () => crypto.randomUUID(),
