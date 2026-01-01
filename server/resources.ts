@@ -2,11 +2,113 @@
 /// <reference types="blockbench-types" />
 import { createResource } from "@/lib/factories";
 
-// Register nodes resource using the factory pattern
+// Register projects resource using the factory pattern
+createResource("projects", {
+  uriTemplate: "projects://{id}",
+  title: "Blockbench Projects",
+  description:
+    "Returns information about available projects in Blockbench. Use without an ID to list all projects, or provide a project UUID/name to get details about a specific project.",
+  async listCallback() {
+    const projects = ModelProject.all;
+    if (!projects || projects.length === 0) {
+      return { resources: [] };
+    }
+    return {
+      resources: projects.map((project) => ({
+        uri: `projects://${project.uuid}`,
+        name: project.name || project.uuid,
+        description: `${project.format?.name ?? "Unknown format"} project${project.saved ? "" : " (unsaved)"}`,
+      })),
+    };
+  },
+  async readCallback(uri, { id }) {
+    const projects = ModelProject.all;
+
+    if (!projects || projects.length === 0) {
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            text: JSON.stringify({ projects: [], count: 0 }),
+          },
+        ],
+      };
+    }
+
+    // Helper to extract project info
+    const getProjectInfo = (project: ModelProject) => ({
+      uuid: project.uuid,
+      name: project.name,
+      selected: project.selected,
+      saved: project.saved,
+      format: project.format?.id ?? null,
+      formatName: project.format?.name ?? null,
+      boxUv: project.box_uv,
+      textureWidth: project.texture_width,
+      textureHeight: project.texture_height,
+      savePath: project.save_path || null,
+      exportPath: project.export_path || null,
+      elementCount: project.elements?.length ?? 0,
+      groupCount: project.groups?.length ?? 0,
+      textureCount: project.textures?.length ?? 0,
+      animationCount: project.animations?.length ?? 0,
+      modelIdentifier: project.model_identifier || null,
+      geometryName: project.geometry_name || null,
+    });
+
+    // If ID provided, find specific project
+    if (id) {
+      const project = projects.find(
+        (p) => p.uuid === id || p.name === id
+      );
+
+      if (!project) {
+        throw new Error(`Project with ID "${id}" not found.`);
+      }
+
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            text: JSON.stringify(getProjectInfo(project)),
+          },
+        ],
+      };
+    }
+
+    // Return all projects
+    return {
+      contents: [
+        {
+          uri: uri.href,
+          text: JSON.stringify({
+            projects: projects.map(getProjectInfo),
+            count: projects.length,
+            activeProject: Project ? Project.uuid : null,
+          }),
+        },
+      ],
+    };
+  },
+});
+
 createResource("nodes", {
   uriTemplate: "nodes://{id}",
   title: "Blockbench Nodes",
   description: "Returns the current nodes in the Blockbench editor.",
+  async listCallback() {
+    if (!Project?.nodes_3d) {
+      return { resources: [] };
+    }
+    const nodes = Object.values(Project.nodes_3d);
+    return {
+      resources: nodes.map((node) => ({
+        uri: `nodes://${node.uuid}`,
+        name: node.name || node.uuid,
+        description: `3D node in current project`,
+      })),
+    };
+  },
   async readCallback(uri, { id }) {
     if (!Project?.nodes_3d) {
       throw new Error("No nodes found in the Blockbench editor.");
@@ -38,188 +140,3 @@ createResource("nodes", {
     };
   },
 });
-
-/*
-// Resources below are commented out pending refactoring to official SDK API
-
-const texturesResource: ResourceTemplate<BlockbenchSessionAuth> = {
-  name: "textures",
-  description: "Returns the current textures in the Blockbench editor.",
-  uriTemplate: "textures://{id}",
-  arguments: [
-    {
-      name: "id",
-      description:
-        "The ID of the texture. Could be a UUID, name, or numeric ID.",
-      complete: async (value: string) => {
-        const textures = Project?.textures ?? Texture.all;
-
-        if (value.length > 0) {
-          const filteredTextures = textures.filter((texture) =>
-            texture.name.includes(value)
-          );
-
-          return {
-            values: filteredTextures.map((texture) => texture.name),
-          };
-        }
-
-        return {
-          values: textures.map((texture) => texture.name),
-        };
-      },
-    },
-  ],
-  async load({ id }) {
-    const texture = getProjectTexture(id);
-
-    if (!texture) {
-      throw new Error(`Texture with ID "${id}" not found.`);
-    }
-
-    return {
-      name: texture.name,
-      blob: await new Promise((resolve) => {
-        resolve(texture.getBase64());
-      }),
-    };
-  },
-};
-
-// @ts-expect-error Blockbench does not need authentication
-server.addResourceTemplate(texturesResource);
-
-const referenceModelResource: ResourceTemplate<BlockbenchSessionAuth> = {
-  name: "reference_model",
-  description: "Returns the current reference model in the Blockbench editor.",
-  uriTemplate: "reference_model://{id}",
-  arguments: [
-    {
-      name: "id",
-    },
-  ],
-  async load({ id }) {
-    const reference = Project?.elements.find((element) => {
-      return (
-        element.mesh.type === "reference_model" &&
-        (element.uuid === id || element.name === id)
-      );
-    });
-
-    if (!reference) {
-      throw new Error(`Reference model with ID "${id}" not found.`);
-    }
-
-    const { position, rotation, scale, ...rest } = reference.mesh;
-
-    return {
-      text: JSON.stringify({
-        ...rest,
-        position: position.toArray(),
-        rotation: rotation.toArray(),
-        scale: scale.toArray(),
-      }),
-    };
-  },
-};
-
-// @ts-expect-error Blockbench does not need authentication
-server.addResourceTemplate(referenceModelResource);
-
-const projectListResource: ResourceTemplate<BlockbenchSessionAuth> = {
-  name: "project",
-  description: "Returns a list of all projects in the Blockbench editor.",
-  uriTemplate: "project://{name}",
-  arguments: [
-    {
-      name: "name",
-      description: "The name of the project.",
-      complete: async (value: string) => {
-        const projects = ModelProject.all;
-
-        if (value.length > 0) {
-          const filteredProjects = projects.filter((project) =>
-            project.name.includes(value)
-          );
-
-          return {
-            values: filteredProjects.map((project) => project.name),
-          };
-        }
-
-        return {
-          values: projects.map((project) => project.name),
-        };
-      },
-    },
-  ],
-  async load({ name }) {
-    const projects = ModelProject.all;
-
-    let project;
-
-    if (name) {
-      project = projects.find((project) => project.name === name);
-    }
-
-    // TODO: Fix circular references and return more than just name
-    return {
-      text: JSON.stringify(
-        project ? [project.name] : projects.map((project) => project.name)
-      ),
-    };
-  },
-};
-
-// @ts-expect-error Blockbench does not need authentication
-server.addResourceTemplate(projectListResource);
-
-// Adds tools to better expose Blockbench scope, context, functions, etc.
-// Check what variables are available in `globalThis` and report back the scope.
-const scopeResource: ResourceTemplate<BlockbenchSessionAuth> = {
-  name: "scope",
-  description: "Returns the current scope in the Blockbench editor.",
-  uriTemplate: "scope://{name}",
-  arguments: [
-    {
-      name: "name",
-      description: "The name of the scope.",
-      complete: async (value: string) => {
-        const scopes = Object.keys(globalThis);
-
-        if (value.length > 0) {
-          const filteredScopes = scopes.filter((scope) =>
-            scope.includes(value)
-          );
-
-          return {
-            values: filteredScopes,
-          };
-        }
-
-        return {
-          values: scopes,
-        };
-      },
-    },
-  ],
-  async load({ name }) {
-    const scopes = Object.keys(globalThis);
-
-    let scope;
-
-    if (name) {
-      scope = scopes.find((scope) => scope === name);
-    }
-
-    return {
-      text: JSON.stringify(
-        scope ? [scope] : scopes
-      ),
-    };
-  },
-};
-
-// @ts-expect-error Blockbench does not need authentication
-server.addResourceTemplate(scopeResource);
-*/

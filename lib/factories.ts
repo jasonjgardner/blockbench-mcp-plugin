@@ -235,6 +235,9 @@ interface ResourceDefinition {
     title?: string;
     description?: string;
   };
+  listCallback?: () => Promise<{
+    resources: Array<{ uri: string; name: string; description?: string; mimeType?: string }>;
+  }>;
   readCallback: (uri: URL, variables: Record<string, string>) => Promise<{
     contents: Array<{ uri: string; text?: string; blob?: string }>;
   }>;
@@ -249,6 +252,7 @@ const resourceDefinitions: Record<string, ResourceDefinition> = {};
  * @param config.uriTemplate - The URI template pattern (e.g., "nodes://{id}").
  * @param config.title - Optional title for the resource.
  * @param config.description - The description of the resource.
+ * @param config.listCallback - Optional async function to list available resources.
  * @param config.readCallback - Async function to read the resource.
  * @returns - The created resource metadata.
  */
@@ -258,6 +262,9 @@ export function createResource(
     uriTemplate: string;
     title?: string;
     description: string;
+    listCallback?: () => Promise<{
+      resources: Array<{ uri: string; name: string; description?: string; mimeType?: string }>;
+    }>;
     readCallback: (uri: URL, variables: Record<string, string>) => Promise<{
       contents: Array<{ uri: string; text?: string; blob?: string }>;
     }>;
@@ -274,6 +281,7 @@ export function createResource(
       title: config.title,
       description: config.description,
     },
+    listCallback: config.listCallback,
     readCallback: config.readCallback,
   };
 
@@ -283,7 +291,7 @@ export function createResource(
   // Register with the current server instance
   getServer().registerResource(
     name,
-    new ResourceTemplate(config.uriTemplate, { list: undefined }),
+    config.uriTemplate,
     {
       title: config.title,
       description: config.description,
@@ -317,7 +325,7 @@ export function registerResourcesOnServer(server: any) {
   for (const [name, resourceDef] of Object.entries(resourceDefinitions)) {
     server.registerResource(
       name,
-      new ResourceTemplate(resourceDef.uriTemplate, { list: undefined }),
+      resourceDef.uriTemplate,
       resourceDef.metadata,
       async (uri: URL, variables: Record<string, string>) => {
         return resourceDef.readCallback(uri, variables);
