@@ -24,15 +24,27 @@ export interface ToolContext {
   reportProgress: (progress: { progress: number; total: number }) => void;
 }
 
+interface TextContent {
+  type: "text";
+  text: string;
+}
+
+interface ImageContent {
+  type: "image";
+  data: string;
+  mimeType: string;
+}
+
+type ToolContentItem = TextContent | ImageContent;
+
+type ToolResult = string | { content: ToolContentItem[]; structuredContent?: unknown };
+
 interface ToolDefinition {
   title: string;
   description: string;
   inputSchema: Record<string, z.ZodType>;
   outputSchema?: Record<string, z.ZodType> | z.ZodType;
-  execute: (args: any, context?: ToolContext) => Promise<
-    | string
-    | { content: Array<{ type: string; text: string }>; structuredContent?: any }
-  >;
+  execute: (args: Record<string, unknown>, context?: ToolContext) => Promise<ToolResult>;
   annotations?: {
     title?: string;
     destructiveHint?: boolean;
@@ -46,19 +58,37 @@ interface ToolDefinition {
 const toolDefinitions: Record<string, ToolDefinition> = {};
 
 /**
+ * Extracts the shape from a Zod schema, unwrapping ZodEffects if necessary.
+ * Uses _def.typeName for reliable type checking across different Zod instances.
+ */
+function extractShape(schema: z.ZodType): Record<string, z.ZodType> {
+  const def = schema._def as { typeName?: string; schema?: z.ZodType; shape?: () => Record<string, z.ZodType> };
+  
+  if (def.typeName === "ZodObject") {
+    return def.shape?.() ?? {};
+  }
+  
+  if (def.typeName === "ZodEffects" && def.schema) {
+    return extractShape(def.schema);
+  }
+  
+  return {};
+}
+
+/**
  * Creates a new MCP tool and registers it with the server using the official SDK.
  * @param suffix - The tool name suffix (will be prefixed with "blockbench_").
  * @param tool - The tool configuration.
  * @param tool.description - The description of the tool.
  * @param tool.annotations - Annotations for the tool (title, hints).
- * @param tool.parameters - Zod schema for input parameters.
+ * @param tool.parameters - Zod schema for input parameters (supports ZodObject or ZodEffects from .refine()).
  * @param tool.execute - The async function to execute when the tool is called.
  * @param status - The status of the tool (stable, experimental, deprecated).
  * @param enabled - Whether the tool is enabled.
  * @returns - The created tool metadata.
  * @throws - If a tool with the same name already exists.
  */
-export function createTool<T extends z.ZodRawShape>(
+export function createTool<T extends z.ZodType>(
   suffix: string,
   tool: {
     description: string;
@@ -67,11 +97,8 @@ export function createTool<T extends z.ZodRawShape>(
       destructiveHint?: boolean;
       openWorldHint?: boolean;
     };
-    parameters: z.ZodObject<T>;
-    execute: (args: z.infer<z.ZodObject<T>>, context?: ToolContext) => Promise<
-      | string
-      | { content: Array<{ type: string; text: string }>; structuredContent?: any }
-    >;
+    parameters: T;
+    execute: (args: z.infer<T>, context?: ToolContext) => Promise<ToolResult>;
   },
   status: IMCPTool["status"] = "stable",
   enabled: boolean = true
@@ -82,10 +109,12 @@ export function createTool<T extends z.ZodRawShape>(
     throw new Error(`Tool with name "${name}" already exists.`);
   }
 
+  const inputSchema = extractShape(tool.parameters);
+
   const toolDef: ToolDefinition = {
     title: tool.annotations?.title ?? tool.description,
     description: tool.description,
-    inputSchema: tool.parameters.shape,
+    inputSchema,
     execute: tool.execute,
     annotations: tool.annotations,
   };
@@ -100,7 +129,7 @@ export function createTool<T extends z.ZodRawShape>(
       {
         title: toolDef.title,
         description: toolDef.description,
-        inputSchema: tool.parameters.shape,
+        inputSchema,
       },
       async (args: z.infer<typeof tool.parameters>, extra) => {
         // Provide a no-op reportProgress function
