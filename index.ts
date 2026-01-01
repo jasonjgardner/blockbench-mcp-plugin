@@ -7,7 +7,6 @@
 /// <reference types="blockbench-types" />
 import { VERSION } from "@/lib/constants";
 import { createServer } from "@/server/server";
-// Import tools from the tools module which re-exports from factories after registration
 import { tools, prompts, getToolCount } from "@/server/tools";
 import { registerToolsOnServer, registerResourcesOnServer } from "@/lib/factories";
 import { resources } from "@/server";
@@ -27,7 +26,7 @@ BBPlugin.register("mcp", {
   title: "MCP Server",
   author: "Jason J. Gardner",
   description: "Plugin to run an MCP server inside Blockbench.",
-  tags: ["MCP", "Server", "Protocol"],
+  tags: ["MCP", "AI"],
   icon: "settings_ethernet",
   variant: "both",
   async onload() {
@@ -314,11 +313,11 @@ BBPlugin.register("mcp", {
       }
     });
 
-    httpServer.listen(port, () => {
+    httpServer?.listen(port, () => {
       console.log(`[MCP] Server listening on http://localhost:${port}${endpoint}`);
     });
 
-    httpServer.on("error", (err: Error) => {
+    httpServer?.on("error", (err: Error) => {
       console.error("[MCP] Server error:", err);
       Blockbench.showQuickMessage(`MCP Server error: ${err.message}`, 3000);
     });

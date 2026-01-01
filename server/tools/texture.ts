@@ -125,22 +125,28 @@ createTool(
         texture.load();
         texture.fillParticle();
         texture.layers_enabled = false;
-      } else if (fill_color) {
-        const color = Array.isArray(fill_color)
-          ? tinycolor({
-            r: Number(fill_color[0]),
-            g: Number(fill_color[1]),
-            b: Number(fill_color[2]),
-            a: Number(fill_color[3] ?? 255),
-          })
-          : tinycolor(fill_color);
+      } else {
         const { ctx } = texture.getActiveCanvas();
 
-        ctx.fillStyle = color.toRgbString().toLowerCase();
-        ctx.fillRect(0, 0, texture.width, texture.height);
+        if (fill_color) {
+          const color = Array.isArray(fill_color)
+            // @ts-ignore - tinycolor is available globally in Blockbench
+            ? tinycolor({
+              r: Number(fill_color[0]),
+              g: Number(fill_color[1]),
+              b: Number(fill_color[2]),
+              a: Number(fill_color[3] ?? 255),
+            })
+            // @ts-ignore - tinycolor ok
+            : tinycolor(fill_color);
+
+          ctx.fillStyle = color.toRgbString().toLowerCase();
+          ctx.fillRect(0, 0, texture.width, texture.height);
+        } else {
+          ctx.clearRect(0, 0, texture.width, texture.height);
+        }
 
         texture.updateSource(ctx.canvas.toDataURL("image/png", 1));
-
         texture.updateLayerChanges(true);
       }
 
@@ -259,7 +265,7 @@ createTool(
 
         textureList.forEach((texture) => {
           texture?.extend({
-            group: textureGroup,
+            group: textureGroup.uuid,
           });
         });
       }
@@ -278,8 +284,7 @@ createTool(
   {
     description: "Returns a list of all textures in the Blockbench editor.",
     annotations: {
-      title: "List Textures",
-      readOnlyHint: true,
+      title: "List Textures"
     },
     parameters: z.object({}),
     async execute() {
@@ -304,8 +309,7 @@ createTool(
     description:
       "Returns the image data of the given texture or default texture.",
     annotations: {
-      title: "Get Texture",
-      readOnlyHint: true,
+      title: "Get Texture"
     },
     parameters: z.object({
       texture: z.string().optional().describe("Texture ID or name."),
