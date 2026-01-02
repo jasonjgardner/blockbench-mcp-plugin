@@ -3,8 +3,6 @@ import type { IMCPTool, IMCPPrompt, IMCPResource } from "@/types";
 import { getServer } from "@/server/server";
 import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 
-const TOOL_PREFIX = "blockbench";
-
 /**
  * User-visible list of tool details.
  */
@@ -77,7 +75,7 @@ function extractShape(schema: z.ZodType): Record<string, z.ZodType> {
 
 /**
  * Creates a new MCP tool and registers it with the server using the official SDK.
- * @param suffix - The tool name suffix (will be prefixed with "blockbench_").
+ * @param name - The tool name suffix (will be prefixed with "blockbench_").
  * @param tool - The tool configuration.
  * @param tool.description - The description of the tool.
  * @param tool.annotations - Annotations for the tool (title, hints).
@@ -89,7 +87,7 @@ function extractShape(schema: z.ZodType): Record<string, z.ZodType> {
  * @throws - If a tool with the same name already exists.
  */
 export function createTool<T extends z.ZodType>(
-  suffix: string,
+  name: string,
   tool: {
     description: string;
     annotations?: {
@@ -103,8 +101,6 @@ export function createTool<T extends z.ZodType>(
   status: IMCPTool["status"] = "stable",
   enabled: boolean = true
 ) {
-  const name = `${TOOL_PREFIX}_${suffix}`;
-  
   if (tools[name]) {
     throw new Error(`Tool with name "${name}" already exists.`);
   }
@@ -443,7 +439,7 @@ const promptDefinitions: Record<string, PromptDefinition> = {};
 
 /**
  * Creates a new MCP prompt and registers it with the server using the official SDK.
- * @param suffix - The prompt name suffix (will be prefixed with "blockbench_").
+ * @param name - The prompt name
  * @param prompt - The prompt configuration.
  * @param prompt.description - The description of the prompt.
  * @param prompt.arguments - Zod schema for prompt arguments.
@@ -454,7 +450,7 @@ const promptDefinitions: Record<string, PromptDefinition> = {};
  * @throws - If a prompt with the same name already exists.
  */
 export function createPrompt<T extends z.ZodRawShape = Record<string, never>>(
-  suffix: string,
+  name: string,
   prompt: {
     title?: string;
     description: string;
@@ -478,8 +474,6 @@ export function createPrompt<T extends z.ZodRawShape = Record<string, never>>(
   status: IMCPPrompt["status"] = "stable",
   enabled: boolean = true
 ) {
-  const name = `${TOOL_PREFIX}_${suffix}`;
-
   if (prompts[name]) {
     throw new Error(`Prompt with name "${name}" already exists.`);
   }
