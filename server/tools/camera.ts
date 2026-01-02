@@ -11,9 +11,7 @@ export function registerCameraTools() {
     {
       description: "Returns the image data of the current view.",
       annotations: {
-        title: "Capture Screenshot",
-        readOnlyHint: true,
-        destructiveHint: true,
+        title: "Capture Screenshot"
       },
       parameters: z.object({
         project: z.string().optional().describe("Project name or UUID."),
@@ -31,7 +29,6 @@ export function registerCameraTools() {
       description: "Returns the image data of the Blockbench app.",
       annotations: {
         title: "Capture App Screenshot",
-        readOnlyHint: true,
       },
       parameters: z.object({}),
       async execute() {
@@ -50,7 +47,6 @@ export function registerCameraTools() {
         destructiveHint: true,
       },
       parameters: z.object({
-        angle: z.object({
           position: z
             .array(z.number())
             .length(3)
@@ -68,16 +64,17 @@ export function registerCameraTools() {
           projection: z
             .enum(["unset", "orthographic", "perspective"])
             .describe("Camera projection type."),
-        }),
       }),
-      async execute({ angle }) {
+      async execute(angle: { position: number[]; target?: number[]; rotation?: number[]; projection: string }) {
         const preview = Preview.selected;
 
         if (!preview) {
           throw new Error("No preview found in the Blockbench editor.");
         }
 
-        preview.loadAnglePreset(angle);
+        preview.loadAnglePreset({
+          ...angle
+        });
 
         return await captureScreenshot();
       },

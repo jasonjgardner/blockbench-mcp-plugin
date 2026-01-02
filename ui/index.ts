@@ -3,6 +3,7 @@ import type { IMCPTool, IMCPPrompt, IMCPResource } from "@/types";
 import { VERSION } from "@/lib/constants";
 import { statusBarSetup, statusBarTeardown } from "@/ui/statusBar";
 import { sessionManager, type Session } from "@/lib/sessions";
+import { openToolTestDialog } from "@/ui/toolTestDialog";
 
 let panel: Panel | undefined;
 let unsubscribe: (() => void) | undefined;
@@ -76,6 +77,31 @@ export function uiSetup({
 
         .tool-toggle-row:last-child {
           border-bottom: none;
+        }
+
+        .tool-toggle-row.clickable {
+          cursor: pointer;
+          padding: 8px;
+          margin: 0 -8px;
+          border-radius: 4px;
+          transition: background-color 0.15s ease;
+        }
+
+        .tool-toggle-row.clickable:hover {
+          background-color: var(--color-button);
+        }
+
+        .tool-toggle-row.clickable:active {
+          background-color: var(--color-accent);
+        }
+
+        .tool-toggle-row.clickable .tool-name::after {
+          content: "chevron_right";
+          font-family: "Material Icons";
+          font-size: 16px;
+          margin-left: 4px;
+          opacity: 0.5;
+          vertical-align: middle;
         }
 
         .tool-info {
@@ -205,6 +231,9 @@ export function uiSetup({
         formatTime(date: Date): string {
           return new Date(date).toLocaleTimeString();
         },
+        openToolTest(toolName: string): void {
+          openToolTestDialog(toolName);
+        },
       },
       name: "mcp_panel",
       template: /*html*/ `<div class="mcp-panel">
@@ -235,7 +264,7 @@ export function uiSetup({
             <summary>Tools</summary>
 
             <div v-if="tools.length > 0">
-                <div v-for="tool in tools" :key="tool.name" class="tool-toggle-row">
+                <div v-for="tool in tools" :key="tool.name" class="tool-toggle-row clickable" @click="openToolTest(tool.name)" :title="'Click to test ' + getDisplayName(tool.name)">
                     <div class="tool-info">
                         <div class="tool-name">
                             {{getDisplayName(tool.name)}}
