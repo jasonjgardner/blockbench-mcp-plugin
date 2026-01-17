@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createTool } from "@/lib/factories";
 import { cubeSchema } from "@/lib/zodObjects";
 import { STATUS_STABLE } from "@/lib/constants";
+import { getProjectTexture } from "@/lib/util";
 
 export function registerCubesTools() {
 createTool(
@@ -64,7 +65,6 @@ createTool(
       const total = elements.length;
 
       const projectTexture = texture
-        // @ts-expect-error Blockbench global utility available at runtime
         ? getProjectTexture(texture)
         : Texture.getDefault();
 

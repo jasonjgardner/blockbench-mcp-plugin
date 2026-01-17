@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createTool } from "@/lib/factories";
 import { meshSchema } from "@/lib/zodObjects";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
+import { getProjectTexture } from "@/lib/util";
 
 export function registerMeshTools() {
 createTool(
@@ -40,7 +41,6 @@ createTool(
             const total = elements.length;
 
             const projectTexture = texture
-                // @ts-expect-error Blockbench global utility available at runtime
                 ? getProjectTexture(texture)
                 : Texture.getDefault();
 
@@ -253,7 +253,6 @@ createTool(
             const total = elements.length;
 
             const projectTexture = texture
-                // @ts-expect-error Blockbench global utility available at runtime
                 ? getProjectTexture(texture)
                 : Texture.getDefault();
 
@@ -460,7 +459,6 @@ createTool(
                     const seen = new Set<string>();
                     for (const fkey in mesh.faces) {
                         const face = mesh.faces[fkey];
-                        // @ts-expect-error MeshFace#getEdges exists at runtime
                         const edges = (face.getEdges() as unknown as [string, string][]);
                         for (const [a, b] of edges) {
                             const key = a < b ? `${a}-${b}` : `${b}-${a}`;
