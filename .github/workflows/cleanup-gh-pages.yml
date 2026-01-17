@@ -1,0 +1,63 @@
+name: Cleanup gh-pages Branch
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "cleanup" to confirm deletion of unwanted files'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm == 'cleanup'
+    steps:
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          fetch-depth: 0
+
+      - name: List current files
+        run: |
+          echo "Current files on gh-pages:"
+          find . -type f -not -path './.git/*' | sort
+
+      - name: Cleanup unwanted files
+        run: |
+          echo "Cleaning up gh-pages branch..."
+
+          # Define allowed file patterns
+          # Keep: mcp.js, about.md in root and versioned directories (nightly/, v*/, pr/*/)
+
+          # Find and remove unwanted files
+          find . -type f -not -path './.git/*' | while read file; do
+            filename=$(basename "$file")
+
+            # Check if file should be kept
+            if [[ "$filename" == "mcp.js" || "$filename" == "about.md" ]]; then
+              echo "KEEP: $file"
+            else
+              echo "REMOVE: $file"
+              rm "$file"
+            fi
+          done
+
+          # Remove empty directories (except .git)
+          find . -type d -empty -not -path './.git/*' -not -path './.git' -delete 2>/dev/null || true
+
+          echo ""
+          echo "Remaining files:"
+          find . -type f -not -path './.git/*' | sort
+
+      - name: Commit and push cleanup
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: cleanup gh-pages branch to only keep mcp.js and about.md" || echo "No changes to commit"
+          git push origin gh-pages
