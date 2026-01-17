@@ -6,12 +6,11 @@ https://github.com/user-attachments/assets/ab1b7e63-b6f0-4d5b-85ab-79d328de31db
 
 Open the desktop version of Blockbench, go to File > Plugins and click the "Load Plugin from URL" and paste in this URL:
 
-
-__[https://jasonjgardner.github.io/blockbench-mcp-plugin/mcp.js](https://jasonjgardner.github.io/blockbench-mcp-plugin/mcp.js)__
-
+**[https://jasonjgardner.github.io/blockbench-mcp-plugin/mcp.js](https://jasonjgardner.github.io/blockbench-mcp-plugin/mcp.js)**
 
 ## Model Context Protocol Server
-Configure the MCP server under Blockbench settings: __Settings__ > __General__ > __MCP Server Port__ and __MCP Server Endpoint__
+
+Configure the MCP server under Blockbench settings: **Settings** > **General** > **MCP Server Port** and **MCP Server Endpoint**
 
 The following examples use the default values of `:3000/bb-mcp`
 
@@ -19,32 +18,29 @@ The following examples use the default values of `:3000/bb-mcp`
 
 #### VS Code
 
-__`.vscode/mcp.json`__
+**`.vscode/mcp.json`**
 
 ```json
 {
-    "servers": {
-        "blockbench": {
-            "url": "http://localhost:3000/bb-mcp",
-            "type": "http"
-        },
+  "servers": {
+    "blockbench": {
+      "url": "http://localhost:3000/bb-mcp",
+      "type": "http"
     }
+  }
 }
 ```
 
 #### Claude Desktop
 
-__`claude_desktop_config.json`__
+**`claude_desktop_config.json`**
 
 ```json
 {
   "mcpServers": {
     "blockbench": {
       "command": "npx",
-      "args": [
-        "mcp-remote",
-        "http://localhost:3000/bb-mcp"
-      ]
+      "args": ["mcp-remote", "http://localhost:3000/bb-mcp"]
     }
   }
 }
@@ -54,6 +50,18 @@ __`claude_desktop_config.json`__
 
 ```bash
 claude mcp add blockbench --transport http http://localhost:3000/bb-mcp
+```
+
+#### [Antigravity](https://antigravity.google/docs/mcp#connecting-custom-mcp-servers)
+
+```json
+{
+  "mcpServers": {
+    "blockbench": {
+      "serverUrl": "http://localhost:3000/bb-mcp"
+    }
+  }
+}
 ```
 
 ## Usage
