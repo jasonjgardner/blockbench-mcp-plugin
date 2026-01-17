@@ -19,6 +19,22 @@ Before configuring the MCP connection, please confirm:
 
 Once confirmed, add the MCP server to your client:
 
+### Cline
+
+Add to `cline_mcp_settings.json`:
+```json
+{
+  "mcpServers": {
+    "blockbench": {
+      "url": "http://localhost:{PORT}/{ENDPOINT}",
+      "type": "streamableHttp",
+      "disabled": false,
+      "autoApprove": []
+    }
+  }
+}
+```
+
 ### VS Code
 
 Create `.vscode/mcp.json`:
