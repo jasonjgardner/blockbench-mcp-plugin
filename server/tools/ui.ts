@@ -64,7 +64,7 @@ createTool(
       try {
         result = await captureAppScreenshot();
       } catch (e) {
-        result = "Action executed, but failed to capture screenshot.";
+        result = `Action "${action}" executed, but failed to capture app screenshot: ${e}`;
       }
 
       return result;
