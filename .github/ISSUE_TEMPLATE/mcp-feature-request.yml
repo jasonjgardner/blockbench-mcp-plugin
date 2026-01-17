@@ -1,0 +1,189 @@
+name: MCP Feature Request
+description: Request a new MCP tool, resource, or prompt for the Blockbench MCP plugin
+title: "[Feature] "
+labels: ["enhancement", "mcp-feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## MCP Feature Request
+
+        This template helps you request new MCP features in a format that can be directly used by AI agents to implement the feature. Please fill out all relevant sections as completely as possible.
+
+  - type: dropdown
+    id: feature-type
+    attributes:
+      label: Feature Type
+      description: What type of MCP feature are you requesting?
+      options:
+        - Tool (action that modifies or queries Blockbench)
+        - Resource (read-only data endpoint)
+        - Prompt (reusable prompt template)
+    validations:
+      required: true
+
+  - type: input
+    id: feature-name
+    attributes:
+      label: Feature Name
+      description: A short, snake_case name for the feature (e.g., `create_sphere`, `list_animations`)
+      placeholder: "my_feature_name"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear, concise description of what this feature should do. This will become the tool/resource/prompt description.
+      placeholder: "Creates a new cube at the specified position with the given dimensions..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: domain
+    attributes:
+      label: Domain/Category
+      description: Which area of Blockbench does this feature relate to?
+      options:
+        - Animation (keyframes, timelines, bone animation)
+        - Camera (screenshots, view manipulation)
+        - Cubes (cube creation, modification)
+        - Elements (groups, outliner, general elements)
+        - Import/Export (file formats, project I/O)
+        - Mesh (mesh creation, vertices, faces)
+        - Paint (texturing, brush tools, layers)
+        - Project (project settings, format)
+        - Texture (texture creation, PBR materials)
+        - UI (dialogs, panels, user interaction)
+        - UV (UV mapping, unwrapping)
+        - Other (specify in description)
+    validations:
+      required: true
+
+  - type: textarea
+    id: parameters
+    attributes:
+      label: Parameters / Input Schema
+      description: |
+        Define the parameters this feature should accept. Use this format for each parameter:
+        ```
+        - parameter_name: type (required/optional) - Description
+        ```
+
+        Supported types: `string`, `number`, `boolean`, `array`, `enum[value1,value2]`
+      placeholder: |
+        - name: string (required) - Name of the element to create
+        - position: array[3] (optional) - XYZ coordinates [x, y, z], defaults to [0, 0, 0]
+        - size: number (optional) - Size in pixels, defaults to 16
+        - type: enum[cube,mesh,sphere] (required) - Type of element to create
+      value: |
+        -
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Expected Output
+      description: What should this feature return? Include example JSON if applicable.
+      placeholder: |
+        Returns a JSON object with:
+        - uuid: string - The UUID of the created element
+        - name: string - The name of the element
+
+        Example:
+        ```json
+        {
+          "uuid": "abc-123",
+          "name": "My Cube"
+        }
+        ```
+    validations:
+      required: true
+
+  - type: textarea
+    id: blockbench-api
+    attributes:
+      label: Relevant Blockbench API
+      description: |
+        If you know which Blockbench APIs or classes should be used, list them here. Reference the Blockbench source code or types if possible.
+      placeholder: |
+        - `new Cube({...}).init().addTo(group)` - Creates a cube
+        - `Undo.initEdit({elements: []})` - Start undo tracking
+        - `Canvas.updateAll()` - Refresh the viewport
+    validations:
+      required: false
+
+  - type: textarea
+    id: example-usage
+    attributes:
+      label: Example Usage
+      description: Show how an AI agent would use this feature with example parameters.
+      placeholder: |
+        ```json
+        {
+          "name": "create_element",
+          "arguments": {
+            "name": "MyCube",
+            "position": [0, 8, 0],
+            "type": "cube"
+          }
+        }
+        ```
+    validations:
+      required: false
+
+  - type: dropdown
+    id: read-only
+    attributes:
+      label: Is this read-only?
+      description: Does this feature only read data without modifying the project?
+      options:
+        - "Yes - Read-only (no modifications)"
+        - "No - Modifies the project"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: destructive
+    attributes:
+      label: Is this destructive?
+      description: Could this feature cause irreversible changes or data loss?
+      options:
+        - "No - Safe/reversible with undo"
+        - "Yes - Potentially destructive"
+    validations:
+      required: true
+
+  - type: textarea
+    id: edge-cases
+    attributes:
+      label: Edge Cases & Error Handling
+      description: What error conditions should be handled? What happens with invalid input?
+      placeholder: |
+        - If element with name already exists: throw error with suggestion to use different name
+        - If position is outside bounds: clamp to valid range
+        - If required texture not found: throw error listing available textures
+    validations:
+      required: false
+
+  - type: textarea
+    id: related-features
+    attributes:
+      label: Related Existing Features
+      description: Are there existing tools/resources this relates to or should work with?
+      placeholder: |
+        - Similar to `place_cube` but for meshes
+        - Should work with textures created by `create_texture`
+        - Extends functionality of `list_outline`
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Any other information that would help implement this feature.
+    validations:
+      required: false
