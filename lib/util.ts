@@ -1,5 +1,3 @@
-import html2canvas from "html2canvas";
-
 /**
  * Helper function to create properly formatted image content for MCP responses.
  * Handles data URLs, base64 strings, and objects with url property.
@@ -90,6 +88,10 @@ export function getProjectTexture(id: string): Texture | null {
   return texture || null;
 }
 
+/**
+ * Captures a screenshot of the 3D preview canvas.
+ * Uses Blockbench's native rendering pipeline for accurate capture.
+ */
 export function captureScreenshot(project?: string) {
   let selectedProject = Project;
 
@@ -103,86 +105,71 @@ export function captureScreenshot(project?: string) {
     throw new Error("No project found in the Blockbench editor.");
   }
 
-  if (selectedProject.select()) {
-    selectedProject.updateThumbnail();
+  // Select the project if needed
+  if (!selectedProject.selected) {
+    selectedProject.select();
   }
 
-  return imageContent(selectedProject.thumbnail, "image/png");
+  // @ts-ignore - Preview is globally available in Blockbench
+  const preview = Preview.selected;
+  if (!preview) {
+    throw new Error("No preview available for the selected project.");
+  }
+
+  // Capture the preview canvas using Blockbench's native approach
+  // Canvas.withoutGizmos temporarily hides gizmos, executes the callback, then restores them
+  let dataUrl: string | undefined;
+  // @ts-ignore - Canvas is globally available in Blockbench
+  Canvas.withoutGizmos(() => {
+    preview.render();
+    dataUrl = preview.canvas.toDataURL();
+  });
+
+  if (!dataUrl) {
+    throw new Error("Failed to capture preview screenshot.");
+  }
+
+  return imageContent(dataUrl, "image/png");
 }
 
 /**
- * Captures a screenshot of the Blockbench application window.
- * Tries Electron's native capture first (better quality, no CSS issues),
- * falls back to html2canvas if Electron capture is not available.
+ * Captures a screenshot of the entire Blockbench application window.
+ * Uses Electron's native capturePage API through Blockbench's Screencam.
+ * Only available when running as a desktop application.
  */
-export async function captureAppScreenshot() {
-  // Try Electron's native capture first (available in desktop app)
-  // This avoids html2canvas CSS parsing issues with modern color functions
-  if (typeof Blockbench !== 'undefined' && Blockbench.isApp) {
-    try {
-      // Access Electron's remote module or webContents
-      const electronModule = typeof require !== 'undefined' ? require('electron') : null;
-      if (electronModule?.remote?.getCurrentWindow) {
-        const win = electronModule.remote.getCurrentWindow();
-        const image = await win.webContents.capturePage();
-        const dataUrl = image.toDataURL();
-        return imageContent(dataUrl, "image/png");
-      }
-    } catch (electronError) {
-      console.warn("Electron capture not available, trying html2canvas:", electronError);
-    }
-  }
-
-  // Fallback to html2canvas with error handling for unsupported CSS
-  try {
-    const canvas = await html2canvas(document.documentElement, {
-      // Ignore CSS parsing errors for unsupported color functions
-      logging: false,
-      useCORS: true,
-      allowTaint: true,
-      // Use a custom onclone to strip problematic styles
-      onclone: (clonedDoc) => {
-        // Remove or replace problematic CSS that html2canvas can't handle
-        const styles = clonedDoc.querySelectorAll('style');
-        styles.forEach((style) => {
-          if (style.textContent) {
-            // Replace color() function with fallback colors
-            style.textContent = style.textContent.replace(
-              /color\([^)]+\)/g,
-              'currentColor'
-            );
-          }
-        });
-      },
-    });
-    const dataUrl = canvas.toDataURL();
-    return imageContent(dataUrl, "image/png");
-  } catch (html2canvasError) {
-    // If html2canvas still fails, try a more aggressive approach
-    console.warn("html2canvas failed, trying simplified capture:", html2canvasError);
-
-    try {
-      // Try capturing just the main preview canvas if available
-      const previewCanvas = document.querySelector('#preview canvas') as HTMLCanvasElement;
-      if (previewCanvas) {
-        const dataUrl = previewCanvas.toDataURL('image/png');
-        const imgResult = imageContent(dataUrl, "image/png");
-        return {
-          content: [
-            { type: "text" as const, text: "Note: Full app screenshot failed due to CSS compatibility. Returning preview canvas only." },
-            ...imgResult.content,
-          ],
-        };
-      }
-    } catch (canvasError) {
-      console.error("Canvas capture also failed:", canvasError);
-    }
-
-    // Return error with helpful message
+export async function captureAppScreenshot(): Promise<ReturnType<typeof imageContent>> {
+  // @ts-ignore - isApp is globally available in Blockbench
+  if (typeof isApp === "undefined" || !isApp) {
     throw new Error(
-      `Failed to capture app screenshot: ${html2canvasError}. ` +
-      "This may be due to modern CSS features not supported by html2canvas. " +
-      "Try using capture_screenshot instead for the 3D preview."
+      "App screenshot is only available in the desktop application."
     );
   }
+
+  return new Promise((resolve, reject) => {
+    let resolved = false;
+
+    // Add a timeout in case the callback is never called
+    const timeoutId = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        reject(new Error("App screenshot timed out after 5 seconds."));
+      }
+    }, 5000);
+
+    // Use Blockbench's native Screencam.fullScreen which uses Electron's capturePage
+    // @ts-ignore - Screencam is globally available in Blockbench
+    Screencam.fullScreen({}, (dataUrl: string) => {
+      if (!resolved) {
+        resolved = true;
+        clearTimeout(timeoutId);
+        if (dataUrl) {
+          resolve(imageContent(dataUrl, "image/png"));
+        } else {
+          reject(
+            new Error("Failed to capture app screenshot - no data returned.")
+          );
+        }
+      }
+    });
+  });
 }

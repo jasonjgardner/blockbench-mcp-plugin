@@ -18,15 +18,14 @@
     "inspect": "bunx @modelcontextprotocol/inspector"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.25.1",
-    "@types/bun": "^1.3.5",
-    "html2canvas": "^1.4.1",
-    "tinycolor2": "^1.6.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
     "blockbench-types": "^5.0.6",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "@modelcontextprotocol/sdk": "^1.25.1",
+    "@types/bun": "^1.3.5",
+    "tinycolor2": "^1.6.0"
   }
 }

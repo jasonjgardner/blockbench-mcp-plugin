@@ -26,23 +26,28 @@ index.ts              # Plugin entry - registers server, UI, settings
 server/
   server.ts           # McpServer singleton (official MCP SDK)
   tools.ts            # Tool module imports aggregator
-  tools/              # Tool implementations by domain (animation, cubes, mesh, paint, etc.)
-  resources.ts        # MCP resource templates
+  tools/              # Tool implementations by domain (animation, camera, cubes, element, import, mesh, paint, project, texture, ui, uv)
+  resources.ts        # MCP resource definitions
   prompts.ts          # MCP prompts with argument completion
+  net.ts              # HTTP server and transport handling
 lib/
-  factories.ts        # createTool() and createPrompt() helpers
+  factories.ts        # createTool(), createPrompt(), and createResource() helpers
   zodObjects.ts       # Reusable Zod schemas
   util.ts             # Shared utilities
   constants.ts        # VERSION and other constants
+  sessions.ts         # Session management
 ui/
   index.ts            # Panel UI
   settings.ts         # Settings registration
+  statusBar.ts        # Status bar UI
+macros/
+  readPrompt.ts       # Build-time macro for embedding prompt files
 build.ts              # Bun build script with Blockbench compatibility shims
 ```
 
 ### Key Patterns
 
-**Tool Registration**: Use `createTool()` from `lib/factories.ts`. Tools are auto-prefixed with `blockbench_` and registered with the MCP server:
+**Tool Registration**: Use `createTool()` from `lib/factories.ts`. Tools are registered with the MCP server using the name provided:
 ```ts
 import { z } from "zod";
 import { createTool } from "@/lib/factories";
@@ -59,7 +64,7 @@ createTool("example", {
 
 **Prompt Registration**: Use `createPrompt()` from `lib/factories.ts` with optional argument completion.
 
-**Resources**: Add directly in `server/resources.ts` using `server.registerResource()`.
+**Resources**: Use `createResource()` from `lib/factories.ts` in `server/resources.ts`.
 
 **Path Alias**: Use `@/*` for imports (e.g., `@/lib/factories`).
 
