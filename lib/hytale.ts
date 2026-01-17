@@ -16,13 +16,13 @@ export const HYTALE_QUAD_NORMALS = ["+X", "-X", "+Y", "-Y", "+Z", "-Z"] as const
 export type HytaleQuadNormal = (typeof HYTALE_QUAD_NORMALS)[number];
 
 /**
- * Check if the Hytale plugin is installed in Blockbench.
+ * Check if the Hytale plugin is installed and enabled in Blockbench.
  */
 export function isHytalePluginInstalled(): boolean {
   // @ts-ignore - Plugins is globally available in Blockbench
   if (typeof Plugins === "undefined") return false;
   // @ts-ignore - Plugins.installed is an array of installed plugins
-  return Plugins.installed?.some?.((p: { id: string }) => p.id === "hytale_plugin") ?? false;
+  return Plugins.installed?.some?.((p: { id: string; disabled: boolean }) => p.id === "hytale_plugin" && !p.disabled) ?? false;
 }
 
 /**
