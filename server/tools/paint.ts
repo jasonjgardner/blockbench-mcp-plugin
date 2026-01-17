@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { createTool } from "@/lib/factories";
 import { STATUS_EXPERIMENTAL } from "@/lib/constants";
+import { getProjectTexture } from "@/lib/util";
 
 export function registerPaintTools() {
 createTool(
