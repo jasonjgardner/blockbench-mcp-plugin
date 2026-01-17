@@ -111,7 +111,7 @@ createTool(
         BarItems.fill_tool.select();
   
         // Perform fill
-        Painter.startPaintTool(texture, x, y);
+        Painter.startPaintTool(texture, x, y, {});
         Painter.stopPaintTool();
   
         Undo.finishEdit("Fill tool");
@@ -230,7 +230,7 @@ createTool(
         BarItems.draw_shape_tool.select();
   
         // Draw shape
-        Painter.startPaintTool(texture, start.x, start.y);
+        Painter.startPaintTool(texture, start.x, start.y, {});
         Painter.useShapeTool(texture, end.x, end.y, {});
         Painter.stopPaintTool();
   
@@ -334,7 +334,7 @@ createTool(
         BarItems.gradient_tool.select();
   
         // Apply gradient
-        Painter.startPaintTool(texture, start.x, start.y);
+        Painter.startPaintTool(texture, start.x, start.y, {});
         Painter.useGradientTool(texture, end.x, end.y, {});
         Painter.stopPaintTool();
   
@@ -497,12 +497,12 @@ createTool(
         BarItems.copy_brush.select();
   
         // Set source point (Ctrl+click equivalent)
-        Painter.startPaintTool(texture, source.x, source.y, undefined, {
+        Painter.startPaintTool(texture, source.x, source.y, {}, {
           ctrlOrCmd: true,
         });
   
         // Apply at target point
-        Painter.startPaintTool(texture, target.x, target.y);
+        Painter.startPaintTool(texture, target.x, target.y, {});
         Painter.stopPaintTool();
   
         Undo.finishEdit("Copy brush");
@@ -616,7 +616,7 @@ createTool(
   
           if (i === 0 || !connect_strokes) {
             // Start new stroke
-            Painter.startPaintTool(texture, coord.x, coord.y);
+            Painter.startPaintTool(texture, coord.x, coord.y, {});
           } else {
             // Continue stroke
             Painter.movePaintTool(texture, coord.x, coord.y, {});
@@ -653,7 +653,10 @@ createTool(
               .describe("Mirror axes."),
             texture: z.boolean().optional().describe("Enable texture mirroring."),
             texture_center: z
-              .tuple([z.number(), z.number()])
+              .object({
+                x: z.number().describe("X coordinate of texture mirror center."),
+                y: z.number().describe("Y coordinate of texture mirror center."),
+              })
               .optional()
               .describe("Texture mirror center."),
           })
@@ -734,7 +737,10 @@ createTool(
               options.texture = mirror_painting.texture;
             }
             if (mirror_painting.texture_center) {
-              options.texture_center = mirror_painting.texture_center;
+              options.texture_center = [
+                mirror_painting.texture_center.x,
+                mirror_painting.texture_center.y,
+              ];
             }
             settings.push(`Mirror options updated`);
           }
@@ -895,35 +901,50 @@ createTool(
         bitmap: true,
       });
 
+      // Parse brush color to RGB values
+      const colorHex = brush_settings?.color ?? "#000000";
+      const red = parseInt(colorHex.slice(1, 3), 16);
+      const green = parseInt(colorHex.slice(3, 5), 16);
+      const blue = parseInt(colorHex.slice(5, 7), 16);
+      const alpha = brush_settings?.opacity ?? 255;
+
+      const size = brush_settings?.size ?? 1;
+      const softness = brush_settings?.softness ?? 0;
+      const shape = brush_settings?.shape ?? "square";
+
       // Apply brush settings using .value assignment
-      BarItems.slider_brush_size.value = brush_settings.size;
-      BarItems.slider_brush_opacity.value = brush_settings.opacity;
-      BarItems.slider_brush_softness.value = brush_settings.softness;
-      BarItems.brush_shape.value = brush_settings.shape;
-      ColorPanel.set(brush_settings.color);
+      // @ts-ignore
+      BarItems.slider_brush_size.value = size;
+      // @ts-ignore
+      BarItems.slider_brush_opacity.value = alpha;
+      // @ts-ignore
+      BarItems.slider_brush_softness.value = softness;
+      // @ts-ignore
+      BarItems.brush_shape.value = shape;
+      ColorPanel.set(colorHex);
 
       // Paint using Painter.edit() method
       texture.edit(
-        (canvas) => {
-          const ctx = canvas.getContext("2d");
+        (canvas: HTMLCanvasElement) => {
+          const ctx = canvas.getContext("2d")!;
           for (const coord of coordinates) {
-            if (brush_settings.shape === "circle") {
+            if (shape === "circle") {
               Painter.editCircle(
                 ctx,
                 coord.x,
                 coord.y,
-                brush_settings.size,
-                brush_settings.softness,
-                (r, g, b, a) => [red, green, blue, alpha]
+                size,
+                softness,
+                () => ({ r: red, g: green, b: blue, a: alpha })
               );
             } else {
               Painter.editSquare(
                 ctx,
                 coord.x,
                 coord.y,
-                brush_settings.size,
-                brush_settings.softness,
-                (r, g, b, a) => [red, green, blue, alpha]
+                size,
+                softness,
+                () => ({ r: red, g: green, b: blue, a: alpha })
               );
             }
           }
