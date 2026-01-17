@@ -138,13 +138,6 @@ export function captureScreenshot(project?: string) {
  * Only available when running as a desktop application.
  */
 export async function captureAppScreenshot(): Promise<ReturnType<typeof imageContent>> {
-  // @ts-ignore - isApp is globally available in Blockbench
-  if (typeof isApp === "undefined" || !isApp) {
-    throw new Error(
-      "App screenshot is only available in the desktop application."
-    );
-  }
-
   return new Promise((resolve, reject) => {
     let resolved = false;
 
