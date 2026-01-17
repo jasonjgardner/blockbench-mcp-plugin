@@ -162,6 +162,32 @@ export function findTextureOrThrow(id: string): Texture {
 }
 
 /**
+ * Helper to find a TextureGroup by name or UUID
+ */
+export function findTextureGroupOrThrow(id: string): TextureGroup {
+  // @ts-ignore - TextureGroup is globally available in Blockbench
+  const group = TextureGroup.all.find(
+    (g: TextureGroup) => g.uuid === id || g.name === id
+  );
+  if (!group) {
+    throw new Error(
+      `Material/texture group "${id}" not found. Use the list_materials tool to see available materials.`
+    );
+  }
+  return group;
+}
+
+/**
+ * Helper to get texture info for a PBR channel
+ */
+export function getChannelTextureInfo(textures: Texture[], channel: string) {
+  const tex = textures.find((t: Texture) => t.pbr_channel === channel);
+  return tex
+    ? { name: tex.name, uuid: tex.uuid, hasTexture: true }
+    : { hasTexture: false };
+}
+
+/**
  * Gets a mesh by ID or returns the selected mesh if no ID provided.
  * Throws an actionable error if no mesh is found.
  * @param meshId - Optional mesh UUID or name
