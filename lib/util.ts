@@ -88,6 +88,100 @@ export function getProjectTexture(id: string): Texture | null {
   return texture || null;
 }
 
+// ============================================================================
+// Lookup Helpers with Actionable Error Messages
+// ============================================================================
+
+/**
+ * Finds a group/bone by name and throws an actionable error if not found.
+ * @param name - The name of the group/bone to find
+ * @returns The found Group
+ * @throws Error with suggestion to use list_outline
+ */
+export function findGroupOrThrow(name: string): Group {
+  // @ts-ignore - Group is globally available in Blockbench
+  const group = Group.all.find((g: Group) => g.name === name);
+  if (!group) {
+    throw new Error(
+      `Bone/group "${name}" not found. Use the list_outline tool to see available groups and bones.`
+    );
+  }
+  return group;
+}
+
+/**
+ * Finds a mesh by ID or name and throws an actionable error if not found.
+ * @param id - The UUID or name of the mesh to find
+ * @returns The found Mesh
+ * @throws Error with suggestion to use list_outline
+ */
+export function findMeshOrThrow(id: string): Mesh {
+  // @ts-ignore - Mesh is globally available in Blockbench
+  const mesh = Mesh.all.find((m: Mesh) => m.uuid === id || m.name === id);
+  if (!mesh) {
+    throw new Error(
+      `Mesh "${id}" not found. Use the list_outline tool to see available meshes.`
+    );
+  }
+  return mesh;
+}
+
+/**
+ * Finds an element (cube, mesh, group) by ID or name and throws an actionable error if not found.
+ * @param id - The UUID or name of the element to find
+ * @returns The found OutlinerElement
+ * @throws Error with suggestion to use list_outline
+ */
+export function findElementOrThrow(id: string): OutlinerElement {
+  // @ts-ignore - Outliner is globally available in Blockbench
+  const element = Outliner.root.find(
+    (el: OutlinerElement) => el.uuid === id || el.name === id
+  );
+  if (!element) {
+    throw new Error(
+      `Element "${id}" not found. Use the list_outline tool to see available elements.`
+    );
+  }
+  return element;
+}
+
+/**
+ * Finds a texture by ID, name, or UUID and throws an actionable error if not found.
+ * @param id - The ID, name, or UUID of the texture to find
+ * @returns The found Texture
+ * @throws Error with suggestion to use list_textures
+ */
+export function findTextureOrThrow(id: string): Texture {
+  const texture = getProjectTexture(id);
+  if (!texture) {
+    throw new Error(
+      `Texture "${id}" not found. Use the list_textures tool to see available textures.`
+    );
+  }
+  return texture;
+}
+
+/**
+ * Gets a mesh by ID or returns the selected mesh if no ID provided.
+ * Throws an actionable error if no mesh is found.
+ * @param meshId - Optional mesh UUID or name
+ * @returns The found or selected Mesh
+ * @throws Error with suggestion to use list_outline
+ */
+export function getMeshOrSelected(meshId?: string): Mesh {
+  if (meshId) {
+    return findMeshOrThrow(meshId);
+  }
+  // @ts-ignore - Mesh is globally available in Blockbench
+  const selected = Mesh.selected[0];
+  if (!selected) {
+    throw new Error(
+      "No mesh selected and no mesh_id provided. Select a mesh or provide a mesh_id. Use the list_outline tool to see available meshes."
+    );
+  }
+  return selected;
+}
+
 /**
  * Captures a screenshot of the 3D preview canvas.
  * Uses Blockbench's native rendering pipeline for accurate capture.

@@ -2,7 +2,12 @@
 /// <reference types="blockbench-types" />
 import { z } from "zod";
 import { createTool } from "@/lib/factories";
-import { getProjectTexture, imageContent } from "@/lib/util";
+import {
+  getProjectTexture,
+  imageContent,
+  findElementOrThrow,
+  findTextureOrThrow,
+} from "@/lib/util";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
 
 export function registerTextureTools() {
@@ -183,26 +188,23 @@ createTool(
         .optional()
         .default("blank"),
     }),
-    async execute({ applyTo, id }) {
+    async execute({ applyTo, id, texture }) {
+      const element = findElementOrThrow(id);
+      const projectTexture = texture
+        ? findTextureOrThrow(texture)
+        : Texture.getDefault();
+
+      if (!projectTexture) {
+        throw new Error(
+          "No default texture available. Use the create_texture tool to create one first."
+        );
+      }
+
       Undo.initEdit({
         elements: [],
         outliner: true,
         collections: [],
       });
-
-      const element = Outliner.root.find(
-        (el) => el.uuid === id || el.name === id
-      );
-
-      if (!element) {
-        throw new Error(`Element with ID "${id}" not found.`);
-      }
-
-      const projectTexture = getProjectTexture(id) ?? Texture.getDefault();
-
-      if (!projectTexture) {
-        throw new Error(`Texture with ID "${id}" not found.`);
-      }
 
       projectTexture.select();
 
@@ -284,7 +286,8 @@ createTool(
   {
     description: "Returns a list of all textures in the Blockbench editor.",
     annotations: {
-      title: "List Textures"
+      title: "List Textures",
+      readOnlyHint: true,
     },
     parameters: z.object({}),
     async execute() {
@@ -309,22 +312,24 @@ createTool(
     description:
       "Returns the image data of the given texture or default texture.",
     annotations: {
-      title: "Get Texture"
+      title: "Get Texture",
+      readOnlyHint: true,
     },
     parameters: z.object({
       texture: z.string().optional().describe("Texture ID or name."),
     }),
     async execute({ texture }) {
       if (!texture) {
-        return imageContent({ url: Texture.getDefault().getDataURL() });
+        const defaultTexture = Texture.getDefault();
+        if (!defaultTexture) {
+          throw new Error(
+            "No default texture available. Use the create_texture tool to create one first, or specify a texture ID."
+          );
+        }
+        return imageContent({ url: defaultTexture.getDataURL() });
       }
 
-      const image = getProjectTexture(texture);
-
-      if (!image) {
-        throw new Error(`Texture with ID "${texture}" not found.`);
-      }
-
+      const image = findTextureOrThrow(texture);
       return imageContent({ url: image.getDataURL() });
     },
   },

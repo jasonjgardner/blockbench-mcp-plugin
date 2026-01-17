@@ -204,8 +204,6 @@ async function buildPlugin(): Promise<boolean> {
     external: [
       "three",
       "tinycolor2",
-      // Prevent undici from bundling and requiring restricted native modules
-      "undici",
       // Native modules that require permission in Blockbench v5.0+
       "node:module",
       "node:fs",

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { createTool } from "@/lib/factories";
 import { meshSchema } from "@/lib/zodObjects";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
-import { getProjectTexture } from "@/lib/util";
+import { getProjectTexture, getMeshOrSelected, findMeshOrThrow } from "@/lib/util";
 
 export function registerMeshTools() {
 createTool(
@@ -110,15 +110,7 @@ createTool(
                 .describe("What to extrude: faces, edges, or vertices."),
         }),
         async execute({ mesh_id, distance, mode }) {
-            const mesh = mesh_id
-                ? Mesh.all.find((m) => m.uuid === mesh_id || m.name === mesh_id)
-                : Mesh.selected[0];
-
-            if (!mesh) {
-                throw new Error(
-                    mesh_id ? `Mesh with ID "${mesh_id}" not found.` : "No mesh selected."
-                );
-            }
+            const mesh = getMeshOrSelected(mesh_id);
 
             // Use the extrude tool
             const tool =
@@ -164,15 +156,7 @@ createTool(
                 .describe("Number of subdivision cuts to make."),
         }),
         async execute({ mesh_id, cuts }) {
-            const mesh = mesh_id
-                ? Mesh.all.find((m) => m.uuid === mesh_id || m.name === mesh_id)
-                : Mesh.selected[0];
-
-            if (!mesh) {
-                throw new Error(
-                    mesh_id ? `Mesh with ID "${mesh_id}" not found.` : "No mesh selected."
-                );
-            }
+            const mesh = getMeshOrSelected(mesh_id);
 
             // Use the loop cut tool with subdivision
             const tool = BarItems.loop_cut;
@@ -413,12 +397,7 @@ createTool(
                 ),
         }),
         async execute({ mesh_id, mode, elements, action }) {
-            const mesh = Mesh.all.find(
-                (m) => m.uuid === mesh_id || m.name === mesh_id
-            );
-            if (!mesh) {
-                throw new Error(`Mesh with ID "${mesh_id}" not found.`);
-            }
+            const mesh = findMeshOrThrow(mesh_id);
 
             Undo.initEdit({
                 elements: [mesh],
@@ -592,15 +571,7 @@ createTool(
                 ),
         }),
         async execute({ mesh_id, offset, vertices }) {
-            const mesh = mesh_id
-                ? Mesh.all.find((m) => m.uuid === mesh_id || m.name === mesh_id)
-                : Mesh.selected[0];
-
-            if (!mesh) {
-                throw new Error(
-                    mesh_id ? `Mesh with ID "${mesh_id}" not found.` : "No mesh selected."
-                );
-            }
+            const mesh = getMeshOrSelected(mesh_id);
 
             Undo.initEdit({
                 elements: [mesh],
@@ -664,15 +635,7 @@ createTool(
                 .describe("When deleting faces/edges, whether to keep the vertices."),
         }),
         async execute({ mesh_id, mode, keep_vertices }) {
-            const mesh = mesh_id
-                ? Mesh.all.find((m) => m.uuid === mesh_id || m.name === mesh_id)
-                : Mesh.selected[0];
-
-            if (!mesh) {
-                throw new Error(
-                    mesh_id ? `Mesh with ID "${mesh_id}" not found.` : "No mesh selected."
-                );
-            }
+            const mesh = getMeshOrSelected(mesh_id);
 
             // Use the delete tool
             const tool = BarItems.delete_mesh_selection;
@@ -712,12 +675,7 @@ createTool(
                 .describe("Whether to only merge selected vertices."),
         }),
         async execute({ mesh_id, threshold, selected_only }) {
-            const mesh = Mesh.all.find(
-                (m) => m.uuid === mesh_id || m.name === mesh_id
-            );
-            if (!mesh) {
-                throw new Error(`Mesh with ID "${mesh_id}" not found.`);
-            }
+            const mesh = findMeshOrThrow(mesh_id);
 
             Undo.initEdit({
                 elements: [mesh],
@@ -817,15 +775,7 @@ createTool(
                 .describe("Texture ID or name to apply to the new face."),
         }),
         async execute({ mesh_id, vertices, texture }) {
-            const mesh = mesh_id
-                ? Mesh.all.find((m) => m.uuid === mesh_id || m.name === mesh_id)
-                : Mesh.selected[0];
-
-            if (!mesh) {
-                throw new Error(
-                    mesh_id ? `Mesh with ID "${mesh_id}" not found.` : "No mesh selected."
-                );
-            }
+            const mesh = getMeshOrSelected(mesh_id);
 
             Undo.initEdit({
                 elements: [mesh],
@@ -1001,12 +951,7 @@ createTool(
         .describe("Points defining the cut path."),
     }),
     async execute({ mesh_id, points }) {
-      const mesh = Mesh.all.find(
-        (m) => m.uuid === mesh_id || m.name === mesh_id
-      );
-      if (!mesh) {
-        throw new Error(`Mesh with ID "${mesh_id}" not found.`);
-      }
+      const mesh = findMeshOrThrow(mesh_id);
 
       Undo.initEdit({
         elements: [mesh],

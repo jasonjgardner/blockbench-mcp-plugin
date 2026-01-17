@@ -5,6 +5,10 @@ export interface Session {
   connectedAt: Date;
   lastActivity: Date;
   timeoutHandle?: ReturnType<typeof setTimeout>;
+  /** Client name from MCP initialize request (e.g., "Claude Code", "Cline") */
+  clientName?: string;
+  /** Client version from MCP initialize request */
+  clientVersion?: string;
 }
 
 type SessionListener = (sessions: Session[]) => void;
@@ -50,6 +54,17 @@ class SessionManager {
     if (session) {
       session.lastActivity = new Date();
       this.resetTimeout(session);
+    }
+  }
+
+  updateClientInfo(sessionId: string, clientName?: string, clientVersion?: string): void {
+    const session = this.sessions.get(sessionId);
+    if (session) {
+      session.clientName = clientName;
+      session.clientVersion = clientVersion;
+      this.notifyListeners();
+      const displayName = clientName || sessionId.slice(0, 8) + '...';
+      console.log(`[MCP] Session identified: ${displayName}${clientVersion ? ` v${clientVersion}` : ''}`);
     }
   }
 

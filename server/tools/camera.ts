@@ -11,7 +11,8 @@ export function registerCameraTools() {
     {
       description: "Returns the image data of the current view.",
       annotations: {
-        title: "Capture Screenshot"
+        title: "Capture Screenshot",
+        readOnlyHint: true,
       },
       parameters: z.object({
         project: z.string().optional().describe("Project name or UUID."),
@@ -29,6 +30,7 @@ export function registerCameraTools() {
       description: "Returns the image data of the Blockbench app.",
       annotations: {
         title: "Capture App Screenshot",
+        readOnlyHint: true,
       },
       parameters: z.object({}),
       async execute() {

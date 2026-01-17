@@ -2,6 +2,7 @@
 /// <reference types="blockbench-types" />
 import { z } from "zod";
 import { createTool, tools } from "@/lib/factories";
+import { findGroupOrThrow } from "@/lib/util";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
 
 export function registerAnimationTools() {
@@ -176,10 +177,7 @@ createTool(
       }
 
       // Find the bone
-      const group = Group.all.find((g) => g.name === bone_name);
-      if (!group) {
-        throw new Error(`Bone/group "${bone_name}" not found.`);
-      }
+      const group = findGroupOrThrow(bone_name);
 
       // Get or create animator
       let animator = animation.animators[group.uuid];
@@ -369,10 +367,7 @@ createTool(
         throw new Error("No animation found or selected.");
       }
 
-      const group = Group.all.find((g) => g.name === bone_name);
-      if (!group) {
-        throw new Error(`Bone/group "${bone_name}" not found.`);
-      }
+      const group = findGroupOrThrow(bone_name);
 
       const animator = animation.animators[group.uuid];
       if (!animator || !animator[channel]) {
@@ -571,14 +566,10 @@ createTool(
         }
 
         case "parent": {
-          const child = Group.all.find((g) => g.name === bone_data.name);
+          const child = findGroupOrThrow(bone_data.name);
           const parent = bone_data.parent
             ? Group.all.find((g) => g.name === bone_data.parent)
             : "root";
-
-          if (!child) {
-            throw new Error(`Bone "${bone_data.name}" not found.`);
-          }
 
           child.addTo(parent);
           result = `Parented "${bone_data.name}" to "${
@@ -588,10 +579,7 @@ createTool(
         }
 
         case "unparent": {
-          const bone = Group.all.find((g) => g.name === bone_data.name);
-          if (!bone) {
-            throw new Error(`Bone "${bone_data.name}" not found.`);
-          }
+          const bone = findGroupOrThrow(bone_data.name);
 
           bone.addTo("root");
           result = `Unparented "${bone_data.name}"`;
@@ -599,10 +587,7 @@ createTool(
         }
 
         case "delete": {
-          const bone = Group.all.find((g) => g.name === bone_data.name);
-          if (!bone) {
-            throw new Error(`Bone "${bone_data.name}" not found.`);
-          }
+          const bone = findGroupOrThrow(bone_data.name);
 
           bone.remove();
           result = `Deleted bone "${bone_data.name}"`;
@@ -610,10 +595,7 @@ createTool(
         }
 
         case "rename": {
-          const bone = Group.all.find((g) => g.name === bone_data.name);
-          if (!bone) {
-            throw new Error(`Bone "${bone_data.name}" not found.`);
-          }
+          const bone = findGroupOrThrow(bone_data.name);
 
           const newName = bone_data.children?.[0] || "new_name";
           bone.name = newName;
@@ -622,10 +604,7 @@ createTool(
         }
 
         case "set_pivot": {
-          const bone = Group.all.find((g) => g.name === bone_data.name);
-          if (!bone) {
-            throw new Error(`Bone "${bone_data.name}" not found.`);
-          }
+          const bone = findGroupOrThrow(bone_data.name);
 
           if (bone_data.origin) {
             bone.origin = bone_data.origin;
@@ -635,10 +614,7 @@ createTool(
         }
 
         case "set_ik": {
-          const bone = Group.all.find((g) => g.name === bone_data.name);
-          if (!bone) {
-            throw new Error(`Bone "${bone_data.name}" not found.`);
-          }
+          const bone = findGroupOrThrow(bone_data.name);
 
           // @ts-ignore
           bone.ik_enabled = bone_data.ik_enabled || false;
@@ -651,10 +627,7 @@ createTool(
         }
 
         case "mirror": {
-          const bone = Group.all.find((g) => g.name === bone_data.name);
-          if (!bone) {
-            throw new Error(`Bone "${bone_data.name}" not found.`);
-          }
+          const bone = findGroupOrThrow(bone_data.name);
 
           const axis = bone_data.mirror_axis || "x";
           const mirroredBone = bone.duplicate();
@@ -1109,10 +1082,7 @@ createTool(
             throw new Error("Source animation not found.");
           }
 
-          const srcBone = Group.all.find((g) => g.name === source.bone);
-          if (!srcBone) {
-            throw new Error(`Source bone "${source.bone}" not found.`);
-          }
+          const srcBone = findGroupOrThrow(source.bone);
 
           const animator = srcAnimation.animators[srcBone.uuid];
           if (!animator) {
@@ -1182,10 +1152,7 @@ createTool(
             throw new Error("Target animation not found.");
           }
 
-          const tgtBone = Group.all.find((g) => g.name === target.bone);
-          if (!tgtBone) {
-            throw new Error(`Target bone "${target.bone}" not found.`);
-          }
+          const tgtBone = findGroupOrThrow(target.bone);
 
           let animator = tgtAnimation.animators[tgtBone.uuid];
           if (!animator) {

@@ -2,6 +2,7 @@
 /// <reference types="blockbench-types" />
 import { z } from "zod";
 import { createTool } from "@/lib/factories";
+import { findElementOrThrow } from "@/lib/util";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
 
 export function registerElementTools() {
@@ -17,19 +18,13 @@ export function registerElementTools() {
       id: z.string().describe("ID or name of the element to remove."),
     }),
     async execute({ id }) {
+      const element = findElementOrThrow(id);
+
       Undo.initEdit({
         elements: [],
         outliner: true,
         collections: [],
       });
-
-      const element = Outliner.root.find(
-        (el) => el.uuid === id || el.name === id
-      );
-
-      if (!element) {
-        throw new Error(`Element with ID "${id}" not found.`);
-      }
 
       element.remove();
 
@@ -150,9 +145,7 @@ createTool(
       newName: z.string().optional(),
     }),
     async execute({ id, offset, newName }) {
-      const element =
-        Outliner.root.find((el) => el.uuid === id || el.name === id) ?? null;
-      if (!element) throw new Error(`Element "${id}" not found.`);
+      const element = findElementOrThrow(id);
 
       // Helper functions for each type; match patterns used in existing tools:contentReference[oaicite:5]{index=5}.
       function cloneCube(cube: Cube, parent: any) {
@@ -248,10 +241,7 @@ createTool(
       new_name: z.string().describe("New name to assign."),
     }),
     async execute({ id, new_name }) {
-      const element = Outliner.root.find(
-        (el) => el.uuid === id || el.name === id
-      );
-      if (!element) throw new Error(`Element "${id}" not found.`);
+      const element = findElementOrThrow(id);
       Undo.initEdit({ elements: [element], outliner: true, collections: [] });
       element.extend({ name: new_name });
       Undo.finishEdit("Agent renamed element");

@@ -177,6 +177,19 @@ export default function createNetServer (
                 if (sess) {
                   sessionTransports.delete('__pending__')
                   sessionTransports.set(newSessionId, sess)
+
+                  // Hook into oninitialized to capture client info
+                  const underlyingServer = sess.server.server
+                  underlyingServer.oninitialized = () => {
+                    const clientInfo = underlyingServer.getClientVersion()
+                    if (clientInfo) {
+                      sessionManager.updateClientInfo(
+                        newSessionId,
+                        clientInfo.name,
+                        clientInfo.version
+                      )
+                    }
+                  }
                 }
               },
               onsessionclosed: (closedSessionId: string) => {

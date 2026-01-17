@@ -47,6 +47,7 @@ interface ToolDefinition {
     title?: string;
     destructiveHint?: boolean;
     openWorldHint?: boolean;
+    readOnlyHint?: boolean;
   };
 }
 
@@ -94,6 +95,7 @@ export function createTool<T extends z.ZodType>(
       title?: string;
       destructiveHint?: boolean;
       openWorldHint?: boolean;
+      readOnlyHint?: boolean;
     };
     parameters: T;
     execute: (args: z.infer<T>, context?: ToolContext) => Promise<ToolResult>;
@@ -264,7 +266,7 @@ interface ResourceDefinition {
     uri: URL,
     variables: Record<string, string>
   ) => Promise<{
-    contents: Array<{ uri: string; text: string } | { uri: string; blob: string }>;
+    contents: Array<{ uri: string; text: string; mimeType?: string } | { uri: string; blob: string; mimeType?: string }>;
   }>;
 }
 
@@ -294,7 +296,7 @@ export function createResource(
       uri: URL,
       variables: Record<string, string>
     ) => Promise<{
-      contents: Array<{ uri: string; text: string } | { uri: string; blob: string }>;
+      contents: Array<{ uri: string; text: string; mimeType?: string } | { uri: string; blob: string; mimeType?: string }>;
     }>;
   }
 ) {
@@ -333,7 +335,7 @@ export function createResource(
           uri: URL,
           variables: Record<string, string | string[]>
         ) => Promise<{
-          contents: Array<{ uri: string; text: string } | { uri: string; blob: string }>;
+          contents: Array<{ uri: string; text: string; mimeType?: string } | { uri: string; blob: string; mimeType?: string }>;
         }>
       ) => void;
     }
@@ -393,7 +395,7 @@ export function registerResourcesOnServer(server: unknown) {
         uri: URL,
         variables: Record<string, string | string[]>
       ) => Promise<{
-        contents: Array<{ uri: string; text: string } | { uri: string; blob: string }>;
+        contents: Array<{ uri: string; text: string; mimeType?: string } | { uri: string; blob: string; mimeType?: string }>;
       }>
     ) => void;
   };

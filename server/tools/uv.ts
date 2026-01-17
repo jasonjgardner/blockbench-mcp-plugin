@@ -2,6 +2,7 @@
 /// <reference types="blockbench-types" />
 import { z } from "zod";
 import { createTool } from "@/lib/factories";
+import { findMeshOrThrow, getMeshOrSelected } from "@/lib/util";
 import { STATUS_EXPERIMENTAL } from "@/lib/constants";
 
 export function registerUVTools() {
@@ -24,12 +25,7 @@ createTool(
                 .describe("UV coordinates for each vertex of the face."),
         }),
         async execute({ mesh_id, face_key, uv_mapping }) {
-            const mesh = Mesh.all.find(
-                (m) => m.uuid === mesh_id || m.name === mesh_id
-            );
-            if (!mesh) {
-                throw new Error(`Mesh with ID "${mesh_id}" not found.`);
-            }
+            const mesh = findMeshOrThrow(mesh_id);
 
             Undo.initEdit({
                 elements: [mesh],
@@ -88,15 +84,7 @@ createTool(
                 ),
         }),
         async execute({ mesh_id, mode, faces }) {
-            const mesh = mesh_id
-                ? Mesh.all.find((m) => m.uuid === mesh_id || m.name === mesh_id)
-                : Mesh.selected[0];
-
-            if (!mesh) {
-                throw new Error(
-                    mesh_id ? `Mesh with ID "${mesh_id}" not found.` : "No mesh selected."
-                );
-            }
+            const mesh = getMeshOrSelected(mesh_id);
 
             Undo.initEdit({
                 elements: [mesh],
@@ -185,15 +173,7 @@ createTool(
                 ),
         }),
         async execute({ mesh_id, angle, faces }) {
-            const mesh = mesh_id
-                ? Mesh.all.find((m) => m.uuid === mesh_id || m.name === mesh_id)
-                : Mesh.selected[0];
-
-            if (!mesh) {
-                throw new Error(
-                    mesh_id ? `Mesh with ID "${mesh_id}" not found.` : "No mesh selected."
-                );
-            }
+            const mesh = getMeshOrSelected(mesh_id);
 
             Undo.initEdit({
                 elements: [mesh],

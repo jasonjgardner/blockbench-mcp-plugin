@@ -18,6 +18,7 @@ createResource("projects", {
         uri: `projects://${project.uuid}`,
         name: project.name || project.uuid,
         description: `${project.format?.name ?? "Unknown format"} project${project.saved ? "" : " (unsaved)"}`,
+        mimeType: "application/json",
       })),
     };
   },
@@ -30,6 +31,7 @@ createResource("projects", {
           {
             uri: uri.href,
             text: JSON.stringify({ projects: [], count: 0 }),
+            mimeType: "application/json",
           },
         ],
       };
@@ -71,6 +73,7 @@ createResource("projects", {
           {
             uri: uri.href,
             text: JSON.stringify(getProjectInfo(project)),
+            mimeType: "application/json",
           },
         ],
       };
@@ -86,6 +89,7 @@ createResource("projects", {
             count: projects.length,
             activeProject: Project ? Project.uuid : null,
           }),
+          mimeType: "application/json",
         },
       ],
     };
@@ -106,6 +110,7 @@ createResource("nodes", {
         uri: `nodes://${node.uuid}`,
         name: node.name || node.uuid,
         description: `3D node in current project`,
+        mimeType: "application/json",
       })),
     };
   },
@@ -135,6 +140,7 @@ createResource("nodes", {
             rotation: rotation.toArray(),
             scale: scale.toArray(),
           }),
+          mimeType: "application/json",
         },
       ],
     };
@@ -169,6 +175,7 @@ createResource("textures", {
           {
             uri: uri.href,
             text: JSON.stringify({ textures: [], count: 0 }),
+            mimeType: "application/json",
           },
         ],
       };
@@ -211,6 +218,7 @@ createResource("textures", {
           {
             uri: uri.href,
             text: JSON.stringify(getTextureInfo(texture)),
+            mimeType: "application/json",
           },
         ],
       };
@@ -225,6 +233,7 @@ createResource("textures", {
             textures: textures.map(getTextureInfo),
             count: textures.length,
           }),
+          mimeType: "application/json",
         },
       ],
     };
