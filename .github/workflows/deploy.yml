@@ -102,7 +102,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: plugin-build
-          path: ./dist
+          path: |
+            ./dist/mcp.js
+            ./dist/about.md
           retention-days: 7
 
   deploy:
@@ -139,9 +141,10 @@ jobs:
         run: |
           DEPLOY_PATH="${{ needs.build.outputs.deploy_path }}"
 
-          # Create directory and copy build
+          # Create directory and copy only mcp.js and about.md
           mkdir -p "${DEPLOY_PATH}"
-          cp ./artifact/* "${DEPLOY_PATH}/"
+          cp ./artifact/dist/mcp.js "${DEPLOY_PATH}/"
+          cp ./artifact/dist/about.md "${DEPLOY_PATH}/"
 
           echo "Deployed to ${DEPLOY_PATH}/"
           ls -la "${DEPLOY_PATH}/"
@@ -149,8 +152,9 @@ jobs:
       - name: Deploy to root (latest release only)
         if: needs.build.outputs.is_latest_release == 'true'
         run: |
-          # Copy to root for latest release
-          cp ./artifact/* ./
+          # Copy only mcp.js and about.md to root for latest release
+          cp ./artifact/dist/mcp.js ./
+          cp ./artifact/dist/about.md ./
           echo "Deployed to root (latest release)"
 
       - name: Commit and push
