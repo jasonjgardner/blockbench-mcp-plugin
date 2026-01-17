@@ -143,8 +143,8 @@ jobs:
 
           # Create directory and copy only mcp.js and about.md
           mkdir -p "${DEPLOY_PATH}"
-          cp ./artifact/dist/mcp.js "${DEPLOY_PATH}/"
-          cp ./artifact/dist/about.md "${DEPLOY_PATH}/"
+          cp ./artifact/mcp.js "${DEPLOY_PATH}/"
+          cp ./artifact/about.md "${DEPLOY_PATH}/"
 
           echo "Deployed to ${DEPLOY_PATH}/"
           ls -la "${DEPLOY_PATH}/"
@@ -153,8 +153,8 @@ jobs:
         if: needs.build.outputs.is_latest_release == 'true'
         run: |
           # Copy only mcp.js and about.md to root for latest release
-          cp ./artifact/dist/mcp.js ./
-          cp ./artifact/dist/about.md ./
+          cp ./artifact/mcp.js ./
+          cp ./artifact/about.md ./
           echo "Deployed to root (latest release)"
 
       - name: Commit and push
