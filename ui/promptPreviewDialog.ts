@@ -146,7 +146,7 @@ function showPromptContentDialog(
 
   contentDialog = new Dialog({
     id: "mcp_prompt_content",
-    title: `Prompt: ${promptName}`,
+    title: tl("mcp.dialog.prompt_title", [promptName]),
     width: 700,
     lines: [
       `<pre style="
@@ -163,13 +163,13 @@ function showPromptContentDialog(
         line-height: 1.5;
       ">${escapeHtml(content)}</pre>`,
     ],
-    buttons: ["Copy", "Close"],
+    buttons: [tl("mcp.dialog.copy"), tl("mcp.dialog.close")],
     onButton(buttonIndex: number) {
       if (buttonIndex === 0) {
         navigator.clipboard.writeText(content).then(() => {
-          Blockbench.showQuickMessage("Prompt copied to clipboard", 1500);
+          Blockbench.showQuickMessage(tl("mcp.dialog.prompt_copied"), 1500);
         }).catch(() => {
-          Blockbench.showQuickMessage("Failed to copy to clipboard", 1500);
+          Blockbench.showQuickMessage(tl("mcp.dialog.copy_failed"), 1500);
         });
         return false; // Keep dialog open
       }
@@ -189,7 +189,7 @@ export function openPromptPreviewDialog(promptName: string) {
   const promptDef = promptDefs[promptName];
 
   if (!promptDef) {
-    Blockbench.showQuickMessage(`Prompt "${promptName}" not found`, 2000);
+    Blockbench.showQuickMessage(tl("mcp.dialog.prompt_not_found", [promptName]), 2000);
     return;
   }
 
@@ -206,9 +206,9 @@ export function openPromptPreviewDialog(promptName: string) {
     form: hasArgs ? formConfig : undefined,
     lines: [
       `<p style="margin-bottom: 12px; color: var(--color-subtle_text);">${escapeHtml(promptDef.description)}</p>`,
-      ...(hasArgs ? [] : [`<p style="color: var(--color-subtle_text); font-style: italic;">This prompt has no arguments.</p>`]),
+      ...(hasArgs ? [] : [`<p style="color: var(--color-subtle_text); font-style: italic;">${tl("mcp.dialog.no_arguments")}</p>`]),
     ],
-    buttons: ["Generate Prompt", "Cancel"],
+    buttons: [tl("mcp.dialog.generate_prompt"), tl("mcp.dialog.cancel")],
     confirmIndex: 0,
     cancelIndex: 1,
     async onConfirm(formResult: Record<string, unknown>) {
@@ -220,7 +220,7 @@ export function openPromptPreviewDialog(promptName: string) {
         }
       }
 
-      Blockbench.showQuickMessage("Generating prompt...", 1000);
+      Blockbench.showQuickMessage(tl("mcp.dialog.generating_prompt"), 1000);
 
       try {
         const result = await promptDef.generate(args);
@@ -228,7 +228,7 @@ export function openPromptPreviewDialog(promptName: string) {
         // Extract text content from messages
         const content = result.messages
           .map((msg) => {
-            const roleLabel = msg.role === "user" ? "User" : "Assistant";
+            const roleLabel = msg.role === "user" ? tl("mcp.dialog.role_user") : tl("mcp.dialog.role_assistant");
             const text = typeof msg.content === "string"
               ? msg.content
               : msg.content.text;

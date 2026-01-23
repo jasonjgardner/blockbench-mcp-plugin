@@ -83,8 +83,59 @@ export function uiSetup({
           status: prompt.status,
           argumentCount: Object.keys(prompt.arguments).length,
         })),
+        // Filter states
+        toolsFilter: {
+          search: "",
+          showExperimental: true,
+        },
+        resourcesFilter: {
+          search: "",
+        },
+        promptsFilter: {
+          search: "",
+          showExperimental: true,
+        },
       }),
+      computed: {
+        filteredTools(): Array<{ name: string; description: string; enabled: boolean; status: string }> {
+          // @ts-ignore - Vue component context
+          const { tools, toolsFilter } = this;
+          const searchLower = toolsFilter.search.toLowerCase();
+          return tools.filter((tool: { name: string; status: string }) => {
+            // Check status filter (stable always visible, experimental based on toggle)
+            if (tool.status === "experimental" && !toolsFilter.showExperimental) return false;
+            // Check search filter (name only)
+            if (searchLower && !tool.name.toLowerCase().includes(searchLower)) return false;
+            return true;
+          });
+        },
+        filteredResources(): Array<{ name: string; description: string; uriTemplate: string }> {
+          // @ts-ignore - Vue component context
+          const { resources, resourcesFilter } = this;
+          const searchLower = resourcesFilter.search.toLowerCase();
+          if (!searchLower) return resources;
+          return resources.filter((resource: { name: string }) =>
+            resource.name.toLowerCase().includes(searchLower)
+          );
+        },
+        filteredPrompts(): Array<{ name: string; description: string; enabled: boolean; status: string; argumentCount: number }> {
+          // @ts-ignore - Vue component context
+          const { prompts, promptsFilter } = this;
+          const searchLower = promptsFilter.search.toLowerCase();
+          return prompts.filter((prompt: { name: string; status: string }) => {
+            // Check status filter (stable always visible, experimental based on toggle)
+            if (prompt.status === "experimental" && !promptsFilter.showExperimental) return false;
+            // Check search filter (name only)
+            if (searchLower && !prompt.name.toLowerCase().includes(searchLower)) return false;
+            return true;
+          });
+        },
+      },
       methods: {
+        // Expose tl() to Vue template
+        tl(key: string, variables?: string | number | (string | number)[]): string {
+          return tl(key, variables);
+        },
         getDisplayName(toolName: string): string {
           return toolName.replace("blockbench_", "");
         },
@@ -104,6 +155,33 @@ export function uiSetup({
         },
         openPromptPreview(promptName: string): void {
           openPromptPreviewDialog(promptName);
+        },
+        formatArgumentCount(count: number): string {
+          if (count === 1) {
+            return tl("mcp.prompts.argument_count", [count]);
+          }
+          return tl("mcp.prompts.argument_count_plural", [count]);
+        },
+        onToolsToggle(event: Event): void {
+          const details = event.target as HTMLDetailsElement;
+          if (!details.open) {
+            // @ts-ignore - Vue component context
+            this.toolsFilter.search = "";
+          }
+        },
+        onResourcesToggle(event: Event): void {
+          const details = event.target as HTMLDetailsElement;
+          if (!details.open) {
+            // @ts-ignore - Vue component context
+            this.resourcesFilter.search = "";
+          }
+        },
+        onPromptsToggle(event: Event): void {
+          const details = event.target as HTMLDetailsElement;
+          if (!details.open) {
+            // @ts-ignore - Vue component context
+            this.promptsFilter.search = "";
+          }
         },
       },
       name: "mcp_panel",

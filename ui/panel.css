@@ -35,20 +35,6 @@
         }
     }
 
-    .stable {
-        border: 1px solid green;
-        border-radius: 4px;
-        background: hsla(from green h 90% 80% / 0.5);
-        color: hsl(from green h 30% 20%);
-    }
-
-    .experimental {
-        border: 1px solid orange;
-        border-radius: 4px;
-        background: hsla(from orange h 90% 80% / 0.5);
-        color: hsl(from orange h 30% 20%);
-    }
-
     .tool-toggle-row {
         display: flex;
         align-items: center;
@@ -118,14 +104,16 @@
         }
     }
 
-    .tool-status {
-        display: inline-block;
-        padding: 2px 4px;
-        border-radius: 3px;
-        font-size: 0.666em;
-        font-weight: bold;
-        text-transform: uppercase;
-        margin-left: 8px;
+    .tool-status.experimental {
+        font-family: "Material Icons";
+        font-size: 14px;
+        margin-left: 6px;
+        vertical-align: middle;
+        line-height: 1;
+    }
+
+    .tool-status.experimental::before {
+        content: "science";
     }
 
     .session-item {
@@ -155,5 +143,95 @@
         color: var(--color-subtle_text);
         font-style: italic;
         padding: 8px 0;
+    }
+
+    .no-results {
+        color: var(--color-subtle_text);
+        font-style: italic;
+        padding: 12px 0;
+        text-align: center;
+    }
+
+    .filter-bar {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 0;
+        margin-bottom: 4px;
+        border-bottom: 1px solid var(--color-border);
+    }
+
+    .filter-input {
+        flex: 1;
+        min-width: 0;
+        padding: 6px 8px;
+        border: 1px solid var(--color-border);
+        border-radius: 4px;
+        background: var(--color-back);
+        color: var(--color-text);
+        font-size: 0.85em;
+        box-sizing: border-box;
+    }
+
+    .filter-input:focus {
+        outline: none;
+        border-color: var(--color-accent);
+    }
+
+    .filter-input::placeholder {
+        color: var(--color-subtle_text);
+    }
+
+    .filter-switch {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.75em;
+        color: var(--color-subtle_text);
+        cursor: pointer;
+        user-select: none;
+        white-space: nowrap;
+    }
+
+    .filter-switch input[type="checkbox"] {
+        display: none;
+    }
+
+    .switch-slider {
+        position: relative;
+        width: 28px;
+        height: 16px;
+        background: var(--color-button);
+        border-radius: 8px;
+        transition: background-color 0.2s ease;
+    }
+
+    .switch-slider::before {
+        content: "";
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 12px;
+        height: 12px;
+        background: var(--color-text);
+        border-radius: 50%;
+        transition: transform 0.2s ease;
+    }
+
+    .filter-switch input:checked + .switch-slider {
+        background: var(--color-accent);
+    }
+
+    .filter-switch input:checked + .switch-slider::before {
+        transform: translateX(12px);
+    }
+
+    .switch-label {
+        color: var(--color-subtle_text);
+    }
+
+    .filter-switch input:checked ~ .switch-label {
+        color: var(--color-text);
     }
 }

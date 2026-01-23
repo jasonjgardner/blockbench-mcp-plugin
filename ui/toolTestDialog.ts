@@ -167,10 +167,10 @@ function zodSchemaToFormConfig(
     if (meta.type === "textarea") {
       fieldConfig.height = 100;
       if (meta.isArray) {
-        fieldConfig.placeholder = "Enter JSON array, e.g. [1, 2, 3]";
+        fieldConfig.placeholder = tl("mcp.dialog.json_array_placeholder");
         fieldConfig.value = fieldConfig.value ?? "[]";
       } else if ((def.typeName as string) === "ZodObject") {
-        fieldConfig.placeholder = "Enter JSON object";
+        fieldConfig.placeholder = tl("mcp.dialog.json_object_placeholder");
         fieldConfig.value = fieldConfig.value ?? "{}";
       }
     }
@@ -230,7 +230,7 @@ function showResultDialog(toolName: string, result: unknown, isError: boolean) {
 
   resultDialog = new Dialog({
     id: "mcp_tool_result",
-    title: `Result: ${toolName}`,
+    title: tl("mcp.dialog.result_title", [toolName]),
     width: 600,
     lines: [
       `<pre style="
@@ -247,7 +247,7 @@ function showResultDialog(toolName: string, result: unknown, isError: boolean) {
       ">${escapeHtml(resultStr)}</pre>`,
     ],
     singleButton: true,
-    buttons: ["Close"],
+    buttons: [tl("mcp.dialog.close")],
   });
 
   resultDialog.show();
@@ -275,7 +275,7 @@ export function openToolTestDialog(toolName: string) {
   const toolDef = toolDefs[toolName];
 
   if (!toolDef) {
-    Blockbench.showQuickMessage(`Tool "${toolName}" not found`, 2000);
+    Blockbench.showQuickMessage(tl("mcp.dialog.tool_not_found", [toolName]), 2000);
     return;
   }
 
@@ -292,8 +292,8 @@ export function openToolTestDialog(toolName: string) {
     form: hasFields ? formConfig : undefined,
     lines: hasFields
       ? undefined
-      : [`<p style="color: var(--color-subtle_text); font-style: italic;">This tool has no parameters.</p>`],
-    buttons: ["Run Tool", "Copy Input", "Cancel"],
+      : [`<p style="color: var(--color-subtle_text); font-style: italic;">${tl("mcp.dialog.no_parameters")}</p>`],
+    buttons: [tl("mcp.dialog.run_tool"), tl("mcp.dialog.copy_input"), tl("mcp.dialog.cancel")],
     confirmIndex: 0,
     cancelIndex: 2,
     onButton(buttonIndex: number) {
@@ -311,9 +311,9 @@ export function openToolTestDialog(toolName: string) {
 
         // Copy to clipboard
         navigator.clipboard.writeText(jsonData).then(() => {
-          Blockbench.showQuickMessage("Input copied to clipboard", 1500);
+          Blockbench.showQuickMessage(tl("mcp.dialog.input_copied"), 1500);
         }).catch(() => {
-          Blockbench.showQuickMessage("Failed to copy to clipboard", 1500);
+          Blockbench.showQuickMessage(tl("mcp.dialog.copy_failed"), 1500);
         });
 
         // Return false to keep dialog open
@@ -324,7 +324,7 @@ export function openToolTestDialog(toolName: string) {
       const args = hasFields ? parseFormResult(formResult, toolDef.inputSchema) : {};
 
       // Show loading message
-      Blockbench.showQuickMessage("Running tool...", 1000);
+      Blockbench.showQuickMessage(tl("mcp.dialog.running_tool"), 1000);
 
       try {
         const result = await toolDef.execute(args);

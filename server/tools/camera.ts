@@ -74,11 +74,12 @@ export function registerCameraTools() {
           throw new Error("No preview found in the Blockbench editor.");
         }
 
+        // @ts-expect-error Angle CAN be loaded like this
         preview.loadAnglePreset({
           ...angle
         });
 
-        return await captureScreenshot();
+        return captureScreenshot();
       },
     },
     STATUS_EXPERIMENTAL

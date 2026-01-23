@@ -21,14 +21,14 @@ export function statusBarSetup(server: McpServer): void {
   // Create the status indicator
   const statusIndicator = document.createElement("div");
   statusIndicator.className = "mcp-status-indicator";
-  statusIndicator.title = "Click to view MCP panel";
-  
+  statusIndicator.title = tl("mcp.tooltip.click_to_view_panel");
+
   const statusDot = document.createElement("div");
   statusDot.className = "mcp-status-dot";
-  
+
   const statusText = document.createElement("span");
   statusText.className = "mcp-status-text";
-  statusText.textContent = "MCP Server";
+  statusText.textContent = tl("mcp.status.server");
   
   const serverInfo = document.createElement("span");
   serverInfo.className = "mcp-server-info";
@@ -47,12 +47,12 @@ export function statusBarSetup(server: McpServer): void {
       statusDot.classList.remove("disconnected");
       statusDot.classList.add("connected");
       statusText.textContent = count === 1
-        ? "MCP Server (1 client)"
-        : `MCP Server (${count} clients)`;
+        ? tl("mcp.status.server_one_client")
+        : tl("mcp.status.server_clients", [count]);
     } else {
       statusDot.classList.remove("connected");
       statusDot.classList.add("disconnected");
-      statusText.textContent = "MCP Server";
+      statusText.textContent = tl("mcp.status.server");
     }
   };
 

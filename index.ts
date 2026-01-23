@@ -11,6 +11,7 @@ import { tools, prompts } from "@/server/tools";
 import { resources } from "@/server";
 import { uiSetup, uiTeardown } from "@/ui";
 import { settingsSetup, settingsTeardown } from "@/ui/settings";
+import { setupI18n } from "@/ui/i18n";
 import { sessionManager } from "@/lib/sessions";
 import type { NetServer, SessionTransports } from "@/server/net";
 import createNetServer from "@/server/net";
@@ -40,6 +41,9 @@ BBPlugin.register("mcp", {
       Blockbench.showQuickMessage("MCP Server requires network permission", 3000);
       return;
     }
+
+    // Initialize internationalization before any UI
+    setupI18n();
 
     settingsSetup();
 
@@ -82,6 +86,7 @@ BBPlugin.register("mcp", {
 
   oninstall() {
     Blockbench.showQuickMessage("Installed MCP Server plugin", 2000);
+    setupI18n();
     settingsSetup();
   },
 

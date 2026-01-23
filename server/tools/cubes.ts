@@ -56,7 +56,7 @@ createTool(
           "Faces to apply the texture to. Set to `true` to enable auto UV mapping."
         ),
     }),
-    async execute({ elements, texture, faces, group }, { reportProgress }) {
+    async execute({ elements, texture, faces, group }) {
       Undo.initEdit({
         elements: [],
         outliner: true,
@@ -108,11 +108,6 @@ createTool(
           );
           cube.mapAutoUV();
         }
-
-        reportProgress({
-          progress,
-          total,
-        });
 
         return cube;
       });
