@@ -1,8 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { sessionManager, type Session } from "@/lib/sessions";
-import importStylesheet from "@/macros/importStylesheet" with { type: "macro" };
-
-const statusBarCSS = importStylesheet("ui/statusBar.css");
+import statusBarCSS from "@/ui/statusBar.css";
 
 let statusBarElement: HTMLDivElement | undefined;
 let unsubscribe: (() => void) | undefined;

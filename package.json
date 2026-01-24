@@ -12,9 +12,9 @@
   "main": "dist/mcp.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "bun run ./build.ts --sourcemap",
+    "dev": "bun run ./build --sourcemap",
     "dev:watch": "bun run dev --watch",
-    "build": "bun run ./build.ts --minify",
+    "build": "bun run ./build --minify",
     "inspect": "bunx @modelcontextprotocol/inspector"
   },
   "dependencies": {

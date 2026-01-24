@@ -1,17 +1,46 @@
 import { build, type BunPlugin } from "bun";
 import { watch } from "node:fs";
 import { mkdir, access, copyFile, rename, rmdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { resolve, join } from "node:path";
 import { argv } from "node:process";
+import { minifyHTML, minifyCSS, log, c } from "./utils";
 
 const OUTPUT_DIR = "./dist";
-const entryFile = path.resolve("./index.ts");
+const entryFile = resolve("./index.ts");
 const isWatchMode = argv.includes("--watch");
 const isCleanMode = argv.includes("--clean");
+const isProduction = process.env.NODE_ENV === "production" || argv.includes("--minify");
+
+/**
+ * Bun plugin to import HTML and CSS files as strings
+ * Applies minification in production builds
+ */
+const textFileLoaderPlugin: BunPlugin = {
+  name: "text-file-loader",
+  setup(build) {
+    build.onLoad({ filter: /\.css$/ }, async (args) => {
+      const content = await Bun.file(args.path).text();
+      const processed = isProduction ? minifyCSS(content) : content;
+      return {
+        contents: `export default ${JSON.stringify(processed)};`,
+        loader: "js",
+      };
+    });
+
+    build.onLoad({ filter: /\.html$/ }, async (args) => {
+      const content = await Bun.file(args.path).text();
+      const processed = isProduction ? minifyHTML(content) : content;
+      return {
+        contents: `export default ${JSON.stringify(processed)};`,
+        loader: "js",
+      };
+    });
+  },
+};
 
 async function fetchIcon() {
   try {
-    const iconPath = path.resolve("./icon.svg");
+    const iconPath = resolve("./icon.svg");
     const content = await readFile(iconPath, "utf8");
     // Base64 encode the SVG content
     return `"data:image/svg+xml;base64,${Buffer.from(content).toString("base64")}"`;
@@ -167,13 +196,12 @@ export { getRequestListener };
 async function cleanOutputDir() {
   try {
     await access(OUTPUT_DIR);
-    console.group("[Build] Clean");
-    console.log(`Cleaning output directory: ${OUTPUT_DIR}`);
+    log.header("[Build] Clean");
+    log.step(`Cleaning output directory: ${c.cyan}${OUTPUT_DIR}${c.reset}`);
     await rmdir(OUTPUT_DIR, { recursive: true });
-    console.groupEnd();
-  } catch (error) {
+  } catch {
     // Directory doesn't exist, no need to clean
-    console.log(`[Build] Output directory does not exist, no need to clean.`);
+    log.dim("[Build] Output directory does not exist, no need to clean.");
   }
 }
 
@@ -184,14 +212,11 @@ async function buildPlugin(): Promise<boolean> {
     await mkdir(OUTPUT_DIR, { recursive: true });
   } catch (error: unknown) {
     if (error && typeof error === "object" && "code" in error && error.code !== "EEXIST") {
-      console.group("[Build] Error");
-      console.error("Error creating output directory:", error);
-      console.groupEnd();
+      log.header(`${c.red}[Build] Error${c.reset}`);
+      log.error(`Error creating output directory: ${error}`);
       return false;
     }
   }
-
-  const isProduction = process.env.NODE_ENV === "production" || argv.includes("--minify");
 
   // Build the plugin
   const result = await build({
@@ -200,7 +225,7 @@ async function buildPlugin(): Promise<boolean> {
     target: "node",
     format: "cjs",
     sourcemap: argv.includes("--sourcemap") ? "external" : "none",
-    plugins: [blockbenchCompatPlugin],
+    plugins: [blockbenchCompatPlugin, textFileLoaderPlugin],
     external: [
       "three",
       "tinycolor2",
@@ -242,37 +267,36 @@ async function buildPlugin(): Promise<boolean> {
   });
 
   if (!result.success) {
-    console.group("[Build] Failed");
+    log.header(`${c.red}[Build] Failed${c.reset}`);
     for (const message of result.logs) {
-      console.error(message);
+      log.error(String(message));
     }
-    console.groupEnd();
     return false;
   }
 
-  console.group("[Build] Assets");
+  log.header("[Build] Assets");
 
-  const iconSource = path.resolve("./icon.svg");
-  const iconDest = path.join(OUTPUT_DIR, "icon.svg");
+  const iconSource = resolve("./icon.svg");
+  const iconDest = join(OUTPUT_DIR, "icon.svg");
 
   try {
     // Check if icon exists and copy it
     await access(iconSource);
     await copyFile(iconSource, iconDest);
-    console.log("Copied icon.svg");
-  } catch (error) {
+    log.step(`Copied ${c.cyan}icon.svg${c.reset}`);
+  } catch {
     // File doesn't exist or couldn't be copied, just continue
   }
 
-  const indexFile = path.join(OUTPUT_DIR, "index.js");
-  const mcpFile = path.join(OUTPUT_DIR, "mcp.js");
+  const indexFile = join(OUTPUT_DIR, "index.js");
+  const mcpFile = join(OUTPUT_DIR, "mcp.js");
 
   try {
     // Check if index file exists and rename it
     await access(indexFile);
     await rename(indexFile, mcpFile);
-    console.log("Renamed index.js to mcp.js");
-  } catch (error) {
+    log.step(`Renamed ${c.gray}index.js${c.reset} → ${c.cyan}mcp.js${c.reset}`);
+  } catch {
     // File doesn't exist or couldn't be renamed
   }
 
@@ -288,43 +312,41 @@ async function buildPlugin(): Promise<boolean> {
   }
 
   // Rename the sourcemap file
-  const indexMapFile = path.join(OUTPUT_DIR, "index.js.map");
-  const mcpMapFile = path.join(OUTPUT_DIR, "mcp.js.map");
+  const indexMapFile = join(OUTPUT_DIR, "index.js.map");
+  const mcpMapFile = join(OUTPUT_DIR, "mcp.js.map");
 
   try {
     // Check if map file exists and rename it
     await access(indexMapFile);
     await rename(indexMapFile, mcpMapFile);
-    console.log("Renamed index.js.map to mcp.js.map");
-  } catch (error) {
+    log.step(`Renamed ${c.gray}index.js.map${c.reset} → ${c.cyan}mcp.js.map${c.reset}`);
+  } catch {
     // File doesn't exist or couldn't be renamed
   }
 
   // Copy the README file
-  const readmeSource = path.resolve("./about.md");
-  const readmeDest = path.join(OUTPUT_DIR, "about.md");
+  const readmeSource = resolve("./about.md");
+  const readmeDest = join(OUTPUT_DIR, "about.md");
 
   try {
     await access(readmeSource);
     await copyFile(readmeSource, readmeDest);
-    console.log("Copied about.md");
-  } catch (error) {
+    log.step(`Copied ${c.cyan}about.md${c.reset}`);
+  } catch {
     // File doesn't exist or couldn't be copied
   }
-
-  console.groupEnd();
 
   return true;
 }
 
 // Function to watch for file changes
 function watchFiles() {
-  console.log("[Build] Watching for changes...");
+  log.info("[Build] Watching for changes...");
 
   const watcher = watch(
     "./",
     { recursive: true },
-    async (eventType, filename) => {
+    async (_eventType, filename) => {
       if (!filename) return;
 
       // Ignore self, output directory and some file types
@@ -338,47 +360,42 @@ function watchFiles() {
         return;
       }
 
-      console.group("[Build] Rebuild");
-      console.log(`File changed: ${filename}`);
+      log.header(`${c.yellow}[Build] Rebuild${c.reset}`);
+      log.step(`File changed: ${c.cyan}${filename}${c.reset}`);
       await cleanOutputDir();
       await buildPlugin();
-      console.log("Rebuild complete");
-      console.groupEnd();
+      log.success("Rebuild complete");
     }
   );
 
   // Handle process termination
   process.on("SIGINT", () => {
     watcher.close();
-    console.log("[Build] Watch mode stopped");
+    log.dim("[Build] Watch mode stopped");
     process.exit(0);
   });
 }
 
 async function main() {
-  console.group("[Build] MCP Plugin");
+  log.header("[Build] MCP Plugin");
 
   if (isCleanMode) {
     await cleanOutputDir();
   }
 
   if (isWatchMode) {
-    console.log("Building with watch mode...");
+    log.info("Building with watch mode...");
     const success = await buildPlugin();
     if (success) {
-      console.log(`Initial build completed. Output in ${OUTPUT_DIR}`);
-      console.groupEnd();
+      log.success(`Initial build completed. Output in ${c.cyan}${OUTPUT_DIR}${c.reset}`);
       watchFiles();
-    } else {
-      console.groupEnd();
     }
   } else {
-    console.log("Building...");
+    log.info("Building...");
     const success = await buildPlugin();
     if (success) {
-      console.log(`Build completed. Output in ${OUTPUT_DIR}`);
+      log.success(`Build completed. Output in ${c.cyan}${OUTPUT_DIR}${c.reset}`);
     }
-    console.groupEnd();
     if (!success) {
       process.exit(1);
     }
@@ -386,8 +403,7 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.group("[Build] Fatal Error");
-  console.error(err);
-  console.groupEnd();
+  log.header(`${c.red}[Build] Fatal Error${c.reset}`);
+  log.error(String(err));
   process.exit(1);
 });

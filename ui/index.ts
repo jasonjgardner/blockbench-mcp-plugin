@@ -5,11 +5,8 @@ import { statusBarSetup, statusBarTeardown } from "@/ui/statusBar";
 import { sessionManager, type Session } from "@/lib/sessions";
 import { openToolTestDialog } from "@/ui/toolTestDialog";
 import { openPromptPreviewDialog } from "@/ui/promptPreviewDialog";
-import importStylesheet from "@/macros/importStylesheet" with { type: "macro" };
-import importHTML from "@/macros/importHTML" with { type: "macro" };
-
-const panelCSS = importStylesheet("ui/panel.css");
-const template = importHTML("ui/panel.html");
+import panelCSS from "@/ui/panel.css";
+import template from "@/ui/panel.html";
 
 let panel: Panel | undefined;
 let unsubscribe: (() => void) | undefined;
