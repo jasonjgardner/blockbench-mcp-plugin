@@ -5,6 +5,8 @@ import { createTool } from "@/lib/factories";
 import { findElementOrThrow } from "@/lib/util";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
 
+// Note: Blockbench API supports uv_only in UndoAspects but it's not in the type definitions
+
 const cubeFaceDirections = ["north", "south", "east", "west", "up", "down"] as const;
 type CubeFaceDirection = (typeof cubeFaceDirections)[number];
 
@@ -127,6 +129,7 @@ export function registerMaterialInstanceTools() {
 
         Undo.initEdit({
           elements: cubes,
+          // @ts-expect-error - uv_only is a valid Blockbench API property
           uv_only: true,
         });
 
@@ -238,6 +241,7 @@ export function registerMaterialInstanceTools() {
 
         Undo.initEdit({
           elements: cubesToEdit,
+          // @ts-expect-error - uv_only is a valid Blockbench API property
           uv_only: true,
         });
 
@@ -315,6 +319,7 @@ export function registerMaterialInstanceTools() {
 
         Undo.initEdit({
           elements: cubes,
+          // @ts-expect-error - uv_only is a valid Blockbench API property
           uv_only: true,
         });
 

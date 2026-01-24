@@ -18,13 +18,12 @@
     "inspect": "bunx @modelcontextprotocol/inspector"
   },
   "dependencies": {
-    "zod": "^3.25.76"
+    "zod": "^3.25.76",
+    "@modelcontextprotocol/sdk": "^1.25.1"
   },
   "devDependencies": {
-    "@types/express": "^5.0.6",
     "blockbench-types": "^5.0.6",
     "typescript": "^5.9.3",
-    "@modelcontextprotocol/sdk": "^1.25.1",
     "@types/bun": "^1.3.5",
     "tinycolor2": "^1.6.0"
   }

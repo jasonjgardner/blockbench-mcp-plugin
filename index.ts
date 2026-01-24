@@ -15,6 +15,7 @@ import { setupI18n } from "@/ui/i18n";
 import { sessionManager } from "@/lib/sessions";
 import type { NetServer, SessionTransports } from "@/server/net";
 import createNetServer from "@/server/net";
+import { getIcon } from "@/macros/getIcon" with { type: "macro" };
 
 let httpServer: NetServer | null = null;
 let sessionTransports: SessionTransports | null = null;
@@ -25,7 +26,7 @@ BBPlugin.register("mcp", {
   author: "Jason J. Gardner",
   description: "Create an MCP server inside Blockbench.",
   tags: ["MCP", "AI"],
-  icon: __ICON__,
+  icon: getIcon(),
   variant: "desktop",
   async onload() {
     // Get network module with Blockbench permission handling

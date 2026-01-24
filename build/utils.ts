@@ -1,3 +1,4 @@
+import { argv } from "node:process";
 /**
  * ANSI color codes for console output
  */
@@ -48,3 +49,23 @@ export function minifyHTML(html: string): string {
     .replace(/\s*=\s*/g, "=")
     .trim();
 }
+
+/**
+ * Minify SVG by removing comments, XML declarations, and unnecessary whitespace
+ */
+export function minifySVG(svg: string): string {
+  return svg
+    .replace(/<\?xml[^>]*\?>/gi, "")
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/>\s+</g, "><")
+    .replace(/\s+/g, " ")
+    .replace(/\s*=\s*/g, "=")
+    .replace(/\s+\/>/g, "/>")
+    .trim();
+}
+
+const isWatchMode = argv.includes("--watch");
+const isCleanMode = argv.includes("--clean");
+const isProduction = process.env.NODE_ENV === "production" || argv.includes("--minify");
+
+export { isWatchMode, isCleanMode, isProduction };
