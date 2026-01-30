@@ -16,12 +16,6 @@ export const vector3Schema = z
   .length(3)
   .describe("3D vector [x, y, z].");
 
-/** 4D vector [x, y, z, w] */
-export const vector4Schema = z
-  .array(z.number())
-  .length(4)
-  .describe("4D vector [x, y, z, w].");
-
 // ============================================================================
 // Enum Schemas
 // ============================================================================

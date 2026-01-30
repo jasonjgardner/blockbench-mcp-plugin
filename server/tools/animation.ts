@@ -14,6 +14,7 @@ import {
   timeRangeSchema,
   boneNameSchema,
   loopModeEnum,
+  keyframeDataSchema,
 } from "@/lib/zodObjects";
 
 export function registerAnimationTools() {
@@ -119,30 +120,7 @@ createTool(
       bone_name: boneNameSchema.describe("Name of the bone/group to manage keyframes for."),
       channel: animationChannelEnum.describe("Animation channel to modify."),
       keyframes: z
-        .array(
-          z.object({
-            time: z.number().describe("Time in seconds for the keyframe."),
-            values: z
-              .union([vector3Schema, z.number()])
-              .optional()
-              .describe(
-                "Values for the keyframe. [x,y,z] for position/rotation, number for uniform scale."
-              ),
-            interpolation: interpolationEnum
-              .optional()
-              .default("linear")
-              .describe("Interpolation type for the keyframe."),
-            bezier_handles: z
-              .object({
-                left_time: z.number().optional(),
-                left_value: vector3Schema.optional(),
-                right_time: z.number().optional(),
-                right_value: vector3Schema.optional(),
-              })
-              .optional()
-              .describe("Bezier handle positions for bezier interpolation."),
-          })
-        )
+        .array(keyframeDataSchema)
         .describe("Keyframe data for the action."),
     }),
     async execute({ animation_id, action, bone_name, channel, keyframes }) {

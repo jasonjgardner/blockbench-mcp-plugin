@@ -46,7 +46,14 @@ class SessionManager {
       clearTimeout(session.timeoutHandle);
     }
 
-    // Notify removal callback (e.g., to close transport) before deleting
+    // Delete from map FIRST to prevent re-entrancy issues
+    // (e.g., if removalCallback triggers onsessionclosed which calls remove() again)
+    this.sessions.delete(sessionId);
+    this.notifyListeners();
+
+    console.log(`[MCP] Session disconnected: ${sessionId.slice(0, 8)}...`);
+
+    // Notify removal callback (e.g., to close transport) after removing from map
     if (this.removalCallback) {
       try {
         this.removalCallback(sessionId);
@@ -54,11 +61,6 @@ class SessionManager {
         console.error("[MCP] Session removal callback error:", error);
       }
     }
-
-    this.sessions.delete(sessionId);
-    this.notifyListeners();
-
-    console.log(`[MCP] Session disconnected: ${sessionId.slice(0, 8)}...`);
   }
 
   updateActivity(sessionId: string): void {

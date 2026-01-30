@@ -5,6 +5,7 @@ import { statusBarSetup, statusBarTeardown } from "@/ui/statusBar";
 import { sessionManager, type Session } from "@/lib/sessions";
 import { openToolTestDialog } from "@/ui/toolTestDialog";
 import { openPromptPreviewDialog } from "@/ui/promptPreviewDialog";
+import { formatArgumentCount } from "@/ui/i18n";
 import panelCSS from "@/ui/panel.css";
 import template from "@/ui/panel.html";
 
@@ -153,12 +154,7 @@ export function uiSetup({
         openPromptPreview(promptName: string): void {
           openPromptPreviewDialog(promptName);
         },
-        formatArgumentCount(count: number): string {
-          if (count === 1) {
-            return tl("mcp.prompts.argument_count", [count]);
-          }
-          return tl("mcp.prompts.argument_count_plural", [count]);
-        },
+        formatArgumentCount,
         onToolsToggle(event: Event): void {
           const details = event.target as HTMLDetailsElement;
           if (!details.open) {

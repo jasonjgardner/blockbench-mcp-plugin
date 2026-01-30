@@ -239,14 +239,14 @@ texture.add(true);  // true = add to undo
 
 ### Global Collections
 
-| Collection | Description |
-|------------|-------------|
-| `Cube.all` / `Cube.selected` | All cubes / selected cubes |
-| `Group.all` / `Group.selected` | All groups / selected groups |
-| `Mesh.all` / `Mesh.selected` | All meshes / selected meshes |
-| `Texture.all` / `Texture.selected` | All textures / selected |
-| `Animation.all` / `Animation.selected` | All animations / selected |
-| `Outliner.elements` | All outliner elements |
+| Collection                               | Description                    |
+|------------------------------------------|--------------------------------|
+| `Cube.all` / `Cube.selected`             | All cubes / selected cubes     |
+| `Group.all` / `Group.selected`           | All groups / selected groups   |
+| `Mesh.all` / `Mesh.selected`             | All meshes / selected meshes   |
+| `Texture.all` / `Texture.selected`       | All textures / selected        |
+| `Animation.all` / `Animation.selected`   | All animations / selected      |
+| `Outliner.elements`                      | All outliner elements          |
 
 ## Event System
 

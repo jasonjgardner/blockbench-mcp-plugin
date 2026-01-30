@@ -29,6 +29,7 @@
 
         <div class="filter-bar">
             <input type="text" v-model="toolsFilter.search" :placeholder="tl('mcp.filter.tools_placeholder')"
+                :aria-label="tl('mcp.filter.tools_placeholder')"
                 class="filter-input" @input="toolsFilter.search = $event.target.value">
             <label class="filter-switch">
                 <input type="checkbox" v-model="toolsFilter.showExperimental">
@@ -61,6 +62,7 @@
 
         <div class="filter-bar">
             <input type="text" v-model="resourcesFilter.search" :placeholder="tl('mcp.filter.resources_placeholder')"
+                :aria-label="tl('mcp.filter.resources_placeholder')"
                 class="filter-input" @input="resourcesFilter.search = $event.target.value">
         </div>
 
@@ -86,6 +88,7 @@
 
         <div class="filter-bar">
             <input type="text" v-model="promptsFilter.search" :placeholder="tl('mcp.filter.prompts_placeholder')"
+                :aria-label="tl('mcp.filter.prompts_placeholder')"
                 class="filter-input" @input="promptsFilter.search = $event.target.value">
             <label class="filter-switch">
                 <input type="checkbox" v-model="promptsFilter.showExperimental">

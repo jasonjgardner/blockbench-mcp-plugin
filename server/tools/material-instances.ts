@@ -4,11 +4,11 @@ import { z } from "zod";
 import { createTool } from "@/lib/factories";
 import { findElementOrThrow } from "@/lib/util";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
+import { faceEnum } from "@/lib/zodObjects";
 
 // Note: Blockbench API supports uv_only in UndoAspects but it's not in the type definitions
 
-const cubeFaceDirections = ["north", "south", "east", "west", "up", "down"] as const;
-type CubeFaceDirection = (typeof cubeFaceDirections)[number];
+type CubeFaceDirection = z.infer<typeof faceEnum>;
 
 /**
  * Helper to find a cube by ID or name
@@ -39,7 +39,7 @@ export function registerMaterialInstanceTools() {
             "ID or name of the cube. If not provided, uses the first selected cube."
           ),
         faces: z
-          .array(z.enum(cubeFaceDirections))
+          .array(faceEnum)
           .optional()
           .describe(
             "Specific faces to get material instances for. If not provided, returns all faces."
@@ -59,7 +59,7 @@ export function registerMaterialInstanceTools() {
           cube = Cube.selected[0];
         }
 
-        const facesToCheck = faces || cubeFaceDirections;
+        const facesToCheck = faces || faceEnum.options;
         const result: Record<string, { material_name: string; texture: string | null }> = {};
 
         for (const faceDir of facesToCheck) {
@@ -106,7 +106,7 @@ export function registerMaterialInstanceTools() {
             "The material instance name to assign. Use empty string to clear the material instance."
           ),
         faces: z
-          .array(z.enum(cubeFaceDirections))
+          .array(faceEnum)
           .optional()
           .default(["north", "south", "east", "west", "up", "down"])
           .describe(
@@ -171,7 +171,7 @@ export function registerMaterialInstanceTools() {
         > = {};
 
         for (const cube of Cube.all) {
-          for (const faceDir of cubeFaceDirections) {
+          for (const faceDir of faceEnum.options) {
             const face = cube.faces[faceDir];
             if (face && face.material_name) {
               if (!materialMap[face.material_name]) {
@@ -218,7 +218,7 @@ export function registerMaterialInstanceTools() {
             z.object({
               cube_id: z.string().describe("ID or name of the cube."),
               faces: z
-                .array(z.enum(cubeFaceDirections))
+                .array(faceEnum)
                 .describe("Faces to set the material instance on."),
               material_name: z.string().describe("Material instance name to assign."),
             })
@@ -284,7 +284,7 @@ export function registerMaterialInstanceTools() {
             "ID or name of the cube. If not provided, clears from all selected cubes."
           ),
         faces: z
-          .array(z.enum(cubeFaceDirections))
+          .array(faceEnum)
           .optional()
           .describe(
             "Specific faces to clear. If not provided, clears all faces."
@@ -323,7 +323,7 @@ export function registerMaterialInstanceTools() {
           uv_only: true,
         });
 
-        const facesToClear = faces || cubeFaceDirections;
+        const facesToClear = faces || faceEnum.options;
         let clearedCount = 0;
 
         for (const cube of cubes) {

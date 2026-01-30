@@ -1,12 +1,14 @@
 import { build } from "bun";
 import { watch } from "node:fs";
 import { mkdir, access, copyFile, rename, rmdir, readFile, writeFile } from "node:fs/promises";
-import { resolve, join } from "node:path";
+import { resolve, join, normalize, sep } from "node:path";
 import { argv } from "node:process";
 import { log, c, isCleanMode, isProduction, isWatchMode } from "./utils";
 import { blockbenchCompatPlugin, textFileLoaderPlugin } from "./plugins";
 
 const OUTPUT_DIR = "./dist";
+// Normalized output dir name for path comparison (strips "./" prefix)
+const OUTPUT_DIR_NAME = normalize(OUTPUT_DIR).replace(/^\.[\\/]/, "");
 const entryFile = resolve("./index.ts");
 
 async function cleanOutputDir() {
@@ -158,28 +160,64 @@ async function buildPlugin(): Promise<boolean> {
 function watchFiles() {
   log.info("[Build] Watching for changes...");
 
+  // Build serialization to prevent overlapping builds
+  let currentBuild: Promise<void> | null = null;
+  let pendingRebuild = false;
+
+  async function queueRebuild(filename: string) {
+    // If a build is in progress, mark as pending and return
+    if (currentBuild) {
+      pendingRebuild = true;
+      return;
+    }
+
+    // Start the build
+    currentBuild = (async () => {
+      do {
+        pendingRebuild = false;
+        log.header(`${c.yellow}[Build] Rebuild${c.reset}`);
+        log.step(`File changed: ${c.cyan}${filename}${c.reset}`);
+        await cleanOutputDir();
+        await buildPlugin();
+        log.success("Rebuild complete");
+      } while (pendingRebuild);
+    })();
+
+    try {
+      await currentBuild;
+    } finally {
+      currentBuild = null;
+    }
+  }
+
   const watcher = watch(
     "./",
     { recursive: true },
-    async (_eventType, filename) => {
+    (_eventType, filename) => {
       if (!filename) return;
 
-      // Ignore self, output directory and some file types
+      // Normalize filename for consistent comparison
+      const normalizedFilename = normalize(filename);
+
+      // Ignore output directory (compare normalized paths)
       if (
-        filename.includes(OUTPUT_DIR) ||
-        filename.endsWith(".js.map") ||
-        filename.endsWith(".git") ||
-        filename === "node_modules" ||
-        filename === __filename
+        normalizedFilename === OUTPUT_DIR_NAME ||
+        normalizedFilename.startsWith(`${OUTPUT_DIR_NAME}${sep}`)
       ) {
         return;
       }
 
-      log.header(`${c.yellow}[Build] Rebuild${c.reset}`);
-      log.step(`File changed: ${c.cyan}${filename}${c.reset}`);
-      await cleanOutputDir();
-      await buildPlugin();
-      log.success("Rebuild complete");
+      // Ignore other non-source files
+      if (
+        normalizedFilename.endsWith(".js.map") ||
+        normalizedFilename.includes(".git") ||
+        normalizedFilename.startsWith(`node_modules${sep}`) ||
+        normalizedFilename === "node_modules"
+      ) {
+        return;
+      }
+
+      queueRebuild(filename);
     }
   );
 

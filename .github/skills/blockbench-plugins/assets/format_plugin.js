@@ -5,7 +5,7 @@
 (function() {
     let myFormat, myCodec, importAction, exportAction;
 
-    Plugin.register('my_format_plugin', {
+    BBPlugin.register('my_format_plugin', {
         title: 'My Format Support',
         author: 'Your Name',
         description: 'Adds support for .mymodel format',
@@ -38,8 +38,10 @@
                         }
                     };
                     
-                    // Export textures
+                    // Export textures and build UUID-to-index map
+                    const textureIndexMap = {};
                     Texture.all.forEach((texture, index) => {
+                        textureIndexMap[texture.uuid] = index;
                         exportData.model.textures.push({
                             id: index,
                             name: texture.name,
@@ -47,7 +49,7 @@
                             data: texture.getDataURL()
                         });
                     });
-                    
+
                     // Export bones (groups) and cubes
                     function exportGroup(group, parentName = null) {
                         const boneData = {
@@ -86,9 +88,12 @@
                     function exportFaces(cube) {
                         const faces = {};
                         for (const [key, face] of Object.entries(cube.faces)) {
+                            // Get texture by reference and map to numeric index
+                            const texture = face.getTexture();
+                            const textureId = texture ? textureIndexMap[texture.uuid] : null;
                             faces[key] = {
                                 uv: [...face.uv],
-                                texture: face.texture
+                                texture: textureId !== undefined ? textureId : null
                             };
                         }
                         return faces;
@@ -206,7 +211,9 @@
                                         cube.box_uv = false;
                                         for (const [key, faceData] of Object.entries(cubeData.faces)) {
                                             cube.faces[key].uv = faceData.uv;
-                                            cube.faces[key].texture = faceData.texture;
+                                            // Look up recreated texture by numeric ID
+                                            const texture = faceData.texture !== null ? textureMap[faceData.texture] : null;
+                                            cube.faces[key].texture = texture ? texture.uuid : false;
                                         }
                                     }
                                     
