@@ -87,8 +87,6 @@ BBPlugin.register("mcp", {
 
   oninstall() {
     Blockbench.showQuickMessage("Installed MCP Server plugin", 2000);
-    setupI18n();
-    settingsSetup();
   },
 
   onuninstall() {

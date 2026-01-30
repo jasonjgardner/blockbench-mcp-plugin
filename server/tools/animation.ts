@@ -271,10 +271,6 @@ createTool(
         ])
         .describe("Type of curve modification to apply."),
       keyframe_range: timeRangeSchema
-        .extend({
-          start: z.number().describe("Start time of the range."),
-          end: z.number().describe("End time of the range."),
-        })
         .optional()
         .describe(
           "Time range to apply the curve modification. If not provided, applies to all keyframes."
