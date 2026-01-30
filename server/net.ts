@@ -45,16 +45,17 @@ export default function createNetServer (
   const sessionTransports: SessionTransports = new Map()
 
   // Register callback to close transport when sessionManager removes a session (e.g., timeout)
-  sessionManager.setRemovalCallback((sessionId: string) => {
+  sessionManager.setRemovalCallback(async (sessionId: string) => {
     const session = sessionTransports.get(sessionId)
     if (session) {
       console.log(`[MCP] Closing transport for session: ${sessionId.slice(0, 8)}...`)
       try {
-        session.transport.close()
+        await session.transport.close()
       } catch (error) {
         console.error('[MCP] Error closing transport:', error)
+      } finally {
+        sessionTransports.delete(sessionId)
       }
-      sessionTransports.delete(sessionId)
     }
   })
 

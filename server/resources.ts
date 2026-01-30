@@ -247,7 +247,8 @@ if (Plugins.installed.some((p: { id: string }) => p.id === "reference_models")) 
     description:
       "Returns information about reference models in the current Blockbench project. Requires the Reference Models plugin. Use without an ID to list all reference models, or provide a UUID/name to get details about a specific reference model.",
     async listCallback() {
-      const referenceModels = Outliner.elements.filter(
+      const elements = Outliner?.elements ?? [];
+      const referenceModels = elements.filter(
         (e) => e.type === "reference_model"
       );
       if (referenceModels.length === 0) {
@@ -265,7 +266,8 @@ if (Plugins.installed.some((p: { id: string }) => p.id === "reference_models")) 
       };
     },
     async readCallback(uri, { id }) {
-      const referenceModels = Outliner.elements.filter(
+      const elements = Outliner?.elements ?? [];
+      const referenceModels = elements.filter(
         (e) => e.type === "reference_model"
       );
 
@@ -281,22 +283,45 @@ if (Plugins.installed.some((p: { id: string }) => p.id === "reference_models")) 
         };
       }
 
+      // Normalize Vector3-like values to [number, number, number] arrays
+      const normalizeVec3 = (
+        value: unknown,
+        defaultValue: [number, number, number]
+      ): [number, number, number] => {
+        if (!value) {
+          return defaultValue;
+        }
+        if (Array.isArray(value) && value.length >= 3) {
+          return [Number(value[0]), Number(value[1]), Number(value[2])];
+        }
+        if (
+          typeof value === "object" &&
+          "x" in value &&
+          "y" in value &&
+          "z" in value
+        ) {
+          const v = value as { x: number; y: number; z: number };
+          return [Number(v.x), Number(v.y), Number(v.z)];
+        }
+        return defaultValue;
+      };
+
       // Helper to extract reference model info
       const getReferenceModelInfo = (model: OutlinerElement) => {
         const refModel = model as OutlinerElement & {
           path?: string;
-          origin?: [number, number, number];
-          rotation?: [number, number, number];
-          scale?: [number, number, number];
+          origin?: unknown;
+          rotation?: unknown;
+          scale?: unknown;
           visibility?: boolean;
         };
         return {
           uuid: refModel.uuid,
           name: refModel.name,
           path: refModel.path || null,
-          origin: refModel.origin || [0, 0, 0],
-          rotation: refModel.rotation || [0, 0, 0],
-          scale: refModel.scale || [1, 1, 1],
+          origin: normalizeVec3(refModel.origin, [0, 0, 0]),
+          rotation: normalizeVec3(refModel.rotation, [0, 0, 0]),
+          scale: normalizeVec3(refModel.scale, [1, 1, 1]),
           visibility: refModel.visibility ?? true,
         };
       };

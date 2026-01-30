@@ -297,9 +297,9 @@ export const keyframeDataSchema = z.object({
   bezier_handles: z
     .object({
       left_time: z.number().optional(),
-      left_value: vector3Schema.optional(),
+      left_value: z.union([vector3Schema, z.number()]).optional(),
       right_time: z.number().optional(),
-      right_value: vector3Schema.optional(),
+      right_value: z.union([vector3Schema, z.number()]).optional(),
     })
     .optional()
     .describe("Bezier handle positions for bezier interpolation."),
