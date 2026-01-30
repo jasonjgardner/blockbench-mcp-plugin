@@ -4,6 +4,12 @@ import { z } from "zod";
 import { createTool } from "@/lib/factories";
 import { findMeshOrThrow, getMeshOrSelected } from "@/lib/util";
 import { STATUS_EXPERIMENTAL } from "@/lib/constants";
+import {
+  meshIdSchema,
+  meshIdOptionalSchema,
+  vector2Schema,
+  uvMappingModeEnum,
+} from "@/lib/zodObjects";
 
 export function registerUVTools() {
 createTool(
@@ -15,12 +21,12 @@ createTool(
             destructiveHint: true,
         },
         parameters: z.object({
-            mesh_id: z.string().describe("ID or name of the mesh."),
+            mesh_id: meshIdSchema,
             face_key: z.string().describe("Face key to set UV for."),
             uv_mapping: z
                 .record(
                     z.string(), // vertex key
-                    z.array(z.number()).length(2) // UV coordinates
+                    vector2Schema // UV coordinates
                 )
                 .describe("UV coordinates for each vertex of the face."),
         }),
@@ -64,14 +70,8 @@ createTool(
             destructiveHint: true,
         },
         parameters: z.object({
-            mesh_id: z
-                .string()
-                .optional()
-                .describe(
-                    "ID or name of the mesh. If not provided, uses selected mesh."
-                ),
-            mode: z
-                .enum(["project", "unwrap", "cylinder", "sphere"])
+            mesh_id: meshIdOptionalSchema,
+            mode: uvMappingModeEnum
                 .default("project")
                 .describe(
                     "UV mapping mode: project from view, unwrap, cylinder, or sphere mapping."
@@ -155,12 +155,7 @@ createTool(
             destructiveHint: true,
         },
         parameters: z.object({
-            mesh_id: z
-                .string()
-                .optional()
-                .describe(
-                    "ID or name of the mesh. If not provided, uses selected mesh."
-                ),
+            mesh_id: meshIdOptionalSchema,
             angle: z
                 .enum(["-90", "90", "180"])
                 .default("90")

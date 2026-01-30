@@ -4,6 +4,17 @@ import { z } from "zod";
 import { createTool } from "@/lib/factories";
 import { findGroupOrThrow } from "@/lib/util";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
+import {
+  vector3Schema,
+  animationIdOptionalSchema,
+  animationChannelEnum,
+  interpolationEnum,
+  axisEnum,
+  axisWithAllEnum,
+  timeRangeSchema,
+  boneNameSchema,
+  loopModeEnum,
+} from "@/lib/zodObjects";
 
 export function registerAnimationTools() {
 createTool(
@@ -29,20 +40,9 @@ createTool(
           z.array(
             z.object({
               time: z.number(),
-              position: z
-                .array(z.number())
-                .length(3)
-                .optional(),
-              rotation: z
-                .array(z.number())
-                .length(3)
-                .optional(),
-              scale: z
-                .union([
-                  z.array(z.number()).length(3),
-                  z.number(),
-                ])
-                .optional(),
+              position: vector3Schema.optional(),
+              rotation: vector3Schema.optional(),
+              scale: z.union([vector3Schema, z.number()]).optional(),
             })
           )
         )
@@ -112,51 +112,32 @@ createTool(
       destructiveHint: true,
     },
     parameters: z.object({
-      animation_id: z
-        .string()
-        .optional()
-        .describe(
-          "Animation UUID or name. If not provided, uses current animation."
-        ),
+      animation_id: animationIdOptionalSchema,
       action: z
         .enum(["create", "delete", "edit", "select"])
         .describe("Action to perform on keyframes."),
-      bone_name: z
-        .string()
-        .describe("Name of the bone/group to manage keyframes for."),
-      channel: z
-        .enum(["rotation", "position", "scale"])
-        .describe("Animation channel to modify."),
+      bone_name: boneNameSchema.describe("Name of the bone/group to manage keyframes for."),
+      channel: animationChannelEnum.describe("Animation channel to modify."),
       keyframes: z
         .array(
           z.object({
             time: z.number().describe("Time in seconds for the keyframe."),
             values: z
-              .union([
-                z.array(z.number()).length(3),
-                z.number(),
-              ])
+              .union([vector3Schema, z.number()])
               .optional()
               .describe(
                 "Values for the keyframe. [x,y,z] for position/rotation, number for uniform scale."
               ),
-            interpolation: z
-              .enum(["linear", "catmullrom", "bezier", "step"])
+            interpolation: interpolationEnum
               .optional()
               .default("linear")
               .describe("Interpolation type for the keyframe."),
             bezier_handles: z
               .object({
                 left_time: z.number().optional(),
-                left_value: z
-                  .array(z.number())
-                  .length(3)
-                  .optional(),
+                left_value: vector3Schema.optional(),
                 right_time: z.number().optional(),
-                right_value: z
-                  .array(z.number())
-                  .length(3)
-                  .optional(),
+                right_value: vector3Schema.optional(),
               })
               .optional()
               .describe("Bezier handle positions for bezier interpolation."),
@@ -296,22 +277,10 @@ createTool(
       destructiveHint: true,
     },
     parameters: z.object({
-      animation_id: z
-        .string()
-        .optional()
-        .describe(
-          "Animation UUID or name. If not provided, uses current animation."
-        ),
-      bone_name: z
-        .string()
-        .describe("Name of the bone/group to modify curves for."),
-      channel: z
-        .enum(["rotation", "position", "scale"])
-        .describe("Animation channel to modify."),
-      axis: z
-        .enum(["x", "y", "z", "all"])
-        .default("all")
-        .describe("Axis to modify curves for."),
+      animation_id: animationIdOptionalSchema,
+      bone_name: boneNameSchema.describe("Name of the bone/group to modify curves for."),
+      channel: animationChannelEnum.describe("Animation channel to modify."),
+      axis: axisWithAllEnum.default("all").describe("Axis to modify curves for."),
       action: z
         .enum([
           "smooth",
@@ -323,8 +292,8 @@ createTool(
           "custom",
         ])
         .describe("Type of curve modification to apply."),
-      keyframe_range: z
-        .object({
+      keyframe_range: timeRangeSchema
+        .extend({
           start: z.number().describe("Start time of the range."),
           end: z.number().describe("End time of the range."),
         })
@@ -487,16 +456,8 @@ createTool(
         .object({
           name: z.string().describe("Name of the bone."),
           parent: z.string().optional().describe("Parent bone name."),
-          origin: z
-            .array(z.number())
-            .length(3)
-            .optional()
-            .describe("Pivot point of the bone."),
-          rotation: z
-            .array(z.number())
-            .length(3)
-            .optional()
-            .describe("Initial rotation of the bone."),
+          origin: vector3Schema.optional().describe("Pivot point of the bone."),
+          rotation: vector3Schema.optional().describe("Initial rotation of the bone."),
           children: z
             .array(z.string())
             .optional()
@@ -509,10 +470,7 @@ createTool(
             .string()
             .optional()
             .describe("Target bone for IK chain."),
-          mirror_axis: z
-            .enum(["x", "y", "z"])
-            .optional()
-            .describe("Axis to mirror the bone across."),
+          mirror_axis: axisEnum.optional().describe("Axis to mirror the bone across."),
         })
         .describe("Bone configuration data."),
     }),
@@ -693,17 +651,8 @@ createTool(
         .max(120)
         .optional()
         .describe("Frames per second (for set_fps action)."),
-      loop_mode: z
-        .enum(["once", "loop", "hold"])
-        .optional()
-        .describe("Loop mode for the animation."),
-      range: z
-        .object({
-          start: z.number(),
-          end: z.number(),
-        })
-        .optional()
-        .describe("Time range for selection."),
+      loop_mode: loopModeEnum.optional().describe("Loop mode for the animation."),
+      range: timeRangeSchema.optional().describe("Time range for selection."),
     }),
     async execute({ action, time, length, fps, loop_mode, range }) {
       if (!Animation.selected) {
@@ -799,13 +748,7 @@ createTool(
         .enum(["all", "selected", "range", "pattern"])
         .default("selected")
         .describe("Which keyframes to operate on."),
-      range: z
-        .object({
-          start: z.number(),
-          end: z.number(),
-        })
-        .optional()
-        .describe("Time range for keyframe selection."),
+      range: timeRangeSchema.optional().describe("Time range for keyframe selection."),
       pattern: z
         .object({
           interval: z.number().describe("Time interval between keyframes."),
@@ -823,11 +766,7 @@ createTool(
       parameters: z
         .object({
           offset_time: z.number().optional().describe("Time offset to apply."),
-          offset_values: z
-            .array(z.number())
-            .length(3)
-            .optional()
-            .describe("Value offset to apply."),
+          offset_values: vector3Schema.optional().describe("Value offset to apply."),
           scale_factor: z
             .number()
             .optional()
@@ -836,10 +775,7 @@ createTool(
             .number()
             .optional()
             .describe("Pivot point for scaling."),
-          mirror_axis: z
-            .enum(["x", "y", "z"])
-            .optional()
-            .describe("Axis to mirror values across."),
+          mirror_axis: axisEnum.optional().describe("Axis to mirror values across."),
           bake_interval: z
             .number()
             .optional()
@@ -1021,15 +957,11 @@ createTool(
             .describe("Source animation name or UUID."),
           bone: z.string().describe("Source bone name."),
           channels: z
-            .array(z.enum(["rotation", "position", "scale"]))
+            .array(animationChannelEnum)
             .optional()
             .default(["rotation", "position", "scale"])
             .describe("Channels to copy."),
-          time_range: z
-            .object({
-              start: z.number(),
-              end: z.number(),
-            })
+          time_range: timeRangeSchema
             .optional()
             .describe(
               "Time range to copy. If not provided, copies all keyframes."
@@ -1049,10 +981,7 @@ createTool(
             .optional()
             .default(0)
             .describe("Time offset for pasted keyframes."),
-          mirror_axis: z
-            .enum(["x", "y", "z"])
-            .optional()
-            .describe("Axis to mirror across for mirror_paste."),
+          mirror_axis: axisEnum.optional().describe("Axis to mirror across for mirror_paste."),
         })
         .optional()
         .describe("Target data for paste operation."),
