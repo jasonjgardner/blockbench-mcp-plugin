@@ -98,7 +98,7 @@ createTool(
         BarItems.fill_tool.select();
   
         // Perform fill
-        Painter.startPaintTool(texture, x, y, {});
+        Painter.startPaintTool(texture, x, y, {}, { shiftKey: false });
         Painter.stopPaintTool();
   
         Undo.finishEdit("Fill tool");
@@ -192,7 +192,7 @@ createTool(
         BarItems.draw_shape_tool.select();
   
         // Draw shape
-        Painter.startPaintTool(texture, start.x, start.y, {});
+        Painter.startPaintTool(texture, start.x, start.y, {}, { shiftKey: false });
         Painter.useShapeTool(texture, end.x, end.y, {});
         Painter.stopPaintTool();
   
@@ -273,7 +273,7 @@ createTool(
         BarItems.gradient_tool.select();
   
         // Apply gradient
-        Painter.startPaintTool(texture, start.x, start.y, {});
+        Painter.startPaintTool(texture, start.x, start.y, {}, { shiftKey: false });
         Painter.useGradientTool(texture, end.x, end.y, {});
         Painter.stopPaintTool();
   
@@ -417,7 +417,7 @@ createTool(
         });
   
         // Apply at target point
-        Painter.startPaintTool(texture, target.x, target.y, {});
+        Painter.startPaintTool(texture, target.x, target.y, {}, { shiftKey: false });
         Painter.stopPaintTool();
   
         Undo.finishEdit("Copy brush");
@@ -511,7 +511,7 @@ createTool(
   
           if (i === 0 || !connect_strokes) {
             // Start new stroke
-            Painter.startPaintTool(texture, coord.x, coord.y, {});
+            Painter.startPaintTool(texture, coord.x, coord.y, {}, { shiftKey: false });
           } else {
             // Continue stroke
             Painter.movePaintTool(texture, coord.x, coord.y, {});
