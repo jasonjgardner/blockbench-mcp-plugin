@@ -4,6 +4,11 @@ import { z } from "zod";
 import { createTool } from "@/lib/factories";
 import { findElementOrThrow } from "@/lib/util";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
+import {
+  elementIdSchema,
+  vector3Schema,
+  autoUvEnum,
+} from "@/lib/zodObjects";
 
 export function registerElementTools() {
   createTool(
@@ -15,7 +20,7 @@ export function registerElementTools() {
       destructiveHint: true,
     },
     parameters: z.object({
-      id: z.string().describe("ID or name of the element to remove."),
+      id: elementIdSchema.describe("ID or name of the element to remove."),
     }),
     async execute({ id }) {
       const element = findElementOrThrow(id);
@@ -47,12 +52,11 @@ export function registerElementTools() {
       },
       parameters: z.object({
         name: z.string(),
-        origin: z.array(z.number()).length(3),
-        rotation: z.array(z.number()).length(3),
+        origin: vector3Schema,
+        rotation: vector3Schema,
         parent: z.string().optional().default("root"),
         visibility: z.boolean().optional().default(true),
-        autouv: z
-          .enum(["0", "1", "2"])
+        autouv: autoUvEnum
           .optional()
           .default("0")
           .describe(
@@ -136,12 +140,8 @@ createTool(
       "Duplicates a cube, mesh or group by ID or name.  You may offset the duplicate or assign a new name.",
     annotations: { title: "Duplicate Element", destructiveHint: true },
     parameters: z.object({
-      id: z.string().describe("ID or name of the element to duplicate."),
-      offset: z
-        .array(z.number())
-        .length(3)
-        .optional()
-        .default([0, 0, 0]),
+      id: elementIdSchema.describe("ID or name of the element to duplicate."),
+      offset: vector3Schema.optional().default([0, 0, 0]),
       newName: z.string().optional(),
     }),
     async execute({ id, offset, newName }) {
@@ -237,7 +237,7 @@ createTool(
     description: "Renames a cube, mesh or group by ID or name.",
     annotations: { title: "Rename Element", destructiveHint: true },
     parameters: z.object({
-      id: z.string().describe("ID or name of the element to rename."),
+      id: elementIdSchema.describe("ID or name of the element to rename."),
       new_name: z.string().describe("New name to assign."),
     }),
     async execute({ id, new_name }) {

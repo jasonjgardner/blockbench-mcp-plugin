@@ -5,9 +5,9 @@ export function settingsSetup() {
 
   settings.push(
     new Setting("mcp_instructions", {
-      name: "MCP System Instructions",
+      name: tl("mcp.settings.instructions_name"),
       // https://github.com/punkpeye/fastmcp?tab=readme-ov-file#providing-instructions
-      description: "Instructions for the MCP system.",
+      description: tl("mcp.settings.instructions_desc"),
       type: "text",
       value:
         "Generate simple, low-poly models for Minecraft inside Blockbench.",
@@ -15,16 +15,16 @@ export function settingsSetup() {
       icon: "psychology",
     }),
     new Setting("mcp_port", {
-      name: "MCP Server Port",
-      description: "Port for the MCP server.",
+      name: tl("mcp.settings.port_name"),
+      description: tl("mcp.settings.port_desc"),
       type: "number",
       value: 3000,
       category,
       icon: "numbers",
     }),
     new Setting("mcp_endpoint", {
-      name: "MCP Server Endpoint",
-      description: "Endpoint for the MCP server.",
+      name: tl("mcp.settings.endpoint_name"),
+      description: tl("mcp.settings.endpoint_desc"),
       type: "text",
       value: "/bb-mcp",
       category,

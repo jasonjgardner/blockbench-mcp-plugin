@@ -11,9 +11,11 @@ import { tools, prompts } from "@/server/tools";
 import { resources } from "@/server";
 import { uiSetup, uiTeardown } from "@/ui";
 import { settingsSetup, settingsTeardown } from "@/ui/settings";
+import { setupI18n } from "@/ui/i18n";
 import { sessionManager } from "@/lib/sessions";
 import type { NetServer, SessionTransports } from "@/server/net";
 import createNetServer from "@/server/net";
+import { getIcon } from "@/macros/getIcon" with { type: "macro" };
 
 let httpServer: NetServer | null = null;
 let sessionTransports: SessionTransports | null = null;
@@ -24,7 +26,7 @@ BBPlugin.register("mcp", {
   author: "Jason J. Gardner",
   description: "Create an MCP server inside Blockbench.",
   tags: ["MCP", "AI"],
-  icon: __ICON__,
+  icon: getIcon(),
   variant: "desktop",
   async onload() {
     // Get network module with Blockbench permission handling
@@ -40,6 +42,9 @@ BBPlugin.register("mcp", {
       Blockbench.showQuickMessage("MCP Server requires network permission", 3000);
       return;
     }
+
+    // Initialize internationalization before any UI
+    setupI18n();
 
     settingsSetup();
 
@@ -82,7 +87,6 @@ BBPlugin.register("mcp", {
 
   oninstall() {
     Blockbench.showQuickMessage("Installed MCP Server plugin", 2000);
-    settingsSetup();
   },
 
   onuninstall() {

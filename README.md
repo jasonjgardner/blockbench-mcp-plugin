@@ -64,9 +64,41 @@ claude mcp add blockbench --transport http http://localhost:3000/bb-mcp
 }
 ```
 
+#### Cline
+
+<img width="674" height="486" alt="Connecting to Blockbench MCP plugin through Cline" src="https://github.com/user-attachments/assets/f27f2304-dd56-4c60-b159-86fbd5af65ee" />
+
+**`cline_mcp_settings.json`**
+
+```json
+{
+  "mcpServers": {
+    "blockbench": {
+      "url": "http://localhost:3000/bb-mcp",
+      "type": "streamableHttp",
+      "disabled": false,
+      "autoApprove": []
+    }
+  }
+}
+```
+
+#### OpenCode
+
+```bash
+opencode mcp add
+```
+
+<img width="504" height="300" alt="Connecting to Blockbench MCP plugin through OpenCode." src="https://github.com/user-attachments/assets/238971fc-0048-4b8d-95dd-6681604bbe90" />
+
+
 ## Usage
 
 [See sample project](https://github.com/jasonjgardner/blockbench-mcp-project) for prompt examples.
+
+### [Skills](https://skills.sh/jasonjgardner/blockbench-mcp-project)
+
+Use Agent Skills to orchestrate tool usage.
 
 ## Plugin Development
 

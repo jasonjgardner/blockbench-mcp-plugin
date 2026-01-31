@@ -133,10 +133,9 @@ export function findMeshOrThrow(id: string): Mesh {
  * @throws Error with suggestion to use list_outline
  */
 export function findElementOrThrow(id: string): OutlinerElement {
-  // @ts-ignore - Outliner is globally available in Blockbench
-  const element = Outliner.root.find(
+  const element = Outliner.elements.find(
     (el: OutlinerElement) => el.uuid === id || el.name === id
-  );
+  ) || Group.all.find((g: Group) => g.uuid === id || g.name === id);
   if (!element) {
     throw new Error(
       `Element "${id}" not found. Use the list_outline tool to see available elements.`

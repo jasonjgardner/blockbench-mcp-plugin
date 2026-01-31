@@ -4,6 +4,23 @@ import { z } from "zod";
 import { createTool } from "@/lib/factories";
 import { STATUS_EXPERIMENTAL } from "@/lib/constants";
 import { getProjectTexture } from "@/lib/util";
+import {
+  textureIdOptionalSchema,
+  hexColorSchema,
+  opacitySchema,
+  brushSizeSchema,
+  brushSoftnessSchema,
+  brushShapeEnum,
+  blendModeEnum,
+  layerBlendModeEnum,
+  fillModeEnum,
+  drawShapeEnum,
+  copyBrushModeEnum,
+  brushModifierEnum,
+  axisEnum,
+  coordinateSchema,
+  brushSettingsSchema,
+} from "@/lib/zodObjects";
 
 export function registerPaintTools() {
 createTool(
@@ -15,53 +32,22 @@ createTool(
         destructiveHint: true,
       },
       parameters: z.object({
-        texture_id: z
-          .string()
-          .optional()
-          .describe(
-            "Texture ID or name. If not provided, uses selected texture."
-          ),
+        texture_id: textureIdOptionalSchema,
         x: z.number().describe("X coordinate to start fill."),
         y: z.number().describe("Y coordinate to start fill."),
-        color: z.string().optional().describe("Fill color as hex string."),
-        opacity: z
-          .number()
-          .min(0)
-          .max(255)
-          .optional()
-          .describe("Fill opacity (0-255)."),
+        color: hexColorSchema.describe("Fill color as hex string."),
+        opacity: opacitySchema.describe("Fill opacity (0-255)."),
         tolerance: z
           .number()
           .min(0)
           .max(100)
           .optional()
           .describe("Color tolerance for fill."),
-        fill_mode: z
-          .enum([
-            "color",
-            "color_connected",
-            "face",
-            "element",
-            "selected_elements",
-            "selection",
-          ])
+        fill_mode: fillModeEnum
           .optional()
           .default("color_connected")
           .describe("Fill mode."),
-        blend_mode: z
-          .enum([
-            "default",
-            "set_opacity",
-            "color",
-            "behind",
-            "multiply",
-            "add",
-            "screen",
-            "overlay",
-            "difference",
-          ])
-          .optional()
-          .describe("Fill blend mode."),
+        blend_mode: blendModeEnum.optional().describe("Fill blend mode."),
       }),
       async execute({
         texture_id,
@@ -112,7 +98,7 @@ createTool(
         BarItems.fill_tool.select();
   
         // Perform fill
-        Painter.startPaintTool(texture, x, y, {});
+        Painter.startPaintTool(texture, x, y, {}, { shiftKey: false });
         Painter.stopPaintTool();
   
         Undo.finishEdit("Fill tool");
@@ -133,50 +119,25 @@ createTool(
         destructiveHint: true,
       },
       parameters: z.object({
-        texture_id: z
-          .string()
-          .optional()
-          .describe(
-            "Texture ID or name. If not provided, uses selected texture."
-          ),
-        shape: z
-          .enum(["rectangle", "rectangle_h", "ellipse", "ellipse_h"])
-          .describe("Shape to draw. '_h' suffix means hollow."),
-        start: z.object({
+        texture_id: textureIdOptionalSchema,
+        shape: drawShapeEnum.describe("Shape to draw. '_h' suffix means hollow."),
+        start: coordinateSchema.extend({
           x: z.number().describe("Start X coordinate."),
           y: z.number().describe("Start Y coordinate."),
         }),
-        end: z.object({
+        end: coordinateSchema.extend({
           x: z.number().describe("End X coordinate."),
           y: z.number().describe("End Y coordinate."),
         }),
-        color: z.string().optional().describe("Shape color as hex string."),
+        color: hexColorSchema.describe("Shape color as hex string."),
         line_width: z
           .number()
           .min(1)
           .max(50)
           .optional()
           .describe("Line width for hollow shapes."),
-        opacity: z
-          .number()
-          .min(0)
-          .max(255)
-          .optional()
-          .describe("Shape opacity (0-255)."),
-        blend_mode: z
-          .enum([
-            "default",
-            "set_opacity",
-            "color",
-            "behind",
-            "multiply",
-            "add",
-            "screen",
-            "overlay",
-            "difference",
-          ])
-          .optional()
-          .describe("Shape blend mode."),
+        opacity: opacitySchema.describe("Shape opacity (0-255)."),
+        blend_mode: blendModeEnum.optional().describe("Shape blend mode."),
       }),
       async execute({
         texture_id,
@@ -231,7 +192,7 @@ createTool(
         BarItems.draw_shape_tool.select();
   
         // Draw shape
-        Painter.startPaintTool(texture, start.x, start.y, {});
+        Painter.startPaintTool(texture, start.x, start.y, {}, { shiftKey: false });
         Painter.useShapeTool(texture, end.x, end.y, {});
         Painter.stopPaintTool();
   
@@ -253,42 +214,19 @@ createTool(
         destructiveHint: true,
       },
       parameters: z.object({
-        texture_id: z
-          .string()
-          .optional()
-          .describe(
-            "Texture ID or name. If not provided, uses selected texture."
-          ),
-        start: z.object({
+        texture_id: textureIdOptionalSchema,
+        start: coordinateSchema.extend({
           x: z.number().describe("Gradient start X coordinate."),
           y: z.number().describe("Gradient start Y coordinate."),
         }),
-        end: z.object({
+        end: coordinateSchema.extend({
           x: z.number().describe("Gradient end X coordinate."),
           y: z.number().describe("Gradient end Y coordinate."),
         }),
         start_color: z.string().describe("Start color as hex string."),
         end_color: z.string().describe("End color as hex string."),
-        opacity: z
-          .number()
-          .min(0)
-          .max(255)
-          .optional()
-          .describe("Gradient opacity (0-255)."),
-        blend_mode: z
-          .enum([
-            "default",
-            "set_opacity",
-            "color",
-            "behind",
-            "multiply",
-            "add",
-            "screen",
-            "overlay",
-            "difference",
-          ])
-          .optional()
-          .describe("Gradient blend mode."),
+        opacity: opacitySchema.describe("Gradient opacity (0-255)."),
+        blend_mode: blendModeEnum.optional().describe("Gradient blend mode."),
       }),
       async execute({
         texture_id,
@@ -335,7 +273,7 @@ createTool(
         BarItems.gradient_tool.select();
   
         // Apply gradient
-        Painter.startPaintTool(texture, start.x, start.y, {});
+        Painter.startPaintTool(texture, start.x, start.y, {}, { shiftKey: false });
         Painter.useGradientTool(texture, end.x, end.y, {});
         Painter.stopPaintTool();
   
@@ -358,12 +296,7 @@ createTool(
         readOnlyHint: true,
       },
       parameters: z.object({
-        texture_id: z
-          .string()
-          .optional()
-          .describe(
-            "Texture ID or name. If not provided, uses selected texture."
-          ),
+        texture_id: textureIdOptionalSchema,
         x: z.number().describe("X coordinate to pick color from."),
         y: z.number().describe("Y coordinate to pick color from."),
         set_as_secondary: z
@@ -429,37 +362,18 @@ createTool(
         destructiveHint: true,
       },
       parameters: z.object({
-        texture_id: z
-          .string()
-          .optional()
-          .describe(
-            "Texture ID or name. If not provided, uses selected texture."
-          ),
-        source: z.object({
+        texture_id: textureIdOptionalSchema,
+        source: coordinateSchema.extend({
           x: z.number().describe("Source X coordinate to copy from."),
           y: z.number().describe("Source Y coordinate to copy from."),
         }),
-        target: z.object({
+        target: coordinateSchema.extend({
           x: z.number().describe("Target X coordinate to paste to."),
           y: z.number().describe("Target Y coordinate to paste to."),
         }),
-        brush_size: z
-          .number()
-          .min(1)
-          .max(100)
-          .optional()
-          .describe("Copy brush size."),
-        opacity: z
-          .number()
-          .min(0)
-          .max(255)
-          .optional()
-          .describe("Copy opacity (0-255)."),
-        mode: z
-          .enum(["copy", "sample", "pattern"])
-          .optional()
-          .default("copy")
-          .describe("Copy brush mode."),
+        brush_size: brushSizeSchema.describe("Copy brush size."),
+        opacity: opacitySchema.describe("Copy opacity (0-255)."),
+        mode: copyBrushModeEnum.optional().default("copy").describe("Copy brush mode."),
       }),
       async execute({ texture_id, source, target, brush_size, opacity, mode }) {
         const texture = texture_id
@@ -503,7 +417,7 @@ createTool(
         });
   
         // Apply at target point
-        Painter.startPaintTool(texture, target.x, target.y, {});
+        Painter.startPaintTool(texture, target.x, target.y, {}, { shiftKey: false });
         Painter.stopPaintTool();
   
         Undo.finishEdit("Copy brush");
@@ -524,39 +438,19 @@ createTool(
         destructiveHint: true,
       },
       parameters: z.object({
-        texture_id: z
-          .string()
-          .optional()
-          .describe(
-            "Texture ID or name. If not provided, uses selected texture."
-          ),
+        texture_id: textureIdOptionalSchema,
         coordinates: z
           .array(
-            z.object({
+            coordinateSchema.extend({
               x: z.number().describe("X coordinate to erase at."),
               y: z.number().describe("Y coordinate to erase at."),
             })
           )
           .describe("Array of coordinates to erase at."),
-        brush_size: z
-          .number()
-          .min(1)
-          .max(100)
-          .optional()
-          .describe("Eraser brush size."),
-        opacity: z
-          .number()
-          .min(0)
-          .max(255)
-          .optional()
-          .describe("Eraser opacity (0-255)."),
-        softness: z
-          .number()
-          .min(0)
-          .max(100)
-          .optional()
-          .describe("Eraser softness percentage."),
-        shape: z.enum(["square", "circle"]).optional().describe("Eraser shape."),
+        brush_size: brushSizeSchema.describe("Eraser brush size."),
+        opacity: opacitySchema.describe("Eraser opacity (0-255)."),
+        softness: brushSoftnessSchema.describe("Eraser softness percentage."),
+        shape: brushShapeEnum.optional().describe("Eraser shape."),
         connect_strokes: z
           .boolean()
           .optional()
@@ -617,7 +511,7 @@ createTool(
   
           if (i === 0 || !connect_strokes) {
             // Start new stroke
-            Painter.startPaintTool(texture, coord.x, coord.y, {});
+            Painter.startPaintTool(texture, coord.x, coord.y, {}, { shiftKey: false });
           } else {
             // Continue stroke
             Painter.movePaintTool(texture, coord.x, coord.y, {});
@@ -648,13 +542,10 @@ createTool(
         mirror_painting: z
           .object({
             enabled: z.boolean().describe("Enable mirror painting."),
-            axis: z
-              .array(z.enum(["x", "y", "z"]))
-              .optional()
-              .describe("Mirror axes."),
+            axis: z.array(axisEnum).optional().describe("Mirror axes."),
             texture: z.boolean().optional().describe("Enable texture mirroring."),
-            texture_center: z
-              .object({
+            texture_center: coordinateSchema
+              .extend({
                 x: z.number().describe("X coordinate of texture mirror center."),
                 y: z.number().describe("Y coordinate of texture mirror center."),
               })
@@ -679,12 +570,10 @@ createTool(
           .boolean()
           .optional()
           .describe("Enable color erase mode."),
-        brush_opacity_modifier: z
-          .enum(["none", "pressure", "tilt"])
+        brush_opacity_modifier: brushModifierEnum
           .optional()
           .describe("Brush opacity modifier for stylus."),
-        brush_size_modifier: z
-          .enum(["none", "pressure", "tilt"])
+        brush_size_modifier: brushModifierEnum
           .optional()
           .describe("Brush size modifier for stylus."),
         paint_with_stylus_only: z
@@ -821,57 +710,16 @@ createTool(
       destructiveHint: true,
     },
     parameters: z.object({
-      texture_id: z
-        .string()
-        .optional()
-        .describe(
-          "Texture ID or name. If not provided, uses selected texture."
-        ),
+      texture_id: textureIdOptionalSchema,
       coordinates: z
         .array(
-          z.object({
+          coordinateSchema.extend({
             x: z.number().describe("X coordinate on texture."),
             y: z.number().describe("Y coordinate on texture."),
           })
         )
         .describe("Array of coordinates to paint at."),
-      brush_settings: z
-        .object({
-          size: z.number().min(1).max(100).optional().describe("Brush size."),
-          opacity: z
-            .number()
-            .min(0)
-            .max(255)
-            .optional()
-            .describe("Brush opacity (0-255)."),
-          softness: z
-            .number()
-            .min(0)
-            .max(100)
-            .optional()
-            .describe("Brush softness percentage."),
-          shape: z
-            .enum(["square", "circle"])
-            .optional()
-            .describe("Brush shape."),
-          color: z.string().optional().describe("Brush color as hex string."),
-          blend_mode: z
-            .enum([
-              "default",
-              "set_opacity",
-              "color",
-              "behind",
-              "multiply",
-              "add",
-              "screen",
-              "overlay",
-              "difference",
-            ])
-            .optional()
-            .describe("Brush blend mode."),
-        })
-        .optional()
-        .describe("Brush settings to apply."),
+      brush_settings: brushSettingsSchema,
       connect_strokes: z
         .boolean()
         .optional()
@@ -972,35 +820,12 @@ createTool(
     },
     parameters: z.object({
       name: z.string().describe("Name of the brush preset."),
-      size: z.number().min(1).max(100).optional().describe("Brush size."),
-      opacity: z
-        .number()
-        .min(0)
-        .max(255)
-        .optional()
-        .describe("Brush opacity (0-255)."),
-      softness: z
-        .number()
-        .min(0)
-        .max(100)
-        .optional()
-        .describe("Brush softness percentage."),
-      shape: z.enum(["square", "circle"]).optional().describe("Brush shape."),
-      color: z.string().optional().describe("Brush color as hex string."),
-      blend_mode: z
-        .enum([
-          "default",
-          "set_opacity",
-          "color",
-          "behind",
-          "multiply",
-          "add",
-          "screen",
-          "overlay",
-          "difference",
-        ])
-        .optional()
-        .describe("Brush blend mode."),
+      size: brushSizeSchema,
+      opacity: opacitySchema,
+      softness: brushSoftnessSchema,
+      shape: brushShapeEnum.optional().describe("Brush shape."),
+      color: hexColorSchema.describe("Brush color as hex string."),
+      blend_mode: blendModeEnum.optional().describe("Brush blend mode."),
       pixel_perfect: z
         .boolean()
         .optional()
@@ -1018,9 +843,9 @@ createTool(
     }) {
       const preset = {
         name,
-        size: size || null,
-        opacity: opacity || null,
-        softness: softness || null,
+        size: size ?? null,
+        opacity: opacity ?? null,
+        softness: softness ?? null,
         shape: shape || "square",
         color: color || null,
         blend_mode: blend_mode || "default",
@@ -1092,12 +917,7 @@ createTool(
           "feather_selection",
         ])
         .describe("Selection action to perform."),
-      texture_id: z
-        .string()
-        .optional()
-        .describe(
-          "Texture ID or name. If not provided, uses selected texture."
-        ),
+      texture_id: textureIdOptionalSchema,
       coordinates: z
         .object({
           x1: z.number().describe("Start X coordinate."),
@@ -1248,12 +1068,7 @@ createTool(
           "flatten_layers",
         ])
         .describe("Layer management action."),
-      texture_id: z
-        .string()
-        .optional()
-        .describe(
-          "Texture ID or name. If not provided, uses selected texture."
-        ),
+      texture_id: textureIdOptionalSchema,
       layer_name: z.string().optional().describe("Name of the layer."),
       opacity: z
         .number()
@@ -1261,23 +1076,7 @@ createTool(
         .max(100)
         .optional()
         .describe("Layer opacity percentage."),
-      blend_mode: z
-        .enum([
-          "normal",
-          "multiply",
-          "screen",
-          "overlay",
-          "soft_light",
-          "hard_light",
-          "color_dodge",
-          "color_burn",
-          "darken",
-          "lighten",
-          "difference",
-          "exclusion",
-        ])
-        .optional()
-        .describe("Layer blend mode."),
+      blend_mode: layerBlendModeEnum.optional().describe("Layer blend mode."),
       target_index: z
         .number()
         .optional()

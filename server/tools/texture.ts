@@ -11,6 +11,15 @@ import {
   getChannelTextureInfo,
 } from "@/lib/util";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
+import {
+  colorSchema,
+  elementIdSchema,
+  textureIdSchema,
+  textureIdOptionalSchema,
+  pbrChannelEnum,
+  renderModeEnum,
+  renderSidesEnum,
+} from "@/lib/zodObjects";
 
 export function registerTextureTools() {
 createTool(
@@ -32,22 +41,7 @@ createTool(
           .optional()
           .describe("Path to the image file or data URL."),
         group: z.string().optional(),
-        fill_color: z
-          .union([
-            z.array(z.number().min(0).max(255)).length(4).describe("RGBA color array [R, G, B, A]"),
-            z
-              .string()
-              .regex(
-                /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$/,
-                "HEX color string (e.g. #RRGGBB or #RRGGBBAA)"
-              ),
-            z
-              .string()
-              .regex(
-                /^[a-z]{3,20}$/,
-                "Color name (e.g. 'red', 'blue', 'green')"
-              ),
-          ])
+        fill_color: colorSchema
           .optional()
           .describe("RGBA color to fill the texture, as tuple or HEX string."),
         layer_name: z
@@ -56,21 +50,18 @@ createTool(
           .describe(
             "Name of the texture layer. Required if fill_color is set."
           ),
-        pbr_channel: z
-          .enum(["color", "normal", "height", "mer"])
+        pbr_channel: pbrChannelEnum
           .optional()
           .describe(
             "PBR channel to use for the texture. Color, normal, height, or Metalness/Emissive/Roughness (MER) map."
           ),
-        render_mode: z
-          .enum(["default", "emissive", "additive", "layered"])
+        render_mode: renderModeEnum
           .optional()
           .default("default")
           .describe(
             "Render mode for the texture. Default, emissive, additive, or layered."
           ),
-        render_sides: z
-          .enum(["auto", "front", "double"])
+        render_sides: renderSidesEnum
           .optional()
           .default("auto")
           .describe("Render sides for the texture. Auto, front, or double."),
@@ -180,10 +171,8 @@ createTool(
       destructiveHint: true,
     },
     parameters: z.object({
-      id: z
-        .string()
-        .describe("ID or name of the element to apply the texture to."),
-      texture: z.string().describe("ID or name of the texture to apply."),
+      id: elementIdSchema.describe("ID or name of the element to apply the texture to."),
+      texture: textureIdSchema.describe("ID or name of the texture to apply."),
       applyTo: z
         .enum(["all", "blank", "none"])
         .describe("Apply texture to element or group.")
@@ -318,7 +307,7 @@ createTool(
       readOnlyHint: true,
     },
     parameters: z.object({
-      texture: z.string().optional().describe("Texture ID or name."),
+      texture: textureIdOptionalSchema,
     }),
     async execute({ texture }) {
       if (!texture) {
@@ -773,10 +762,8 @@ createTool(
     },
     parameters: z.object({
       material: z.string().describe("Material name or UUID."),
-      texture: z.string().describe("Texture name or UUID to assign."),
-      channel: z
-        .enum(["color", "normal", "height", "mer"])
-        .describe("PBR channel to assign the texture to."),
+      texture: textureIdSchema.describe("Texture name or UUID to assign."),
+      channel: pbrChannelEnum.describe("PBR channel to assign the texture to."),
     }),
     async execute({ material, texture, channel }) {
       const textureGroup = findTextureGroupOrThrow(material);

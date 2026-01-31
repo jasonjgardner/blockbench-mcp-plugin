@@ -24,6 +24,7 @@ function getStatusText (status: number): string {
     400: 'Bad Request',
     404: 'Not Found',
     405: 'Method Not Allowed',
+    409: 'Conflict',
     500: 'Internal Server Error'
   }
   return texts[status] || 'Unknown'
@@ -43,10 +44,28 @@ export default function createNetServer (
   }
 ): [NetServer, SessionTransports] {
   const sessionTransports: SessionTransports = new Map()
+
+  // Register callback to close transport when sessionManager removes a session (e.g., timeout)
+  sessionManager.setRemovalCallback(async (sessionId: string) => {
+    const session = sessionTransports.get(sessionId)
+    if (session) {
+      console.log(`[MCP] Closing transport for session: ${sessionId.slice(0, 8)}...`)
+      try {
+        await session.transport.close()
+      } catch (error) {
+        console.error('[MCP] Error closing transport:', error)
+      } finally {
+        sessionTransports.delete(sessionId)
+      }
+    }
+  })
+
   const httpServer = createServer((socket: Socket) => {
     let buffer = Buffer.alloc(0)
+    let socketEnded = false
 
     socket.on('data', (chunk: Buffer) => {
+      if (socketEnded) return
       buffer = Buffer.concat([buffer, chunk])
       processHttpRequests().catch(err => {
         console.error('[MCP] Unhandled error in processHttpRequests:', err)
@@ -84,6 +103,11 @@ export default function createNetServer (
 
     async function processHttpRequests () {
       while (true) {
+        // Stop processing if socket is no longer writable
+        if (socketEnded || socket.destroyed || !socket.writable) {
+          return
+        }
+
         // Look for end of HTTP headers
         const headerEnd = buffer.indexOf('\r\n\r\n')
         if (headerEnd === -1) return
@@ -155,6 +179,29 @@ export default function createNetServer (
           const sessionId = headers['mcp-session-id']
           let session = sessionId ? sessionTransports.get(sessionId) : null
 
+          // If client provided a session ID but it's not found, reject with 409
+          // This happens when the session timed out or was closed
+          if (sessionId && !session) {
+            console.log(
+              `[MCP] Invalid session ID: ${sessionId.slice(0, 8)}... (session expired or not found)`
+            )
+            sendResponse(
+              socket,
+              409,
+              { 'content-type': 'application/json' },
+              JSON.stringify({
+                jsonrpc: '2.0',
+                error: {
+                  code: -32600,
+                  message: 'Session expired or not found. Please reconnect.'
+                },
+                id: null
+              }),
+              headers['connection']
+            )
+            continue
+          }
+
           // If no session exists, create a new one with its own server and transport
           if (!session) {
             const sessionServer = createMcpServer()
@@ -196,8 +243,10 @@ export default function createNetServer (
                 console.log(
                   `[MCP] Session closed: ${closedSessionId.slice(0, 8)}...`
                 )
-                sessionManager.remove(closedSessionId)
+                // Delete from sessionTransports BEFORE calling sessionManager.remove()
+                // to prevent the removal callback from trying to close an already-closing transport
                 sessionTransports.delete(closedSessionId)
+                sessionManager.remove(closedSessionId)
               }
             })
 
@@ -220,12 +269,6 @@ export default function createNetServer (
           // Let the transport handle the MCP protocol
           const webResponse = await session.transport.handleRequest(webRequest)
 
-          console.log(
-            `[MCP] Response: ${webResponse.status} ${webResponse.headers.get(
-              'content-type'
-            )}`
-          )
-
           // Convert Web Standard Response to HTTP
           const responseHeaders: Record<string, string> = {}
           webResponse.headers.forEach((value: string, key: string) => {
@@ -233,6 +276,11 @@ export default function createNetServer (
           })
 
           const contentType = webResponse.headers.get('content-type') || ''
+
+          // Ensure content-type is set for non-SSE responses (some clients require it)
+          if (!contentType && webResponse.status !== 204) {
+            responseHeaders['content-type'] = 'application/json'
+          }
 
           // Handle SSE streams differently from regular responses
           if (contentType.includes('text/event-stream')) {
@@ -246,6 +294,9 @@ export default function createNetServer (
 
               try {
                 while (true) {
+                  // Check socket is still writable before each chunk
+                  if (socketEnded || socket.destroyed || !socket.writable) break
+
                   const { done, value } = await reader.read()
                   if (done) break
 
@@ -255,9 +306,11 @@ export default function createNetServer (
               } catch (streamError) {
                 console.error('[MCP] SSE stream error:', streamError)
               } finally {
+                socketEnded = true
                 socket.end()
               }
             } else {
+              socketEnded = true
               socket.end()
             }
           } else {
@@ -288,7 +341,12 @@ export default function createNetServer (
       sock: Socket,
       status: number,
       headers: Record<string, string>
-    ) {
+    ): boolean {
+      // Don't write to an already-ended socket
+      if (socketEnded || sock.destroyed || !sock.writable) {
+        return false
+      }
+
       let response = `HTTP/1.1 ${status} ${getStatusText(status)}\r\n`
 
       // Remove content-length for SSE streams
@@ -304,6 +362,7 @@ export default function createNetServer (
       response += '\r\n'
 
       sock.write(response)
+      return true
     }
 
     function sendResponse (
@@ -312,12 +371,25 @@ export default function createNetServer (
       headers: Record<string, string>,
       body: string,
       connection?: string
-    ) {
+    ): boolean {
+      // Don't write to an already-ended socket
+      if (socketEnded || sock.destroyed || !sock.writable) {
+        return false
+      }
+
       let response = `HTTP/1.1 ${status} ${getStatusText(status)}\r\n`
 
-      // Add content-length if not present
-      if (!headers['content-length']) {
-        headers['content-length'] = Buffer.byteLength(body).toString()
+      // Ensure required HTTP headers
+      const bodyBytes = Buffer.byteLength(body)
+      headers['content-length'] = bodyBytes.toString()
+
+      // Set connection header based on client request
+      const keepAlive = connection?.toLowerCase() === 'keep-alive'
+      headers['connection'] = keepAlive ? 'keep-alive' : 'close'
+
+      // Add Date header for HTTP/1.1 compliance
+      if (!headers['date']) {
+        headers['date'] = new Date().toUTCString()
       }
 
       for (const [key, value] of Object.entries(headers)) {
@@ -326,12 +398,18 @@ export default function createNetServer (
       response += '\r\n'
       response += body
 
-      sock.write(response)
-
-      // Close connection unless keep-alive
-      if (connection?.toLowerCase() !== 'keep-alive') {
-        sock.end()
+      // Write response and wait for it to be flushed before closing
+      if (!keepAlive) {
+        socketEnded = true
+        // Use callback to ensure data is flushed before closing
+        sock.write(response, () => {
+          sock.end()
+        })
+      } else {
+        sock.write(response)
       }
+
+      return true
     }
   })
 

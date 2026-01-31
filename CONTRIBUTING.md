@@ -12,7 +12,6 @@ bun install                # install deps
 bun run dev                # build once with sourcemaps
 bun run dev:watch          # rebuild on change (watch mode)
 bun run build              # minified production build to dist/mcp.js
-bun run ./build.ts --clean # remove dist/ for a fresh build
 ```
 
 For MCP Inspector (optional):

@@ -12,10 +12,12 @@ export interface Session {
 }
 
 type SessionListener = (sessions: Session[]) => void;
+type RemovalCallback = (sessionId: string) => void;
 
 class SessionManager {
   private sessions: Map<string, Session> = new Map();
   private listeners: Set<SessionListener> = new Set();
+  private removalCallback: RemovalCallback | null = null;
 
   add(sessionId: string): void {
     // Don't add duplicate sessions
@@ -43,10 +45,22 @@ class SessionManager {
     if (session.timeoutHandle) {
       clearTimeout(session.timeoutHandle);
     }
+
+    // Delete from map FIRST to prevent re-entrancy issues
+    // (e.g., if removalCallback triggers onsessionclosed which calls remove() again)
     this.sessions.delete(sessionId);
     this.notifyListeners();
 
     console.log(`[MCP] Session disconnected: ${sessionId.slice(0, 8)}...`);
+
+    // Notify removal callback (e.g., to close transport) after removing from map
+    if (this.removalCallback) {
+      try {
+        this.removalCallback(sessionId);
+      } catch (error) {
+        console.error("[MCP] Session removal callback error:", error);
+      }
+    }
   }
 
   updateActivity(sessionId: string): void {
@@ -95,6 +109,14 @@ class SessionManager {
     // Immediately call with current state
     listener(this.getAll());
     return () => this.listeners.delete(listener);
+  }
+
+  /**
+   * Sets a callback to be invoked when a session is removed (timeout or explicit).
+   * Used to synchronize transport cleanup with session removal.
+   */
+  setRemovalCallback(callback: RemovalCallback | null): void {
+    this.removalCallback = callback;
   }
 
   private notifyListeners(): void {

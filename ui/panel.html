@@ -1,6 +1,6 @@
 <div class="mcp-panel">
     <details name="mcp_panel" open>
-        <summary>Sessions ({{sessions.length}})</summary>
+        <summary>{{tl('mcp.panel.sessions')}} ({{sessions.length}})</summary>
         <div v-if="sessions.length > 0">
             <div v-for="session in sessions" :key="session.id" class="session-item" :title="session.id">
                 <span class="session-id">{{formatSessionId(session)}}</span>
@@ -8,44 +8,66 @@
             </div>
         </div>
         <div v-else class="no-sessions">
-            No clients connected
+            {{tl('mcp.sessions.no_clients')}}
         </div>
     </details>
     <details name="mcp_panel">
-        <summary>Server</summary>
+        <summary>{{tl('mcp.panel.server')}}</summary>
         <dl>
-            <dt>Server Name</dt>
+            <dt>{{tl('mcp.server.name')}}</dt>
             <dd>{{server.name}}</dd>
-            <dt>Server Version</dt>
-            <dd>{{server.version}}</dd>
-            <dt>Connected Clients</dt>
+            <dt>{{tl('mcp.server.version')}}</dt>
+            <dd><a href="https://github.com/jasonjgardner/blockbench-mcp-plugin/releases/" target="_blank"
+                    rel="noopener noreferrer">{{server.version}}</a>
+            </dd>
+            <dt>{{tl('mcp.server.connected_clients')}}</dt>
             <dd>{{sessions.length}}</dd>
         </dl>
     </details>
-    <details name="mcp_panel">
-        <summary>Tools</summary>
+    <details name="mcp_panel" @toggle="onToolsToggle">
+        <summary>{{tl('mcp.panel.tools')}} ({{filteredTools.length}}/{{tools.length}})</summary>
 
-        <div v-if="tools.length > 0">
-            <div v-for="tool in tools" :key="tool.name" class="tool-toggle-row clickable"
-                @click="openToolTest(tool.name)" :title="'Click to test ' + getDisplayName(tool.name)">
+        <div class="filter-bar">
+            <input type="text" v-model="toolsFilter.search" :placeholder="tl('mcp.filter.tools_placeholder')"
+                :aria-label="tl('mcp.filter.tools_placeholder')"
+                class="filter-input" @input="toolsFilter.search = $event.target.value">
+            <label class="filter-switch">
+                <input type="checkbox" v-model="toolsFilter.showExperimental">
+                <span class="switch-slider"></span>
+                <span class="switch-label">{{tl('mcp.filter.show_experimental')}}</span>
+            </label>
+        </div>
+
+        <div v-if="filteredTools.length > 0">
+            <div v-for="tool in filteredTools" :key="tool.name" class="tool-toggle-row clickable"
+                @click="openToolTest(tool.name)" :title="tl('mcp.tooltip.click_to_test', [getDisplayName(tool.name)])">
                 <div class="tool-info">
                     <div class="tool-name">
                         {{getDisplayName(tool.name)}}
-                        <span :class="['tool-status', tool.status]">{{tool.status}}</span>
+                        <span v-if="tool.status === 'experimental'" class="tool-status experimental" :title="tl('mcp.status.experimental_tooltip')"></span>
                     </div>
                     <div class="tool-description" :title="tool.description">{{tool.description}}</div>
                 </div>
             </div>
         </div>
+        <div v-else-if="tools.length > 0" class="no-results">
+            {{tl('mcp.tools.no_match')}}
+        </div>
         <div v-else>
-            <p>No tools available.</p>
+            <p>{{tl('mcp.tools.none_available')}}</p>
         </div>
     </details>
-    <details name="mcp_panel">
-        <summary>Resources</summary>
+    <details name="mcp_panel" @toggle="onResourcesToggle">
+        <summary>{{tl('mcp.panel.resources')}} ({{filteredResources.length}}/{{resources.length}})</summary>
 
-        <div v-if="resources.length > 0">
-            <div v-for="resource in resources" :key="resource.name" class="tool-toggle-row">
+        <div class="filter-bar">
+            <input type="text" v-model="resourcesFilter.search" :placeholder="tl('mcp.filter.resources_placeholder')"
+                :aria-label="tl('mcp.filter.resources_placeholder')"
+                class="filter-input" @input="resourcesFilter.search = $event.target.value">
+        </div>
+
+        <div v-if="filteredResources.length > 0">
+            <div v-for="resource in filteredResources" :key="resource.name" class="tool-toggle-row">
                 <div class="tool-info">
                     <div class="tool-name">{{getDisplayName(resource.name)}}</div>
                     <div class="tool-description" :title="resource.description">{{resource.description}}</div>
@@ -54,30 +76,49 @@
                 </div>
             </div>
         </div>
+        <div v-else-if="resources.length > 0" class="no-results">
+            {{tl('mcp.resources.no_match')}}
+        </div>
         <div v-else>
-            <p>No resources available.</p>
+            <p>{{tl('mcp.resources.none_available')}}</p>
         </div>
     </details>
-    <details name="mcp_panel">
-        <summary>Prompts</summary>
+    <details name="mcp_panel" @toggle="onPromptsToggle">
+        <summary>{{tl('mcp.panel.prompts')}} ({{filteredPrompts.length}}/{{prompts.length}})</summary>
 
-        <div v-if="prompts.length > 0">
-            <div v-for="prompt in prompts" :key="prompt.name" class="tool-toggle-row clickable"
-                @click="openPromptPreview(prompt.name)" :title="'Click to preview ' + getDisplayName(prompt.name)">
+        <div class="filter-bar">
+            <input type="text" v-model="promptsFilter.search" :placeholder="tl('mcp.filter.prompts_placeholder')"
+                :aria-label="tl('mcp.filter.prompts_placeholder')"
+                class="filter-input" @input="promptsFilter.search = $event.target.value">
+            <label class="filter-switch">
+                <input type="checkbox" v-model="promptsFilter.showExperimental">
+                <span class="switch-slider"></span>
+                <span class="switch-label">{{tl('mcp.filter.show_experimental')}}</span>
+            </label>
+        </div>
+
+        <div v-if="filteredPrompts.length > 0">
+            <div v-for="prompt in filteredPrompts" :key="prompt.name" class="tool-toggle-row clickable"
+                @click="openPromptPreview(prompt.name)"
+                :title="tl('mcp.tooltip.click_to_preview', [getDisplayName(prompt.name)])">
                 <div class="tool-info">
                     <div class="tool-name">
                         {{getDisplayName(prompt.name)}}
-                        <span :class="['tool-status', prompt.status]">{{prompt.status}}</span>
+                        <span v-if="prompt.status === 'experimental'" class="tool-status experimental" :title="tl('mcp.status.experimental_tooltip')"></span>
                     </div>
                     <div class="tool-description" :title="prompt.description">{{prompt.description}}</div>
-                    <div v-if="prompt.argumentCount > 0" class="tool-description" style="font-style: italic; margin-top: 2px;">
-                        {{prompt.argumentCount}} argument{{prompt.argumentCount > 1 ? 's' : ''}}
+                    <div v-if="prompt.argumentCount > 0" class="tool-description"
+                        style="font-style: italic; margin-top: 2px;">
+                        {{formatArgumentCount(prompt.argumentCount)}}
                     </div>
                 </div>
             </div>
         </div>
+        <div v-else-if="prompts.length > 0" class="no-results">
+            {{tl('mcp.prompts.no_match')}}
+        </div>
         <div v-else>
-            <p>No prompts available.</p>
+            <p>{{tl('mcp.prompts.none_available')}}</p>
         </div>
     </details>
 </div>
