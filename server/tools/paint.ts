@@ -843,9 +843,9 @@ createTool(
     }) {
       const preset = {
         name,
-        size: size || null,
-        opacity: opacity || null,
-        softness: softness || null,
+        size: size ?? null,
+        opacity: opacity ?? null,
+        softness: softness ?? null,
         shape: shape || "square",
         color: color || null,
         blend_mode: blend_mode || "default",
