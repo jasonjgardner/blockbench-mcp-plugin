@@ -54,8 +54,25 @@ export const modifyCubeParameters = z.object({
     .describe(
       "ID or name of the cube to modify. Defaults to selected, which could be more than one."
     ),
-    ...cubeSchema.shape,
   name: z.string().optional().describe("New name of the cube."),
+  origin: z
+    .array(z.number()).length(3)
+    .optional()
+    .describe("Pivot point of the cube."),
+  from: z
+    .array(z.number()).length(3)
+    .optional()
+    .describe("Starting point of the cube."),
+  to: z
+    .array(z.number()).length(3)
+    .optional()
+    .describe("Ending point of the cube."),
+  rotation: z
+    .array(z.number()).length(3)
+    .optional()
+    .describe("Rotation of the cube."),
+  autouv: z
+    // ... rest of schema continues
   autouv: z
     .enum(["0", "1", "2"])
     .optional()
