@@ -2,7 +2,7 @@
 /// <reference types="blockbench-types" />
 
 import { z } from "zod";
-import { createTool } from "@/lib/factories";
+import { createTool, type ToolSpec } from "@/lib/factories";
 import {
   isHytalePluginInstalled,
   isHytaleFormat,
@@ -22,6 +22,235 @@ import {
   type HytaleAttachmentCollection,
 } from "@/lib/hytale";
 import { findGroupOrThrow, findElementOrThrow } from "@/lib/util";
+import {
+  cubeIdOptionalSchema,
+  vector3Schema,
+  groupIdOptionalSchema,
+  animationIdOptionalSchema,
+  boneNameSchema,
+  stretchSchema,
+  size2dSchema,
+} from "@/lib/zodObjects";
+
+// ============================================================================
+// Hytale-Specific Enums
+// ============================================================================
+
+/** Hytale shading modes */
+export const hytaleShadingModeEnum = z.enum(HYTALE_SHADING_MODES);
+
+/** Hytale quad normal directions */
+export const hytaleQuadNormalEnum = z.enum(HYTALE_QUAD_NORMALS);
+
+/** Hytale loop modes */
+export const hytaleLoopModeEnum = z.enum(["loop", "hold", "once"]);
+
+// ============================================================================
+// Hytale Tool Parameter Schemas
+// ============================================================================
+
+/** Empty parameters schema for read-only tools */
+export const emptyParametersSchema = z.object({});
+
+/** Parameters for setting Hytale cube properties */
+export const hytaleSetCubePropertiesParametersSchema = z.object({
+  cube_id: cubeIdOptionalSchema,
+  shading_mode: hytaleShadingModeEnum
+    .optional()
+    .describe("Shading mode: flat (no lighting), standard (normal), fullbright (emissive), reflective"),
+  double_sided: z
+    .boolean()
+    .optional()
+    .describe("Whether to render both sides of faces"),
+});
+
+/** Parameters for getting Hytale cube properties */
+export const hytaleGetCubePropertiesParametersSchema = z.object({
+  cube_id: cubeIdOptionalSchema,
+});
+
+/** Parameters for creating a Hytale quad */
+export const hytaleCreateQuadParametersSchema = z.object({
+  name: z.string().describe("Name for the quad"),
+  position: vector3Schema.default([0, 0, 0]).describe("Position [x, y, z]"),
+  normal: hytaleQuadNormalEnum
+    .default("+Y")
+    .describe("Normal direction: +X, -X, +Y, -Y, +Z, -Z"),
+  size: size2dSchema.default([16, 16]),
+  group: groupIdOptionalSchema.describe("Parent group/bone name"),
+  double_sided: z
+    .boolean()
+    .default(true)
+    .describe("Whether to render both sides"),
+});
+
+/** Parameters for setting attachment piece */
+export const hytaleSetAttachmentPieceParametersSchema = z.object({
+  group_name: z.string().describe("Name of the group to mark as attachment piece"),
+  is_piece: z.boolean().describe("Whether the group is an attachment piece"),
+});
+
+/** Parameters for creating visibility keyframe */
+export const hytaleCreateVisibilityKeyframeParametersSchema = z.object({
+  bone_name: boneNameSchema,
+  time: z.number().describe("Time in seconds for the keyframe"),
+  visible: z.boolean().describe("Whether the bone is visible at this keyframe"),
+  animation_id: animationIdOptionalSchema,
+});
+
+/** Parameters for setting animation loop mode */
+export const hytaleSetAnimationLoopParametersSchema = z.object({
+  animation_id: animationIdOptionalSchema,
+  loop_mode: hytaleLoopModeEnum.describe(
+    "Loop mode: loop (continuous), hold (freeze on last frame), once (play once)"
+  ),
+});
+
+/** Parameters for setting cube stretch */
+export const hytaleSetCubeStretchParametersSchema = z.object({
+  cube_id: cubeIdOptionalSchema,
+  stretch: stretchSchema,
+});
+
+/** Parameters for getting cube stretch */
+export const hytaleGetCubeStretchParametersSchema = z.object({
+  cube_id: cubeIdOptionalSchema,
+});
+
+// ============================================================================
+// Hytale Tool Docs
+// ============================================================================
+
+export const hytaleToolDocs: ToolSpec[] = [
+  {
+    name: "hytale_get_format_info",
+    description:
+      "Returns information about the current Hytale format. Requires the Hytale plugin and a Hytale format project to be active.",
+    annotations: {
+      title: "Get Hytale Format Info",
+      readOnlyHint: true,
+    },
+    parameters: emptyParametersSchema,
+    status: "experimental",
+  },
+  {
+    name: "hytale_validate_model",
+    description:
+      "Validates the current Hytale model against Hytale engine constraints (node count, UV sizes, etc.).",
+    annotations: {
+      title: "Validate Hytale Model",
+      readOnlyHint: true,
+    },
+    parameters: emptyParametersSchema,
+    status: "experimental",
+  },
+  {
+    name: "hytale_set_cube_properties",
+    description:
+      "Sets Hytale-specific properties on a cube: shading_mode (flat, standard, fullbright, reflective) and double_sided.",
+    annotations: {
+      title: "Set Hytale Cube Properties",
+      destructiveHint: false,
+    },
+    parameters: hytaleSetCubePropertiesParametersSchema,
+    status: "experimental",
+  },
+  {
+    name: "hytale_get_cube_properties",
+    description: "Gets Hytale-specific properties from a cube (shading_mode, double_sided).",
+    annotations: {
+      title: "Get Hytale Cube Properties",
+      readOnlyHint: true,
+    },
+    parameters: hytaleGetCubePropertiesParametersSchema,
+    status: "experimental",
+  },
+  {
+    name: "hytale_create_quad",
+    description:
+      "Creates a Hytale quad (2D plane) with a specified normal direction. Quads are single-face elements useful for flat surfaces.",
+    annotations: {
+      title: "Create Hytale Quad",
+      destructiveHint: false,
+    },
+    parameters: hytaleCreateQuadParametersSchema,
+    status: "experimental",
+  },
+  {
+    name: "hytale_list_attachments",
+    description: "Lists all attachment collections in the current Hytale project.",
+    annotations: {
+      title: "List Hytale Attachments",
+      readOnlyHint: true,
+    },
+    parameters: emptyParametersSchema,
+    status: "experimental",
+  },
+  {
+    name: "hytale_set_attachment_piece",
+    description:
+      "Marks or unmarks a group as an attachment piece. Attachment pieces attach to like-named bones in the main model.",
+    annotations: {
+      title: "Set Attachment Piece",
+      destructiveHint: false,
+    },
+    parameters: hytaleSetAttachmentPieceParametersSchema,
+    status: "experimental",
+  },
+  {
+    name: "hytale_list_attachment_pieces",
+    description: "Lists all groups marked as attachment pieces.",
+    annotations: {
+      title: "List Attachment Pieces",
+      readOnlyHint: true,
+    },
+    parameters: emptyParametersSchema,
+    status: "experimental",
+  },
+  {
+    name: "hytale_create_visibility_keyframe",
+    description:
+      "Creates a visibility keyframe for a bone. Hytale supports toggling node visibility at keyframes.",
+    annotations: {
+      title: "Create Visibility Keyframe",
+      destructiveHint: false,
+    },
+    parameters: hytaleCreateVisibilityKeyframeParametersSchema,
+    status: "experimental",
+  },
+  {
+    name: "hytale_set_animation_loop",
+    description:
+      'Sets the loop mode for a Hytale animation. Hytale supports "loop" (continuous) or "hold" (freeze on last frame).',
+    annotations: {
+      title: "Set Animation Loop Mode",
+      destructiveHint: false,
+    },
+    parameters: hytaleSetAnimationLoopParametersSchema,
+    status: "experimental",
+  },
+  {
+    name: "hytale_set_cube_stretch",
+    description:
+      "Sets the stretch values for a cube. Hytale uses stretch instead of float sizes for better UV handling.",
+    annotations: {
+      title: "Set Cube Stretch",
+      destructiveHint: false,
+    },
+    parameters: hytaleSetCubeStretchParametersSchema,
+    status: "experimental",
+  },
+  {
+    name: "hytale_get_cube_stretch",
+    description: "Gets the stretch values for a cube.",
+    annotations: {
+      title: "Get Cube Stretch",
+      readOnlyHint: true,
+    },
+    parameters: hytaleGetCubeStretchParametersSchema,
+    status: "experimental",
+  },
+];
 
 /**
  * Register Hytale-specific tools.
@@ -41,15 +270,9 @@ export function registerHytaleTools() {
   // ============================================================================
 
   createTool(
-    "hytale_get_format_info",
+    hytaleToolDocs[0].name,
     {
-      description:
-        "Returns information about the current Hytale format. Requires the Hytale plugin and a Hytale format project to be active.",
-      annotations: {
-        title: "Get Hytale Format Info",
-        readOnlyHint: true,
-      },
-      parameters: z.object({}),
+      ...hytaleToolDocs[0],
       async execute() {
         if (!isHytaleFormat()) {
           throw new Error(
@@ -80,19 +303,13 @@ export function registerHytaleTools() {
         });
       },
     },
-    "experimental"
+    hytaleToolDocs[0].status
   );
 
   createTool(
-    "hytale_validate_model",
+    hytaleToolDocs[1].name,
     {
-      description:
-        "Validates the current Hytale model against Hytale engine constraints (node count, UV sizes, etc.).",
-      annotations: {
-        title: "Validate Hytale Model",
-        readOnlyHint: true,
-      },
-      parameters: z.object({}),
+      ...hytaleToolDocs[1],
       async execute() {
         if (!isHytaleFormat()) {
           throw new Error("Current project is not using a Hytale format.");
@@ -131,7 +348,7 @@ export function registerHytaleTools() {
         });
       },
     },
-    "experimental"
+    hytaleToolDocs[1].status
   );
 
   // ============================================================================
@@ -139,28 +356,9 @@ export function registerHytaleTools() {
   // ============================================================================
 
   createTool(
-    "hytale_set_cube_properties",
+    hytaleToolDocs[2].name,
     {
-      description:
-        "Sets Hytale-specific properties on a cube: shading_mode (flat, standard, fullbright, reflective) and double_sided.",
-      annotations: {
-        title: "Set Hytale Cube Properties",
-        destructiveHint: false,
-      },
-      parameters: z.object({
-        cube_id: z
-          .string()
-          .describe("ID or name of the cube to modify. Uses selected cube if not provided.")
-          .optional(),
-        shading_mode: z
-          .enum(HYTALE_SHADING_MODES)
-          .describe("Shading mode: flat (no lighting), standard (normal), fullbright (emissive), reflective")
-          .optional(),
-        double_sided: z
-          .boolean()
-          .describe("Whether to render both sides of faces")
-          .optional(),
-      }),
+      ...hytaleToolDocs[2],
       async execute({ cube_id, shading_mode, double_sided }) {
         if (!isHytaleFormat()) {
           throw new Error("Current project is not using a Hytale format.");
@@ -204,23 +402,13 @@ export function registerHytaleTools() {
         });
       },
     },
-    "experimental"
+    hytaleToolDocs[2].status
   );
 
   createTool(
-    "hytale_get_cube_properties",
+    hytaleToolDocs[3].name,
     {
-      description: "Gets Hytale-specific properties from a cube (shading_mode, double_sided).",
-      annotations: {
-        title: "Get Hytale Cube Properties",
-        readOnlyHint: true,
-      },
-      parameters: z.object({
-        cube_id: z
-          .string()
-          .describe("ID or name of the cube. Uses selected cube if not provided.")
-          .optional(),
-      }),
+      ...hytaleToolDocs[3],
       async execute({ cube_id }) {
         if (!isHytaleFormat()) {
           throw new Error("Current project is not using a Hytale format.");
@@ -250,7 +438,7 @@ export function registerHytaleTools() {
         });
       },
     },
-    "experimental"
+    hytaleToolDocs[3].status
   );
 
   // ============================================================================
@@ -258,39 +446,9 @@ export function registerHytaleTools() {
   // ============================================================================
 
   createTool(
-    "hytale_create_quad",
+    hytaleToolDocs[4].name,
     {
-      description:
-        "Creates a Hytale quad (2D plane) with a specified normal direction. Quads are single-face elements useful for flat surfaces.",
-      annotations: {
-        title: "Create Hytale Quad",
-        destructiveHint: false,
-      },
-      parameters: z.object({
-        name: z.string().describe("Name for the quad"),
-        position: z
-          .array(z.number())
-          .length(3)
-          .describe("Position [x, y, z]")
-          .default([0, 0, 0]),
-        normal: z
-          .enum(HYTALE_QUAD_NORMALS)
-          .describe("Normal direction: +X, -X, +Y, -Y, +Z, -Z")
-          .default("+Y"),
-        size: z
-          .array(z.number())
-          .length(2)
-          .describe("Size [width, height]")
-          .default([16, 16]),
-        group: z
-          .string()
-          .describe("Parent group/bone name")
-          .optional(),
-        double_sided: z
-          .boolean()
-          .describe("Whether to render both sides")
-          .default(true),
-      }),
+      ...hytaleToolDocs[4],
       async execute({ name, position, normal, size, group, double_sided }) {
         if (!isHytaleFormat()) {
           throw new Error("Current project is not using a Hytale format.");
@@ -367,7 +525,7 @@ export function registerHytaleTools() {
         });
       },
     },
-    "experimental"
+    hytaleToolDocs[4].status
   );
 
   // ============================================================================
@@ -375,14 +533,9 @@ export function registerHytaleTools() {
   // ============================================================================
 
   createTool(
-    "hytale_list_attachments",
+    hytaleToolDocs[5].name,
     {
-      description: "Lists all attachment collections in the current Hytale project.",
-      annotations: {
-        title: "List Hytale Attachments",
-        readOnlyHint: true,
-      },
-      parameters: z.object({}),
+      ...hytaleToolDocs[5],
       async execute() {
         if (!isHytaleFormat()) {
           throw new Error("Current project is not using a Hytale format.");
@@ -402,22 +555,13 @@ export function registerHytaleTools() {
         });
       },
     },
-    "experimental"
+    hytaleToolDocs[5].status
   );
 
   createTool(
-    "hytale_set_attachment_piece",
+    hytaleToolDocs[6].name,
     {
-      description:
-        "Marks or unmarks a group as an attachment piece. Attachment pieces attach to like-named bones in the main model.",
-      annotations: {
-        title: "Set Attachment Piece",
-        destructiveHint: false,
-      },
-      parameters: z.object({
-        group_name: z.string().describe("Name of the group to mark as attachment piece"),
-        is_piece: z.boolean().describe("Whether the group is an attachment piece"),
-      }),
+      ...hytaleToolDocs[6],
       async execute({ group_name, is_piece }) {
         if (!isHytaleFormat()) {
           throw new Error("Current project is not using a Hytale format.");
@@ -440,18 +584,13 @@ export function registerHytaleTools() {
         });
       },
     },
-    "experimental"
+    hytaleToolDocs[6].status
   );
 
   createTool(
-    "hytale_list_attachment_pieces",
+    hytaleToolDocs[7].name,
     {
-      description: "Lists all groups marked as attachment pieces.",
-      annotations: {
-        title: "List Attachment Pieces",
-        readOnlyHint: true,
-      },
-      parameters: z.object({}),
+      ...hytaleToolDocs[7],
       async execute() {
         if (!isHytaleFormat()) {
           throw new Error("Current project is not using a Hytale format.");
@@ -469,7 +608,7 @@ export function registerHytaleTools() {
         });
       },
     },
-    "experimental"
+    hytaleToolDocs[7].status
   );
 
   // ============================================================================
@@ -477,23 +616,9 @@ export function registerHytaleTools() {
   // ============================================================================
 
   createTool(
-    "hytale_create_visibility_keyframe",
+    hytaleToolDocs[8].name,
     {
-      description:
-        "Creates a visibility keyframe for a bone. Hytale supports toggling node visibility at keyframes.",
-      annotations: {
-        title: "Create Visibility Keyframe",
-        destructiveHint: false,
-      },
-      parameters: z.object({
-        bone_name: z.string().describe("Name of the bone/group"),
-        time: z.number().describe("Time in seconds for the keyframe"),
-        visible: z.boolean().describe("Whether the bone is visible at this keyframe"),
-        animation_id: z
-          .string()
-          .describe("Animation UUID or name. Uses current animation if not provided.")
-          .optional(),
-      }),
+      ...hytaleToolDocs[8],
       async execute({ bone_name, time, visible, animation_id }) {
         if (!isHytaleFormat()) {
           throw new Error("Current project is not using a Hytale format.");
@@ -554,27 +679,13 @@ export function registerHytaleTools() {
         });
       },
     },
-    "experimental"
+    hytaleToolDocs[8].status
   );
 
   createTool(
-    "hytale_set_animation_loop",
+    hytaleToolDocs[9].name,
     {
-      description:
-        'Sets the loop mode for a Hytale animation. Hytale supports "loop" (continuous) or "hold" (freeze on last frame).',
-      annotations: {
-        title: "Set Animation Loop Mode",
-        destructiveHint: false,
-      },
-      parameters: z.object({
-        animation_id: z
-          .string()
-          .describe("Animation UUID or name. Uses current animation if not provided.")
-          .optional(),
-        loop_mode: z
-          .enum(["loop", "hold", "once"])
-          .describe("Loop mode: loop (continuous), hold (freeze on last frame), once (play once)"),
-      }),
+      ...hytaleToolDocs[9],
       async execute({ animation_id, loop_mode }) {
         if (!isHytaleFormat()) {
           throw new Error("Current project is not using a Hytale format.");
@@ -614,7 +725,7 @@ export function registerHytaleTools() {
         });
       },
     },
-    "experimental"
+    hytaleToolDocs[9].status
   );
 
   // ============================================================================
@@ -622,24 +733,9 @@ export function registerHytaleTools() {
   // ============================================================================
 
   createTool(
-    "hytale_set_cube_stretch",
+    hytaleToolDocs[10].name,
     {
-      description:
-        "Sets the stretch values for a cube. Hytale uses stretch instead of float sizes for better UV handling.",
-      annotations: {
-        title: "Set Cube Stretch",
-        destructiveHint: false,
-      },
-      parameters: z.object({
-        cube_id: z
-          .string()
-          .describe("ID or name of the cube. Uses selected cube if not provided.")
-          .optional(),
-        stretch: z
-          .array(z.number())
-          .length(3)
-          .describe("Stretch values [x, y, z]"),
-      }),
+      ...hytaleToolDocs[10],
       async execute({ cube_id, stretch }) {
         if (!isHytaleFormat()) {
           throw new Error("Current project is not using a Hytale format.");
@@ -680,23 +776,13 @@ export function registerHytaleTools() {
         });
       },
     },
-    "experimental"
+    hytaleToolDocs[10].status
   );
 
   createTool(
-    "hytale_get_cube_stretch",
+    hytaleToolDocs[11].name,
     {
-      description: "Gets the stretch values for a cube.",
-      annotations: {
-        title: "Get Cube Stretch",
-        readOnlyHint: true,
-      },
-      parameters: z.object({
-        cube_id: z
-          .string()
-          .describe("ID or name of the cube. Uses selected cube if not provided.")
-          .optional(),
-      }),
+      ...hytaleToolDocs[11],
       async execute({ cube_id }) {
         if (!isHytaleFormat()) {
           throw new Error("Current project is not using a Hytale format.");
@@ -728,7 +814,7 @@ export function registerHytaleTools() {
         });
       },
     },
-    "experimental"
+    hytaleToolDocs[11].status
   );
 
   console.log("[MCP] Hytale tools registered successfully");

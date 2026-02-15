@@ -1,7 +1,7 @@
 /// <reference types="three" />
 /// <reference types="blockbench-types" />
 import { z } from "zod";
-import { createTool } from "@/lib/factories";
+import { createTool, type ToolSpec } from "@/lib/factories";
 import { findGroupOrThrow } from "@/lib/util";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
 import {
@@ -17,42 +17,318 @@ import {
   keyframeDataSchema,
 } from "@/lib/zodObjects";
 
-export function registerAnimationTools() {
-createTool(
-  "create_animation",
+export const createAnimationParameters = z.object({
+  name: z.string().describe("Name of the animation"),
+  loop: z
+    .boolean()
+    .default(false)
+    .describe("Whether the animation should loop"),
+  animation_length: z
+    .number()
+    .optional()
+    .describe("Length of the animation in seconds"),
+  bones: z
+    .record(
+      z.array(
+        z.object({
+          time: z.number(),
+          position: vector3Schema.optional(),
+          rotation: vector3Schema.optional(),
+          scale: z.union([vector3Schema, z.number()]).optional(),
+        })
+      )
+    )
+    .describe("Keyframes for each bone"),
+  particle_effects: z
+    .record(z.string().describe("Effect name"))
+    .optional()
+    .describe("Particle effects with timestamps as keys"),
+});
+
+export const manageKeyframesParameters = z.object({
+  animation_id: animationIdOptionalSchema,
+  action: z
+    .enum(["create", "delete", "edit", "select"])
+    .describe("Action to perform on keyframes."),
+  bone_name: boneNameSchema.describe("Name of the bone/group to manage keyframes for."),
+  channel: animationChannelEnum.describe("Animation channel to modify."),
+  keyframes: z
+    .array(keyframeDataSchema)
+    .describe("Keyframe data for the action."),
+});
+
+export const animationGraphEditorParameters = z.object({
+  animation_id: animationIdOptionalSchema,
+  bone_name: boneNameSchema.describe("Name of the bone/group to modify curves for."),
+  channel: animationChannelEnum.describe("Animation channel to modify."),
+  axis: axisWithAllEnum.default("all").describe("Axis to modify curves for."),
+  action: z
+    .enum([
+      "smooth",
+      "linear",
+      "ease_in",
+      "ease_out",
+      "ease_in_out",
+      "stepped",
+      "custom",
+    ])
+    .describe("Type of curve modification to apply."),
+  keyframe_range: timeRangeSchema
+    .optional()
+    .describe(
+      "Time range to apply the curve modification. If not provided, applies to all keyframes."
+    ),
+  custom_curve: z
+    .object({
+      control_point_1: z
+        .array(z.number())
+        .length(2)
+        .describe("First control point [time, value]."),
+      control_point_2: z
+        .array(z.number())
+        .length(2)
+        .describe("Second control point [time, value]."),
+    })
+    .optional()
+    .describe(
+      "Custom bezier curve control points (only for 'custom' action)."
+    ),
+});
+
+export const boneRiggingParameters = z.object({
+  action: z
+    .enum([
+      "create",
+      "parent",
+      "unparent",
+      "delete",
+      "rename",
+      "set_pivot",
+      "set_ik",
+      "mirror",
+    ])
+    .describe("Action to perform on the bone structure."),
+  bone_data: z
+    .object({
+      name: z.string().describe("Name of the bone."),
+      parent: z.string().optional().describe("Parent bone name."),
+      origin: vector3Schema.optional().describe("Pivot point of the bone."),
+      rotation: vector3Schema.optional().describe("Initial rotation of the bone."),
+      children: z
+        .array(z.string())
+        .optional()
+        .describe("Names of elements to add to this bone."),
+      ik_enabled: z
+        .boolean()
+        .optional()
+        .describe("Enable inverse kinematics for this bone."),
+      ik_target: z
+        .string()
+        .optional()
+        .describe("Target bone for IK chain."),
+      mirror_axis: axisEnum.optional().describe("Axis to mirror the bone across."),
+    })
+    .describe("Bone configuration data."),
+});
+
+export const animationTimelineParameters = z.object({
+  action: z
+    .enum([
+      "play",
+      "pause",
+      "stop",
+      "set_time",
+      "set_length",
+      "set_fps",
+      "loop",
+      "select_range",
+    ])
+    .describe("Timeline action to perform."),
+  time: z
+    .number()
+    .optional()
+    .describe("Time in seconds (for set_time action)."),
+  length: z
+    .number()
+    .optional()
+    .describe("Animation length in seconds (for set_length action)."),
+  fps: z
+    .number()
+    .min(1)
+    .max(120)
+    .optional()
+    .describe("Frames per second (for set_fps action)."),
+  loop_mode: loopModeEnum.optional().describe("Loop mode for the animation."),
+  range: timeRangeSchema.optional().describe("Time range for selection."),
+});
+
+export const batchKeyframeOperationsParameters = z.object({
+  selection: z
+    .enum(["all", "selected", "range", "pattern"])
+    .default("selected")
+    .describe("Which keyframes to operate on."),
+  range: timeRangeSchema.optional().describe("Time range for keyframe selection."),
+  pattern: z
+    .object({
+      interval: z.number().describe("Time interval between keyframes."),
+      offset: z
+        .number()
+        .optional()
+        .default(0)
+        .describe("Time offset for the pattern."),
+    })
+    .optional()
+    .describe("Pattern-based selection."),
+  operation: z
+    .enum(["offset", "scale", "reverse", "mirror", "smooth", "bake"])
+    .describe("Operation to perform on keyframes."),
+  parameters: z
+    .object({
+      offset_time: z.number().optional().describe("Time offset to apply."),
+      offset_values: vector3Schema.optional().describe("Value offset to apply."),
+      scale_factor: z
+        .number()
+        .optional()
+        .describe("Scale factor for time or values."),
+      scale_pivot: z
+        .number()
+        .optional()
+        .describe("Pivot point for scaling."),
+      mirror_axis: axisEnum.optional().describe("Axis to mirror values across."),
+      bake_interval: z
+        .number()
+        .optional()
+        .describe("Interval for baking keyframes."),
+    })
+    .optional()
+    .describe("Operation-specific parameters."),
+});
+
+export const animationCopyPasteParameters = z.object({
+  action: z
+    .enum(["copy", "paste", "mirror_paste"])
+    .describe("Copy or paste action."),
+  source: z
+    .object({
+      animation: z
+        .string()
+        .optional()
+        .describe("Source animation name or UUID."),
+      bone: z.string().describe("Source bone name."),
+      channels: z
+        .array(animationChannelEnum)
+        .optional()
+        .default(["rotation", "position", "scale"])
+        .describe("Channels to copy."),
+      time_range: timeRangeSchema
+        .optional()
+        .describe(
+          "Time range to copy. If not provided, copies all keyframes."
+        ),
+    })
+    .optional()
+    .describe("Source data for copy operation."),
+  target: z
+    .object({
+      animation: z
+        .string()
+        .optional()
+        .describe("Target animation name or UUID."),
+      bone: z.string().describe("Target bone name."),
+      time_offset: z
+        .number()
+        .optional()
+        .default(0)
+        .describe("Time offset for pasted keyframes."),
+      mirror_axis: axisEnum.optional().describe("Axis to mirror across for mirror_paste."),
+    })
+    .optional()
+    .describe("Target data for paste operation."),
+});
+
+export const animationToolDocs: ToolSpec[] = [
   {
+    name: "create_animation",
     description: "Creates a new animation with keyframes for bones.",
     annotations: {
       title: "Create Animation",
       destructiveHint: true,
     },
-    parameters: z.object({
-      name: z.string().describe("Name of the animation"),
-      loop: z
-        .boolean()
-        .default(false)
-        .describe("Whether the animation should loop"),
-      animation_length: z
-        .number()
-        .optional()
-        .describe("Length of the animation in seconds"),
-      bones: z
-        .record(
-          z.array(
-            z.object({
-              time: z.number(),
-              position: vector3Schema.optional(),
-              rotation: vector3Schema.optional(),
-              scale: z.union([vector3Schema, z.number()]).optional(),
-            })
-          )
-        )
-        .describe("Keyframes for each bone"),
-      particle_effects: z
-        .record(z.string().describe("Effect name"))
-        .optional()
-        .describe("Particle effects with timestamps as keys"),
-    }),
+    parameters: createAnimationParameters,
+    status: STATUS_STABLE,
+  },
+  {
+    name: "manage_keyframes",
+    description:
+      "Creates, deletes, or edits keyframes in the animation timeline for specific bones and channels.",
+    annotations: {
+      title: "Manage Keyframes",
+      destructiveHint: true,
+    },
+    parameters: manageKeyframesParameters,
+    status: STATUS_EXPERIMENTAL,
+  },
+  {
+    name: "animation_graph_editor",
+    description:
+      "Controls animation curves in the graph editor for fine-tuning animations.",
+    annotations: {
+      title: "Animation Graph Editor",
+      destructiveHint: true,
+    },
+    parameters: animationGraphEditorParameters,
+    status: STATUS_EXPERIMENTAL,
+  },
+  {
+    name: "bone_rigging",
+    description:
+      "Creates and manipulates the bone structure (rig) of a model for animation.",
+    annotations: {
+      title: "Bone Rigging",
+      destructiveHint: true,
+    },
+    parameters: boneRiggingParameters,
+    status: STATUS_EXPERIMENTAL,
+  },
+  {
+    name: "animation_timeline",
+    description:
+      "Controls the animation timeline, including playback, time scrubbing, and timeline settings.",
+    annotations: {
+      title: "Animation Timeline",
+      destructiveHint: true,
+    },
+    parameters: animationTimelineParameters,
+    status: STATUS_EXPERIMENTAL,
+  },
+  {
+    name: "batch_keyframe_operations",
+    description: "Performs batch operations on multiple keyframes at once.",
+    annotations: {
+      title: "Batch Keyframe Operations",
+      destructiveHint: true,
+    },
+    parameters: batchKeyframeOperationsParameters,
+    status: STATUS_EXPERIMENTAL,
+  },
+  {
+    name: "animation_copy_paste",
+    description:
+      "Copies and pastes animation data between bones or animations.",
+    annotations: {
+      title: "Animation Copy/Paste",
+      destructiveHint: true,
+    },
+    parameters: animationCopyPasteParameters,
+    status: STATUS_EXPERIMENTAL,
+  },
+];
+
+export function registerAnimationTools() {
+createTool(
+  animationToolDocs[0].name,
+  {
+    ...animationToolDocs[0],
     async execute({ name, loop, animation_length, bones, particle_effects }) {
       const animationData = {
         loop,
@@ -100,29 +376,13 @@ createTool(
       }`;
     },
   },
-  STATUS_STABLE
+  animationToolDocs[0].status
 );
 
 createTool(
-  "manage_keyframes",
+  animationToolDocs[1].name,
   {
-    description:
-      "Creates, deletes, or edits keyframes in the animation timeline for specific bones and channels.",
-    annotations: {
-      title: "Manage Keyframes",
-      destructiveHint: true,
-    },
-    parameters: z.object({
-      animation_id: animationIdOptionalSchema,
-      action: z
-        .enum(["create", "delete", "edit", "select"])
-        .describe("Action to perform on keyframes."),
-      bone_name: boneNameSchema.describe("Name of the bone/group to manage keyframes for."),
-      channel: animationChannelEnum.describe("Animation channel to modify."),
-      keyframes: z
-        .array(keyframeDataSchema)
-        .describe("Keyframe data for the action."),
-    }),
+    ...animationToolDocs[1],
     async execute({ animation_id, action, bone_name, channel, keyframes }) {
       // Find or select animation
       const animation = animation_id
@@ -242,55 +502,13 @@ createTool(
       return `Successfully performed ${action} on ${keyframes.length} keyframes for ${bone_name}.${channel}`;
     },
   },
-  STATUS_EXPERIMENTAL
+  animationToolDocs[1].status
 );
 
 createTool(
-  "animation_graph_editor",
+  animationToolDocs[2].name,
   {
-    description:
-      "Controls animation curves in the graph editor for fine-tuning animations.",
-    annotations: {
-      title: "Animation Graph Editor",
-      destructiveHint: true,
-    },
-    parameters: z.object({
-      animation_id: animationIdOptionalSchema,
-      bone_name: boneNameSchema.describe("Name of the bone/group to modify curves for."),
-      channel: animationChannelEnum.describe("Animation channel to modify."),
-      axis: axisWithAllEnum.default("all").describe("Axis to modify curves for."),
-      action: z
-        .enum([
-          "smooth",
-          "linear",
-          "ease_in",
-          "ease_out",
-          "ease_in_out",
-          "stepped",
-          "custom",
-        ])
-        .describe("Type of curve modification to apply."),
-      keyframe_range: timeRangeSchema
-        .optional()
-        .describe(
-          "Time range to apply the curve modification. If not provided, applies to all keyframes."
-        ),
-      custom_curve: z
-        .object({
-          control_point_1: z
-            .array(z.number())
-            .length(2)
-            .describe("First control point [time, value]."),
-          control_point_2: z
-            .array(z.number())
-            .length(2)
-            .describe("Second control point [time, value]."),
-        })
-        .optional()
-        .describe(
-          "Custom bezier curve control points (only for 'custom' action)."
-        ),
-    }),
+    ...animationToolDocs[2],
     async execute({
       animation_id,
       bone_name,
@@ -401,53 +619,13 @@ createTool(
       return `Applied ${action} curve to ${keyframes.length} keyframes in ${bone_name}.${channel}`;
     },
   },
-  STATUS_EXPERIMENTAL
+  animationToolDocs[2].status
 );
 
 createTool(
-  "bone_rigging",
+  animationToolDocs[3].name,
   {
-    description:
-      "Creates and manipulates the bone structure (rig) of a model for animation.",
-    annotations: {
-      title: "Bone Rigging",
-      destructiveHint: true,
-    },
-    parameters: z.object({
-      action: z
-        .enum([
-          "create",
-          "parent",
-          "unparent",
-          "delete",
-          "rename",
-          "set_pivot",
-          "set_ik",
-          "mirror",
-        ])
-        .describe("Action to perform on the bone structure."),
-      bone_data: z
-        .object({
-          name: z.string().describe("Name of the bone."),
-          parent: z.string().optional().describe("Parent bone name."),
-          origin: vector3Schema.optional().describe("Pivot point of the bone."),
-          rotation: vector3Schema.optional().describe("Initial rotation of the bone."),
-          children: z
-            .array(z.string())
-            .optional()
-            .describe("Names of elements to add to this bone."),
-          ik_enabled: z
-            .boolean()
-            .optional()
-            .describe("Enable inverse kinematics for this bone."),
-          ik_target: z
-            .string()
-            .optional()
-            .describe("Target bone for IK chain."),
-          mirror_axis: axisEnum.optional().describe("Axis to mirror the bone across."),
-        })
-        .describe("Bone configuration data."),
-    }),
+    ...animationToolDocs[3],
     async execute({ action, bone_data }) {
       Undo.initEdit({
         outliner: true,
@@ -586,48 +764,13 @@ createTool(
       return result;
     },
   },
-  STATUS_EXPERIMENTAL
+  animationToolDocs[3].status
 );
 
 createTool(
-  "animation_timeline",
+  animationToolDocs[4].name,
   {
-    description:
-      "Controls the animation timeline, including playback, time scrubbing, and timeline settings.",
-    annotations: {
-      title: "Animation Timeline",
-      destructiveHint: true,
-    },
-    parameters: z.object({
-      action: z
-        .enum([
-          "play",
-          "pause",
-          "stop",
-          "set_time",
-          "set_length",
-          "set_fps",
-          "loop",
-          "select_range",
-        ])
-        .describe("Timeline action to perform."),
-      time: z
-        .number()
-        .optional()
-        .describe("Time in seconds (for set_time action)."),
-      length: z
-        .number()
-        .optional()
-        .describe("Animation length in seconds (for set_length action)."),
-      fps: z
-        .number()
-        .min(1)
-        .max(120)
-        .optional()
-        .describe("Frames per second (for set_fps action)."),
-      loop_mode: loopModeEnum.optional().describe("Loop mode for the animation."),
-      range: timeRangeSchema.optional().describe("Time range for selection."),
-    }),
+    ...animationToolDocs[4],
     async execute({ action, time, length, fps, loop_mode, range }) {
       if (!Animation.selected) {
         throw new Error("No animation selected.");
@@ -706,58 +849,13 @@ createTool(
       return result;
     },
   },
-  STATUS_EXPERIMENTAL
+  animationToolDocs[4].status
 );
 
 createTool(
-  "batch_keyframe_operations",
+  animationToolDocs[5].name,
   {
-    description: "Performs batch operations on multiple keyframes at once.",
-    annotations: {
-      title: "Batch Keyframe Operations",
-      destructiveHint: true,
-    },
-    parameters: z.object({
-      selection: z
-        .enum(["all", "selected", "range", "pattern"])
-        .default("selected")
-        .describe("Which keyframes to operate on."),
-      range: timeRangeSchema.optional().describe("Time range for keyframe selection."),
-      pattern: z
-        .object({
-          interval: z.number().describe("Time interval between keyframes."),
-          offset: z
-            .number()
-            .optional()
-            .default(0)
-            .describe("Time offset for the pattern."),
-        })
-        .optional()
-        .describe("Pattern-based selection."),
-      operation: z
-        .enum(["offset", "scale", "reverse", "mirror", "smooth", "bake"])
-        .describe("Operation to perform on keyframes."),
-      parameters: z
-        .object({
-          offset_time: z.number().optional().describe("Time offset to apply."),
-          offset_values: vector3Schema.optional().describe("Value offset to apply."),
-          scale_factor: z
-            .number()
-            .optional()
-            .describe("Scale factor for time or values."),
-          scale_pivot: z
-            .number()
-            .optional()
-            .describe("Pivot point for scaling."),
-          mirror_axis: axisEnum.optional().describe("Axis to mirror values across."),
-          bake_interval: z
-            .number()
-            .optional()
-            .describe("Interval for baking keyframes."),
-        })
-        .optional()
-        .describe("Operation-specific parameters."),
-    }),
+    ...animationToolDocs[5],
     async execute({ selection, range, pattern, operation, parameters = {} }) {
       if (!Animation.selected) {
         throw new Error("No animation selected.");
@@ -907,59 +1005,13 @@ createTool(
       return `Performed ${operation} on ${keyframes.length} keyframes`;
     },
   },
-  STATUS_EXPERIMENTAL
+  animationToolDocs[5].status
 );
 
 createTool(
-  "animation_copy_paste",
+  animationToolDocs[6].name,
   {
-    description:
-      "Copies and pastes animation data between bones or animations.",
-    annotations: {
-      title: "Animation Copy/Paste",
-      destructiveHint: true,
-    },
-    parameters: z.object({
-      action: z
-        .enum(["copy", "paste", "mirror_paste"])
-        .describe("Copy or paste action."),
-      source: z
-        .object({
-          animation: z
-            .string()
-            .optional()
-            .describe("Source animation name or UUID."),
-          bone: z.string().describe("Source bone name."),
-          channels: z
-            .array(animationChannelEnum)
-            .optional()
-            .default(["rotation", "position", "scale"])
-            .describe("Channels to copy."),
-          time_range: timeRangeSchema
-            .optional()
-            .describe(
-              "Time range to copy. If not provided, copies all keyframes."
-            ),
-        })
-        .optional()
-        .describe("Source data for copy operation."),
-      target: z
-        .object({
-          animation: z
-            .string()
-            .optional()
-            .describe("Target animation name or UUID."),
-          bone: z.string().describe("Target bone name."),
-          time_offset: z
-            .number()
-            .optional()
-            .default(0)
-            .describe("Time offset for pasted keyframes."),
-          mirror_axis: axisEnum.optional().describe("Axis to mirror across for mirror_paste."),
-        })
-        .optional()
-        .describe("Target data for paste operation."),
-    }),
+    ...animationToolDocs[6],
     async execute({ action, source, target }) {
       // Static storage for copied data between copy/paste operations
       // @ts-ignore
@@ -1139,6 +1191,6 @@ createTool(
       }
     },
   },
-  STATUS_EXPERIMENTAL
+  animationToolDocs[6].status
 );
 }

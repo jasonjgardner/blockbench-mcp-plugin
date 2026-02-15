@@ -8,8 +8,6 @@ import { minifySVG } from "../build/utils";
  */
 export function getIcon(): string {
   const iconPath = resolve(import.meta.dir, "..", "icon.svg");
-  const svg = readFileSync(iconPath, "utf-8");
-  const minified = minifySVG(svg);
-  const base64 = Buffer.from(minified).toString("base64");
-  return `data:image/svg+xml;base64,${base64}`;
+
+  return `data:image/svg+xml;base64,${btoa(minifySVG(readFileSync(iconPath, "utf-8")))}`;
 }

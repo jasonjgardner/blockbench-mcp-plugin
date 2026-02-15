@@ -1,6 +1,6 @@
 {
   "name": "blockbench-mcp",
-  "version": "1.4.2",
+  "version": "1.5.0",
   "description": "Blockbench MCP server plugin",
   "keywords": [
     "Blockbench",
@@ -15,6 +15,9 @@
     "dev": "bun run ./build --sourcemap",
     "dev:watch": "bun run dev --watch",
     "build": "bun run ./build --minify",
+    "docs:build": "bun run ./build/docs.ts",
+    "docs:serve": "bun run docs/index.html",
+    "docs": "bun run docs:build && bun run docs:serve",
     "inspect": "bunx @modelcontextprotocol/inspector"
   },
   "dependencies": {
@@ -22,9 +25,10 @@
     "@modelcontextprotocol/sdk": "^1.25.3"
   },
   "devDependencies": {
-    "blockbench-types": "^5.0.6",
-    "typescript": "^5.9.3",
     "@types/bun": "^1.3.8",
-    "tinycolor2": "^1.6.0"
+    "blockbench-types": "^5.0.6",
+    "tinycolor2": "^1.6.0",
+    "typescript": "^5.9.3",
+    "zod-to-json-schema": "^3.25.1"
   }
 }

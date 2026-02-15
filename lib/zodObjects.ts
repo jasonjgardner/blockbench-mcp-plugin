@@ -56,7 +56,7 @@ export const interpolationEnum = z.enum(["linear", "catmullrom", "bezier", "step
 export const axisEnum = z.enum(["x", "y", "z"]);
 
 /** 3D axis with 'all' option */
-export const axisWithAllEnum = z.enum(["x", "y", "z", "all"]);
+export const axisWithAllEnum = axisEnum.or(z.literal("all"));
 
 /** Animation channels */
 export const animationChannelEnum = z.enum(["rotation", "position", "scale"]);
@@ -196,6 +196,23 @@ export const boneNameSchema = z
   .string()
   .describe("Name of the bone/group.");
 
+/** Optional cube ID with fallback to selected */
+export const cubeIdOptionalSchema = z
+  .string()
+  .optional()
+  .describe("ID or name of the cube. If not provided, uses selected cube.");
+
+/** Required cube ID */
+export const cubeIdSchema = z
+  .string()
+  .describe("ID or name of the cube.");
+
+/** Face keys array (optional) */
+export const faceKeysOptionalSchema = z
+  .array(z.string())
+  .optional()
+  .describe("Specific face keys. If not provided, uses all/selected faces.");
+
 // ============================================================================
 // Common Parameter Schemas
 // ============================================================================
@@ -229,6 +246,24 @@ export const coordinateSchema = z.object({
   x: z.number().describe("X coordinate."),
   y: z.number().describe("Y coordinate."),
 });
+
+/** UV rotation angle enum */
+export const uvRotationAngleEnum = z.enum(["-90", "90", "180"]);
+
+/** Mouse button enum */
+export const mouseButtonEnum = z.enum(["left", "right"]);
+
+/** Stretch values for Hytale cubes */
+export const stretchSchema = z
+  .array(z.number())
+  .length(3)
+  .describe("Stretch values [x, y, z].");
+
+/** Size 2D schema */
+export const size2dSchema = z
+  .array(z.number())
+  .length(2)
+  .describe("Size [width, height].");
 
 // ============================================================================
 // Composite Schemas (using base schemas)

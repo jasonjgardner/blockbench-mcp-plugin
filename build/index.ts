@@ -1,10 +1,9 @@
-import { build } from "bun";
 import { watch } from "node:fs";
-import { mkdir, access, copyFile, rename, rmdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, copyFile, rename, rm, stat } from "node:fs/promises";
 import { resolve, join, normalize, sep } from "node:path";
-import { argv } from "node:process";
 import { log, c, isCleanMode, isProduction, isWatchMode } from "./utils";
 import { blockbenchCompatPlugin, textFileLoaderPlugin } from "./plugins";
+import { version } from "../package.json";
 
 const OUTPUT_DIR = "./dist";
 // Normalized output dir name for path comparison (strips "./" prefix)
@@ -13,12 +12,13 @@ const entryFile = resolve("./index.ts");
 
 async function cleanOutputDir() {
   try {
-    await access(OUTPUT_DIR);
-    log.header("[Build] Clean");
-    log.step(`Cleaning output directory: ${c.cyan}${OUTPUT_DIR}${c.reset}`);
-    await rmdir(OUTPUT_DIR, { recursive: true });
+    const info = await stat(OUTPUT_DIR);
+    if (info.isDirectory()) {
+      log.header("[Build] Clean");
+      log.step(`Cleaning output directory: ${c.cyan}${OUTPUT_DIR}${c.reset}`);
+      await rm(OUTPUT_DIR, { recursive: true, force: true });
+    }
   } catch {
-    // Directory doesn't exist, no need to clean
     log.dim("[Build] Output directory does not exist, no need to clean.");
   }
 }
@@ -37,12 +37,12 @@ async function buildPlugin(): Promise<boolean> {
   }
 
   // Build the plugin
-  const result = await build({
+  const result = await Bun.build({
     entrypoints: [entryFile],
     outdir: OUTPUT_DIR,
     target: "node",
     format: "cjs",
-    sourcemap: argv.includes("--sourcemap") ? "external" : "none",
+    sourcemap: Bun.argv.includes("--sourcemap") ? "external" : "none",
     plugins: [blockbenchCompatPlugin, textFileLoaderPlugin],
     external: [
       "three",
@@ -96,61 +96,46 @@ async function buildPlugin(): Promise<boolean> {
   const iconSource = resolve("./icon.svg");
   const iconDest = join(OUTPUT_DIR, "icon.svg");
 
-  try {
-    // Check if icon exists and copy it
-    await access(iconSource);
+  if (await Bun.file(iconSource).exists()) {
     await copyFile(iconSource, iconDest);
     log.step(`Copied ${c.cyan}icon.svg${c.reset}`);
-  } catch {
-    // File doesn't exist or couldn't be copied, just continue
   }
 
   const indexFile = join(OUTPUT_DIR, "index.js");
   const mcpFile = join(OUTPUT_DIR, "mcp.js");
 
-  try {
-    // Check if index file exists and rename it
-    await access(indexFile);
+  if (await Bun.file(indexFile).exists()) {
     await rename(indexFile, mcpFile);
     log.step(`Renamed ${c.gray}index.js${c.reset} → ${c.cyan}mcp.js${c.reset}`);
-  } catch {
-    // File doesn't exist or couldn't be renamed
   }
 
-  try {
-    const mcpContent = await readFile(mcpFile, "utf-8");
-    const banner = "let process = requireNativeModule('process');\n";
+  const mcpBunFile = Bun.file(mcpFile);
+  if (await mcpBunFile.exists()) {
+    const mcpContent = await mcpBunFile.text();
+    const banner = /* js */ `/* v${version} */
+let process = requireNativeModule('process');`;
 
     if (!mcpContent.startsWith(banner)) {
-      await writeFile(mcpFile, banner + mcpContent, "utf-8");
+      await Bun.write(mcpFile, banner + mcpContent);
     }
-  } catch (error) {
-    // If the bundle doesn't exist or can't be edited, just continue.
   }
 
   // Rename the sourcemap file
   const indexMapFile = join(OUTPUT_DIR, "index.js.map");
   const mcpMapFile = join(OUTPUT_DIR, "mcp.js.map");
 
-  try {
-    // Check if map file exists and rename it
-    await access(indexMapFile);
+  if (await Bun.file(indexMapFile).exists()) {
     await rename(indexMapFile, mcpMapFile);
     log.step(`Renamed ${c.gray}index.js.map${c.reset} → ${c.cyan}mcp.js.map${c.reset}`);
-  } catch {
-    // File doesn't exist or couldn't be renamed
   }
 
   // Copy the README file
   const readmeSource = resolve("./about.md");
   const readmeDest = join(OUTPUT_DIR, "about.md");
 
-  try {
-    await access(readmeSource);
+  if (await Bun.file(readmeSource).exists()) {
     await copyFile(readmeSource, readmeDest);
     log.step(`Copied ${c.cyan}about.md${c.reset}`);
-  } catch {
-    // File doesn't exist or couldn't be copied
   }
 
   return true;

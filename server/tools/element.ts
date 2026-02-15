@@ -1,7 +1,7 @@
 /// <reference types="three" />
 /// <reference types="blockbench-types" />
 import { z } from "zod";
-import { createTool } from "@/lib/factories";
+import { createTool, type ToolSpec } from "@/lib/factories";
 import { findElementOrThrow } from "@/lib/util";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
 import {
@@ -10,18 +10,91 @@ import {
   autoUvEnum,
 } from "@/lib/zodObjects";
 
-export function registerElementTools() {
-  createTool(
-  "remove_element",
+export const removeElementParameters = z.object({
+  id: elementIdSchema.describe("ID or name of the element to remove."),
+});
+
+export const addGroupParameters = z.object({
+  name: z.string(),
+  origin: vector3Schema,
+  rotation: vector3Schema,
+  parent: z.string().optional().default("root"),
+  visibility: z.boolean().optional().default(true),
+  autouv: autoUvEnum
+    .optional()
+    .default("0")
+    .describe(
+      "Auto UV setting. 0 = disabled, 1 = enabled, 2 = relative auto UV."
+    ),
+  selected: z.boolean().optional().default(false),
+  shade: z.boolean().optional().default(false),
+});
+
+export const listOutlineParameters = z.object({});
+
+export const duplicateElementParameters = z.object({
+  id: elementIdSchema.describe("ID or name of the element to duplicate."),
+  offset: vector3Schema.optional().default([0, 0, 0]),
+  newName: z.string().optional(),
+});
+
+export const renameElementParameters = z.object({
+  id: elementIdSchema.describe("ID or name of the element to rename."),
+  new_name: z.string().describe("New name to assign."),
+});
+
+export const elementToolDocs: ToolSpec[] = [
   {
+    name: "remove_element",
     description: "Removes the element with the given ID.",
     annotations: {
       title: "Remove Element",
       destructiveHint: true,
     },
-    parameters: z.object({
-      id: elementIdSchema.describe("ID or name of the element to remove."),
-    }),
+    parameters: removeElementParameters,
+    status: STATUS_EXPERIMENTAL,
+  },
+  {
+    name: "add_group",
+    description: "Adds a new group with the given name and options.",
+    annotations: {
+      title: "Add Group",
+      destructiveHint: true,
+    },
+    parameters: addGroupParameters,
+    status: STATUS_STABLE,
+  },
+  {
+    name: "list_outline",
+    description:
+      "Returns a list of all groups and their children in the Blockbench editor.",
+    annotations: {
+      title: "List Outline",
+      readOnlyHint: true,
+    },
+    parameters: listOutlineParameters,
+    status: STATUS_STABLE,
+  },
+  {
+    name: "duplicate_element",
+    description:
+      "Duplicates a cube, mesh or group by ID or name.  You may offset the duplicate or assign a new name.",
+    annotations: { title: "Duplicate Element", destructiveHint: true },
+    parameters: duplicateElementParameters,
+    status: STATUS_EXPERIMENTAL,
+  },
+  {
+    name: "rename_element",
+    description: "Renames a cube, mesh or group by ID or name.",
+    annotations: { title: "Rename Element", destructiveHint: true },
+    parameters: renameElementParameters,
+    status: STATUS_EXPERIMENTAL,
+  },
+];
+
+export function registerElementTools() {
+  createTool(elementToolDocs[0].name, {
+    ...elementToolDocs[0],
     async execute({ id }) {
       const element = findElementOrThrow(id);
 
@@ -38,112 +111,70 @@ export function registerElementTools() {
 
       return `Removed element with ID ${id}`;
     },
-  },
-  STATUS_EXPERIMENTAL
-  );
+  }, elementToolDocs[0].status);
 
-  createTool(
-    "add_group",
-    {
-      description: "Adds a new group with the given name and options.",
-      annotations: {
-        title: "Add Group",
-        destructiveHint: true,
-      },
-      parameters: z.object({
-        name: z.string(),
-        origin: vector3Schema,
-        rotation: vector3Schema,
-        parent: z.string().optional().default("root"),
-        visibility: z.boolean().optional().default(true),
-        autouv: autoUvEnum
-          .optional()
-          .default("0")
-          .describe(
-            "Auto UV setting. 0 = disabled, 1 = enabled, 2 = relative auto UV."
-          ),
-        selected: z.boolean().optional().default(false),
-        shade: z.boolean().optional().default(false),
-      }),
-      async execute({
+  createTool(elementToolDocs[1].name, {
+    ...elementToolDocs[1],
+    async execute({
+      name,
+      origin,
+      rotation,
+      parent,
+      visibility,
+      autouv,
+      selected,
+      shade,
+    }) {
+      Undo.initEdit({
+        elements: [],
+        outliner: true,
+        collections: [],
+      });
+
+      const group = new Group({
         name,
         origin,
         rotation,
-        parent,
-        visibility,
-        autouv,
-        selected,
-        shade,
-      }) {
-        Undo.initEdit({
-          elements: [],
-          outliner: true,
-          collections: [],
-        });
+        autouv: Number(autouv) as 0 | 1 | 2,
+        visibility: Boolean(visibility),
+        selected: Boolean(selected),
+        shade: Boolean(shade),
+      }).init();
 
-        const group = new Group({
-          name,
-          origin,
-          rotation,
-          autouv: Number(autouv) as 0 | 1 | 2,
-          visibility: Boolean(visibility),
-          selected: Boolean(selected),
-          shade: Boolean(shade),
-        }).init();
+      const parentGroup = parent === "root"
+        ? "root"
+        : // `@ts-expect-error` getAllGroups is a Blockbench global
+          getAllGroups().find((g: Group) => g.name === parent || g.uuid === parent);
+      group.addTo(parentGroup);
 
-        group.addTo(
-          getAllGroups().find((g) => g.name === parent || g.uuid === parent)
-        );
+      Undo.finishEdit("Agent added group");
+      Canvas.updateAll();
 
-        Undo.finishEdit("Agent added group");
-        Canvas.updateAll();
-
-        return `Added group ${group.name} with ID ${group.uuid}`;
-      },
+      return `Added group ${group.name} with ID ${group.uuid}`;
     },
-    STATUS_STABLE
-  );
+  }, elementToolDocs[1].status);
 
-  createTool(
-    "list_outline",
-    {
-      description:
-        "Returns a list of all groups and their children in the Blockbench editor.",
-      annotations: {
-        title: "List Outline",
-        readOnlyHint: true,
-      },
-      parameters: z.object({}),
-      async execute() {
-        const elements = Outliner.elements;
+  createTool(elementToolDocs[2].name, {
+    ...elementToolDocs[2],
+    async execute() {
+      const elements = Outliner.elements;
 
-        return JSON.stringify(
-          elements.map((element) => {
-            const { name, uuid } = element;
-            return {
-              name,
-              uuid,
-            };
-          }),
-          null,
-          2
-        );
-      },
+      return JSON.stringify(
+        elements.map((element) => {
+          const { name, uuid } = element;
+          return {
+            name,
+            uuid,
+          };
+        }),
+        null,
+        2
+      );
     },
-    STATUS_STABLE
-  );
+  }, elementToolDocs[2].status);
 
-createTool(
-  "duplicate_element",
-  {
-    description:
-      "Duplicates a cube, mesh or group by ID or name.  You may offset the duplicate or assign a new name.",
-    annotations: { title: "Duplicate Element", destructiveHint: true },
-    parameters: z.object({
-      id: elementIdSchema.describe("ID or name of the element to duplicate."),
-      offset: vector3Schema.optional().default([0, 0, 0]),
-      newName: z.string().optional(),
-    }),
+  createTool(elementToolDocs[3].name, {
+    ...elementToolDocs[3],
     async execute({ id, offset, newName }) {
       const element = findElementOrThrow(id);
 
@@ -223,23 +254,14 @@ createTool(
       Canvas.updateAll();
       return `Duplicated "${element.name}" as "${dup.name}" (ID: ${dup.uuid}).`;
     },
-  },
-  STATUS_EXPERIMENTAL
-);
+  }, elementToolDocs[3].status);
 
-/**
- * Rename an element.  Mirrors the simple property change seen in the existing tools,
- * using `extend` to apply the change and updating the editor.
- */
-createTool(
-  "rename_element",
-  {
-    description: "Renames a cube, mesh or group by ID or name.",
-    annotations: { title: "Rename Element", destructiveHint: true },
-    parameters: z.object({
-      id: elementIdSchema.describe("ID or name of the element to rename."),
-      new_name: z.string().describe("New name to assign."),
-    }),
+  /**
+   * Rename an element.  Mirrors the simple property change seen in the existing tools,
+   * using `extend` to apply the change and updating the editor.
+   */
+  createTool(elementToolDocs[4].name, {
+    ...elementToolDocs[4],
     async execute({ id, new_name }) {
       const element = findElementOrThrow(id);
       Undo.initEdit({ elements: [element], outliner: true, collections: [] });
@@ -248,7 +270,5 @@ createTool(
       Canvas.updateAll();
       return `Renamed element "${id}" to "${new_name}".`;
     },
-  },
-  STATUS_EXPERIMENTAL
-);
+  }, elementToolDocs[4].status);
 }

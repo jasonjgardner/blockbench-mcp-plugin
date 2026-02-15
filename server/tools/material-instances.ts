@@ -1,14 +1,83 @@
 /// <reference types="three" />
 /// <reference types="blockbench-types" />
 import { z } from "zod";
-import { createTool } from "@/lib/factories";
+import { createTool, type ToolSpec } from "@/lib/factories";
 import { findElementOrThrow } from "@/lib/util";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
-import { faceEnum } from "@/lib/zodObjects";
+import { faceEnum, cubeIdOptionalSchema, cubeIdSchema } from "@/lib/zodObjects";
 
-// Note: Blockbench API supports uv_only in UndoAspects but it's not in the type definitions
+// ============================================================================
+// Material Instance Parameter Schemas
+// ============================================================================
 
-type CubeFaceDirection = z.infer<typeof faceEnum>;
+/** Empty parameters schema */
+export const emptyParametersSchema = z.object({});
+
+/** Faces array with default to all faces */
+export const facesArrayWithDefaultSchema = z
+  .array(faceEnum)
+  .optional()
+  .default(faceEnum.options)
+  .describe("Faces to set the material instance on. Defaults to all faces.");
+
+/** Faces array optional */
+export const facesArrayOptionalSchema = z
+  .array(faceEnum)
+  .optional()
+  .describe("Specific faces to get/clear material instances for. If not provided, returns/clears all faces.");
+
+/** Parameters for getting face material instances */
+export const getFaceMaterialInstancesParametersSchema = z.object({
+  cube_id: cubeIdOptionalSchema.describe(
+    "ID or name of the cube. If not provided, uses the first selected cube."
+  ),
+  faces: facesArrayOptionalSchema,
+});
+
+/** Parameters for setting face material instance */
+export const setFaceMaterialInstanceParametersSchema = z.object({
+  cube_id: cubeIdOptionalSchema.describe(
+    "ID or name of the cube. If not provided, applies to all selected cubes."
+  ),
+  material_name: z
+    .string()
+    .describe(
+      "The material instance name to assign. Use empty string to clear the material instance."
+    ),
+  faces: facesArrayWithDefaultSchema,
+});
+
+/** Single material instance assignment */
+export const materialInstanceAssignmentSchema = z.object({
+  cube_id: cubeIdSchema,
+  faces: z.array(faceEnum).describe("Faces to set the material instance on."),
+  material_name: z.string().describe("Material instance name to assign."),
+});
+
+/** Parameters for bulk setting material instances */
+export const bulkSetMaterialInstancesParametersSchema = z.object({
+  assignments: z
+    .array(materialInstanceAssignmentSchema)
+    .min(1)
+    .describe("Array of material instance assignments."),
+});
+
+/** Parameters for clearing material instances */
+export const clearMaterialInstancesParametersSchema = z.object({
+  cube_id: cubeIdOptionalSchema.describe(
+    "ID or name of the cube. If not provided, clears from all selected cubes."
+  ),
+  faces: facesArrayOptionalSchema.describe(
+    "Specific faces to clear. If not provided, clears all faces."
+  ),
+  all_cubes: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe(
+      "If true, clears material instances from all cubes in the project."
+    ),
+});
 
 /**
  * Helper to find a cube by ID or name
@@ -21,42 +90,78 @@ function findCubeOrThrow(id: string): Cube {
   return element;
 }
 
+// ============================================================================
+// Material Instance Tool Docs
+// ============================================================================
+
+export const materialInstanceToolDocs: ToolSpec[] = [
+  {
+    name: "get_face_material_instances",
+    description:
+      "Gets the material instance names for cube faces. Material instances are used in Bedrock Block format to map faces to materials defined in the minecraft:material_instances component.",
+    annotations: {
+      title: "Get Face Material Instances",
+      readOnlyHint: true,
+    },
+    parameters: getFaceMaterialInstancesParametersSchema,
+    status: STATUS_STABLE,
+  },
+  {
+    name: "set_face_material_instance",
+    description:
+      "Sets the material instance name for one or more cube faces. Material instances are strings that map to materials defined in the minecraft:material_instances component for Bedrock Block format.",
+    annotations: {
+      title: "Set Face Material Instance",
+      destructiveHint: true,
+    },
+    parameters: setFaceMaterialInstanceParametersSchema,
+    status: STATUS_EXPERIMENTAL,
+  },
+  {
+    name: "list_material_instances",
+    description:
+      "Lists all unique material instance names used in the project. Returns the material instance names along with which cubes and faces use them.",
+    annotations: {
+      title: "List Material Instances",
+      readOnlyHint: true,
+    },
+    parameters: emptyParametersSchema,
+    status: STATUS_STABLE,
+  },
+  {
+    name: "bulk_set_material_instances",
+    description:
+      "Sets material instance names on multiple cubes at once. Useful for assigning different material instances to different faces across the project.",
+    annotations: {
+      title: "Bulk Set Material Instances",
+      destructiveHint: true,
+    },
+    parameters: bulkSetMaterialInstancesParametersSchema,
+    status: STATUS_EXPERIMENTAL,
+  },
+  {
+    name: "clear_material_instances",
+    description:
+      "Clears (removes) material instance names from cube faces. Useful for resetting material assignments.",
+    annotations: {
+      title: "Clear Material Instances",
+      destructiveHint: true,
+    },
+    parameters: clearMaterialInstancesParametersSchema,
+    status: STATUS_EXPERIMENTAL,
+  },
+];
+
 export function registerMaterialInstanceTools() {
   createTool(
-    "get_face_material_instances",
+    materialInstanceToolDocs[0].name,
     {
-      description:
-        "Gets the material instance names for cube faces. Material instances are used in Bedrock Block format to map faces to materials defined in the minecraft:material_instances component.",
-      annotations: {
-        title: "Get Face Material Instances",
-        readOnlyHint: true,
-      },
-      parameters: z.object({
-        cube_id: z
-          .string()
-          .optional()
-          .describe(
-            "ID or name of the cube. If not provided, uses the first selected cube."
-          ),
-        faces: z
-          .array(faceEnum)
-          .optional()
-          .describe(
-            "Specific faces to get material instances for. If not provided, returns all faces."
-          ),
-      }),
+      ...materialInstanceToolDocs[0],
       async execute({ cube_id, faces }) {
-        let cube: Cube;
+        const cube: Cube | undefined = cube_id ? findCubeOrThrow(cube_id) : Cube.selected.at(0);
 
-        if (cube_id) {
-          cube = findCubeOrThrow(cube_id);
-        } else {
-          if (!Cube.selected.length) {
-            throw new Error(
-              "No cube specified and no cube selected. Provide a cube_id or select a cube."
-            );
-          }
-          cube = Cube.selected[0];
+        if (!cube) {
+          throw new Error("No cube found to get material instances from.");
         }
 
         const facesToCheck = faces || faceEnum.options;
@@ -81,38 +186,13 @@ export function registerMaterialInstanceTools() {
         }, null, 2);
       },
     },
-    STATUS_STABLE
+    materialInstanceToolDocs[0].status
   );
 
   createTool(
-    "set_face_material_instance",
+    materialInstanceToolDocs[1].name,
     {
-      description:
-        "Sets the material instance name for one or more cube faces. Material instances are strings that map to materials defined in the minecraft:material_instances component for Bedrock Block format.",
-      annotations: {
-        title: "Set Face Material Instance",
-        destructiveHint: true,
-      },
-      parameters: z.object({
-        cube_id: z
-          .string()
-          .optional()
-          .describe(
-            "ID or name of the cube. If not provided, applies to all selected cubes."
-          ),
-        material_name: z
-          .string()
-          .describe(
-            "The material instance name to assign. Use empty string to clear the material instance."
-          ),
-        faces: z
-          .array(faceEnum)
-          .optional()
-          .default(["north", "south", "east", "west", "up", "down"])
-          .describe(
-            "Faces to set the material instance on. Defaults to all faces."
-          ),
-      }),
+      ...materialInstanceToolDocs[1],
       async execute({ cube_id, material_name, faces }) {
         let cubes: Cube[];
 
@@ -151,19 +231,13 @@ export function registerMaterialInstanceTools() {
         return `Set material instance "${material_name}" on ${modifiedCount} face(s) across ${cubes.length} cube(s).`;
       },
     },
-    STATUS_EXPERIMENTAL
+    materialInstanceToolDocs[1].status
   );
 
   createTool(
-    "list_material_instances",
+    materialInstanceToolDocs[2].name,
     {
-      description:
-        "Lists all unique material instance names used in the project. Returns the material instance names along with which cubes and faces use them.",
-      annotations: {
-        title: "List Material Instances",
-        readOnlyHint: true,
-      },
-      parameters: z.object({}),
+      ...materialInstanceToolDocs[2],
       async execute() {
         const materialMap: Record<
           string,
@@ -200,32 +274,13 @@ export function registerMaterialInstanceTools() {
         }, null, 2);
       },
     },
-    STATUS_STABLE
+    materialInstanceToolDocs[2].status
   );
 
   createTool(
-    "bulk_set_material_instances",
+    materialInstanceToolDocs[3].name,
     {
-      description:
-        "Sets material instance names on multiple cubes at once. Useful for assigning different material instances to different faces across the project.",
-      annotations: {
-        title: "Bulk Set Material Instances",
-        destructiveHint: true,
-      },
-      parameters: z.object({
-        assignments: z
-          .array(
-            z.object({
-              cube_id: z.string().describe("ID or name of the cube."),
-              faces: z
-                .array(faceEnum)
-                .describe("Faces to set the material instance on."),
-              material_name: z.string().describe("Material instance name to assign."),
-            })
-          )
-          .min(1)
-          .describe("Array of material instance assignments."),
-      }),
+      ...materialInstanceToolDocs[3],
       async execute({ assignments }) {
         const cubeCache: Record<string, Cube> = {};
         const cubesToEdit: Cube[] = [];
@@ -264,39 +319,13 @@ export function registerMaterialInstanceTools() {
         return `Applied ${assignments.length} material instance assignment(s) affecting ${totalModified} face(s) on ${cubesToEdit.length} cube(s).`;
       },
     },
-    STATUS_EXPERIMENTAL
+    materialInstanceToolDocs[3].status
   );
 
   createTool(
-    "clear_material_instances",
+    materialInstanceToolDocs[4].name,
     {
-      description:
-        "Clears (removes) material instance names from cube faces. Useful for resetting material assignments.",
-      annotations: {
-        title: "Clear Material Instances",
-        destructiveHint: true,
-      },
-      parameters: z.object({
-        cube_id: z
-          .string()
-          .optional()
-          .describe(
-            "ID or name of the cube. If not provided, clears from all selected cubes."
-          ),
-        faces: z
-          .array(faceEnum)
-          .optional()
-          .describe(
-            "Specific faces to clear. If not provided, clears all faces."
-          ),
-        all_cubes: z
-          .boolean()
-          .optional()
-          .default(false)
-          .describe(
-            "If true, clears material instances from all cubes in the project."
-          ),
-      }),
+      ...materialInstanceToolDocs[4],
       async execute({ cube_id, faces, all_cubes }) {
         let cubes: Cube[];
 
@@ -342,6 +371,6 @@ export function registerMaterialInstanceTools() {
         return `Cleared material instances from ${clearedCount} face(s) across ${cubes.length} cube(s).`;
       },
     },
-    STATUS_EXPERIMENTAL
+    materialInstanceToolDocs[4].status
   );
 }
