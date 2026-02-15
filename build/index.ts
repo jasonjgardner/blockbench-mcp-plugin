@@ -1,5 +1,5 @@
 import { watch } from "node:fs";
-import { mkdir, copyFile, rename, rmdir } from "node:fs/promises";
+import { mkdir, copyFile, rename, rm, stat } from "node:fs/promises";
 import { resolve, join, normalize, sep } from "node:path";
 import { log, c, isCleanMode, isProduction, isWatchMode } from "./utils";
 import { blockbenchCompatPlugin, textFileLoaderPlugin } from "./plugins";
@@ -11,12 +11,14 @@ const OUTPUT_DIR_NAME = normalize(OUTPUT_DIR).replace(/^\.[\\/]/, "");
 const entryFile = resolve("./index.ts");
 
 async function cleanOutputDir() {
-  const dirExists = await Bun.file(OUTPUT_DIR).exists();
-  if (dirExists) {
-    log.header("[Build] Clean");
-    log.step(`Cleaning output directory: ${c.cyan}${OUTPUT_DIR}${c.reset}`);
-    await rmdir(OUTPUT_DIR, { recursive: true });
-  } else {
+  try {
+    const info = await stat(OUTPUT_DIR);
+    if (info.isDirectory()) {
+      log.header("[Build] Clean");
+      log.step(`Cleaning output directory: ${c.cyan}${OUTPUT_DIR}${c.reset}`);
+      await rm(OUTPUT_DIR, { recursive: true, force: true });
+    }
+  } catch {
     log.dim("[Build] Output directory does not exist, no need to clean.");
   }
 }

@@ -83,7 +83,6 @@ Prompt and resource specs are defined **inline in the manifest** (not imported f
 - Language: TypeScript (strict), ESNext modules, CJS output for the plugin.
 - Paths: Use alias `@/*` (see `tsconfig.json`).
 - Indentation: 2 spaces; prefer explicit return types and narrow types.
-- Tools: Name with `blockbench_<action>` (UI strips the prefix for display).
 - Keep UI text concise; avoid blocking calls in plugin lifecycle hooks.
 - Schema naming: `{camelCaseToolName}Parameters` (e.g., `placeCubeParameters`).
 - Docs array naming: `{domainName}ToolDocs` (e.g., `cubeToolDocs`).

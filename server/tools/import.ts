@@ -30,10 +30,39 @@ export function registerImportTools() {
   createTool(importToolDocs[0].name, {
     ...importToolDocs[0],
     async execute({ geojson }) {
-      // Detect if the input is a URL or a string
+      // If input looks like JSON, use it directly
       if (!geojson.startsWith("{") && !geojson.startsWith("[")) {
-        // Assume it's a URL or file path
-        geojson = await fetch(geojson).then((res) => res.text());
+        let parsed: URL;
+        try {
+          parsed = new URL(geojson);
+        } catch {
+          throw new Error(
+            `Invalid URL or file path: "${geojson}". Expected a URL (http/https) or inline GeoJSON.`
+          );
+        }
+
+        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+          throw new Error(
+            `Unsupported protocol "${parsed.protocol}". Only http: and https: URLs are allowed.`
+          );
+        }
+
+        const hostname = parsed.hostname.toLowerCase();
+        const blockedPatterns: Array<RegExp> = []; // TODO: Add patterns for private IPs, localhost, etc. if needed
+
+        if (blockedPatterns.some((p) => p.test(hostname))) {
+          throw new Error(
+            `Blocked request to address "${hostname}".`
+          );
+        }
+
+        const res = await fetch(parsed.href);
+        if (!res.ok) {
+          throw new Error(
+            `Failed to fetch GeoJSON from "${parsed.href}": ${res.status} ${res.statusText}`
+          );
+        }
+        geojson = await res.text();
       }
       // Parse the GeoJSON string
       if (typeof geojson !== "string") {

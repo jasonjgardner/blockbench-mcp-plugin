@@ -141,9 +141,10 @@ export function registerElementTools() {
         shade: Boolean(shade),
       }).init();
 
-      group.addTo(
-        getAllGroups().find((g) => g.name === parent || g.uuid === parent)
-      );
+      const parentGroup = parent === "root"
+        ? "root"
+        : getAllGroups().find((g) => g.name === parent || g.uuid === parent);
+      group.addTo(parentGroup);
 
       Undo.finishEdit("Agent added group");
       Canvas.updateAll();

@@ -203,12 +203,20 @@ export function registerUVTools() {
           uv_only: true,
         });
 
+        // Set the face selection before rotating so UVEditor.rotate
+        // operates on the caller-specified faces instead of whatever
+        // happens to be selected in the viewport.
+        if (faces && faces.length > 0) {
+          mesh.getSelectedFaces(true).replace(faces);
+        }
+
         const rotation = parseInt(angle);
         UVEditor.rotate(rotation);
 
         Undo.finishEdit("Rotate mesh UV");
 
-        return `Rotated UV by ${angle} degrees for mesh "${mesh.name}"`;
+        const affected = faces ?? mesh.getSelectedFaces();
+        return `Rotated UV by ${angle} degrees for ${affected.length} faces of mesh "${mesh.name}"`;
       },
     },
     uvToolDocs[2].status

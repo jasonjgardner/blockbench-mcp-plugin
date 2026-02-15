@@ -85,8 +85,13 @@ jobs:
       - name: Stage deployment files
         run: |
           mkdir -p staging/plugin staging/docs
-          cp dist/mcp.js dist/about.md dist/icon.svg staging/plugin/
-          cp docs/api.json docs/index.html docs/style.css staging/docs/
+          cp dist/mcp.js staging/plugin/
+          for f in dist/about.md dist/icon.svg; do
+            [ -f "$f" ] && cp "$f" staging/plugin/
+          done
+          for f in docs/api.json docs/index.html docs/style.css; do
+            [ -f "$f" ] && cp "$f" staging/docs/
+          done
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -130,20 +135,27 @@ jobs:
           DEPLOY_TYPE: ${{ needs.build.outputs.deploy_type }}
           DEPLOY_PATH: ${{ needs.build.outputs.deploy_path }}
         run: |
+          copy_if_exists() {
+            local dest="$1"; shift
+            for f in "$@"; do
+              [ -f "$f" ] && cp "$f" "$dest"
+            done
+          }
+
           # Always deploy plugin files to the target path
           mkdir -p "${DEPLOY_PATH}"
-          cp staging/plugin/mcp.js staging/plugin/about.md staging/plugin/icon.svg "${DEPLOY_PATH}/"
+          copy_if_exists "${DEPLOY_PATH}/" staging/plugin/mcp.js staging/plugin/about.md staging/plugin/icon.svg
 
           # Release: also copy docs to target path + update root with everything
           if [[ "${DEPLOY_TYPE}" == "release" ]]; then
-            cp staging/docs/api.json staging/docs/index.html staging/docs/style.css "${DEPLOY_PATH}/"
-            cp staging/plugin/mcp.js staging/plugin/about.md staging/plugin/icon.svg ./
-            cp staging/docs/api.json staging/docs/index.html staging/docs/style.css ./
+            copy_if_exists "${DEPLOY_PATH}/" staging/docs/api.json staging/docs/index.html staging/docs/style.css
+            copy_if_exists ./ staging/plugin/mcp.js staging/plugin/about.md staging/plugin/icon.svg
+            copy_if_exists ./ staging/docs/api.json staging/docs/index.html staging/docs/style.css
           fi
 
           # Nightly: update root docs only
           if [[ "${DEPLOY_TYPE}" == "nightly" ]]; then
-            cp staging/docs/api.json staging/docs/index.html staging/docs/style.css ./
+            copy_if_exists ./ staging/docs/api.json staging/docs/index.html staging/docs/style.css
           fi
 
           # Clean up staging

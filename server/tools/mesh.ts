@@ -371,12 +371,7 @@ export function registerMeshTools() {
       const mesh = getMeshOrSelected(mesh_id);
 
       // Use the extrude tool
-      const tool =
-        mode === "faces"
-          ? BarItems.extrude_mesh_selection
-          : mode === "edges"
-            ? BarItems.extrude_mesh_selection
-            : BarItems.extrude_mesh_selection;
+      const tool = BarItems.extrude_mesh_selection;
 
       if (!tool) {
         throw new Error(`Extrude tool for ${mode} not found.`);

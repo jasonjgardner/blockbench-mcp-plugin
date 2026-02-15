@@ -194,9 +194,10 @@ createTool(cubeToolDocs[1].name, {
     color,
     visibility,
   }) {
-    const cubes = (Outliner.root.filter(
-      (el) => el instanceof Cube && (el.uuid === id || el.name === id)
-    ) ?? Cube.selected) as Cube[];
+    const match = id
+      ? (Cube.all ?? []).filter((el: Cube) => el.uuid === id || el.name === id)
+      : [];
+    const cubes: Cube[] = match.length > 0 ? match : Cube.selected;
 
     if (!cubes.length) {
       throw new Error(`Cube with ID "${id}" not found.`);
