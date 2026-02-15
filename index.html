@@ -1,1 +1,4086 @@
-<!DOCTYPE html><html><head><title>Blockbench MCP Plugin</title></head><body><h1>Blockbench MCP Plugin Downloads</h1></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Blockbench MCP Plugin — API Reference</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="layout">
+    <nav class="sidebar">
+      <div class="sidebar-brand">
+        <h1>Blockbench MCP</h1>
+        <p>v1.5.0 — API Reference</p>
+      </div>
+
+      <input id="search" type="text" placeholder="Search tools..." class="search-input" />
+
+      <div class="nav-group">
+        <p class="nav-heading">Overview</p>
+        <a href="#tools" class="nav-link">Tools <span class="count">(94)</span></a>
+        <a href="#prompts" class="nav-link">Prompts <span class="count">(6)</span></a>
+        <a href="#resources" class="nav-link">Resources <span class="count">(12)</span></a>
+      </div>
+
+      <div class="nav-group">
+        <p class="nav-heading">Categories</p>
+        <a href="#cat-cubes" class="nav-link">Cubes <span class="count">(2)</span></a>
+        <a href="#cat-camera-screenshots" class="nav-link">Camera &amp; Screenshots <span class="count">(3)</span></a>
+        <a href="#cat-animation" class="nav-link">Animation <span class="count">(7)</span></a>
+        <a href="#cat-armature" class="nav-link">Armature <span class="count">(16)</span></a>
+        <a href="#cat-elements" class="nav-link">Elements <span class="count">(5)</span></a>
+        <a href="#cat-import-export" class="nav-link">Import/Export <span class="count">(1)</span></a>
+        <a href="#cat-material-instances" class="nav-link">Material Instances <span class="count">(5)</span></a>
+        <a href="#cat-mesh-editing" class="nav-link">Mesh Editing <span class="count">(11)</span></a>
+        <a href="#cat-paint-tools" class="nav-link">Paint Tools <span class="count">(12)</span></a>
+        <a href="#cat-project" class="nav-link">Project <span class="count">(1)</span></a>
+        <a href="#cat-textures" class="nav-link">Textures <span class="count">(12)</span></a>
+        <a href="#cat-ui-interaction" class="nav-link">UI Interaction <span class="count">(4)</span></a>
+        <a href="#cat-uv-mapping" class="nav-link">UV Mapping <span class="count">(3)</span></a>
+        <a href="#cat-hytale-integration" class="nav-link">Hytale Integration <span class="count">(12)</span></a>
+      </div>
+    </nav>
+
+    <main class="main">
+      <header class="page-header">
+        <h1>Blockbench MCP Plugin</h1>
+        <p class="subtitle">API Reference — v1.5.0</p>
+        <nav class="stats">
+          <a href="#tools"><strong>94</strong> tools (29 stable, 65 experimental)</a>
+          <a href="#prompts"><strong>6</strong> prompts</a>
+          <a href="#resources"><strong>12</strong> resources</a>
+        </nav>
+      </header>
+
+      <section id="install" class="doc-section">
+        <h2>Installation</h2>
+<ul>
+<li><a href="https://jasonjgardner.github.io/blockbench-mcp-plugin/mcp.js">Stable</a></li>
+<li><a href="https://jasonjgardner.github.io/blockbench-mcp-plugin/nightly/mcp.js">Latest</a></li>
+</ul>
+
+      </section>
+
+      <section id="tools" class="doc-section">
+        <h2 class="section-title">Tools</h2>
+        <section id="cat-cubes" class="category-section">
+          <h3 class="category-title">Cubes</h3>
+          <div id="tool-place_cube" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">place_cube</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Place Cube</p>
+      <p class="card-desc">Places a cube of the given size at the specified position. Texture and group are optional.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">elements</td>
+      <td class="col-type">object[]</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Array of cubes to place. <span class="param-meta">[minItems: 1]</span></td>
+    </tr><tr>
+      <td class="col-name">texture</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Texture ID or name to apply to the cube.</td>
+    </tr><tr>
+      <td class="col-name">group</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Group/bone to which the cube belongs.</td>
+    </tr><tr>
+      <td class="col-name">faces</td>
+      <td class="col-type">&quot;north&quot; | &quot;south&quot; | &quot;east&quot; | &quot;west&quot; | &quot;up&quot; | &quot;down&quot;[] | unknown | boolean | object[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Faces to apply the texture to. Set to `true` to enable auto UV mapping. <span class="param-meta">(default: <code>true</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-modify_cube" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">modify_cube</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Modify Cube</p>
+      <p class="card-desc">Modifies the cube with the given ID. Auto UV setting: saved as an integer, where 0 means disabled, 1 means enabled, and 2 means relative auto UV (cube position affects UV)</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">ID or name of the cube to modify. Defaults to selected, which could be more than one.</td>
+    </tr><tr>
+      <td class="col-name">name</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">New name of the cube.</td>
+    </tr><tr>
+      <td class="col-name">origin</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Pivot point of the cube. <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
+    </tr><tr>
+      <td class="col-name">from</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Starting point of the cube. <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
+    </tr><tr>
+      <td class="col-name">to</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Ending point of the cube. <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
+    </tr><tr>
+      <td class="col-name">rotation</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Rotation of the cube. <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
+    </tr><tr>
+      <td class="col-name">autouv</td>
+      <td class="col-type">&quot;0&quot; | &quot;1&quot; | &quot;2&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Auto UV setting. 0 = disabled, 1 = enabled, 2 = relative auto UV.</td>
+    </tr><tr>
+      <td class="col-name">uv_offset</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">UV offset for the texture. <span class="param-meta">[minItems: 2, maxItems: 2]</span></td>
+    </tr><tr>
+      <td class="col-name">mirror_uv</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Whether to mirror the UVs.</td>
+    </tr><tr>
+      <td class="col-name">shade</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Whether to apply shading to the cube.</td>
+    </tr><tr>
+      <td class="col-name">inflate</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Inflation amount for the cube.</td>
+    </tr><tr>
+      <td class="col-name">color</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Single digit to represent a color from a palette.</td>
+    </tr><tr>
+      <td class="col-name">visibility</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Whether the cube is visible or not.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+        </section>
+<section id="cat-camera-screenshots" class="category-section">
+          <h3 class="category-title">Camera &amp; Screenshots</h3>
+          <div id="tool-capture_screenshot" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">capture_screenshot</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">Capture Screenshot</p>
+      <p class="card-desc">Returns the image data of the current view.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">project</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Project name or UUID.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-capture_app_screenshot" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">capture_app_screenshot</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">Capture App Screenshot</p>
+      <p class="card-desc">Returns the image data of the Blockbench app.</p>
+      <div class="overflow-x">
+        <p class="empty-params">No parameters</p>
+      </div>
+    </div>
+<div id="tool-set_camera_angle" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">set_camera_angle</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Set Camera Angle</p>
+      <p class="card-desc">Sets the camera angle to the specified value.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">position</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Camera position. <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
+    </tr><tr>
+      <td class="col-name">target</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Camera target position. <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
+    </tr><tr>
+      <td class="col-name">rotation</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Camera rotation. <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
+    </tr><tr>
+      <td class="col-name">projection</td>
+      <td class="col-type">&quot;unset&quot; | &quot;orthographic&quot; | &quot;perspective&quot;</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Camera projection type.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+        </section>
+<section id="cat-animation" class="category-section">
+          <h3 class="category-title">Animation</h3>
+          <div id="tool-create_animation" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">create_animation</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Create Animation</p>
+      <p class="card-desc">Creates a new animation with keyframes for bones.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">name</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Name of the animation</td>
+    </tr><tr>
+      <td class="col-name">loop</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Whether the animation should loop <span class="param-meta">(default: <code>false</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">animation_length</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Length of the animation in seconds</td>
+    </tr><tr>
+      <td class="col-name">bones</td>
+      <td class="col-type">Record&lt;string, object[]&gt;</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Keyframes for each bone</td>
+    </tr><tr>
+      <td class="col-name">particle_effects</td>
+      <td class="col-type">Record&lt;string, string&gt;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Particle effects with timestamps as keys</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-manage_keyframes" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">manage_keyframes</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Manage Keyframes</p>
+      <p class="card-desc">Creates, deletes, or edits keyframes in the animation timeline for specific bones and channels.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">animation_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Animation UUID or name. If not provided, uses current animation.</td>
+    </tr><tr>
+      <td class="col-name">action</td>
+      <td class="col-type">&quot;create&quot; | &quot;delete&quot; | &quot;edit&quot; | &quot;select&quot;</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Action to perform on keyframes.</td>
+    </tr><tr>
+      <td class="col-name">bone_name</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Name of the bone/group to manage keyframes for.</td>
+    </tr><tr>
+      <td class="col-name">channel</td>
+      <td class="col-type">&quot;rotation&quot; | &quot;position&quot; | &quot;scale&quot;</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Animation channel to modify.</td>
+    </tr><tr>
+      <td class="col-name">keyframes</td>
+      <td class="col-type">object[]</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Keyframe data for the action.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-animation_graph_editor" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">animation_graph_editor</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Animation Graph Editor</p>
+      <p class="card-desc">Controls animation curves in the graph editor for fine-tuning animations.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">animation_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Animation UUID or name. If not provided, uses current animation.</td>
+    </tr><tr>
+      <td class="col-name">bone_name</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Name of the bone/group to modify curves for.</td>
+    </tr><tr>
+      <td class="col-name">channel</td>
+      <td class="col-type">&quot;rotation&quot; | &quot;position&quot; | &quot;scale&quot;</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Animation channel to modify.</td>
+    </tr><tr>
+      <td class="col-name">axis</td>
+      <td class="col-type">&quot;x&quot; | &quot;y&quot; | &quot;z&quot; | string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Axis to modify curves for. <span class="param-meta">(default: <code>&quot;all&quot;</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">action</td>
+      <td class="col-type">&quot;smooth&quot; | &quot;linear&quot; | &quot;ease_in&quot; | &quot;ease_out&quot; | &quot;ease_in_out&quot; | &quot;stepped&quot; | &quot;custom&quot;</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Type of curve modification to apply.</td>
+    </tr><tr>
+      <td class="col-name">keyframe_range</td>
+      <td class="col-type">object</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Time range to apply the curve modification. If not provided, applies to all keyframes.</td>
+    </tr><tr>
+      <td class="col-name">custom_curve</td>
+      <td class="col-type">object</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Custom bezier curve control points (only for 'custom' action).</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-bone_rigging" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">bone_rigging</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Bone Rigging</p>
+      <p class="card-desc">Creates and manipulates the bone structure (rig) of a model for animation.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">action</td>
+      <td class="col-type">&quot;create&quot; | &quot;parent&quot; | &quot;unparent&quot; | &quot;delete&quot; | &quot;rename&quot; | &quot;set_pivot&quot; | &quot;set_ik&quot; | &quot;mirror&quot;</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Action to perform on the bone structure.</td>
+    </tr><tr>
+      <td class="col-name">bone_data</td>
+      <td class="col-type">object</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Bone configuration data.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-animation_timeline" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">animation_timeline</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Animation Timeline</p>
+      <p class="card-desc">Controls the animation timeline, including playback, time scrubbing, and timeline settings.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">action</td>
+      <td class="col-type">&quot;play&quot; | &quot;pause&quot; | &quot;stop&quot; | &quot;set_time&quot; | &quot;set_length&quot; | &quot;set_fps&quot; | &quot;loop&quot; | &quot;select_range&quot;</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Timeline action to perform.</td>
+    </tr><tr>
+      <td class="col-name">time</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Time in seconds (for set_time action).</td>
+    </tr><tr>
+      <td class="col-name">length</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Animation length in seconds (for set_length action).</td>
+    </tr><tr>
+      <td class="col-name">fps</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Frames per second (for set_fps action). <span class="param-meta">[min: 1, max: 120]</span></td>
+    </tr><tr>
+      <td class="col-name">loop_mode</td>
+      <td class="col-type">&quot;once&quot; | &quot;loop&quot; | &quot;hold&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Loop mode for the animation.</td>
+    </tr><tr>
+      <td class="col-name">range</td>
+      <td class="col-type">object</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Time range for selection.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-batch_keyframe_operations" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">batch_keyframe_operations</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Batch Keyframe Operations</p>
+      <p class="card-desc">Performs batch operations on multiple keyframes at once.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">selection</td>
+      <td class="col-type">&quot;all&quot; | &quot;selected&quot; | &quot;range&quot; | &quot;pattern&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Which keyframes to operate on. <span class="param-meta">(default: <code>&quot;selected&quot;</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">range</td>
+      <td class="col-type">object</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Time range for keyframe selection.</td>
+    </tr><tr>
+      <td class="col-name">pattern</td>
+      <td class="col-type">object</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Pattern-based selection.</td>
+    </tr><tr>
+      <td class="col-name">operation</td>
+      <td class="col-type">&quot;offset&quot; | &quot;scale&quot; | &quot;reverse&quot; | &quot;mirror&quot; | &quot;smooth&quot; | &quot;bake&quot;</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Operation to perform on keyframes.</td>
+    </tr><tr>
+      <td class="col-name">parameters</td>
+      <td class="col-type">object</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Operation-specific parameters.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-animation_copy_paste" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">animation_copy_paste</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Animation Copy/Paste</p>
+      <p class="card-desc">Copies and pastes animation data between bones or animations.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">action</td>
+      <td class="col-type">&quot;copy&quot; | &quot;paste&quot; | &quot;mirror_paste&quot;</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Copy or paste action.</td>
+    </tr><tr>
+      <td class="col-name">source</td>
+      <td class="col-type">object</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Source data for copy operation.</td>
+    </tr><tr>
+      <td class="col-name">target</td>
+      <td class="col-type">object</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Target data for paste operation.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+        </section>
+<section id="cat-armature" class="category-section">
+          <h3 class="category-title">Armature</h3>
+          <div id="tool-list_armatures" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">list_armatures</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">List Armatures</p>
+      <p class="card-desc">Lists all armatures in the current project with their basic info.</p>
+      <div class="overflow-x">
+        <p class="empty-params">No parameters</p>
+      </div>
+    </div>
+<div id="tool-get_armature" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">get_armature</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">Get Armature</p>
+      <p class="card-desc">Gets detailed information about a specific armature including its bones.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">UUID or name of the armature.</td>
+    </tr><tr>
+      <td class="col-name">include_bones</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Whether to include bone hierarchy in response. <span class="param-meta">(default: <code>true</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-add_armature" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">add_armature</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Add Armature</p>
+      <p class="card-desc">Creates a new armature in the project. An armature is a skeletal rig used for mesh deformation.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">name</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Name for the new armature. <span class="param-meta">(default: <code>&quot;armature&quot;</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">visibility</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc"> <span class="param-meta">(default: <code>true</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">locked</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc"> <span class="param-meta">(default: <code>false</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">add_initial_bone</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Whether to add an initial bone to the armature. <span class="param-meta">(default: <code>true</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-remove_armature" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">remove_armature</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Remove Armature</p>
+      <p class="card-desc">Removes an armature and all its bones from the project.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">UUID or name of the armature to remove.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-update_armature" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">update_armature</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Update Armature</p>
+      <p class="card-desc">Updates properties of an existing armature.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">UUID or name of the armature.</td>
+    </tr><tr>
+      <td class="col-name">name</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">New name for the armature.</td>
+    </tr><tr>
+      <td class="col-name">visibility</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc"></td>
+    </tr><tr>
+      <td class="col-name">locked</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc"></td>
+    </tr><tr>
+      <td class="col-name">export</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Whether to export this armature.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-list_armature_bones" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">list_armature_bones</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">List Armature Bones</p>
+      <p class="card-desc">Lists all armature bones, optionally filtered by a specific armature.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">armature_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Filter bones by armature UUID or name. If not provided, lists all bones.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-get_armature_bone" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">get_armature_bone</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">Get Armature Bone</p>
+      <p class="card-desc">Gets detailed information about a specific armature bone.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">UUID or name of the bone.</td>
+    </tr><tr>
+      <td class="col-name">include_weights</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Whether to include all vertex weights in response. <span class="param-meta">(default: <code>false</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-add_armature_bone" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">add_armature_bone</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Add Armature Bone</p>
+      <p class="card-desc">Creates a new bone and adds it to an armature or parent bone.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">parent_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">UUID or name of parent armature or bone.</td>
+    </tr><tr>
+      <td class="col-name">name</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Name for the new bone. <span class="param-meta">(default: <code>&quot;bone&quot;</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">origin</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Position of the bone. Defaults to [0, parent.length, 0] for child bones. <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
+    </tr><tr>
+      <td class="col-name">rotation</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">3D vector [x, y, z]. <span class="param-meta">(default: <code>[0,0,0]</code>) [minItems: 3, maxItems: 3]</span></td>
+    </tr><tr>
+      <td class="col-name">length</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Length of the bone. <span class="param-meta">(default: <code>8</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">width</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Width of the bone. <span class="param-meta">(default: <code>2</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">connected</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Whether bone is connected to parent. <span class="param-meta">(default: <code>true</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">color</td>
+      <td class="col-type">integer</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Marker color index (0-7). <span class="param-meta">[min: 0, max: 7]</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-remove_armature_bone" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">remove_armature_bone</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Remove Armature Bone</p>
+      <p class="card-desc">Removes an armature bone from the project.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">UUID or name of the bone to remove.</td>
+    </tr><tr>
+      <td class="col-name">remove_children</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Whether to also remove child bones. <span class="param-meta">(default: <code>true</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-update_armature_bone" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">update_armature_bone</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Update Armature Bone</p>
+      <p class="card-desc">Updates properties of an existing armature bone.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">UUID or name of the bone.</td>
+    </tr><tr>
+      <td class="col-name">name</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc"></td>
+    </tr><tr>
+      <td class="col-name">origin</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">New position of the bone. <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
+    </tr><tr>
+      <td class="col-name">rotation</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">New rotation [x, y, z] in degrees. <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
+    </tr><tr>
+      <td class="col-name">length</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc"></td>
+    </tr><tr>
+      <td class="col-name">width</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc"></td>
+    </tr><tr>
+      <td class="col-name">connected</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc"></td>
+    </tr><tr>
+      <td class="col-name">color</td>
+      <td class="col-type">integer</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc"> <span class="param-meta">[min: 0, max: 7]</span></td>
+    </tr><tr>
+      <td class="col-name">visibility</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc"></td>
+    </tr><tr>
+      <td class="col-name">locked</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc"></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-update_armature_bones_batch" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">update_armature_bones_batch</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Update Armature Bones (Batch)</p>
+      <p class="card-desc">Updates multiple armature bones at once with the same properties.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">ids</td>
+      <td class="col-type">string[]</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Array of bone UUIDs or names to update.</td>
+    </tr><tr>
+      <td class="col-name">visibility</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc"></td>
+    </tr><tr>
+      <td class="col-name">locked</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc"></td>
+    </tr><tr>
+      <td class="col-name">color</td>
+      <td class="col-type">integer</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc"> <span class="param-meta">[min: 0, max: 7]</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-select_armature_bones" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">select_armature_bones</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          
+        </div>
+      </div>
+      <p class="card-title">Select Armature Bones</p>
+      <p class="card-desc">Selects armature bones by ID. Can select single bone, multiple bones, or bone hierarchy.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">ids</td>
+      <td class="col-type">string[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Array of bone UUIDs or names to select.</td>
+    </tr><tr>
+      <td class="col-name">armature_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Select all bones in this armature.</td>
+    </tr><tr>
+      <td class="col-name">include_descendants</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Include all descendant bones in selection. <span class="param-meta">(default: <code>false</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">clear_selection</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Clear existing selection before selecting. <span class="param-meta">(default: <code>true</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-get_vertex_weights" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">get_vertex_weights</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">Get Vertex Weights</p>
+      <p class="card-desc">Gets vertex weights for a mesh from all bones affecting it.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">mesh_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">ID or name of the mesh. If not provided, uses selected mesh.</td>
+    </tr><tr>
+      <td class="col-name">bone_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Filter weights by specific bone.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-set_vertex_weight" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">set_vertex_weight</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Set Vertex Weight</p>
+      <p class="card-desc">Sets the weight of a specific vertex on a bone.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">bone_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">UUID or name of the bone.</td>
+    </tr><tr>
+      <td class="col-name">mesh_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">ID or name of the mesh. If not provided, uses selected mesh.</td>
+    </tr><tr>
+      <td class="col-name">vertex_key</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Key of the vertex in the mesh.</td>
+    </tr><tr>
+      <td class="col-name">weight</td>
+      <td class="col-type">number</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Weight value (0-1). Set to 0 to remove weight. <span class="param-meta">[min: 0, max: 1]</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-set_vertex_weights_batch" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">set_vertex_weights_batch</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Set Vertex Weights (Batch)</p>
+      <p class="card-desc">Sets multiple vertex weights at once on a bone.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">bone_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">UUID or name of the bone.</td>
+    </tr><tr>
+      <td class="col-name">mesh_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">ID or name of the mesh. If not provided, uses selected mesh.</td>
+    </tr><tr>
+      <td class="col-name">weights</td>
+      <td class="col-type">Record&lt;string, number&gt;</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Map of vertex_key -&gt; weight value.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-clear_vertex_weights" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">clear_vertex_weights</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Clear Vertex Weights</p>
+      <p class="card-desc">Clears all vertex weights from a bone for a specific mesh.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">bone_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">UUID or name of the bone.</td>
+    </tr><tr>
+      <td class="col-name">mesh_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">ID or name of the mesh. If not provided, uses selected mesh.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+        </section>
+<section id="cat-elements" class="category-section">
+          <h3 class="category-title">Elements</h3>
+          <div id="tool-remove_element" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">remove_element</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Remove Element</p>
+      <p class="card-desc">Removes the element with the given ID.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">ID or name of the element to remove.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-add_group" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">add_group</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Add Group</p>
+      <p class="card-desc">Adds a new group with the given name and options.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">name</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc"></td>
+    </tr><tr>
+      <td class="col-name">origin</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">3D vector [x, y, z]. <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
+    </tr><tr>
+      <td class="col-name">rotation</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">3D vector [x, y, z]. <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
+    </tr><tr>
+      <td class="col-name">parent</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc"> <span class="param-meta">(default: <code>&quot;root&quot;</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">visibility</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc"> <span class="param-meta">(default: <code>true</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">autouv</td>
+      <td class="col-type">&quot;0&quot; | &quot;1&quot; | &quot;2&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Auto UV setting. 0 = disabled, 1 = enabled, 2 = relative auto UV. <span class="param-meta">(default: <code>&quot;0&quot;</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">selected</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc"> <span class="param-meta">(default: <code>false</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">shade</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc"> <span class="param-meta">(default: <code>false</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-list_outline" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">list_outline</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">List Outline</p>
+      <p class="card-desc">Returns a list of all groups and their children in the Blockbench editor.</p>
+      <div class="overflow-x">
+        <p class="empty-params">No parameters</p>
+      </div>
+    </div>
+<div id="tool-duplicate_element" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">duplicate_element</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Duplicate Element</p>
+      <p class="card-desc">Duplicates a cube, mesh or group by ID or name.  You may offset the duplicate or assign a new name.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">ID or name of the element to duplicate.</td>
+    </tr><tr>
+      <td class="col-name">offset</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">3D vector [x, y, z]. <span class="param-meta">(default: <code>[0,0,0]</code>) [minItems: 3, maxItems: 3]</span></td>
+    </tr><tr>
+      <td class="col-name">newName</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc"></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-rename_element" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">rename_element</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Rename Element</p>
+      <p class="card-desc">Renames a cube, mesh or group by ID or name.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">ID or name of the element to rename.</td>
+    </tr><tr>
+      <td class="col-name">new_name</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">New name to assign.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+        </section>
+<section id="cat-import-export" class="category-section">
+          <h3 class="category-title">Import/Export</h3>
+          <div id="tool-from_geo_json" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">from_geo_json</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Import GeoJSON</p>
+      <p class="card-desc">Imports a model from a GeoJSON file.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">geojson</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Path to the GeoJSON file or data URL, or the GeoJSON string itself.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+        </section>
+<section id="cat-material-instances" class="category-section">
+          <h3 class="category-title">Material Instances</h3>
+          <div id="tool-get_face_material_instances" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">get_face_material_instances</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">Get Face Material Instances</p>
+      <p class="card-desc">Gets the material instance names for cube faces. Material instances are used in Bedrock Block format to map faces to materials defined in the minecraft:material_instances component.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">cube_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">ID or name of the cube. If not provided, uses the first selected cube.</td>
+    </tr><tr>
+      <td class="col-name">faces</td>
+      <td class="col-type">&quot;north&quot; | &quot;south&quot; | &quot;east&quot; | &quot;west&quot; | &quot;up&quot; | &quot;down&quot;[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Specific faces to get/clear material instances for. If not provided, returns/clears all faces.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-set_face_material_instance" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">set_face_material_instance</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Set Face Material Instance</p>
+      <p class="card-desc">Sets the material instance name for one or more cube faces. Material instances are strings that map to materials defined in the minecraft:material_instances component for Bedrock Block format.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">cube_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">ID or name of the cube. If not provided, applies to all selected cubes.</td>
+    </tr><tr>
+      <td class="col-name">material_name</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">The material instance name to assign. Use empty string to clear the material instance.</td>
+    </tr><tr>
+      <td class="col-name">faces</td>
+      <td class="col-type">&quot;north&quot; | &quot;south&quot; | &quot;east&quot; | &quot;west&quot; | &quot;up&quot; | &quot;down&quot;[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Faces to set the material instance on. Defaults to all faces. <span class="param-meta">(default: <code>[&quot;north&quot;,&quot;south&quot;,&quot;east&quot;,&quot;west&quot;,&quot;up&quot;,&quot;down&quot;]</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-list_material_instances" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">list_material_instances</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">List Material Instances</p>
+      <p class="card-desc">Lists all unique material instance names used in the project. Returns the material instance names along with which cubes and faces use them.</p>
+      <div class="overflow-x">
+        <p class="empty-params">No parameters</p>
+      </div>
+    </div>
+<div id="tool-bulk_set_material_instances" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">bulk_set_material_instances</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Bulk Set Material Instances</p>
+      <p class="card-desc">Sets material instance names on multiple cubes at once. Useful for assigning different material instances to different faces across the project.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">assignments</td>
+      <td class="col-type">object[]</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Array of material instance assignments. <span class="param-meta">[minItems: 1]</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-clear_material_instances" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">clear_material_instances</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Clear Material Instances</p>
+      <p class="card-desc">Clears (removes) material instance names from cube faces. Useful for resetting material assignments.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">cube_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">ID or name of the cube. If not provided, clears from all selected cubes.</td>
+    </tr><tr>
+      <td class="col-name">faces</td>
+      <td class="col-type">&quot;north&quot; | &quot;south&quot; | &quot;east&quot; | &quot;west&quot; | &quot;up&quot; | &quot;down&quot;[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Specific faces to clear. If not provided, clears all faces.</td>
+    </tr><tr>
+      <td class="col-name">all_cubes</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">If true, clears material instances from all cubes in the project. <span class="param-meta">(default: <code>false</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+        </section>
+<section id="cat-mesh-editing" class="category-section">
+          <h3 class="category-title">Mesh Editing</h3>
+          <div id="tool-place_mesh" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">place_mesh</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Place Mesh</p>
+      <p class="card-desc">Places a mesh at the specified position. Texture and group are optional.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">elements</td>
+      <td class="col-type">object[]</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Array of meshes to place. <span class="param-meta">[minItems: 1]</span></td>
+    </tr><tr>
+      <td class="col-name">texture</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Texture ID or name to apply to the mesh.</td>
+    </tr><tr>
+      <td class="col-name">group</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Group/bone to which the mesh belongs.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-extrude_mesh" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">extrude_mesh</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Extrude Mesh</p>
+      <p class="card-desc">Extrudes selected faces or edges of a mesh.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">mesh_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">ID or name of the mesh. If not provided, uses selected mesh.</td>
+    </tr><tr>
+      <td class="col-name">distance</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Distance to extrude. <span class="param-meta">(default: <code>1</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">mode</td>
+      <td class="col-type">&quot;faces&quot; | &quot;edges&quot; | &quot;vertices&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">What to extrude: faces, edges, or vertices. <span class="param-meta">(default: <code>&quot;faces&quot;</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-subdivide_mesh" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">subdivide_mesh</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Subdivide Mesh</p>
+      <p class="card-desc">Subdivides selected faces of a mesh to create more geometry.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">mesh_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">ID or name of the mesh. If not provided, uses selected mesh.</td>
+    </tr><tr>
+      <td class="col-name">cuts</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Number of subdivision cuts to make. <span class="param-meta">(default: <code>1</code>) [min: 1, max: 10]</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-create_sphere" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">create_sphere</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Create Sphere</p>
+      <p class="card-desc">Creates a sphere mesh at the specified position with the given parameters. The sphere is created as a mesh with vertices and faces using spherical coordinates.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">elements</td>
+      <td class="col-type">object[]</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Array of spheres to create. <span class="param-meta">[minItems: 1]</span></td>
+    </tr><tr>
+      <td class="col-name">texture</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Texture ID or name to apply to the sphere.</td>
+    </tr><tr>
+      <td class="col-name">group</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Group/bone to which the sphere belongs.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-select_mesh_elements" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">select_mesh_elements</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Select Mesh Elements</p>
+      <p class="card-desc">Selects vertices, edges, or faces of a mesh for manipulation.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">mesh_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">ID or name of the mesh to select elements from.</td>
+    </tr><tr>
+      <td class="col-name">mode</td>
+      <td class="col-type">&quot;vertex&quot; | &quot;edge&quot; | &quot;face&quot;</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Selection mode.</td>
+    </tr><tr>
+      <td class="col-name">elements</td>
+      <td class="col-type">string,number[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Specific elements to select. If not provided, selects all.</td>
+    </tr><tr>
+      <td class="col-name">action</td>
+      <td class="col-type">&quot;select&quot; | &quot;add&quot; | &quot;remove&quot; | &quot;toggle&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Selection action: select (replace), add, remove, or toggle. <span class="param-meta">(default: <code>&quot;select&quot;</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-move_mesh_vertices" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">move_mesh_vertices</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Move Mesh Vertices</p>
+      <p class="card-desc">Moves selected vertices of a mesh by the specified offset.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">mesh_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">ID or name of the mesh. If not provided, uses selected mesh.</td>
+    </tr><tr>
+      <td class="col-name">offset</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Offset to move vertices by [x, y, z]. <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
+    </tr><tr>
+      <td class="col-name">vertices</td>
+      <td class="col-type">string[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Specific vertex keys to move. If not provided, moves all selected vertices.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-delete_mesh_elements" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">delete_mesh_elements</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Delete Mesh Elements</p>
+      <p class="card-desc">Deletes selected vertices, edges, or faces from a mesh.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">mesh_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">ID or name of the mesh. If not provided, uses selected mesh.</td>
+    </tr><tr>
+      <td class="col-name">mode</td>
+      <td class="col-type">&quot;vertices&quot; | &quot;edges&quot; | &quot;faces&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">What to delete: vertices, edges, or faces. <span class="param-meta">(default: <code>&quot;faces&quot;</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">keep_vertices</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">When deleting faces/edges, whether to keep the vertices. <span class="param-meta">(default: <code>false</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-merge_mesh_vertices" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">merge_mesh_vertices</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Merge Mesh Vertices</p>
+      <p class="card-desc">Merges vertices that are within a specified distance of each other.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">mesh_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">ID or name of the mesh.</td>
+    </tr><tr>
+      <td class="col-name">threshold</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Maximum distance between vertices to merge. <span class="param-meta">(default: <code>0.1</code>) [min: 0, max: 10]</span></td>
+    </tr><tr>
+      <td class="col-name">selected_only</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Whether to only merge selected vertices. <span class="param-meta">(default: <code>true</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-create_mesh_face" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">create_mesh_face</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Create Mesh Face</p>
+      <p class="card-desc">Creates a new face from selected vertices.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">mesh_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">ID or name of the mesh. If not provided, uses selected mesh.</td>
+    </tr><tr>
+      <td class="col-name">vertices</td>
+      <td class="col-type">string[]</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Vertex keys to create face from. Must be 3 or 4 vertices. <span class="param-meta">[minItems: 3, maxItems: 4]</span></td>
+    </tr><tr>
+      <td class="col-name">texture</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Texture ID or name to apply to the new face.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-create_cylinder" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">create_cylinder</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Create Cylinder</p>
+      <p class="card-desc">Creates one or more cylinder meshes with optional end caps.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">elements</td>
+      <td class="col-type">object[]</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc"> <span class="param-meta">[minItems: 1]</span></td>
+    </tr><tr>
+      <td class="col-name">texture</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Texture ID or name. If not provided, uses selected texture.</td>
+    </tr><tr>
+      <td class="col-name">group</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Group/bone ID or name.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-knife_tool" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">knife_tool</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Knife Tool</p>
+      <p class="card-desc">Uses the knife tool to cut custom edges into mesh faces.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">mesh_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">ID or name of the mesh to cut.</td>
+    </tr><tr>
+      <td class="col-name">points</td>
+      <td class="col-type">object[]</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Points defining the cut path. <span class="param-meta">[minItems: 2]</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+        </section>
+<section id="cat-paint-tools" class="category-section">
+          <h3 class="category-title">Paint Tools</h3>
+          <div id="tool-paint_fill_tool" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">paint_fill_tool</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Paint Fill Tool</p>
+      <p class="card-desc">Uses the fill/bucket tool to fill areas with color.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">texture_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Texture ID or name. If not provided, uses selected texture.</td>
+    </tr><tr>
+      <td class="col-name">x</td>
+      <td class="col-type">number</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">X coordinate to start fill.</td>
+    </tr><tr>
+      <td class="col-name">y</td>
+      <td class="col-type">number</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Y coordinate to start fill.</td>
+    </tr><tr>
+      <td class="col-name">color</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Fill color as hex string.</td>
+    </tr><tr>
+      <td class="col-name">opacity</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Fill opacity (0-255). <span class="param-meta">[min: 0, max: 255]</span></td>
+    </tr><tr>
+      <td class="col-name">tolerance</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Color tolerance for fill. <span class="param-meta">[min: 0, max: 100]</span></td>
+    </tr><tr>
+      <td class="col-name">fill_mode</td>
+      <td class="col-type">&quot;color&quot; | &quot;color_connected&quot; | &quot;face&quot; | &quot;element&quot; | &quot;selected_elements&quot; | &quot;selection&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Fill mode. <span class="param-meta">(default: <code>&quot;color_connected&quot;</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">blend_mode</td>
+      <td class="col-type">&quot;default&quot; | &quot;set_opacity&quot; | &quot;color&quot; | &quot;behind&quot; | &quot;multiply&quot; | &quot;add&quot; | &quot;screen&quot; | &quot;overlay&quot; | &quot;difference&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Fill blend mode.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-draw_shape_tool" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">draw_shape_tool</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Draw Shape Tool</p>
+      <p class="card-desc">Draws geometric shapes on textures.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">texture_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Texture ID or name. If not provided, uses selected texture.</td>
+    </tr><tr>
+      <td class="col-name">shape</td>
+      <td class="col-type">&quot;rectangle&quot; | &quot;rectangle_h&quot; | &quot;ellipse&quot; | &quot;ellipse_h&quot;</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Shape to draw. '_h' suffix means hollow.</td>
+    </tr><tr>
+      <td class="col-name">start</td>
+      <td class="col-type">object</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc"></td>
+    </tr><tr>
+      <td class="col-name">end</td>
+      <td class="col-type">object</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc"></td>
+    </tr><tr>
+      <td class="col-name">color</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Shape color as hex string.</td>
+    </tr><tr>
+      <td class="col-name">line_width</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Line width for hollow shapes. <span class="param-meta">[min: 1, max: 50]</span></td>
+    </tr><tr>
+      <td class="col-name">opacity</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Shape opacity (0-255). <span class="param-meta">[min: 0, max: 255]</span></td>
+    </tr><tr>
+      <td class="col-name">blend_mode</td>
+      <td class="col-type">&quot;default&quot; | &quot;set_opacity&quot; | &quot;color&quot; | &quot;behind&quot; | &quot;multiply&quot; | &quot;add&quot; | &quot;screen&quot; | &quot;overlay&quot; | &quot;difference&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Shape blend mode.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-gradient_tool" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">gradient_tool</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Gradient Tool</p>
+      <p class="card-desc">Applies gradients to textures.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">texture_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Texture ID or name. If not provided, uses selected texture.</td>
+    </tr><tr>
+      <td class="col-name">start</td>
+      <td class="col-type">object</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc"></td>
+    </tr><tr>
+      <td class="col-name">end</td>
+      <td class="col-type">object</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc"></td>
+    </tr><tr>
+      <td class="col-name">start_color</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Start color as hex string.</td>
+    </tr><tr>
+      <td class="col-name">end_color</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">End color as hex string.</td>
+    </tr><tr>
+      <td class="col-name">opacity</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Gradient opacity (0-255). <span class="param-meta">[min: 0, max: 255]</span></td>
+    </tr><tr>
+      <td class="col-name">blend_mode</td>
+      <td class="col-type">&quot;default&quot; | &quot;set_opacity&quot; | &quot;color&quot; | &quot;behind&quot; | &quot;multiply&quot; | &quot;add&quot; | &quot;screen&quot; | &quot;overlay&quot; | &quot;difference&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Gradient blend mode.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-color_picker_tool" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">color_picker_tool</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">Color Picker Tool</p>
+      <p class="card-desc">Picks colors from textures and sets them as the active color.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">texture_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Texture ID or name. If not provided, uses selected texture.</td>
+    </tr><tr>
+      <td class="col-name">x</td>
+      <td class="col-type">number</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">X coordinate to pick color from.</td>
+    </tr><tr>
+      <td class="col-name">y</td>
+      <td class="col-type">number</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Y coordinate to pick color from.</td>
+    </tr><tr>
+      <td class="col-name">set_as_secondary</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Set as secondary color instead of primary. <span class="param-meta">(default: <code>false</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">pick_opacity</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Also pick and apply the pixel's opacity. <span class="param-meta">(default: <code>false</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-copy_brush_tool" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">copy_brush_tool</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Copy Brush Tool</p>
+      <p class="card-desc">Uses the copy/clone brush to copy texture areas.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">texture_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Texture ID or name. If not provided, uses selected texture.</td>
+    </tr><tr>
+      <td class="col-name">source</td>
+      <td class="col-type">object</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc"></td>
+    </tr><tr>
+      <td class="col-name">target</td>
+      <td class="col-type">object</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc"></td>
+    </tr><tr>
+      <td class="col-name">brush_size</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Copy brush size. <span class="param-meta">[min: 1, max: 100]</span></td>
+    </tr><tr>
+      <td class="col-name">opacity</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Copy opacity (0-255). <span class="param-meta">[min: 0, max: 255]</span></td>
+    </tr><tr>
+      <td class="col-name">mode</td>
+      <td class="col-type">&quot;copy&quot; | &quot;sample&quot; | &quot;pattern&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Copy brush mode. <span class="param-meta">(default: <code>&quot;copy&quot;</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-eraser_tool" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">eraser_tool</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Eraser Tool</p>
+      <p class="card-desc">Erases parts of textures with customizable settings.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">texture_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Texture ID or name. If not provided, uses selected texture.</td>
+    </tr><tr>
+      <td class="col-name">coordinates</td>
+      <td class="col-type">object[]</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Array of coordinates to erase at.</td>
+    </tr><tr>
+      <td class="col-name">brush_size</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Eraser brush size. <span class="param-meta">[min: 1, max: 100]</span></td>
+    </tr><tr>
+      <td class="col-name">opacity</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Eraser opacity (0-255). <span class="param-meta">[min: 0, max: 255]</span></td>
+    </tr><tr>
+      <td class="col-name">softness</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Eraser softness percentage. <span class="param-meta">[min: 0, max: 100]</span></td>
+    </tr><tr>
+      <td class="col-name">shape</td>
+      <td class="col-type">&quot;square&quot; | &quot;circle&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Eraser shape.</td>
+    </tr><tr>
+      <td class="col-name">connect_strokes</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Whether to connect erase strokes with lines. <span class="param-meta">(default: <code>true</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-paint_settings" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">paint_settings</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Paint Settings</p>
+      <p class="card-desc">Configures paint mode settings and preferences.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">mirror_painting</td>
+      <td class="col-type">object</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Mirror painting settings.</td>
+    </tr><tr>
+      <td class="col-name">lock_alpha</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Lock alpha channel while painting.</td>
+    </tr><tr>
+      <td class="col-name">pixel_perfect</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Enable pixel perfect drawing.</td>
+    </tr><tr>
+      <td class="col-name">paint_side_restrict</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Restrict painting to current face side.</td>
+    </tr><tr>
+      <td class="col-name">color_erase_mode</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Enable color erase mode.</td>
+    </tr><tr>
+      <td class="col-name">brush_opacity_modifier</td>
+      <td class="col-type">&quot;none&quot; | &quot;pressure&quot; | &quot;tilt&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Brush opacity modifier for stylus.</td>
+    </tr><tr>
+      <td class="col-name">brush_size_modifier</td>
+      <td class="col-type">&quot;none&quot; | &quot;pressure&quot; | &quot;tilt&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Brush size modifier for stylus.</td>
+    </tr><tr>
+      <td class="col-name">paint_with_stylus_only</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Only allow painting with stylus input.</td>
+    </tr><tr>
+      <td class="col-name">pick_color_opacity</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Pick opacity when using color picker.</td>
+    </tr><tr>
+      <td class="col-name">pick_combined_color</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Pick combined layer colors.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-paint_with_brush" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">paint_with_brush</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Paint with Brush</p>
+      <p class="card-desc">Paints on textures using the brush tool with customizable settings.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">texture_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Texture ID or name. If not provided, uses selected texture.</td>
+    </tr><tr>
+      <td class="col-name">coordinates</td>
+      <td class="col-type">object[]</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Array of coordinates to paint at.</td>
+    </tr><tr>
+      <td class="col-name">brush_settings</td>
+      <td class="col-type">object</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Brush settings to apply.</td>
+    </tr><tr>
+      <td class="col-name">connect_strokes</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Whether to connect paint strokes with lines. <span class="param-meta">(default: <code>true</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-create_brush_preset" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">create_brush_preset</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Create Brush Preset</p>
+      <p class="card-desc">Creates a custom brush preset with specified settings.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">name</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Name of the brush preset.</td>
+    </tr><tr>
+      <td class="col-name">size</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Brush size. <span class="param-meta">[min: 1, max: 100]</span></td>
+    </tr><tr>
+      <td class="col-name">opacity</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Opacity (0-255). <span class="param-meta">[min: 0, max: 255]</span></td>
+    </tr><tr>
+      <td class="col-name">softness</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Brush softness percentage. <span class="param-meta">[min: 0, max: 100]</span></td>
+    </tr><tr>
+      <td class="col-name">shape</td>
+      <td class="col-type">&quot;square&quot; | &quot;circle&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Brush shape.</td>
+    </tr><tr>
+      <td class="col-name">color</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Brush color as hex string.</td>
+    </tr><tr>
+      <td class="col-name">blend_mode</td>
+      <td class="col-type">&quot;default&quot; | &quot;set_opacity&quot; | &quot;color&quot; | &quot;behind&quot; | &quot;multiply&quot; | &quot;add&quot; | &quot;screen&quot; | &quot;overlay&quot; | &quot;difference&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Brush blend mode.</td>
+    </tr><tr>
+      <td class="col-name">pixel_perfect</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Enable pixel perfect drawing.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-load_brush_preset" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">load_brush_preset</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Load Brush Preset</p>
+      <p class="card-desc">Loads and applies a brush preset by name.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">preset_name</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Name of the brush preset to load.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-texture_selection" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">texture_selection</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Texture Selection</p>
+      <p class="card-desc">Creates, modifies, or manipulates texture selections for painting.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">action</td>
+      <td class="col-type">&quot;select_rectangle&quot; | &quot;select_ellipse&quot; | &quot;select_all&quot; | &quot;clear_selection&quot; | &quot;invert_selection&quot; | &quot;expand_selection&quot; | &quot;contract_selection&quot; | &quot;feather_selection&quot;</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Selection action to perform.</td>
+    </tr><tr>
+      <td class="col-name">texture_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Texture ID or name. If not provided, uses selected texture.</td>
+    </tr><tr>
+      <td class="col-name">coordinates</td>
+      <td class="col-type">object</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Selection area coordinates.</td>
+    </tr><tr>
+      <td class="col-name">radius</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Radius for expand/contract/feather operations.</td>
+    </tr><tr>
+      <td class="col-name">mode</td>
+      <td class="col-type">&quot;create&quot; | &quot;add&quot; | &quot;subtract&quot; | &quot;intersect&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Selection mode. <span class="param-meta">(default: <code>&quot;create&quot;</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-texture_layer_management" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">texture_layer_management</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Texture Layer Management</p>
+      <p class="card-desc">Creates, manages, and manipulates texture layers.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">action</td>
+      <td class="col-type">&quot;create_layer&quot; | &quot;delete_layer&quot; | &quot;duplicate_layer&quot; | &quot;merge_down&quot; | &quot;set_opacity&quot; | &quot;set_blend_mode&quot; | &quot;move_layer&quot; | &quot;rename_layer&quot; | &quot;flatten_layers&quot;</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Layer management action.</td>
+    </tr><tr>
+      <td class="col-name">texture_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Texture ID or name. If not provided, uses selected texture.</td>
+    </tr><tr>
+      <td class="col-name">layer_name</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Name of the layer.</td>
+    </tr><tr>
+      <td class="col-name">opacity</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Layer opacity percentage. <span class="param-meta">[min: 0, max: 100]</span></td>
+    </tr><tr>
+      <td class="col-name">blend_mode</td>
+      <td class="col-type">&quot;normal&quot; | &quot;multiply&quot; | &quot;screen&quot; | &quot;overlay&quot; | &quot;soft_light&quot; | &quot;hard_light&quot; | &quot;color_dodge&quot; | &quot;color_burn&quot; | &quot;darken&quot; | &quot;lighten&quot; | &quot;difference&quot; | &quot;exclusion&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Layer blend mode.</td>
+    </tr><tr>
+      <td class="col-name">target_index</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Target position for moving layers.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+        </section>
+<section id="cat-project" class="category-section">
+          <h3 class="category-title">Project</h3>
+          <div id="tool-create_project" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">create_project</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-destructive">destructive</span><span class="badge badge-openworld">open-world</span>
+        </div>
+      </div>
+      <p class="card-title">Create Project</p>
+      <p class="card-desc">Creates a new project with the given name and project type.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">name</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc"></td>
+    </tr><tr>
+      <td class="col-name">format</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Project format ID from Blockbench's Formats registry. <span class="param-meta">(default: <code>&quot;bedrock_block&quot;</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+        </section>
+<section id="cat-textures" class="category-section">
+          <h3 class="category-title">Textures</h3>
+          <div id="tool-create_texture" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">create_texture</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span><span class="badge badge-openworld">open-world</span>
+        </div>
+      </div>
+      <p class="card-title">Create Texture</p>
+      <p class="card-desc">Creates a new texture with the given name and size.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">name</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc"></td>
+    </tr><tr>
+      <td class="col-name">width</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc"> <span class="param-meta">(default: <code>16</code>) [min: 16, max: 4096]</span></td>
+    </tr><tr>
+      <td class="col-name">height</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc"> <span class="param-meta">(default: <code>16</code>) [min: 16, max: 4096]</span></td>
+    </tr><tr>
+      <td class="col-name">data</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Path to the image file or data URL.</td>
+    </tr><tr>
+      <td class="col-name">group</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc"></td>
+    </tr><tr>
+      <td class="col-name">fill_color</td>
+      <td class="col-type">number[] | string | string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">RGBA color to fill the texture, as tuple or HEX string.</td>
+    </tr><tr>
+      <td class="col-name">layer_name</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Name of the texture layer. Required if fill_color is set.</td>
+    </tr><tr>
+      <td class="col-name">pbr_channel</td>
+      <td class="col-type">&quot;color&quot; | &quot;normal&quot; | &quot;height&quot; | &quot;mer&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">PBR channel to use for the texture. Color, normal, height, or Metalness/Emissive/Roughness (MER) map.</td>
+    </tr><tr>
+      <td class="col-name">render_mode</td>
+      <td class="col-type">&quot;default&quot; | &quot;emissive&quot; | &quot;additive&quot; | &quot;layered&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Render mode for the texture. Default, emissive, additive, or layered. <span class="param-meta">(default: <code>&quot;default&quot;</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">render_sides</td>
+      <td class="col-type">&quot;auto&quot; | &quot;front&quot; | &quot;double&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Render sides for the texture. Auto, front, or double. <span class="param-meta">(default: <code>&quot;auto&quot;</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-apply_texture" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">apply_texture</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Apply Texture</p>
+      <p class="card-desc">Applies the given texture to the element with the specified ID.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">ID or name of the element to apply the texture to.</td>
+    </tr><tr>
+      <td class="col-name">texture</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">ID or name of the texture to apply.</td>
+    </tr><tr>
+      <td class="col-name">applyTo</td>
+      <td class="col-type">&quot;all&quot; | &quot;blank&quot; | &quot;none&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Apply texture to element or group. <span class="param-meta">(default: <code>&quot;blank&quot;</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-add_texture_group" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">add_texture_group</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Add Texture Group</p>
+      <p class="card-desc">Adds a new texture group with the given name.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">name</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc"></td>
+    </tr><tr>
+      <td class="col-name">textures</td>
+      <td class="col-type">string[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Array of texture IDs or names to add to the group.</td>
+    </tr><tr>
+      <td class="col-name">is_material</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Whether the texture group is a PBR material or not. <span class="param-meta">(default: <code>true</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-list_textures" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">list_textures</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">List Textures</p>
+      <p class="card-desc">Returns a list of all textures in the Blockbench editor.</p>
+      <div class="overflow-x">
+        <p class="empty-params">No parameters</p>
+      </div>
+    </div>
+<div id="tool-get_texture" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">get_texture</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">Get Texture</p>
+      <p class="card-desc">Returns the image data of the given texture or default texture.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">texture</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Texture ID or name. If not provided, uses selected texture.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-create_pbr_material" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">create_pbr_material</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Create PBR Material</p>
+      <p class="card-desc">Creates a new PBR material (texture group with is_material=true) and optionally assigns textures to PBR channels. Use this for Minecraft Bedrock resource packs or any format supporting PBR.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">name</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Name of the material.</td>
+    </tr><tr>
+      <td class="col-name">color_texture</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Texture ID/name for the color (albedo) channel.</td>
+    </tr><tr>
+      <td class="col-name">normal_texture</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Texture ID/name for the normal map channel.</td>
+    </tr><tr>
+      <td class="col-name">height_texture</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Texture ID/name for the height/displacement map channel.</td>
+    </tr><tr>
+      <td class="col-name">mer_texture</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Texture ID/name for the MER (Metalness/Emissive/Roughness) channel.</td>
+    </tr><tr>
+      <td class="col-name">color_value</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Uniform RGBA color [R,G,B,A] when no color texture is provided. <span class="param-meta">[minItems: 4, maxItems: 4]</span></td>
+    </tr><tr>
+      <td class="col-name">mer_value</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Uniform MER values [Metalness, Emissive, Roughness] (0-255) when no MER texture is provided. <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
+    </tr><tr>
+      <td class="col-name">subsurface_value</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Subsurface scattering value (0-255) for Bedrock 1.21.30+ materials. <span class="param-meta">[min: 0, max: 255]</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-configure_material" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">configure_material</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Configure Material</p>
+      <p class="card-desc">Configures an existing PBR material's properties including channel assignments, uniform values, and subsurface scattering.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">material</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Material name or UUID to configure.</td>
+    </tr><tr>
+      <td class="col-name">color_texture</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Texture ID/name for the color channel, or 'none' to use uniform color.</td>
+    </tr><tr>
+      <td class="col-name">normal_texture</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Texture ID/name for the normal map, or 'none' to remove.</td>
+    </tr><tr>
+      <td class="col-name">height_texture</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Texture ID/name for the height map, or 'none' to remove.</td>
+    </tr><tr>
+      <td class="col-name">mer_texture</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Texture ID/name for MER channel, or 'none' to use uniform values.</td>
+    </tr><tr>
+      <td class="col-name">color_value</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Uniform RGBA color [R,G,B,A] when no color texture. <span class="param-meta">[minItems: 4, maxItems: 4]</span></td>
+    </tr><tr>
+      <td class="col-name">mer_value</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Uniform MER values [Metalness, Emissive, Roughness] (0-255). <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
+    </tr><tr>
+      <td class="col-name">subsurface_value</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Subsurface scattering value (0-255). <span class="param-meta">[min: 0, max: 255]</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-list_materials" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">list_materials</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">List Materials</p>
+      <p class="card-desc">Lists all PBR materials (texture groups with is_material=true) and their assigned textures per channel.</p>
+      <div class="overflow-x">
+        <p class="empty-params">No parameters</p>
+      </div>
+    </div>
+<div id="tool-get_material_info" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">get_material_info</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">Get Material Info</p>
+      <p class="card-desc">Gets detailed information about a PBR material including the compiled texture_set.json preview for Bedrock export.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">material</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Material name or UUID.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-import_texture_set" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">import_texture_set</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span><span class="badge badge-openworld">open-world</span>
+        </div>
+      </div>
+      <p class="card-title">Import Texture Set</p>
+      <p class="card-desc">Imports a Minecraft Bedrock texture_set.json file and creates a PBR material with the associated textures.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">path</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Path to the .texture_set.json file to import.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-assign_texture_channel" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">assign_texture_channel</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Assign Texture Channel</p>
+      <p class="card-desc">Assigns a texture to a specific PBR channel within a material.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">material</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Material name or UUID.</td>
+    </tr><tr>
+      <td class="col-name">texture</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Texture name or UUID to assign.</td>
+    </tr><tr>
+      <td class="col-name">channel</td>
+      <td class="col-type">&quot;color&quot; | &quot;normal&quot; | &quot;height&quot; | &quot;mer&quot;</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">PBR channel to assign the texture to.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-save_material_config" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">save_material_config</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span><span class="badge badge-openworld">open-world</span>
+        </div>
+      </div>
+      <p class="card-title">Save Material Config</p>
+      <p class="card-desc">Saves the material's texture_set.json file to disk (Bedrock format). Requires the color texture to have a valid file path.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">material</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Material name or UUID to save.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+        </section>
+<section id="cat-ui-interaction" class="category-section">
+          <h3 class="category-title">UI Interaction</h3>
+          <div id="tool-trigger_action" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">trigger_action</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span><span class="badge badge-openworld">open-world</span>
+        </div>
+      </div>
+      <p class="card-title">Trigger Action</p>
+      <p class="card-desc">Triggers an action in the Blockbench editor.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">action</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Action ID from Blockbench's BarItems registry.</td>
+    </tr><tr>
+      <td class="col-name">confirmDialog</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Whether or not to automatically confirm any dialogs that appear as a result of the action. <span class="param-meta">(default: <code>true</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">confirmEvent</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Stringified form of event arguments.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-risky_eval" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">risky_eval</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-destructive">destructive</span><span class="badge badge-openworld">open-world</span>
+        </div>
+      </div>
+      <p class="card-title">Eval</p>
+      <p class="card-desc">Evaluates the given expression and logs it to the console. Do not pass `console` commands as they will not work.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">code</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">JavaScript code to evaluate. Do not pass `console` commands or comments.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-emulate_clicks" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">emulate_clicks</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span><span class="badge badge-openworld">open-world</span>
+        </div>
+      </div>
+      <p class="card-title">Emulate Clicks</p>
+      <p class="card-desc">Emulates clicks on the given interface elements.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">position</td>
+      <td class="col-type">object</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc"></td>
+    </tr><tr>
+      <td class="col-name">drag</td>
+      <td class="col-type">object</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Drag options. If set, will perform a drag from position to 'to'.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-fill_dialog" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">fill_dialog</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span><span class="badge badge-openworld">open-world</span>
+        </div>
+      </div>
+      <p class="card-title">Fill Dialog</p>
+      <p class="card-desc">Fills the dialog with the given values.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">values</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Stringified form of values to fill the dialog with.</td>
+    </tr><tr>
+      <td class="col-name">confirm</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Whether to confirm or cancel the dialog after filling it. True to confirm, false to cancel. <span class="param-meta">(default: <code>true</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+        </section>
+<section id="cat-uv-mapping" class="category-section">
+          <h3 class="category-title">UV Mapping</h3>
+          <div id="tool-set_mesh_uv" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">set_mesh_uv</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Set Mesh UV</p>
+      <p class="card-desc">Sets UV coordinates for mesh faces or vertices.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">mesh_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">ID or name of the mesh.</td>
+    </tr><tr>
+      <td class="col-name">face_key</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Face key to set UV for.</td>
+    </tr><tr>
+      <td class="col-name">uv_mapping</td>
+      <td class="col-type">Record&lt;string, number[]&gt;</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">UV coordinates for each vertex of the face.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-auto_uv_mesh" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">auto_uv_mesh</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Auto UV Mesh</p>
+      <p class="card-desc">Automatically generates UV mapping for selected mesh faces.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">mesh_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">ID or name of the mesh. If not provided, uses selected mesh.</td>
+    </tr><tr>
+      <td class="col-name">mode</td>
+      <td class="col-type">&quot;project&quot; | &quot;unwrap&quot; | &quot;cylinder&quot; | &quot;sphere&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">UV mapping mode: project from view, unwrap, cylinder, or sphere mapping. <span class="param-meta">(default: <code>&quot;project&quot;</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">faces</td>
+      <td class="col-type">string[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Specific face keys to UV map. If not provided, maps all selected faces.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-rotate_mesh_uv" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">rotate_mesh_uv</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Rotate Mesh UV</p>
+      <p class="card-desc">Rotates UV coordinates of selected mesh faces.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">mesh_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">ID or name of the mesh. If not provided, uses selected mesh.</td>
+    </tr><tr>
+      <td class="col-name">angle</td>
+      <td class="col-type">&quot;-90&quot; | &quot;90&quot; | &quot;180&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Rotation angle in degrees. <span class="param-meta">(default: <code>&quot;90&quot;</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">faces</td>
+      <td class="col-type">string[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Specific face keys to rotate UV for. If not provided, rotates all selected faces.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+        </section>
+<section id="cat-hytale-integration" class="category-section">
+          <h3 class="category-title">Hytale Integration</h3>
+          <div id="tool-hytale_get_format_info" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">hytale_get_format_info</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">Get Hytale Format Info</p>
+      <p class="card-desc">Returns information about the current Hytale format. Requires the Hytale plugin and a Hytale format project to be active.</p>
+      <div class="overflow-x">
+        <p class="empty-params">No parameters</p>
+      </div>
+    </div>
+<div id="tool-hytale_validate_model" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">hytale_validate_model</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">Validate Hytale Model</p>
+      <p class="card-desc">Validates the current Hytale model against Hytale engine constraints (node count, UV sizes, etc.).</p>
+      <div class="overflow-x">
+        <p class="empty-params">No parameters</p>
+      </div>
+    </div>
+<div id="tool-hytale_set_cube_properties" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">hytale_set_cube_properties</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          
+        </div>
+      </div>
+      <p class="card-title">Set Hytale Cube Properties</p>
+      <p class="card-desc">Sets Hytale-specific properties on a cube: shading_mode (flat, standard, fullbright, reflective) and double_sided.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">cube_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">ID or name of the cube. If not provided, uses selected cube.</td>
+    </tr><tr>
+      <td class="col-name">shading_mode</td>
+      <td class="col-type">&quot;flat&quot; | &quot;standard&quot; | &quot;fullbright&quot; | &quot;reflective&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Shading mode: flat (no lighting), standard (normal), fullbright (emissive), reflective</td>
+    </tr><tr>
+      <td class="col-name">double_sided</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Whether to render both sides of faces</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-hytale_get_cube_properties" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">hytale_get_cube_properties</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">Get Hytale Cube Properties</p>
+      <p class="card-desc">Gets Hytale-specific properties from a cube (shading_mode, double_sided).</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">cube_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">ID or name of the cube. If not provided, uses selected cube.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-hytale_create_quad" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">hytale_create_quad</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          
+        </div>
+      </div>
+      <p class="card-title">Create Hytale Quad</p>
+      <p class="card-desc">Creates a Hytale quad (2D plane) with a specified normal direction. Quads are single-face elements useful for flat surfaces.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">name</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Name for the quad</td>
+    </tr><tr>
+      <td class="col-name">position</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Position [x, y, z] <span class="param-meta">(default: <code>[0,0,0]</code>) [minItems: 3, maxItems: 3]</span></td>
+    </tr><tr>
+      <td class="col-name">normal</td>
+      <td class="col-type">&quot;+X&quot; | &quot;-X&quot; | &quot;+Y&quot; | &quot;-Y&quot; | &quot;+Z&quot; | &quot;-Z&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Normal direction: +X, -X, +Y, -Y, +Z, -Z <span class="param-meta">(default: <code>&quot;+Y&quot;</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">size</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Size [width, height]. <span class="param-meta">(default: <code>[16,16]</code>) [minItems: 2, maxItems: 2]</span></td>
+    </tr><tr>
+      <td class="col-name">group</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Parent group/bone name</td>
+    </tr><tr>
+      <td class="col-name">double_sided</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Whether to render both sides <span class="param-meta">(default: <code>true</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-hytale_list_attachments" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">hytale_list_attachments</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">List Hytale Attachments</p>
+      <p class="card-desc">Lists all attachment collections in the current Hytale project.</p>
+      <div class="overflow-x">
+        <p class="empty-params">No parameters</p>
+      </div>
+    </div>
+<div id="tool-hytale_set_attachment_piece" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">hytale_set_attachment_piece</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          
+        </div>
+      </div>
+      <p class="card-title">Set Attachment Piece</p>
+      <p class="card-desc">Marks or unmarks a group as an attachment piece. Attachment pieces attach to like-named bones in the main model.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">group_name</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Name of the group to mark as attachment piece</td>
+    </tr><tr>
+      <td class="col-name">is_piece</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Whether the group is an attachment piece</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-hytale_list_attachment_pieces" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">hytale_list_attachment_pieces</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">List Attachment Pieces</p>
+      <p class="card-desc">Lists all groups marked as attachment pieces.</p>
+      <div class="overflow-x">
+        <p class="empty-params">No parameters</p>
+      </div>
+    </div>
+<div id="tool-hytale_create_visibility_keyframe" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">hytale_create_visibility_keyframe</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          
+        </div>
+      </div>
+      <p class="card-title">Create Visibility Keyframe</p>
+      <p class="card-desc">Creates a visibility keyframe for a bone. Hytale supports toggling node visibility at keyframes.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">bone_name</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Name of the bone/group.</td>
+    </tr><tr>
+      <td class="col-name">time</td>
+      <td class="col-type">number</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Time in seconds for the keyframe</td>
+    </tr><tr>
+      <td class="col-name">visible</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Whether the bone is visible at this keyframe</td>
+    </tr><tr>
+      <td class="col-name">animation_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Animation UUID or name. If not provided, uses current animation.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-hytale_set_animation_loop" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">hytale_set_animation_loop</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          
+        </div>
+      </div>
+      <p class="card-title">Set Animation Loop Mode</p>
+      <p class="card-desc">Sets the loop mode for a Hytale animation. Hytale supports &quot;loop&quot; (continuous) or &quot;hold&quot; (freeze on last frame).</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">animation_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Animation UUID or name. If not provided, uses current animation.</td>
+    </tr><tr>
+      <td class="col-name">loop_mode</td>
+      <td class="col-type">&quot;loop&quot; | &quot;hold&quot; | &quot;once&quot;</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Loop mode: loop (continuous), hold (freeze on last frame), once (play once)</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-hytale_set_cube_stretch" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">hytale_set_cube_stretch</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          
+        </div>
+      </div>
+      <p class="card-title">Set Cube Stretch</p>
+      <p class="card-desc">Sets the stretch values for a cube. Hytale uses stretch instead of float sizes for better UV handling.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">cube_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">ID or name of the cube. If not provided, uses selected cube.</td>
+    </tr><tr>
+      <td class="col-name">stretch</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Stretch values [x, y, z]. <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-hytale_get_cube_stretch" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">hytale_get_cube_stretch</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">Get Cube Stretch</p>
+      <p class="card-desc">Gets the stretch values for a cube.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">cube_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">ID or name of the cube. If not provided, uses selected cube.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+        </section>
+      </section>
+
+      <section id="prompts" class="doc-section">
+        <h2 class="section-title">Prompts</h2>
+        <div class="card">
+      <div class="card-header">
+        <h3 class="card-name">blockbench_native_apis</h3>
+        <div class="card-badges"><span class="badge badge-stable">stable</span></div>
+      </div>
+      
+      <p class="card-desc">Essential information about Blockbench v5.0 native API security model and requireNativeModule() usage. Use this when working with Node.js modules, file system access, or native APIs in Blockbench plugins.</p>
+      <div class="overflow-x"><p class="empty-params">No arguments</p></div>
+    </div>
+<div class="card">
+      <div class="card-header">
+        <h3 class="card-name">blockbench_code_eval_safety</h3>
+        <div class="card-badges"><span class="badge badge-stable">stable</span></div>
+      </div>
+      
+      <p class="card-desc">Critical safety guide for agents using code evaluation/execution tools with Blockbench v5.0+. Contains breaking changes, quick reference, common mistakes, and safe code patterns for native module usage.</p>
+      <div class="overflow-x"><p class="empty-params">No arguments</p></div>
+    </div>
+<div class="card">
+      <div class="card-header">
+        <h3 class="card-name">model_creation_strategy</h3>
+        <div class="card-badges"><span class="badge badge-stable">stable</span></div>
+      </div>
+      <p class="card-title">Model Creation Strategy</p>
+      <p class="card-desc">A strategy for creating a new 3D model in Blockbench.</p>
+      <div class="overflow-x"><table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">format</td>
+      <td class="col-type">&quot;java_block&quot; | &quot;bedrock&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Target model format.</td>
+    </tr><tr>
+      <td class="col-name">approach</td>
+      <td class="col-type">&quot;ui&quot; | &quot;programmatic&quot; | &quot;import&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Creation approach to use.</td>
+    </tr></tbody>
+    </table></div>
+    </div>
+<div class="card">
+      <div class="card-header">
+        <h3 class="card-name">hytale_model_creation</h3>
+        <div class="card-badges"><span class="badge badge-experimental">experimental</span></div>
+      </div>
+      <p class="card-title">Hytale Model Creation Guide</p>
+      <p class="card-desc">Comprehensive guide for creating Hytale character and prop models. Covers format selection, node limits, shading modes, stretch, quads, and best practices.</p>
+      <div class="overflow-x"><table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">format_type</td>
+      <td class="col-type">&quot;character&quot; | &quot;prop&quot; | &quot;both&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Which format type to focus on. <span class="param-meta">(default: <code>&quot;both&quot;</code>)</span></td>
+    </tr></tbody>
+    </table></div>
+    </div>
+<div class="card">
+      <div class="card-header">
+        <h3 class="card-name">hytale_animation_workflow</h3>
+        <div class="card-badges"><span class="badge badge-experimental">experimental</span></div>
+      </div>
+      <p class="card-title">Hytale Animation Workflow</p>
+      <p class="card-desc">Guide for creating animations for Hytale models. Covers 60 FPS timing, quaternion rotations, visibility keyframes, loop modes, and common animation patterns.</p>
+      <div class="overflow-x"><table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">animation_type</td>
+      <td class="col-type">&quot;walk&quot; | &quot;idle&quot; | &quot;attack&quot; | &quot;general&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Type of animation to focus on. <span class="param-meta">(default: <code>&quot;general&quot;</code>)</span></td>
+    </tr></tbody>
+    </table></div>
+    </div>
+<div class="card">
+      <div class="card-header">
+        <h3 class="card-name">hytale_attachments</h3>
+        <div class="card-badges"><span class="badge badge-experimental">experimental</span></div>
+      </div>
+      <p class="card-title">Hytale Attachments System</p>
+      <p class="card-desc">Guide for creating and managing attachments in Hytale models. Covers attachment collections, piece bones, modular equipment, and best practices.</p>
+      <div class="overflow-x"><p class="empty-params">No arguments</p></div>
+    </div>
+      </section>
+
+      <section id="resources" class="doc-section">
+        <h2 class="section-title">Resources</h2>
+        <div class="card">
+      <div class="card-header">
+        <h3 class="card-name">projects</h3>
+      </div>
+      <p class="card-title">Blockbench Projects</p>
+      <p class="uri-template">projects://{id}</p>
+      <p class="card-desc">Returns information about available projects in Blockbench. Use without an ID to list all projects, or provide a project UUID/name to get details about a specific project.</p>
+    </div>
+<div class="card">
+      <div class="card-header">
+        <h3 class="card-name">nodes</h3>
+      </div>
+      <p class="card-title">Blockbench Nodes</p>
+      <p class="uri-template">nodes://{id}</p>
+      <p class="card-desc">Returns the current nodes in the Blockbench editor.</p>
+    </div>
+<div class="card">
+      <div class="card-header">
+        <h3 class="card-name">textures</h3>
+      </div>
+      <p class="card-title">Blockbench Textures</p>
+      <p class="uri-template">textures://{id}</p>
+      <p class="card-desc">Returns information about textures in the current Blockbench project. Use without an ID to list all textures, or provide a texture UUID/name to get details about a specific texture.</p>
+    </div>
+<div class="card">
+      <div class="card-header">
+        <h3 class="card-name">reference_models</h3>
+      </div>
+      <p class="card-title">Reference Models</p>
+      <p class="uri-template">reference_models://{id}</p>
+      <p class="card-desc">Returns information about reference models in the current Blockbench project. Requires the Reference Models plugin.</p>
+    </div>
+<div class="card">
+      <div class="card-header">
+        <h3 class="card-name">validator-status</h3>
+      </div>
+      <p class="card-title">Validator Status</p>
+      <p class="uri-template">validator://status</p>
+      <p class="card-desc">Returns the current validation status including error/warning counts and a summary of all problems.</p>
+    </div>
+<div class="card">
+      <div class="card-header">
+        <h3 class="card-name">validator-checks</h3>
+      </div>
+      <p class="card-title">Validator Checks</p>
+      <p class="uri-template">validator://checks/{id}</p>
+      <p class="card-desc">Returns information about registered validator checks. Use without an ID to list all checks, or provide a check ID to get details about a specific check.</p>
+    </div>
+<div class="card">
+      <div class="card-header">
+        <h3 class="card-name">validator-warnings</h3>
+      </div>
+      <p class="card-title">Validator Warnings</p>
+      <p class="uri-template">validator://warnings</p>
+      <p class="card-desc">Returns all current validation warnings with element references where available.</p>
+    </div>
+<div class="card">
+      <div class="card-header">
+        <h3 class="card-name">validator-errors</h3>
+      </div>
+      <p class="card-title">Validator Errors</p>
+      <p class="uri-template">validator://errors</p>
+      <p class="card-desc">Returns all current validation errors with element references where available.</p>
+    </div>
+<div class="card">
+      <div class="card-header">
+        <h3 class="card-name">hytale-format</h3>
+      </div>
+      <p class="card-title">Hytale Format Information</p>
+      <p class="uri-template">hytale://format</p>
+      <p class="card-desc">Returns comprehensive information about the current Hytale format, including format type, block size, node limits, and feature support.</p>
+    </div>
+<div class="card">
+      <div class="card-header">
+        <h3 class="card-name">hytale-attachments</h3>
+      </div>
+      <p class="card-title">Hytale Attachments</p>
+      <p class="uri-template">hytale://attachments/{id}</p>
+      <p class="card-desc">Returns information about attachment collections in the current Hytale project.</p>
+    </div>
+<div class="card">
+      <div class="card-header">
+        <h3 class="card-name">hytale-pieces</h3>
+      </div>
+      <p class="card-title">Hytale Attachment Pieces</p>
+      <p class="uri-template">hytale://pieces/{id}</p>
+      <p class="card-desc">Returns information about groups marked as attachment pieces. Attachment pieces connect to like-named bones in the main model.</p>
+    </div>
+<div class="card">
+      <div class="card-header">
+        <h3 class="card-name">hytale-cubes</h3>
+      </div>
+      <p class="card-title">Hytale Cubes</p>
+      <p class="uri-template">hytale://cubes/{id}</p>
+      <p class="card-desc">Returns information about cubes with Hytale-specific properties (shading_mode, double_sided, stretch).</p>
+    </div>
+      </section>
+
+      <footer class="page-footer">
+        Generated 2026-02-15T19:25:25.542Z from Zod schemas
+      </footer>
+    </main>
+  </div>
+
+  <script>
+    document.getElementById('search')?.addEventListener('input', (e) => {
+      const query = e.target.value.toLowerCase();
+      document.querySelectorAll('.tool-card').forEach((card) => {
+        const text = card.textContent?.toLowerCase() ?? '';
+        card.style.display = text.includes(query) ? '' : 'none';
+      });
+    });
+  </script>
+</body>
+</html>
