@@ -72,8 +72,6 @@ export const modifyCubeParameters = z.object({
     .optional()
     .describe("Rotation of the cube."),
   autouv: z
-    // ... rest of schema continues
-  autouv: z
     .enum(["0", "1", "2"])
     .optional()
     .describe(
@@ -154,7 +152,7 @@ createTool(cubeToolDocs[0].name, {
       (Array.isArray(faces) &&
         faces.every((face) => typeof face === "string"));
 
-    const cubes = elements.map((element, progress) => {
+    const cubes = elements.map((element: Cube) => {
       const cube = new Cube({
         autouv: autouv ? 1 : 0,
         name: element.name,
@@ -188,7 +186,7 @@ createTool(cubeToolDocs[0].name, {
 
     return await Promise.resolve(
       JSON.stringify(
-        cubes.map((cube) => `Added cube ${cube.name} with ID ${cube.uuid}`)
+        cubes.map((cube: Cube) => `Added cube ${cube.name} with ID ${cube.uuid}`)
       )
     );
   },
