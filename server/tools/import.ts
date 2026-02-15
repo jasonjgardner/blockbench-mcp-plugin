@@ -71,9 +71,9 @@ export function registerImportTools() {
 
       Codecs.bedrock.parse!(JSON.parse(geojson), "");
 
-      return new Promise((resolve) => {
-        setTimeout(async () => {
-          resolve(await captureAppScreenshot());
+      return new Promise((resolve, reject) => {
+        setTimeout(() => {
+          captureAppScreenshot().then(resolve).catch(reject);
         }, 3000);
       });
     },
