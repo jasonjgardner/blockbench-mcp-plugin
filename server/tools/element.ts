@@ -143,7 +143,8 @@ export function registerElementTools() {
 
       const parentGroup = parent === "root"
         ? "root"
-        : getAllGroups().find((g) => g.name === parent || g.uuid === parent);
+        : // `@ts-expect-error` getAllGroups is a Blockbench global
+          getAllGroups().find((g: Group) => g.name === parent || g.uuid === parent);
       group.addTo(parentGroup);
 
       Undo.finishEdit("Agent added group");
