@@ -329,9 +329,9 @@ export function registerMeshTools() {
 
       // @ts-expect-error getAllGroups is a utility function that returns all groups in the project
       const groups = getAllGroups();
-      const outlinerGroup = groups.find(
-        (g: Group) => g.name === group || g.uuid === group
-      );
+      const outlinerGroup = group === "root"
+        ? "root"
+        : groups.find((g: Group) => g.name === group || g.uuid === group) ?? "root";
 
       const meshes = elements.map((element, progress) => {
         const mesh = new Mesh({
@@ -422,9 +422,9 @@ export function registerMeshTools() {
 
       // @ts-expect-error getAllGroups is a utility function that returns all groups in the project
       const groups = getAllGroups();
-      const outlinerGroup = groups.find(
-        (g) => g.name === group || g.uuid === group
-      );
+      const outlinerGroup = group === "root"
+        ? "root"
+        : groups.find((g: Group) => g.name === group || g.uuid === group) ?? "root";
 
       const spheres = elements.map((element, progress) => {
         const mesh = new Mesh({
@@ -872,9 +872,10 @@ export function registerMeshTools() {
         : Texture.getDefault();
       if (!projectTexture) throw new Error(`Texture "${texture}" not found.`);
       // @ts-expect-error getAllGroups is a utility function that returns all groups in the project
-      const outlinerGroup = getAllGroups().find(
-        (g) => g.name === group || g.uuid === group
-      );
+      const groups = getAllGroups();
+      const outlinerGroup = group === "root"
+        ? "root"
+        : groups.find((g: Group) => g.name === group || g.uuid === group) ?? "root";
       const cylinders = elements.map((element, progress) => {
         const mesh = new Mesh({
           name: element.name,

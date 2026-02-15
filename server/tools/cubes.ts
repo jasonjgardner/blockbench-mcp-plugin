@@ -143,9 +143,9 @@ createTool(cubeToolDocs[0].name, {
 
     // @ts-expect-error Blockbench global utility available at runtime
     const groups = getAllGroups();
-    const outlinerGroup = groups.find(
-      (g: any) => g.name === group || g.uuid === group
-    );
+    const outlinerGroup = group === "root"
+      ? "root"
+      : groups.find((g: any) => g.name === group || g.uuid === group) ?? "root";
 
     const autouv =
       faces === true ||
@@ -209,13 +209,17 @@ createTool(cubeToolDocs[1].name, {
     color,
     visibility,
   }) {
-    const match = id
-      ? (Cube.all ?? []).filter((el: Cube) => el.uuid === id || el.name === id)
-      : [];
-    const cubes: Cube[] = match.length > 0 ? match : Cube.selected;
-
-    if (!cubes.length) {
-      throw new Error(`Cube with ID "${id}" not found.`);
+    let cubes: Cube[];
+    if (id) {
+      cubes = (Cube.all ?? []).filter((el: Cube) => el.uuid === id || el.name === id);
+      if (!cubes.length) {
+        throw new Error(`Cube with ID "${id}" not found. Use the list_outline tool to see available cubes.`);
+      }
+    } else {
+      cubes = Cube.selected;
+      if (!cubes.length) {
+        throw new Error("No cube selected and no id provided. Select a cube or provide an id.");
+      }
     }
 
     Undo.initEdit({

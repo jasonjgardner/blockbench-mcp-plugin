@@ -207,7 +207,9 @@ export function registerUVTools() {
         // operates on the caller-specified faces instead of whatever
         // happens to be selected in the viewport.
         if (faces && faces.length > 0) {
-          mesh.getSelectedFaces(true).replace(faces);
+          const sel = mesh.getSelectedFaces(true);
+          sel.length = 0;
+          sel.push(...faces);
         }
 
         const rotation = parseInt(angle);

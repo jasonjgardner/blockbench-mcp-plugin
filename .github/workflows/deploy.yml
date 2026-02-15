@@ -59,14 +59,25 @@ jobs:
               core.setOutput('should_deploy', 'true');
               return;
             }
-            const { data } = await github.rest.repos.getCollaboratorPermissionLevel({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              username: context.payload.pull_request.user.login
-            });
-            const hasAccess = ['admin', 'write'].includes(data.permission);
-            console.log(`PR author: ${context.payload.pull_request.user.login}, permission: ${data.permission}`);
-            core.setOutput('should_deploy', hasAccess.toString());
+            const author = context.payload.pull_request.user.login;
+            try {
+              const { data } = await github.rest.repos.getCollaboratorPermissionLevel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                username: author
+              });
+              const hasAccess = ['admin', 'write'].includes(data.permission);
+              console.log(`PR author: ${author}, permission: ${data.permission}`);
+              core.setOutput('should_deploy', hasAccess.toString());
+            } catch (error) {
+              const status = error.status ?? error.response?.status;
+              if (status === 404 || status === 403) {
+                console.log(`PR author ${author} is not a collaborator (HTTP ${status}), skipping deploy`);
+              } else {
+                console.error(`Failed to check permissions for ${author}:`, error.message);
+              }
+              core.setOutput('should_deploy', 'false');
+            }
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2

@@ -16,7 +16,7 @@
 - `bun run dev:watch`: Rebuild on change (watch mode).
 - `bun run build`: Minified production build to `dist/mcp.js`.
 - `bun run ./build.ts --clean`: Remove `dist/` before a fresh build.
-- `bun run docs`: Generate API documentation from Zod schemas to `docs/`.
+- `bun run docs:build`: Generate API documentation from Zod schemas to `docs/`.
 - `bun run docs:serve`: Serve the generated docs locally with Tailwind processing.
 - `bunx @modelcontextprotocol/inspector`: Launch MCP Inspector for local testing.
 

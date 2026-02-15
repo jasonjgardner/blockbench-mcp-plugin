@@ -14,7 +14,7 @@ bun run dev                     # Build with sourcemaps (one-time)
 bun run dev:watch               # Build with watch mode
 bun run build                   # Minified production build
 bun run ./build.ts --clean      # Clean dist/ before building
-bun run docs                    # Generate API docs from Zod schemas
+bun run docs:build              # Generate API docs from Zod schemas
 bun run docs:serve              # Serve docs locally with Tailwind
 bunx @modelcontextprotocol/inspector  # Test MCP tools locally
 ```
