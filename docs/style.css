@@ -165,12 +165,13 @@ a:hover {
   font-size: var(--font-size-0);
   color: var(--text-2);
   border-radius: var(--radius-2);
-  transition: background 0.15s, color 0.15s;
+  transition: background-color 0.15s, color 0.15s;
 }
 
-.nav-link:hover {
+.nav-link:hover,
+.nav-link:focus {
   color: var(--text-1);
-  background: var(--surface-3);
+  background-color: var(--surface-3);
   text-decoration: none;
 }
 

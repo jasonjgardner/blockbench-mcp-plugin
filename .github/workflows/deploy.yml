@@ -1,21 +1,12 @@
-name: Deploy to GitHub Pages
+name: Deploy
 
 on:
   push:
-    branches: ["main"]
-    tags: ["v*"]
+    branches: [main]
+    tags: [v*]
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, closed]
   workflow_dispatch:
-    inputs:
-      deploy_type:
-        description: 'Deployment type'
-        required: true
-        default: 'nightly'
-        type: choice
-        options:
-          - nightly
-          - release
 
 permissions:
   contents: write
@@ -28,92 +19,92 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Build — runs on all events except PR close
+  # ---------------------------------------------------------------------------
   build:
+    if: github.event.action != 'closed'
     runs-on: ubuntu-latest
     outputs:
-      deploy_path: ${{ steps.set-path.outputs.deploy_path }}
-      should_deploy: ${{ steps.check-deploy.outputs.should_deploy }}
-      is_latest_release: ${{ steps.set-path.outputs.is_latest_release }}
+      deploy_type: ${{ steps.context.outputs.deploy_type }}
+      deploy_path: ${{ steps.context.outputs.deploy_path }}
+      should_deploy: ${{ steps.permissions.outputs.should_deploy }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Check if should deploy PR
-        id: check-deploy
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const eventName = context.eventName;
-
-            if (eventName === 'pull_request') {
-              const prAuthor = context.payload.pull_request.user.login;
-              const { data: permissionData } = await github.rest.repos.getCollaboratorPermissionLevel({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                username: prAuthor
-              });
-
-              const permission = permissionData.permission;
-              const hasWriteAccess = ['admin', 'write'].includes(permission);
-
-              console.log(`PR author: ${prAuthor}, Permission: ${permission}, Has write access: ${hasWriteAccess}`);
-              core.setOutput('should_deploy', hasWriteAccess.toString());
-            } else {
-              core.setOutput('should_deploy', 'true');
-            }
-
-      - name: Determine deployment path
-        id: set-path
+      - name: Determine deployment context
+        id: context
         run: |
           if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == refs/tags/v* ]]; then
             TAG="${GITHUB_REF#refs/tags/}"
-            echo "deploy_path=${TAG}" >> $GITHUB_OUTPUT
-            echo "is_latest_release=true" >> $GITHUB_OUTPUT
-            echo "Deploying release: ${TAG}"
+            echo "deploy_type=release" >> $GITHUB_OUTPUT
+            echo "deploy_path=releases/${TAG}" >> $GITHUB_OUTPUT
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            PR_NUM="${{ github.event.pull_request.number }}"
-            echo "deploy_path=pr/${PR_NUM}" >> $GITHUB_OUTPUT
-            echo "is_latest_release=false" >> $GITHUB_OUTPUT
-            echo "Deploying PR preview: pr/${PR_NUM}"
+            echo "deploy_type=pr" >> $GITHUB_OUTPUT
+            echo "deploy_path=pr/${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
           else
+            echo "deploy_type=nightly" >> $GITHUB_OUTPUT
             echo "deploy_path=nightly" >> $GITHUB_OUTPUT
-            echo "is_latest_release=false" >> $GITHUB_OUTPUT
-            echo "Deploying nightly build"
           fi
 
+      - name: Check deploy permissions
+        id: permissions
+        uses: actions/github-script@v7
+        with:
+          script: |
+            if (context.eventName !== 'pull_request') {
+              core.setOutput('should_deploy', 'true');
+              return;
+            }
+            const { data } = await github.rest.repos.getCollaboratorPermissionLevel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              username: context.payload.pull_request.user.login
+            });
+            const hasAccess = ['admin', 'write'].includes(data.permission);
+            console.log(`PR author: ${context.payload.pull_request.user.login}, permission: ${data.permission}`);
+            core.setOutput('should_deploy', hasAccess.toString());
+
       - name: Setup Bun
-        if: steps.check-deploy.outputs.should_deploy == 'true'
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
       - name: Install dependencies
-        if: steps.check-deploy.outputs.should_deploy == 'true'
         run: bun install
 
       - name: Build plugin
-        if: steps.check-deploy.outputs.should_deploy == 'true'
         run: bun run build
 
+      - name: Build docs
+        run: bun run docs:build
+
+      - name: Stage deployment files
+        run: |
+          mkdir -p staging/plugin staging/docs
+          cp dist/mcp.js dist/about.md dist/icon.svg staging/plugin/
+          cp docs/api.json docs/index.html docs/style.css staging/docs/
+
       - name: Upload build artifact
-        if: steps.check-deploy.outputs.should_deploy == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: plugin-build
-          path: |
-            ./dist/mcp.js
-            ./dist/about.md
-          retention-days: 7
+          name: blockbench-mcp-plugin
+          path: staging/
+          retention-days: 30
 
+  # ---------------------------------------------------------------------------
+  # Deploy — pushes to gh-pages branch
+  # ---------------------------------------------------------------------------
   deploy:
     needs: build
     if: needs.build.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: https://jasonjgardner.github.io/blockbench-mcp-plugin/${{ needs.build.outputs.deploy_path }}/mcp.js
+      url: https://jasonjgardner.github.io/blockbench-mcp-plugin/
     steps:
       - name: Checkout gh-pages branch
         uses: actions/checkout@v4
@@ -122,101 +113,139 @@ jobs:
           fetch-depth: 0
         continue-on-error: true
 
-      - name: Initialize gh-pages if not exists
+      - name: Initialize gh-pages if needed
         run: |
-          if [ ! -f "index.html" ]; then
-            echo "Initializing gh-pages branch"
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            echo "<!DOCTYPE html><html><head><title>Blockbench MCP Plugin</title></head><body><h1>Blockbench MCP Plugin Downloads</h1></body></html>" > index.html
+          if [ ! -f ".gitignore" ]; then
+            printf 'node_modules\ndist/\n.claude\n' > .gitignore
           fi
 
       - name: Download build artifact
         uses: actions/download-artifact@v4
         with:
-          name: plugin-build
-          path: ./artifact
+          name: blockbench-mcp-plugin
+          path: ./staging
 
-      - name: Deploy to versioned path
+      - name: Deploy files
+        env:
+          DEPLOY_TYPE: ${{ needs.build.outputs.deploy_type }}
+          DEPLOY_PATH: ${{ needs.build.outputs.deploy_path }}
         run: |
-          DEPLOY_PATH="${{ needs.build.outputs.deploy_path }}"
-
-          # Create directory and copy only mcp.js and about.md
+          # Always deploy plugin files to the target path
           mkdir -p "${DEPLOY_PATH}"
-          cp ./artifact/mcp.js "${DEPLOY_PATH}/"
-          cp ./artifact/about.md "${DEPLOY_PATH}/"
+          cp staging/plugin/mcp.js staging/plugin/about.md staging/plugin/icon.svg "${DEPLOY_PATH}/"
 
-          echo "Deployed to ${DEPLOY_PATH}/"
+          # Release: also copy docs to target path + update root with everything
+          if [[ "${DEPLOY_TYPE}" == "release" ]]; then
+            cp staging/docs/api.json staging/docs/index.html staging/docs/style.css "${DEPLOY_PATH}/"
+            cp staging/plugin/mcp.js staging/plugin/about.md staging/plugin/icon.svg ./
+            cp staging/docs/api.json staging/docs/index.html staging/docs/style.css ./
+          fi
+
+          # Nightly: update root docs only
+          if [[ "${DEPLOY_TYPE}" == "nightly" ]]; then
+            cp staging/docs/api.json staging/docs/index.html staging/docs/style.css ./
+          fi
+
+          # Clean up staging
+          rm -rf staging
+
+          echo "Deployed ${DEPLOY_TYPE} to ${DEPLOY_PATH}/"
           ls -la "${DEPLOY_PATH}/"
 
-      - name: Deploy to root (latest release only)
-        if: needs.build.outputs.is_latest_release == 'true'
-        run: |
-          # Copy only mcp.js and about.md to root for latest release
-          cp ./artifact/mcp.js ./
-          cp ./artifact/about.md ./
-          echo "Deployed to root (latest release)"
-
       - name: Commit and push
+        env:
+          DEPLOY_TYPE: ${{ needs.build.outputs.deploy_type }}
+          DEPLOY_PATH: ${{ needs.build.outputs.deploy_path }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
 
-          DEPLOY_PATH="${{ needs.build.outputs.deploy_path }}"
+          case "${DEPLOY_TYPE}" in
+            release) MSG="deploy: release ${DEPLOY_PATH##*/}" ;;
+            pr)      MSG="deploy: PR #${DEPLOY_PATH##*/} preview" ;;
+            *)       MSG="deploy: nightly build" ;;
+          esac
 
-          if [[ "${{ needs.build.outputs.is_latest_release }}" == "true" ]]; then
-            git commit -m "Deploy release ${DEPLOY_PATH}" || echo "No changes to commit"
-          elif [[ "${DEPLOY_PATH}" == pr/* ]]; then
-            git commit -m "Deploy PR preview ${DEPLOY_PATH}" || echo "No changes to commit"
-          else
-            git commit -m "Deploy nightly build" || echo "No changes to commit"
-          fi
-
+          git commit -m "${MSG}" || echo "No changes to commit"
           git push origin gh-pages
 
       - name: Comment on PR
-        if: github.event_name == 'pull_request'
+        if: needs.build.outputs.deploy_type == 'pr'
         uses: actions/github-script@v7
         with:
           script: |
             const deployPath = '${{ needs.build.outputs.deploy_path }}';
             const baseUrl = 'https://jasonjgardner.github.io/blockbench-mcp-plugin';
 
-            const body = `## Preview Deployment
+            const body = [
+              '## Preview Deployment',
+              '',
+              'Your changes have been deployed for preview:',
+              '',
+              `**Plugin URL:** \`${baseUrl}/${deployPath}/mcp.js\``,
+              '',
+              'Load in Blockbench via File > Plugins > Load Plugin from URL.',
+              '',
+              '_This preview will be automatically cleaned up when the PR is closed._'
+            ].join('\n');
 
-            Your changes have been deployed for preview:
-
-            **Plugin URL:** \`${baseUrl}/${deployPath}/mcp.js\`
-
-            You can load this plugin in Blockbench via File > Plugins > Load Plugin from URL.
-
-            _This preview will be automatically cleaned up when the PR is closed._`;
-
-            // Check for existing comment
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number
             });
 
-            const botComment = comments.find(comment =>
-              comment.user.type === 'Bot' &&
-              comment.body.includes('Preview Deployment')
+            const existing = comments.find(c =>
+              c.user.type === 'Bot' && c.body.includes('Preview Deployment')
             );
 
-            if (botComment) {
+            if (existing) {
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                comment_id: botComment.id,
-                body: body
+                comment_id: existing.id,
+                body
               });
             } else {
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.issue.number,
-                body: body
+                body
               });
             }
+
+  # ---------------------------------------------------------------------------
+  # Cleanup — removes PR preview when PR is closed
+  # ---------------------------------------------------------------------------
+  cleanup-pr:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          fetch-depth: 0
+
+      - name: Remove PR preview
+        env:
+          PR_NUM: ${{ github.event.pull_request.number }}
+        run: |
+          PR_PATH="pr/${PR_NUM}"
+
+          if [ -d "${PR_PATH}" ]; then
+            rm -rf "${PR_PATH}"
+
+            # Remove empty pr/ directory
+            if [ -d "pr" ] && [ -z "$(ls -A pr)" ]; then
+              rm -rf "pr"
+            fi
+
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "chore: cleanup PR #${PR_NUM} preview" || echo "No changes"
+            git push origin gh-pages
+          fi

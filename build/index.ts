@@ -3,6 +3,7 @@ import { mkdir, copyFile, rename, rmdir } from "node:fs/promises";
 import { resolve, join, normalize, sep } from "node:path";
 import { log, c, isCleanMode, isProduction, isWatchMode } from "./utils";
 import { blockbenchCompatPlugin, textFileLoaderPlugin } from "./plugins";
+import { version } from "../package.json";
 
 const OUTPUT_DIR = "./dist";
 // Normalized output dir name for path comparison (strips "./" prefix)
@@ -109,7 +110,8 @@ async function buildPlugin(): Promise<boolean> {
   const mcpBunFile = Bun.file(mcpFile);
   if (await mcpBunFile.exists()) {
     const mcpContent = await mcpBunFile.text();
-    const banner = "let process = requireNativeModule('process');\n";
+    const banner = /* js */ `/* v${version} */
+let process = requireNativeModule('process');`;
 
     if (!mcpContent.startsWith(banner)) {
       await Bun.write(mcpFile, banner + mcpContent);
