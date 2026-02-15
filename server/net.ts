@@ -7,9 +7,22 @@ import {
   registerPromptsOnServer
 } from '@/lib/factories'
 import { createServer as createMcpServer } from '@/server/server'
-import { sessionManager } from '@/lib/sessions'
+import { sessionManager, type SessionConfig } from '@/lib/sessions'
 
 export type { NetServer }
+
+/** TCP Keep-alive configuration */
+interface KeepAliveConfig {
+  /** Enable TCP keep-alive */
+  enabled: boolean
+  /** Initial delay before sending first keep-alive probe (ms) */
+  initialDelay: number
+}
+
+const DEFAULT_KEEP_ALIVE: KeepAliveConfig = {
+  enabled: true,
+  initialDelay: 30000 // 30 seconds
+}
 
 export type SessionTransports = Map<
   string,
@@ -36,14 +49,37 @@ export default function createNetServer (
   }: { createServer: (callback: (socket: Socket) => void) => NetServer },
   {
     port,
-    endpoint
+    endpoint,
+    keepAlive = DEFAULT_KEEP_ALIVE,
+    sessionConfig
   }: {
     endpoint: string
     port: number
     host?: string
+    keepAlive?: Partial<KeepAliveConfig>
+    sessionConfig?: Partial<SessionConfig>
   }
 ): [NetServer, SessionTransports] {
   const sessionTransports: SessionTransports = new Map()
+  const keepAliveConfig = { ...DEFAULT_KEEP_ALIVE, ...keepAlive }
+
+  // Apply session configuration if provided
+  if (sessionConfig) {
+    sessionManager.configure(sessionConfig)
+  }
+
+  // Set up ping callback for session keep-alive
+  // Note: The MCP SDK doesn't expose a direct ping method on the server-side,
+  // so we verify the session is still registered. The actual connection health
+  // is maintained through TCP keep-alive and the inactivity timeout.
+  sessionManager.setPingCallback(async (sessionId: string) => {
+    const session = sessionTransports.get(sessionId)
+    if (!session) return false
+
+    // Session exists and transport is available - consider it healthy
+    // TCP keep-alive and inactivity timeouts handle actual connection failures
+    return true
+  })
 
   // Register callback to close transport when sessionManager removes a session (e.g., timeout)
   sessionManager.setRemovalCallback(async (sessionId: string) => {
@@ -63,6 +99,11 @@ export default function createNetServer (
   const httpServer = createServer((socket: Socket) => {
     let buffer = Buffer.alloc(0)
     let socketEnded = false
+
+    // Configure TCP keep-alive for connection health
+    if (keepAliveConfig.enabled) {
+      socket.setKeepAlive(true, keepAliveConfig.initialDelay)
+    }
 
     socket.on('data', (chunk: Buffer) => {
       if (socketEnded) return
@@ -157,8 +198,40 @@ export default function createNetServer (
 
         const webRequest = new Request(url, requestInit)
 
-        // Check endpoint - must match exactly or have query string/trailing content
+        // Health check endpoint for monitoring
         const pathWithoutQuery = path.split('?')[0]
+        if (pathWithoutQuery === '/health' || pathWithoutQuery === endpoint + '/health') {
+          const healthStatus = {
+            status: 'ok',
+            timestamp: new Date().toISOString(),
+            sessions: {
+              active: sessionManager.getCount(),
+              config: sessionManager.getConfig()
+            }
+          }
+          sendResponse(
+            socket,
+            200,
+            { 'content-type': 'application/json' },
+            JSON.stringify(healthStatus),
+            headers['connection']
+          )
+          continue
+        }
+
+        // Ready check endpoint (lighter weight than health)
+        if (pathWithoutQuery === '/ready' || pathWithoutQuery === endpoint + '/ready') {
+          sendResponse(
+            socket,
+            200,
+            { 'content-type': 'application/json' },
+            JSON.stringify({ ready: true }),
+            headers['connection']
+          )
+          continue
+        }
+
+        // Check endpoint - must match exactly or have query string/trailing content
         if (
           pathWithoutQuery !== endpoint &&
           !path.startsWith(endpoint + '/') &&

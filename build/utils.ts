@@ -1,4 +1,3 @@
-import { argv } from "node:process";
 /**
  * ANSI color codes for console output
  */
@@ -64,8 +63,8 @@ export function minifySVG(svg: string): string {
     .trim();
 }
 
-const isWatchMode = argv.includes("--watch");
-const isCleanMode = argv.includes("--clean");
-const isProduction = process.env.NODE_ENV === "production" || argv.includes("--minify");
+const isWatchMode = Bun.argv.includes("--watch");
+const isCleanMode = Bun.argv.includes("--clean");
+const isProduction = Bun.env.NODE_ENV === "production" || Bun.argv.includes("--minify");
 
 export { isWatchMode, isCleanMode, isProduction };

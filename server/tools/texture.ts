@@ -1,7 +1,7 @@
 /// <reference types="three" />
 /// <reference types="blockbench-types" />
 import { z } from "zod";
-import { createTool } from "@/lib/factories";
+import { createTool, type ToolSpec } from "@/lib/factories";
 import {
   getProjectTexture,
   imageContent,
@@ -21,69 +21,353 @@ import {
   renderSidesEnum,
 } from "@/lib/zodObjects";
 
-export function registerTextureTools() {
-createTool(
-  "create_texture",
+// ============================================================================
+// Texture Tool Parameter Schemas
+// ============================================================================
+
+export const createTextureParameters = z
+  .object({
+    name: z.string(),
+    width: z.number().min(16).max(4096).default(16),
+    height: z.number().min(16).max(4096).default(16),
+    data: z
+      .string()
+      .optional()
+      .describe("Path to the image file or data URL."),
+    group: z.string().optional(),
+    fill_color: colorSchema
+      .optional()
+      .describe("RGBA color to fill the texture, as tuple or HEX string."),
+    layer_name: z
+      .string()
+      .optional()
+      .describe(
+        "Name of the texture layer. Required if fill_color is set."
+      ),
+    pbr_channel: pbrChannelEnum
+      .optional()
+      .describe(
+        "PBR channel to use for the texture. Color, normal, height, or Metalness/Emissive/Roughness (MER) map."
+      ),
+    render_mode: renderModeEnum
+      .optional()
+      .default("default")
+      .describe(
+        "Render mode for the texture. Default, emissive, additive, or layered."
+      ),
+    render_sides: renderSidesEnum
+      .optional()
+      .default("auto")
+      .describe("Render sides for the texture. Auto, front, or double."),
+  })
+  .refine((params) => !(params.data && params.fill_color), {
+    message:
+      "The 'data' and 'fill_color' properties cannot both be defined.",
+    path: ["data", "fill_color"],
+  })
+  .refine((params) => !(params.fill_color && !params.layer_name), {
+    message:
+      "The 'layer_name' property is required when 'fill_color' is set.",
+    path: ["layer_name", "fill_color"],
+  })
+  .refine(
+    ({ pbr_channel, group }) => (pbr_channel && group) || !pbr_channel,
+    {
+      message:
+        "The 'group' property is required when 'pbr_channel' is set.",
+      path: ["group", "pbr_channel"],
+    }
+  );
+
+export const applyTextureParameters = z.object({
+  id: elementIdSchema.describe("ID or name of the element to apply the texture to."),
+  texture: textureIdSchema.describe("ID or name of the texture to apply."),
+  applyTo: z
+    .enum(["all", "blank", "none"])
+    .describe("Apply texture to element or group.")
+    .optional()
+    .default("blank"),
+});
+
+export const addTextureGroupParameters = z.object({
+  name: z.string(),
+  textures: z
+    .array(z.string())
+    .optional()
+    .describe("Array of texture IDs or names to add to the group."),
+  is_material: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe("Whether the texture group is a PBR material or not."),
+});
+
+export const listTexturesParameters = z.object({});
+
+export const getTextureParameters = z.object({
+  texture: textureIdOptionalSchema,
+});
+
+export const createPbrMaterialParameters = z.object({
+  name: z.string().describe("Name of the material."),
+  color_texture: z
+    .string()
+    .optional()
+    .describe("Texture ID/name for the color (albedo) channel."),
+  normal_texture: z
+    .string()
+    .optional()
+    .describe("Texture ID/name for the normal map channel."),
+  height_texture: z
+    .string()
+    .optional()
+    .describe("Texture ID/name for the height/displacement map channel."),
+  mer_texture: z
+    .string()
+    .optional()
+    .describe(
+      "Texture ID/name for the MER (Metalness/Emissive/Roughness) channel."
+    ),
+  color_value: z
+    .array(z.number().min(0).max(255))
+    .length(4)
+    .optional()
+    .describe(
+      "Uniform RGBA color [R,G,B,A] when no color texture is provided."
+    ),
+  mer_value: z
+    .array(z.number().min(0).max(255))
+    .length(3)
+    .optional()
+    .describe(
+      "Uniform MER values [Metalness, Emissive, Roughness] (0-255) when no MER texture is provided."
+    ),
+  subsurface_value: z
+    .number()
+    .min(0)
+    .max(255)
+    .optional()
+    .describe(
+      "Subsurface scattering value (0-255) for Bedrock 1.21.30+ materials."
+    ),
+});
+
+export const configureMaterialParameters = z.object({
+  material: z.string().describe("Material name or UUID to configure."),
+  color_texture: z
+    .string()
+    .optional()
+    .describe(
+      "Texture ID/name for the color channel, or 'none' to use uniform color."
+    ),
+  normal_texture: z
+    .string()
+    .optional()
+    .describe(
+      "Texture ID/name for the normal map, or 'none' to remove."
+    ),
+  height_texture: z
+    .string()
+    .optional()
+    .describe(
+      "Texture ID/name for the height map, or 'none' to remove."
+    ),
+  mer_texture: z
+    .string()
+    .optional()
+    .describe(
+      "Texture ID/name for MER channel, or 'none' to use uniform values."
+    ),
+  color_value: z
+    .array(z.number().min(0).max(255))
+    .length(4)
+    .optional()
+    .describe("Uniform RGBA color [R,G,B,A] when no color texture."),
+  mer_value: z
+    .array(z.number().min(0).max(255))
+    .length(3)
+    .optional()
+    .describe(
+      "Uniform MER values [Metalness, Emissive, Roughness] (0-255)."
+    ),
+  subsurface_value: z
+    .number()
+    .min(0)
+    .max(255)
+    .optional()
+    .describe("Subsurface scattering value (0-255)."),
+});
+
+export const listMaterialsParameters = z.object({});
+
+export const getMaterialInfoParameters = z.object({
+  material: z.string().describe("Material name or UUID."),
+});
+
+export const importTextureSetParameters = z.object({
+  path: z
+    .string()
+    .describe(
+      "Path to the .texture_set.json file to import."
+    ),
+});
+
+export const assignTextureChannelParameters = z.object({
+  material: z.string().describe("Material name or UUID."),
+  texture: textureIdSchema.describe("Texture name or UUID to assign."),
+  channel: pbrChannelEnum.describe("PBR channel to assign the texture to."),
+});
+
+export const saveMaterialConfigParameters = z.object({
+  material: z.string().describe("Material name or UUID to save."),
+});
+
+// ============================================================================
+// Texture Tool Docs
+// ============================================================================
+
+export const textureToolDocs: ToolSpec[] = [
   {
+    name: "create_texture",
     description: "Creates a new texture with the given name and size.",
     annotations: {
       title: "Create Texture",
       destructiveHint: true,
       openWorldHint: true,
     },
-    parameters: z
-      .object({
-        name: z.string(),
-        width: z.number().min(16).max(4096).default(16),
-        height: z.number().min(16).max(4096).default(16),
-        data: z
-          .string()
-          .optional()
-          .describe("Path to the image file or data URL."),
-        group: z.string().optional(),
-        fill_color: colorSchema
-          .optional()
-          .describe("RGBA color to fill the texture, as tuple or HEX string."),
-        layer_name: z
-          .string()
-          .optional()
-          .describe(
-            "Name of the texture layer. Required if fill_color is set."
-          ),
-        pbr_channel: pbrChannelEnum
-          .optional()
-          .describe(
-            "PBR channel to use for the texture. Color, normal, height, or Metalness/Emissive/Roughness (MER) map."
-          ),
-        render_mode: renderModeEnum
-          .optional()
-          .default("default")
-          .describe(
-            "Render mode for the texture. Default, emissive, additive, or layered."
-          ),
-        render_sides: renderSidesEnum
-          .optional()
-          .default("auto")
-          .describe("Render sides for the texture. Auto, front, or double."),
-      })
-      .refine((params) => !(params.data && params.fill_color), {
-        message:
-          "The 'data' and 'fill_color' properties cannot both be defined.",
-        path: ["data", "fill_color"],
-      })
-      .refine((params) => !(params.fill_color && !params.layer_name), {
-        message:
-          "The 'layer_name' property is required when 'fill_color' is set.",
-        path: ["layer_name", "fill_color"],
-      })
-      .refine(
-        ({ pbr_channel, group }) => (pbr_channel && group) || !pbr_channel,
-        {
-          message:
-            "The 'group' property is required when 'pbr_channel' is set.",
-          path: ["group", "pbr_channel"],
-        }
-      ),
+    parameters: createTextureParameters,
+    status: STATUS_EXPERIMENTAL,
+  },
+  {
+    name: "apply_texture",
+    description:
+      "Applies the given texture to the element with the specified ID.",
+    annotations: {
+      title: "Apply Texture",
+      destructiveHint: true,
+    },
+    parameters: applyTextureParameters,
+    status: STATUS_STABLE,
+  },
+  {
+    name: "add_texture_group",
+    description: "Adds a new texture group with the given name.",
+    annotations: {
+      title: "Add Texture Group",
+      destructiveHint: true,
+    },
+    parameters: addTextureGroupParameters,
+    status: STATUS_EXPERIMENTAL,
+  },
+  {
+    name: "list_textures",
+    description: "Returns a list of all textures in the Blockbench editor.",
+    annotations: {
+      title: "List Textures",
+      readOnlyHint: true,
+    },
+    parameters: listTexturesParameters,
+    status: STATUS_STABLE,
+  },
+  {
+    name: "get_texture",
+    description:
+      "Returns the image data of the given texture or default texture.",
+    annotations: {
+      title: "Get Texture",
+      readOnlyHint: true,
+    },
+    parameters: getTextureParameters,
+    status: STATUS_STABLE,
+  },
+  {
+    name: "create_pbr_material",
+    description:
+      "Creates a new PBR material (texture group with is_material=true) and optionally assigns textures to PBR channels. Use this for Minecraft Bedrock resource packs or any format supporting PBR.",
+    annotations: {
+      title: "Create PBR Material",
+      destructiveHint: true,
+    },
+    parameters: createPbrMaterialParameters,
+    status: STATUS_EXPERIMENTAL,
+  },
+  {
+    name: "configure_material",
+    description:
+      "Configures an existing PBR material's properties including channel assignments, uniform values, and subsurface scattering.",
+    annotations: {
+      title: "Configure Material",
+      destructiveHint: true,
+    },
+    parameters: configureMaterialParameters,
+    status: STATUS_EXPERIMENTAL,
+  },
+  {
+    name: "list_materials",
+    description:
+      "Lists all PBR materials (texture groups with is_material=true) and their assigned textures per channel.",
+    annotations: {
+      title: "List Materials",
+      readOnlyHint: true,
+    },
+    parameters: listMaterialsParameters,
+    status: STATUS_STABLE,
+  },
+  {
+    name: "get_material_info",
+    description:
+      "Gets detailed information about a PBR material including the compiled texture_set.json preview for Bedrock export.",
+    annotations: {
+      title: "Get Material Info",
+      readOnlyHint: true,
+    },
+    parameters: getMaterialInfoParameters,
+    status: STATUS_STABLE,
+  },
+  {
+    name: "import_texture_set",
+    description:
+      "Imports a Minecraft Bedrock texture_set.json file and creates a PBR material with the associated textures.",
+    annotations: {
+      title: "Import Texture Set",
+      destructiveHint: true,
+      openWorldHint: true,
+    },
+    parameters: importTextureSetParameters,
+    status: STATUS_EXPERIMENTAL,
+  },
+  {
+    name: "assign_texture_channel",
+    description:
+      "Assigns a texture to a specific PBR channel within a material.",
+    annotations: {
+      title: "Assign Texture Channel",
+      destructiveHint: true,
+    },
+    parameters: assignTextureChannelParameters,
+    status: STATUS_EXPERIMENTAL,
+  },
+  {
+    name: "save_material_config",
+    description:
+      "Saves the material's texture_set.json file to disk (Bedrock format). Requires the color texture to have a valid file path.",
+    annotations: {
+      title: "Save Material Config",
+      destructiveHint: true,
+      openWorldHint: true,
+    },
+    parameters: saveMaterialConfigParameters,
+    status: STATUS_EXPERIMENTAL,
+  },
+];
+
+// ============================================================================
+// Tool Registration
+// ============================================================================
+
+export function registerTextureTools() {
+  createTool(textureToolDocs[0].name, {
+    ...textureToolDocs[0],
     async execute({
       name,
       width,
@@ -157,28 +441,10 @@ createTool(
         url: texture.getDataURL(),
       });
     },
-  },
-  STATUS_EXPERIMENTAL
-);
+  }, textureToolDocs[0].status);
 
-createTool(
-  "apply_texture",
-  {
-    description:
-      "Applies the given texture to the element with the specified ID.",
-    annotations: {
-      title: "Apply Texture",
-      destructiveHint: true,
-    },
-    parameters: z.object({
-      id: elementIdSchema.describe("ID or name of the element to apply the texture to."),
-      texture: textureIdSchema.describe("ID or name of the texture to apply."),
-      applyTo: z
-        .enum(["all", "blank", "none"])
-        .describe("Apply texture to element or group.")
-        .optional()
-        .default("blank"),
-    }),
+  createTool(textureToolDocs[1].name, {
+    ...textureToolDocs[1],
     async execute({ applyTo, id, texture }) {
       const element = findElementOrThrow(id);
       const projectTexture = texture
@@ -210,30 +476,10 @@ createTool(
 
       return `Applied texture ${projectTexture.name} to element with ID ${id}`;
     },
-  },
-  STATUS_STABLE
-);
+  }, textureToolDocs[1].status);
 
-createTool(
-  "add_texture_group",
-  {
-    description: "Adds a new texture group with the given name.",
-    annotations: {
-      title: "Add Texture Group",
-      destructiveHint: true,
-    },
-    parameters: z.object({
-      name: z.string(),
-      textures: z
-        .array(z.string())
-        .optional()
-        .describe("Array of texture IDs or names to add to the group."),
-      is_material: z
-        .boolean()
-        .optional()
-        .default(true)
-        .describe("Whether the texture group is a PBR material or not."),
-    }),
+  createTool(textureToolDocs[2].name, {
+    ...textureToolDocs[2],
     async execute({ name, textures, is_material }) {
       Undo.initEdit({
         elements: [],
@@ -268,19 +514,10 @@ createTool(
 
       return `Added texture group ${textureGroup.name} with ID ${textureGroup.uuid}`;
     },
-  },
-  STATUS_EXPERIMENTAL
-);
+  }, textureToolDocs[2].status);
 
-createTool(
-  "list_textures",
-  {
-    description: "Returns a list of all textures in the Blockbench editor.",
-    annotations: {
-      title: "List Textures",
-      readOnlyHint: true,
-    },
-    parameters: z.object({}),
+  createTool(textureToolDocs[3].name, {
+    ...textureToolDocs[3],
     async execute() {
       const textures = Project?.textures ?? Texture.all;
 
@@ -293,22 +530,10 @@ createTool(
         }))
       );
     },
-  },
-  STATUS_STABLE
-);
+  }, textureToolDocs[3].status);
 
-createTool(
-  "get_texture",
-  {
-    description:
-      "Returns the image data of the given texture or default texture.",
-    annotations: {
-      title: "Get Texture",
-      readOnlyHint: true,
-    },
-    parameters: z.object({
-      texture: textureIdOptionalSchema,
-    }),
+  createTool(textureToolDocs[4].name, {
+    ...textureToolDocs[4],
     async execute({ texture }) {
       if (!texture) {
         const defaultTexture = Texture.getDefault();
@@ -323,62 +548,10 @@ createTool(
       const image = findTextureOrThrow(texture);
       return imageContent({ url: image.getDataURL() });
     },
-  },
-  STATUS_STABLE
-);
+  }, textureToolDocs[4].status);
 
-createTool(
-  "create_pbr_material",
-  {
-    description:
-      "Creates a new PBR material (texture group with is_material=true) and optionally assigns textures to PBR channels. Use this for Minecraft Bedrock resource packs or any format supporting PBR.",
-    annotations: {
-      title: "Create PBR Material",
-      destructiveHint: true,
-    },
-    parameters: z.object({
-      name: z.string().describe("Name of the material."),
-      color_texture: z
-        .string()
-        .optional()
-        .describe("Texture ID/name for the color (albedo) channel."),
-      normal_texture: z
-        .string()
-        .optional()
-        .describe("Texture ID/name for the normal map channel."),
-      height_texture: z
-        .string()
-        .optional()
-        .describe("Texture ID/name for the height/displacement map channel."),
-      mer_texture: z
-        .string()
-        .optional()
-        .describe(
-          "Texture ID/name for the MER (Metalness/Emissive/Roughness) channel."
-        ),
-      color_value: z
-        .array(z.number().min(0).max(255))
-        .length(4)
-        .optional()
-        .describe(
-          "Uniform RGBA color [R,G,B,A] when no color texture is provided."
-        ),
-      mer_value: z
-        .array(z.number().min(0).max(255))
-        .length(3)
-        .optional()
-        .describe(
-          "Uniform MER values [Metalness, Emissive, Roughness] (0-255) when no MER texture is provided."
-        ),
-      subsurface_value: z
-        .number()
-        .min(0)
-        .max(255)
-        .optional()
-        .describe(
-          "Subsurface scattering value (0-255) for Bedrock 1.21.30+ materials."
-        ),
-    }),
+  createTool(textureToolDocs[5].name, {
+    ...textureToolDocs[5],
     async execute({
       name,
       color_texture,
@@ -473,64 +646,10 @@ createTool(
         },
       });
     },
-  },
-  STATUS_EXPERIMENTAL
-);
+  }, textureToolDocs[5].status);
 
-createTool(
-  "configure_material",
-  {
-    description:
-      "Configures an existing PBR material's properties including channel assignments, uniform values, and subsurface scattering.",
-    annotations: {
-      title: "Configure Material",
-      destructiveHint: true,
-    },
-    parameters: z.object({
-      material: z.string().describe("Material name or UUID to configure."),
-      color_texture: z
-        .string()
-        .optional()
-        .describe(
-          "Texture ID/name for the color channel, or 'none' to use uniform color."
-        ),
-      normal_texture: z
-        .string()
-        .optional()
-        .describe(
-          "Texture ID/name for the normal map, or 'none' to remove."
-        ),
-      height_texture: z
-        .string()
-        .optional()
-        .describe(
-          "Texture ID/name for the height map, or 'none' to remove."
-        ),
-      mer_texture: z
-        .string()
-        .optional()
-        .describe(
-          "Texture ID/name for MER channel, or 'none' to use uniform values."
-        ),
-      color_value: z
-        .array(z.number().min(0).max(255))
-        .length(4)
-        .optional()
-        .describe("Uniform RGBA color [R,G,B,A] when no color texture."),
-      mer_value: z
-        .array(z.number().min(0).max(255))
-        .length(3)
-        .optional()
-        .describe(
-          "Uniform MER values [Metalness, Emissive, Roughness] (0-255)."
-        ),
-      subsurface_value: z
-        .number()
-        .min(0)
-        .max(255)
-        .optional()
-        .describe("Subsurface scattering value (0-255)."),
-    }),
+  createTool(textureToolDocs[6].name, {
+    ...textureToolDocs[6],
     async execute({
       material,
       color_texture,
@@ -611,20 +730,10 @@ createTool(
 
       return `Configured material "${textureGroup.name}"`;
     },
-  },
-  STATUS_EXPERIMENTAL
-);
+  }, textureToolDocs[6].status);
 
-createTool(
-  "list_materials",
-  {
-    description:
-      "Lists all PBR materials (texture groups with is_material=true) and their assigned textures per channel.",
-    annotations: {
-      title: "List Materials",
-      readOnlyHint: true,
-    },
-    parameters: z.object({}),
+  createTool(textureToolDocs[7].name, {
+    ...textureToolDocs[7],
     async execute() {
       // @ts-ignore - TextureGroup is globally available
       const materials = TextureGroup.all.filter(
@@ -653,22 +762,10 @@ createTool(
 
       return JSON.stringify(result, null, 2);
     },
-  },
-  STATUS_STABLE
-);
+  }, textureToolDocs[7].status);
 
-createTool(
-  "get_material_info",
-  {
-    description:
-      "Gets detailed information about a PBR material including the compiled texture_set.json preview for Bedrock export.",
-    annotations: {
-      title: "Get Material Info",
-      readOnlyHint: true,
-    },
-    parameters: z.object({
-      material: z.string().describe("Material name or UUID."),
-    }),
+  createTool(textureToolDocs[8].name, {
+    ...textureToolDocs[8],
     async execute({ material }) {
       const textureGroup = findTextureGroupOrThrow(material);
       const textures = textureGroup.getTextures();
@@ -706,27 +803,10 @@ createTool(
 
       return JSON.stringify(result, null, 2);
     },
-  },
-  STATUS_STABLE
-);
+  }, textureToolDocs[8].status);
 
-createTool(
-  "import_texture_set",
-  {
-    description:
-      "Imports a Minecraft Bedrock texture_set.json file and creates a PBR material with the associated textures.",
-    annotations: {
-      title: "Import Texture Set",
-      destructiveHint: true,
-      openWorldHint: true,
-    },
-    parameters: z.object({
-      path: z
-        .string()
-        .describe(
-          "Path to the .texture_set.json file to import."
-        ),
-    }),
+  createTool(textureToolDocs[9].name, {
+    ...textureToolDocs[9],
     async execute({ path }) {
       // Validate path ends with texture_set.json
       if (!path.endsWith(".texture_set.json")) {
@@ -747,24 +827,10 @@ createTool(
 
       return `Imported texture set from "${path}". Check the textures panel for the new material.`;
     },
-  },
-  STATUS_EXPERIMENTAL
-);
+  }, textureToolDocs[9].status);
 
-createTool(
-  "assign_texture_channel",
-  {
-    description:
-      "Assigns a texture to a specific PBR channel within a material.",
-    annotations: {
-      title: "Assign Texture Channel",
-      destructiveHint: true,
-    },
-    parameters: z.object({
-      material: z.string().describe("Material name or UUID."),
-      texture: textureIdSchema.describe("Texture name or UUID to assign."),
-      channel: pbrChannelEnum.describe("PBR channel to assign the texture to."),
-    }),
+  createTool(textureToolDocs[10].name, {
+    ...textureToolDocs[10],
     async execute({ material, texture, channel }) {
       const textureGroup = findTextureGroupOrThrow(material);
       const tex = findTextureOrThrow(texture);
@@ -796,23 +862,10 @@ createTool(
 
       return `Assigned texture "${tex.name}" to ${channel} channel of material "${textureGroup.name}"`;
     },
-  },
-  STATUS_EXPERIMENTAL
-);
+  }, textureToolDocs[10].status);
 
-createTool(
-  "save_material_config",
-  {
-    description:
-      "Saves the material's texture_set.json file to disk (Bedrock format). Requires the color texture to have a valid file path.",
-    annotations: {
-      title: "Save Material Config",
-      destructiveHint: true,
-      openWorldHint: true,
-    },
-    parameters: z.object({
-      material: z.string().describe("Material name or UUID to save."),
-    }),
+  createTool(textureToolDocs[11].name, {
+    ...textureToolDocs[11],
     async execute({ material }) {
       const textureGroup = findTextureGroupOrThrow(material);
       const filePath = textureGroup.material_config.getFilePath();
@@ -827,7 +880,5 @@ createTool(
 
       return `Saved material config to "${filePath}"`;
     },
-  },
-  STATUS_EXPERIMENTAL
-);
+  }, textureToolDocs[11].status);
 }

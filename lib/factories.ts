@@ -1,7 +1,45 @@
 import { z } from "zod";
-import type { IMCPTool, IMCPPrompt, IMCPResource } from "@/types";
+import type { IMCPTool, IMCPPrompt, IMCPResource, StatusType } from "@/types";
 import { getServer } from "@/server/server";
 import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
+
+/**
+ * Declarative tool spec for documentation and registration.
+ * Contains everything except the `execute` implementation.
+ */
+export interface ToolSpec {
+  name: string;
+  description: string;
+  annotations?: {
+    title?: string;
+    destructiveHint?: boolean;
+    readOnlyHint?: boolean;
+    openWorldHint?: boolean;
+  };
+  parameters: z.ZodType;
+  status: StatusType;
+}
+
+/**
+ * Declarative prompt spec for documentation and registration.
+ */
+export interface PromptSpec {
+  name: string;
+  description: string;
+  title?: string;
+  argsSchema?: z.ZodObject<z.ZodRawShape>;
+  status: StatusType;
+}
+
+/**
+ * Declarative resource spec for documentation and registration.
+ */
+export interface ResourceSpec {
+  name: string;
+  description: string;
+  uriTemplate: string;
+  title?: string;
+}
 
 /**
  * User-visible list of tool details.
