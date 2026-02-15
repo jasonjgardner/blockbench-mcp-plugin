@@ -52,6 +52,7 @@ interface DocOutput {
 
 function convertSchema(name: string, schema: z.ZodType): object {
   try {
+    // @ts-ignore Deep type instantiation
     return zodToJsonSchema(schema, {
       name,
       $refStrategy: "none",
@@ -103,6 +104,18 @@ function convertResourceSpec(spec: ResourceSpec): ResourceDocEntry {
 // HTML Generation
 // ============================================================================
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function slugify(str: string): string {
+  return str.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
 function getTypeLabel(schema: Record<string, unknown>): string {
   if (schema.enum) return (schema.enum as string[]).map((v) => `"${v}"`).join(" | ");
   if (schema.anyOf) return (schema.anyOf as Record<string, unknown>[]).map(getTypeLabel).join(" | ");
@@ -118,6 +131,25 @@ function getTypeLabel(schema: Record<string, unknown>): string {
   if (schema.type) return schema.type as string;
   if (schema.const !== undefined) return JSON.stringify(schema.const);
   return "unknown";
+}
+
+function statusBadge(status: string): string {
+  const cls = status === "stable" ? "badge-stable" : "badge-experimental";
+  return `<span class="badge ${cls}">${status}</span>`;
+}
+
+function annotationBadges(annotations: ToolDocEntry["annotations"]): string {
+  const badges: string[] = [];
+  if (annotations.destructiveHint) {
+    badges.push('<span class="badge badge-destructive">destructive</span>');
+  }
+  if (annotations.readOnlyHint) {
+    badges.push('<span class="badge badge-readonly">read-only</span>');
+  }
+  if (annotations.openWorldHint) {
+    badges.push('<span class="badge badge-openworld">open-world</span>');
+  }
+  return badges.join("");
 }
 
 function renderParameterRow(
@@ -137,16 +169,20 @@ function renderParameterRow(
   if (prop.minItems !== undefined) constraints.push(`minItems: ${prop.minItems}`);
   if (prop.maxItems !== undefined) constraints.push(`maxItems: ${prop.maxItems}`);
 
-  return `
-    <tr class="border-b border-gray-200 dark:border-gray-700">
-      <td class="py-2 px-3 font-mono text-sm text-blue-700 dark:text-blue-400">${name}</td>
-      <td class="py-2 px-3 font-mono text-xs text-gray-600 dark:text-gray-400">${escapeHtml(typeLabel)}</td>
-      <td class="py-2 px-3 text-sm">${required
-        ? '<span class="text-red-600 dark:text-red-400 font-medium">required</span>'
-        : '<span class="text-gray-400">optional</span>'}</td>
-      <td class="py-2 px-3 text-sm text-gray-700 dark:text-gray-300">${escapeHtml(description)}${
-        defaultVal ? ` <span class="text-gray-400">(default: <code class="text-xs">${escapeHtml(defaultVal)}</code>)</span>` : ""
-      }${constraints.length ? ` <span class="text-gray-400">[${constraints.join(", ")}]</span>` : ""}</td>
+  const reqSpan = required
+    ? '<span class="param-required">required</span>'
+    : '<span class="param-optional">optional</span>';
+
+  const meta = [
+    defaultVal ? `(default: <code>${escapeHtml(defaultVal)}</code>)` : "",
+    constraints.length ? `[${constraints.join(", ")}]` : "",
+  ].filter(Boolean).join(" ");
+
+  return `<tr>
+      <td class="col-name">${name}</td>
+      <td class="col-type">${escapeHtml(typeLabel)}</td>
+      <td>${reqSpan}</td>
+      <td class="col-desc">${escapeHtml(description)}${meta ? ` <span class="param-meta">${meta}</span>` : ""}</td>
     </tr>`;
 }
 
@@ -155,54 +191,24 @@ function renderParametersTable(params: Record<string, unknown>): string {
   const required = new Set((params.required ?? []) as string[]);
 
   if (Object.keys(properties).length === 0) {
-    return '<p class="text-sm text-gray-400 italic">No parameters</p>';
+    return '<p class="empty-params">No parameters</p>';
   }
 
   const rows = Object.entries(properties)
     .map(([name, prop]) => renderParameterRow(name, prop, required.has(name)))
     .join("");
 
-  return `
-    <table class="w-full text-left">
+  return `<table class="param-table">
       <thead>
-        <tr class="border-b-2 border-gray-300 dark:border-gray-600">
-          <th class="py-2 px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Name</th>
-          <th class="py-2 px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Type</th>
-          <th class="py-2 px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Required</th>
-          <th class="py-2 px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Description</th>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>`;
-}
-
-function statusBadge(status: string): string {
-  if (status === "stable") {
-    return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">stable</span>';
-  }
-  return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">experimental</span>';
-}
-
-function annotationBadges(annotations: ToolDocEntry["annotations"]): string {
-  const badges: string[] = [];
-  if (annotations.destructiveHint) {
-    badges.push('<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300">destructive</span>');
-  }
-  if (annotations.readOnlyHint) {
-    badges.push('<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">read-only</span>');
-  }
-  if (annotations.openWorldHint) {
-    badges.push('<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">open-world</span>');
-  }
-  return badges.join(" ");
-}
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
 
 function renderToolCard(tool: ToolDocEntry): string {
@@ -211,18 +217,17 @@ function renderToolCard(tool: ToolDocEntry): string {
     ((schema.definitions as Record<string, unknown> | undefined)?.[tool.name] as Record<string, unknown>) ??
     schema;
 
-  return `
-    <div id="tool-${tool.name}" class="tool-card bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-4">
-      <div class="flex items-center justify-between mb-2">
-        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 font-mono">${tool.name}</h3>
-        <div class="flex gap-1">
+  return `<div id="tool-${tool.name}" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">${tool.name}</h3>
+        <div class="card-badges">
           ${statusBadge(tool.status)}
           ${annotationBadges(tool.annotations)}
         </div>
       </div>
-      ${tool.title !== tool.name ? `<p class="text-sm text-gray-500 dark:text-gray-400 mb-2">${escapeHtml(tool.title)}</p>` : ""}
-      <p class="text-sm text-gray-700 dark:text-gray-300 mb-4">${escapeHtml(tool.description)}</p>
-      <div class="overflow-x-auto">
+      ${tool.title !== tool.name ? `<p class="card-title">${escapeHtml(tool.title)}</p>` : ""}
+      <p class="card-desc">${escapeHtml(tool.description)}</p>
+      <div class="overflow-x">
         ${renderParametersTable(innerSchema)}
       </div>
     </div>`;
@@ -234,146 +239,123 @@ function renderPromptCard(prompt: PromptDocEntry): string {
         ((prompt.arguments as Record<string, unknown>).definitions as Record<string, Record<string, unknown>> | undefined)?.[prompt.name] ??
         prompt.arguments as Record<string, unknown>
       )
-    : '<p class="text-sm text-gray-400 italic">No arguments</p>';
+    : '<p class="empty-params">No arguments</p>';
 
-  return `
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-4">
-      <div class="flex items-center justify-between mb-2">
-        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 font-mono">${prompt.name}</h3>
-        ${statusBadge(prompt.status)}
+  return `<div class="card">
+      <div class="card-header">
+        <h3 class="card-name">${prompt.name}</h3>
+        <div class="card-badges">${statusBadge(prompt.status)}</div>
       </div>
-      ${prompt.title !== prompt.name ? `<p class="text-sm text-gray-500 dark:text-gray-400 mb-2">${escapeHtml(prompt.title)}</p>` : ""}
-      <p class="text-sm text-gray-700 dark:text-gray-300 mb-4">${escapeHtml(prompt.description)}</p>
-      <div class="overflow-x-auto">${argsHtml}</div>
+      ${prompt.title !== prompt.name ? `<p class="card-title">${escapeHtml(prompt.title)}</p>` : ""}
+      <p class="card-desc">${escapeHtml(prompt.description)}</p>
+      <div class="overflow-x">${argsHtml}</div>
     </div>`;
 }
 
 function renderResourceCard(resource: ResourceDocEntry): string {
-  return `
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-4">
-      <div class="flex items-center justify-between mb-2">
-        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 font-mono">${resource.name}</h3>
+  return `<div class="card">
+      <div class="card-header">
+        <h3 class="card-name">${resource.name}</h3>
       </div>
-      ${resource.title !== resource.name ? `<p class="text-sm text-gray-500 dark:text-gray-400 mb-1">${escapeHtml(resource.title)}</p>` : ""}
-      <p class="text-sm font-mono text-blue-600 dark:text-blue-400 mb-2">${escapeHtml(resource.uriTemplate)}</p>
-      <p class="text-sm text-gray-700 dark:text-gray-300">${escapeHtml(resource.description)}</p>
+      ${resource.title !== resource.name ? `<p class="card-title">${escapeHtml(resource.title)}</p>` : ""}
+      <p class="uri-template">${escapeHtml(resource.uriTemplate)}</p>
+      <p class="card-desc">${escapeHtml(resource.description)}</p>
     </div>`;
 }
 
-function slugify(str: string): string {
-  return str.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-}
-
-function generateHtml(data: DocOutput): string {
+async function generateHtml(data: DocOutput): Promise<string> {
   const categoryNav = toolManifest
     .map(
       ({ category, tools }) =>
-        `<a href="#cat-${slugify(category)}" class="block px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">
-          ${escapeHtml(category)} <span class="text-gray-400">(${tools.length})</span>
-        </a>`
+        `<a href="#cat-${slugify(category)}" class="nav-link">${escapeHtml(category)} <span class="count">(${tools.length})</span></a>`
     )
-    .join("");
+    .join("\n        ");
 
   const toolSections = toolManifest
     .map(({ category }) => {
       const tools = data.tools.filter((t) => t.category === category);
       if (tools.length === 0) return "";
-      return `
-        <section id="cat-${slugify(category)}" class="mb-8">
-          <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">${escapeHtml(category)}</h2>
-          ${tools.map(renderToolCard).join("")}
+      return `<section id="cat-${slugify(category)}" class="category-section">
+          <h3 class="category-title">${escapeHtml(category)}</h3>
+          ${tools.map(renderToolCard).join("\n")}
         </section>`;
     })
-    .join("");
+    .join("\n");
 
   const stableCount = data.tools.filter((t) => t.status === "stable").length;
   const experimentalCount = data.tools.filter((t) => t.status === "experimental").length;
 
-  return `<!DOCTYPE html>
-<html lang="en" class="scroll-smooth">
+  const installationInstructionsFile = await Bun.file(import.meta.dir + "/../docs/llms/install.md").text();
+  const installationInstructions = Bun.markdown.html(installationInstructionsFile);
+
+  return /* html */ `<!DOCTYPE html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Blockbench MCP Plugin — API Reference</title>
   <link rel="stylesheet" href="style.css" />
-  <script>
-    if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-      document.documentElement.classList.add('dark');
-    }
-  </script>
 </head>
-<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen">
-  <div class="flex">
-    <!-- Sidebar -->
-    <nav class="hidden lg:block w-64 shrink-0 h-screen sticky top-0 overflow-y-auto border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-      <div class="mb-6">
-        <h1 class="text-lg font-bold">Blockbench MCP</h1>
-        <p class="text-xs text-gray-500 dark:text-gray-400">v${version} — API Reference</p>
+<body>
+  <div class="layout">
+    <nav class="sidebar">
+      <div class="sidebar-brand">
+        <h1>Blockbench MCP</h1>
+        <p>v${version} — API Reference</p>
       </div>
 
-      <div class="mb-4">
-        <input id="search" type="text" placeholder="Search tools..."
-          class="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      <input id="search" type="text" placeholder="Search tools..." class="search-input" />
+
+      <div class="nav-group">
+        <p class="nav-heading">Overview</p>
+        <a href="#tools" class="nav-link">Tools <span class="count">(${data.tools.length})</span></a>
+        <a href="#prompts" class="nav-link">Prompts <span class="count">(${data.prompts.length})</span></a>
+        <a href="#resources" class="nav-link">Resources <span class="count">(${data.resources.length})</span></a>
       </div>
 
-      <div class="mb-4">
-        <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">Overview</p>
-        <a href="#tools" class="block px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">Tools <span class="text-gray-400">(${data.tools.length})</span></a>
-        <a href="#prompts" class="block px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">Prompts <span class="text-gray-400">(${data.prompts.length})</span></a>
-        <a href="#resources" class="block px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">Resources <span class="text-gray-400">(${data.resources.length})</span></a>
-      </div>
-
-      <div>
-        <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">Categories</p>
+      <div class="nav-group">
+        <p class="nav-heading">Categories</p>
         ${categoryNav}
-      </div>
-
-      <div class="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-        <button id="theme-toggle" class="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">Toggle theme</button>
       </div>
     </nav>
 
-    <!-- Main Content -->
-    <main class="flex-1 max-w-4xl mx-auto px-6 py-8">
-      <header class="mb-8">
-        <h1 class="text-3xl font-bold mb-2">Blockbench MCP Plugin</h1>
-        <p class="text-gray-600 dark:text-gray-400 mb-4">API Reference — v${version}</p>
-        <div class="flex gap-4 text-sm">
-          <span class="text-gray-600 dark:text-gray-400"><strong>${data.tools.length}</strong> tools (${stableCount} stable, ${experimentalCount} experimental)</span>
-          <span class="text-gray-600 dark:text-gray-400"><strong>${data.prompts.length}</strong> prompts</span>
-          <span class="text-gray-600 dark:text-gray-400"><strong>${data.resources.length}</strong> resources</span>
-        </div>
+    <main class="main">
+      <header class="page-header">
+        <h1>Blockbench MCP Plugin</h1>
+        <p class="subtitle">API Reference — v${version}</p>
+        <nav class="stats">
+          <a href="#tools"><strong>${data.tools.length}</strong> tools (${stableCount} stable, ${experimentalCount} experimental)</a>
+          <a href="#prompts"><strong>${data.prompts.length}</strong> prompts</a>
+          <a href="#resources"><strong>${data.resources.length}</strong> resources</a>
+        </nav>
       </header>
 
-      <section id="tools" class="mb-12">
-        <h2 class="text-2xl font-bold mb-6 border-b-2 border-gray-300 dark:border-gray-600 pb-2">Tools</h2>
+      <section id="install" class="doc-section">
+        ${installationInstructions}
+      </section>
+
+      <section id="tools" class="doc-section">
+        <h2 class="section-title">Tools</h2>
         ${toolSections}
       </section>
 
-      <section id="prompts" class="mb-12">
-        <h2 class="text-2xl font-bold mb-6 border-b-2 border-gray-300 dark:border-gray-600 pb-2">Prompts</h2>
-        ${data.prompts.map(renderPromptCard).join("")}
+      <section id="prompts" class="doc-section">
+        <h2 class="section-title">Prompts</h2>
+        ${data.prompts.map(renderPromptCard).join("\n")}
       </section>
 
-      <section id="resources" class="mb-12">
-        <h2 class="text-2xl font-bold mb-6 border-b-2 border-gray-300 dark:border-gray-600 pb-2">Resources</h2>
-        ${data.resources.map(renderResourceCard).join("")}
+      <section id="resources" class="doc-section">
+        <h2 class="section-title">Resources</h2>
+        ${data.resources.map(renderResourceCard).join("\n")}
       </section>
 
-      <footer class="text-center text-xs text-gray-400 dark:text-gray-500 py-8 border-t border-gray-200 dark:border-gray-700">
+      <footer class="page-footer">
         Generated ${data.generatedAt} from Zod schemas
       </footer>
     </main>
   </div>
 
   <script>
-    // Theme toggle
-    document.getElementById('theme-toggle')?.addEventListener('click', () => {
-      document.documentElement.classList.toggle('dark');
-      localStorage.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
-    });
-
-    // Search
     document.getElementById('search')?.addEventListener('input', (e) => {
       const query = e.target.value.toLowerCase();
       document.querySelectorAll('.tool-card').forEach((card) => {
@@ -430,14 +412,9 @@ async function main() {
   // Write HTML
   log.step("Writing docs/index.html...");
   const htmlPath = docsDir + "/index.html";
-  await Bun.write(htmlPath, generateHtml(output));
+  const htmlContent = await generateHtml(output);
+  await Bun.write(htmlPath, htmlContent);
   log.info(`  ${htmlPath}`);
-
-  // Write Tailwind CSS source
-  log.step("Writing docs/style.css...");
-  const cssPath = docsDir + "/style.css";
-  await Bun.write(cssPath, `@import "tailwindcss";\n`);
-  log.info(`  ${cssPath}`);
 
   log.success(
     `Documentation generated: ${tools.length} tools, ${prompts.length} prompts, ${resources.length} resources`

@@ -14,6 +14,8 @@ bun run dev                     # Build with sourcemaps (one-time)
 bun run dev:watch               # Build with watch mode
 bun run build                   # Minified production build
 bun run ./build.ts --clean      # Clean dist/ before building
+bun run docs                    # Generate API docs from Zod schemas
+bun run docs:serve              # Serve docs locally with Tailwind
 bunx @modelcontextprotocol/inspector  # Test MCP tools locally
 ```
 
@@ -26,12 +28,14 @@ index.ts              # Plugin entry - registers server, UI, settings
 server/
   server.ts           # McpServer singleton (official MCP SDK)
   tools.ts            # Tool module imports aggregator
-  tools/              # Tool implementations by domain (animation, camera, cubes, element, import, mesh, paint, project, texture, ui, uv)
+  tools/              # Tool implementations by domain (each exports schemas + toolDocs + register fn)
   resources.ts        # MCP resource definitions
+  resources/          # Resource implementations by domain
   prompts.ts          # MCP prompts with argument completion
+  prompts/            # Prompt implementations by domain
   net.ts              # HTTP server and transport handling
 lib/
-  factories.ts        # createTool(), createPrompt(), and createResource() helpers
+  factories.ts        # createTool(), createPrompt(), createResource(), ToolSpec/PromptSpec/ResourceSpec
   zodObjects.ts       # Reusable Zod schemas
   util.ts             # Shared utilities
   constants.ts        # VERSION and other constants
@@ -42,31 +46,66 @@ ui/
   statusBar.ts        # Status bar UI
 macros/
   readPrompt.ts       # Build-time macro for embedding prompt files
-build.ts              # Bun build script with Blockbench compatibility shims
+build/
+  index.ts            # Bun build script with Blockbench compatibility shims
+  utils.ts            # Build utilities and logging (log.info, log.step, etc.)
+  plugins.ts          # Bun plugins (text loader, Blockbench compatibility shims)
+  docs.ts             # Documentation generator (Zod → JSON Schema → HTML)
+  docs-manifest.ts    # Aggregates all tool/prompt/resource specs for doc generation
+docs/
+  api.json            # Generated: machine-readable API documentation
+  index.html          # Generated: styled single-page documentation site
+  style.css           # Tailwind CSS source for docs
 ```
 
 ### Key Patterns
 
-**Tool Registration**: Use `createTool()` from `lib/factories.ts`. Tools are registered with the MCP server using the name provided:
+**Tool Registration**: Each tool file in `server/tools/` follows a two-part pattern:
+
+1. Export the Zod parameter schema and a `toolDocs: ToolSpec[]` array at module level (no Blockbench globals allowed here):
 ```ts
 import { z } from "zod";
-import { createTool } from "@/lib/factories";
+import { createTool, type ToolSpec } from "@/lib/factories";
 
-createTool("example", {
-  description: "Does something",
-  annotations: { title: "Example" },
-  parameters: z.object({ name: z.string() }),
-  async execute({ name }) {
-    return `Hello, ${name}!`;
-  },
+export const exampleParameters = z.object({
+  name: z.string().describe("Name to greet."),
 });
+
+export const exampleToolDocs: ToolSpec[] = [
+  {
+    name: "example",
+    description: "Does something",
+    annotations: { title: "Example" },
+    parameters: exampleParameters,
+    status: "stable",
+  },
+];
 ```
+
+2. Register inside a function, spreading from the spec:
+```ts
+export function registerExampleTools() {
+  createTool(exampleToolDocs[0].name, {
+    ...exampleToolDocs[0],
+    async execute({ name }) {
+      // Blockbench globals safe inside execute()
+      return `Hello, ${name}!`;
+    },
+  }, exampleToolDocs[0].status);
+}
+```
+
+After adding a tool: import the `toolDocs` in `build/docs-manifest.ts`, add to `toolManifest`, and run `bun run docs`.
+
+**Critical**: Never use Blockbench runtime globals (`BarItems`, `Formats`, `Plugins`, etc.) in schema construction. The doc generator imports schemas outside Blockbench. Use `z.string().describe(...)` and validate at runtime in `execute()`.
 
 **Prompt Registration**: Use `createPrompt()` from `lib/factories.ts` with optional argument completion.
 
 **Resources**: Use `createResource()` from `lib/factories.ts` in `server/resources.ts`.
 
 **Path Alias**: Use `@/*` for imports (e.g., `@/lib/factories`).
+
+**Documentation Generation**: Run `bun run docs` to regenerate `docs/api.json` and `docs/index.html` from Zod schemas. The doc system uses `build/docs-manifest.ts` (imports tool schemas, defines prompt/resource specs inline) and `build/docs.ts` (converts via `zod-to-json-schema`, renders HTML with Tailwind).
 
 ## Code Style
 
@@ -89,9 +128,10 @@ createTool("example", {
 
 No automated tests yet. Manual verification:
 1. Build: `bun run build`
-2. Load plugin in Blockbench
-3. Use MCP Inspector to test tools/resources
-4. Verify UI renders in light/dark themes
+2. Docs: `bun run docs` (verify tool count matches expectations)
+3. Load plugin in Blockbench
+4. Use MCP Inspector to test tools/resources
+5. Verify UI renders in light/dark themes
 
 ## Commits
 
