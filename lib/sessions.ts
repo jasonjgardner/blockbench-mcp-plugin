@@ -126,14 +126,16 @@ class SessionManager {
   }
 
   /**
-   * Record that a pong (ping response) was received from the session
+   * Record that a pong (ping response) was received from the session.
+   * This confirms the transport is alive but does NOT count as client
+   * activity — only real MCP requests should reset the inactivity timer
+   * (via updateActivity).
    */
   recordPongReceived(sessionId: string): void {
     const session = this.sessions.get(sessionId);
     if (session) {
       session.lastPongAt = new Date();
       session.failedPings = 0;
-      this.resetTimeout(session);
     }
   }
 

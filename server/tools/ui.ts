@@ -144,7 +144,16 @@ export function registerUITools() {
           outliner: true,
           collections: [],
         });
-        const parsedArgs = args ? JSON.parse(args) : {};
+        let parsedArgs: Record<string, unknown> = {};
+        if (args) {
+          try {
+            parsedArgs = JSON.parse(args);
+          } catch (e) {
+            throw new Error(
+              `Invalid JSON in confirmEvent: ${e instanceof Error ? e.message : e}`
+            );
+          }
+        }
 
         if (!(action in BarItems)) {
           throw new Error(`Action "${action}" not found.`);
@@ -257,7 +266,14 @@ export function registerUITools() {
         if (!Dialog.open) {
           Dialog.stack[Dialog.stack.length - 1]?.focus();
         }
-        const parsedValues = JSON.parse(values);
+        let parsedValues: Record<string, unknown>;
+        try {
+          parsedValues = JSON.parse(values);
+        } catch (e) {
+          throw new Error(
+            `Invalid JSON in values: ${e instanceof Error ? e.message : e}`
+          );
+        }
 
         const keys = Object.keys(Dialog.open?.getFormResult() ?? {});
         const valuesToFill = Object.entries(parsedValues).reduce(
@@ -266,8 +282,9 @@ export function registerUITools() {
               acc[key as keyof FormResultValue] = value as FormResultValue;
             }
             return acc;
-          }
-        ) as Record<keyof FormResultValue, FormResultValue>;
+          },
+          {} as Record<keyof FormResultValue, FormResultValue>
+        );
         Dialog.open?.setFormValues(valuesToFill, true);
 
         if (confirm) {
