@@ -118,9 +118,6 @@ jobs:
     needs: build
     if: needs.build.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: https://jasonjgardner.github.io/blockbench-mcp-plugin/
     steps:
       - name: Checkout gh-pages branch
         uses: actions/checkout@v4
