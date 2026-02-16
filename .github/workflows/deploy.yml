@@ -113,14 +113,17 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # Deploy — pushes to gh-pages branch
+  # Note: The 'environment' block is intentionally omitted to allow tag-based
+  # deployments (releases) to work without being blocked by environment
+  # protection rules. The workflow is already secured via:
+  # - Trigger conditions (only main branch, v* tags, or approved PRs)
+  # - Permission checks in the build job
+  # - Repository permissions (contents: write, pages: write)
   # ---------------------------------------------------------------------------
   deploy:
     needs: build
     if: needs.build.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: https://jasonjgardner.github.io/blockbench-mcp-plugin/
     steps:
       - name: Checkout gh-pages branch
         uses: actions/checkout@v4
