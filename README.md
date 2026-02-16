@@ -83,6 +83,14 @@ claude mcp add blockbench --transport http http://localhost:3000/bb-mcp
 }
 ```
 
+#### Ollama
+
+```bash
+uvx ollmcp -u http://localhost:3000/bb-mcp
+```
+
+Recommended: [jonigl/mcp-client-for-ollama](https://github.com/jonigl/mcp-client-for-ollama)
+
 #### OpenCode
 
 ```bash
