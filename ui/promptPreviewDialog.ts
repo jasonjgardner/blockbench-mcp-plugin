@@ -1,6 +1,7 @@
 /// <reference types="blockbench-types" />
 import { z } from "zod";
 import { getAllPromptDefinitions } from "@/lib/factories";
+import { openPromptOverrideDialog } from "@/ui/promptOverrideDialog";
 
 interface FormElementOptions {
   label?: string;
@@ -163,7 +164,7 @@ function showPromptContentDialog(
         line-height: 1.5;
       ">${escapeHtml(content)}</pre>`,
     ],
-    buttons: [tl("mcp.dialog.copy"), tl("mcp.dialog.close")],
+    buttons: [tl("mcp.dialog.copy"), tl("mcp.dialog.edit_override"), tl("mcp.dialog.close")],
     onButton(buttonIndex: number) {
       if (buttonIndex === 0) {
         navigator.clipboard.writeText(content).then(() => {
@@ -172,6 +173,10 @@ function showPromptContentDialog(
           Blockbench.showQuickMessage(tl("mcp.dialog.copy_failed"), 1500);
         });
         return false; // Keep dialog open
+      }
+      if (buttonIndex === 1) {
+        openPromptOverrideDialog(promptName);
+        return; // Close content dialog, open override dialog
       }
     },
   });

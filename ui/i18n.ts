@@ -61,6 +61,8 @@ const en: Record<string, string> = {
   "mcp.settings.port_desc": "Port for the MCP server.",
   "mcp.settings.endpoint_name": "MCP Server Endpoint",
   "mcp.settings.endpoint_desc": "Endpoint for the MCP server.",
+  "mcp.settings.prompt_cdn_name": "Enable Prompt CDN",
+  "mcp.settings.prompt_cdn_desc": "Fetch prompt content from CDN on plugin load. Disable to use only cached prompts.",
 
   // Tool test dialog
   "mcp.dialog.result_title": "Result: %0",
@@ -86,6 +88,16 @@ const en: Record<string, string> = {
   "mcp.dialog.prompt_not_found": "Prompt \"%0\" not found",
   "mcp.dialog.role_user": "User",
   "mcp.dialog.role_assistant": "Assistant",
+
+  // Prompt override dialog
+  "mcp.dialog.edit_override": "Edit Override",
+  "mcp.dialog.save_override": "Save Override",
+  "mcp.dialog.reset_to_default": "Reset to Default",
+  "mcp.dialog.override_saved": "Custom prompt override saved",
+  "mcp.dialog.override_reset": "Prompt reset to default",
+  "mcp.dialog.using_custom": "Using: Custom Override",
+  "mcp.dialog.using_default": "Using: Default (v%0)",
+  "mcp.prompts.custom_badge": "custom",
 };
 
 // German translations
@@ -141,6 +153,8 @@ const de: Record<string, string> = {
   "mcp.settings.port_desc": "Port für den MCP-Server.",
   "mcp.settings.endpoint_name": "MCP Server Endpunkt",
   "mcp.settings.endpoint_desc": "Endpunkt für den MCP-Server.",
+  "mcp.settings.prompt_cdn_name": "Prompt-CDN aktivieren",
+  "mcp.settings.prompt_cdn_desc": "Prompt-Inhalte beim Laden des Plugins vom CDN abrufen. Deaktivieren, um nur zwischengespeicherte Prompts zu verwenden.",
 
   // Tool test dialog
   "mcp.dialog.result_title": "Ergebnis: %0",
@@ -166,6 +180,16 @@ const de: Record<string, string> = {
   "mcp.dialog.prompt_not_found": "Prompt \"%0\" nicht gefunden",
   "mcp.dialog.role_user": "Benutzer",
   "mcp.dialog.role_assistant": "Assistent",
+
+  // Prompt override dialog
+  "mcp.dialog.edit_override": "Override bearbeiten",
+  "mcp.dialog.save_override": "Override speichern",
+  "mcp.dialog.reset_to_default": "Auf Standard zurücksetzen",
+  "mcp.dialog.override_saved": "Benutzerdefiniertes Prompt-Override gespeichert",
+  "mcp.dialog.override_reset": "Prompt auf Standard zurückgesetzt",
+  "mcp.dialog.using_custom": "Verwendet: Benutzerdefiniert",
+  "mcp.dialog.using_default": "Verwendet: Standard (v%0)",
+  "mcp.prompts.custom_badge": "custom",
 };
 
 // Japanese translations
@@ -221,6 +245,8 @@ const ja: Record<string, string> = {
   "mcp.settings.port_desc": "MCPサーバーのポート。",
   "mcp.settings.endpoint_name": "MCPサーバーエンドポイント",
   "mcp.settings.endpoint_desc": "MCPサーバーのエンドポイント。",
+  "mcp.settings.prompt_cdn_name": "プロンプトCDNを有効化",
+  "mcp.settings.prompt_cdn_desc": "プラグイン読み込み時にCDNからプロンプト内容を取得します。無効にするとキャッシュされたプロンプトのみ使用します。",
 
   // Tool test dialog
   "mcp.dialog.result_title": "結果: %0",
@@ -246,6 +272,16 @@ const ja: Record<string, string> = {
   "mcp.dialog.prompt_not_found": "プロンプト \"%0\" が見つかりません",
   "mcp.dialog.role_user": "ユーザー",
   "mcp.dialog.role_assistant": "アシスタント",
+
+  // Prompt override dialog
+  "mcp.dialog.edit_override": "オーバーライドを編集",
+  "mcp.dialog.save_override": "オーバーライドを保存",
+  "mcp.dialog.reset_to_default": "デフォルトに戻す",
+  "mcp.dialog.override_saved": "カスタムプロンプトオーバーライドを保存しました",
+  "mcp.dialog.override_reset": "プロンプトをデフォルトに戻しました",
+  "mcp.dialog.using_custom": "使用中: カスタム",
+  "mcp.dialog.using_default": "使用中: デフォルト (v%0)",
+  "mcp.prompts.custom_badge": "カスタム",
 };
 
 // Chinese (Simplified) translations
@@ -301,6 +337,8 @@ const zh: Record<string, string> = {
   "mcp.settings.port_desc": "MCP服务器的端口。",
   "mcp.settings.endpoint_name": "MCP服务器端点",
   "mcp.settings.endpoint_desc": "MCP服务器的端点。",
+  "mcp.settings.prompt_cdn_name": "启用提示词CDN",
+  "mcp.settings.prompt_cdn_desc": "插件加载时从CDN获取提示词内容。禁用后仅使用缓存的提示词。",
 
   // Tool test dialog
   "mcp.dialog.result_title": "结果: %0",
@@ -326,6 +364,16 @@ const zh: Record<string, string> = {
   "mcp.dialog.prompt_not_found": "未找到提示词 \"%0\"",
   "mcp.dialog.role_user": "用户",
   "mcp.dialog.role_assistant": "助手",
+
+  // Prompt override dialog
+  "mcp.dialog.edit_override": "编辑覆盖",
+  "mcp.dialog.save_override": "保存覆盖",
+  "mcp.dialog.reset_to_default": "重置为默认",
+  "mcp.dialog.override_saved": "自定义提示词覆盖已保存",
+  "mcp.dialog.override_reset": "提示词已重置为默认",
+  "mcp.dialog.using_custom": "使用中: 自定义",
+  "mcp.dialog.using_default": "使用中: 默认 (v%0)",
+  "mcp.prompts.custom_badge": "自定义",
 };
 
 // All translations mapped by language code

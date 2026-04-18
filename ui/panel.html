@@ -101,16 +101,31 @@
             <div v-for="prompt in filteredPrompts" :key="prompt.name" class="tool-toggle-row clickable"
                 @click="openPromptPreview(prompt.name)"
                 :title="tl('mcp.tooltip.click_to_preview', [getDisplayName(prompt.name)])">
-                <div class="tool-info">
+                <div class="tool-info" style="flex: 1;">
                     <div class="tool-name">
                         {{getDisplayName(prompt.name)}}
                         <span v-if="prompt.status === 'experimental'" class="tool-status experimental" :title="tl('mcp.status.experimental_tooltip')"></span>
+                        <span v-if="isPromptOverridden(prompt.name)" style="
+                            background: var(--color-accent);
+                            color: var(--color-light);
+                            font-size: 10px;
+                            padding: 0 4px;
+                            border-radius: 3px;
+                            margin-left: 4px;
+                            font-weight: bold;
+                        ">{{tl('mcp.prompts.custom_badge')}}</span>
                     </div>
                     <div class="tool-description" :title="prompt.description">{{prompt.description}}</div>
                     <div v-if="prompt.argumentCount > 0" class="tool-description"
                         style="font-style: italic; margin-top: 2px;">
                         {{formatArgumentCount(prompt.argumentCount)}}
                     </div>
+                </div>
+                <div @click.stop style="display: flex; align-items: center; padding-left: 4px;">
+                    <i class="material-icons" @click="openPromptOverride(prompt.name)"
+                        :title="tl('mcp.dialog.edit_override')"
+                        style="cursor: pointer; opacity: 0.5; font-size: 18px;"
+                        onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.5'">edit</i>
                 </div>
             </div>
         </div>

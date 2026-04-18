@@ -5,12 +5,15 @@ import { statusBarSetup, statusBarTeardown } from "@/ui/statusBar";
 import { sessionManager, type Session } from "@/lib/sessions";
 import { openToolTestDialog } from "@/ui/toolTestDialog";
 import { openPromptPreviewDialog } from "@/ui/promptPreviewDialog";
+import { openPromptOverrideDialog, overrideDialogTeardown, PROMPT_OVERRIDE_CHANGED } from "@/ui/promptOverrideDialog";
+import { hasPromptOverride } from "@/lib/promptLoader";
 import { formatArgumentCount } from "@/ui/i18n";
 import panelCSS from "@/ui/panel.css";
 import template from "@/ui/panel.html";
 
 let panel: Panel | undefined;
 let unsubscribe: (() => void) | undefined;
+let overrideListener: (() => void) | undefined;
 
 export function uiSetup({
   server,
@@ -49,11 +52,20 @@ export function uiSetup({
           }));
           vm.server.connected = sessions.length > 0;
         });
+
+        // Listen for override changes to refresh badge state
+        const handler = () => vm.$forceUpdate();
+        document.addEventListener(PROMPT_OVERRIDE_CHANGED, handler);
+        overrideListener = () => document.removeEventListener(PROMPT_OVERRIDE_CHANGED, handler);
       },
       beforeDestroy() {
         if (unsubscribe) {
           unsubscribe();
           unsubscribe = undefined;
+        }
+        if (overrideListener) {
+          overrideListener();
+          overrideListener = undefined;
         }
       },
       data: () => ({
@@ -154,6 +166,12 @@ export function uiSetup({
         openPromptPreview(promptName: string): void {
           openPromptPreviewDialog(promptName);
         },
+        openPromptOverride(promptName: string): void {
+          openPromptOverrideDialog(promptName);
+        },
+        isPromptOverridden(promptName: string): boolean {
+          return hasPromptOverride(promptName);
+        },
         formatArgumentCount,
         onToolsToggle(event: Event): void {
           const details = event.target as HTMLDetailsElement;
@@ -187,6 +205,7 @@ export function uiSetup({
 }
 
 export function uiTeardown() {
+  overrideDialogTeardown();
   statusBarTeardown();
   panel?.delete();
 }

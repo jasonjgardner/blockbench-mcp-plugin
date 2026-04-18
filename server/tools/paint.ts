@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { createTool, type ToolSpec } from "@/lib/factories";
 import { STATUS_EXPERIMENTAL } from "@/lib/constants";
-import { getProjectTexture } from "@/lib/util";
+import { getProjectTexture, getAndActivateTexture, setBarItemValue } from "@/lib/util";
 import {
   textureIdOptionalSchema,
   hexColorSchema,
@@ -423,17 +423,7 @@ export function registerPaintTools() {
         fill_mode,
         blend_mode,
       }) {
-        const texture = texture_id
-          ? getProjectTexture(texture_id)
-          : Texture.getDefault();
-
-        if (!texture) {
-          throw new Error(
-            texture_id
-              ? `Texture with ID "${texture_id}" not found.`
-              : "No texture available."
-          );
-        }
+        const texture = getAndActivateTexture(texture_id);
 
         Undo.initEdit({
           textures: [texture],
@@ -445,16 +435,13 @@ export function registerPaintTools() {
           ColorPanel.set(color);
         }
         if (opacity !== undefined) {
-          // @ts-ignore
-          BarItems.slider_brush_opacity.set(opacity);
+          setBarItemValue("slider_brush_opacity", opacity);
         }
         if (fill_mode) {
-          // @ts-ignore
-          BarItems.fill_mode.set(fill_mode);
+          setBarItemValue("fill_mode", fill_mode);
         }
         if (blend_mode) {
-          // @ts-ignore
-          BarItems.blend_mode.set(blend_mode);
+          setBarItemValue("blend_mode", blend_mode);
         }
 
         // Select fill tool
@@ -488,17 +475,7 @@ export function registerPaintTools() {
         opacity,
         blend_mode,
       }) {
-        const texture = texture_id
-          ? getProjectTexture(texture_id)
-          : Texture.getDefault();
-
-        if (!texture) {
-          throw new Error(
-            texture_id
-              ? `Texture with ID "${texture_id}" not found.`
-              : "No texture available."
-          );
-        }
+        const texture = getAndActivateTexture(texture_id);
 
         Undo.initEdit({
           textures: [texture],
@@ -510,21 +487,17 @@ export function registerPaintTools() {
           ColorPanel.set(color);
         }
         if (opacity !== undefined) {
-          // @ts-ignore
-          BarItems.slider_brush_opacity.set(opacity);
+          setBarItemValue("slider_brush_opacity", opacity);
         }
         if (line_width !== undefined) {
-          // @ts-ignore
-          BarItems.slider_brush_size.set(line_width);
+          setBarItemValue("slider_brush_size", line_width);
         }
         if (blend_mode) {
-          // @ts-ignore
-          BarItems.blend_mode.set(blend_mode);
+          setBarItemValue("blend_mode", blend_mode);
         }
 
         // Set shape type
-        // @ts-ignore
-        BarItems.draw_shape_type.set(shape);
+        setBarItemValue("draw_shape_type", shape);
 
         // Select draw shape tool
         // @ts-ignore
@@ -557,17 +530,7 @@ export function registerPaintTools() {
         opacity,
         blend_mode,
       }) {
-        const texture = texture_id
-          ? getProjectTexture(texture_id)
-          : Texture.getDefault();
-
-        if (!texture) {
-          throw new Error(
-            texture_id
-              ? `Texture with ID "${texture_id}" not found.`
-              : "No texture available."
-          );
-        }
+        const texture = getAndActivateTexture(texture_id);
 
         Undo.initEdit({
           textures: [texture],
@@ -580,12 +543,10 @@ export function registerPaintTools() {
         ColorPanel.set(end_color, true); // Set as secondary color
 
         if (opacity !== undefined) {
-          // @ts-ignore
-          BarItems.slider_brush_opacity.set(opacity);
+          setBarItemValue("slider_brush_opacity", opacity);
         }
         if (blend_mode) {
-          // @ts-ignore
-          BarItems.blend_mode.set(blend_mode);
+          setBarItemValue("blend_mode", blend_mode);
         }
 
         // Select gradient tool
@@ -611,17 +572,7 @@ export function registerPaintTools() {
     {
       ...paintToolDocs[3],
       async execute({ texture_id, x, y, set_as_secondary, pick_opacity }) {
-        const texture = texture_id
-          ? getProjectTexture(texture_id)
-          : Texture.getDefault();
-
-        if (!texture) {
-          throw new Error(
-            texture_id
-              ? `Texture with ID "${texture_id}" not found.`
-              : "No texture available."
-          );
-        }
+        const texture = getAndActivateTexture(texture_id);
 
         // Pick color
         Painter.colorPicker(texture, x, y, { button: set_as_secondary ? 2 : 0 });
@@ -658,17 +609,7 @@ export function registerPaintTools() {
     {
       ...paintToolDocs[4],
       async execute({ texture_id, source, target, brush_size, opacity, mode }) {
-        const texture = texture_id
-          ? getProjectTexture(texture_id)
-          : Texture.getDefault();
-
-        if (!texture) {
-          throw new Error(
-            texture_id
-              ? `Texture with ID "${texture_id}" not found.`
-              : "No texture available."
-          );
-        }
+        const texture = getAndActivateTexture(texture_id);
 
         Undo.initEdit({
           textures: [texture],
@@ -677,16 +618,13 @@ export function registerPaintTools() {
 
         // Apply settings
         if (brush_size !== undefined) {
-          // @ts-ignore
-          BarItems.slider_brush_size.set(brush_size);
+          setBarItemValue("slider_brush_size", brush_size);
         }
         if (opacity !== undefined) {
-          // @ts-ignore
-          BarItems.slider_brush_opacity.set(opacity);
+          setBarItemValue("slider_brush_opacity", opacity);
         }
         if (mode) {
-          // @ts-ignore
-          BarItems.copy_brush_mode.set(mode);
+          setBarItemValue("copy_brush_mode", mode);
         }
 
         // Select copy brush tool
@@ -724,17 +662,7 @@ export function registerPaintTools() {
         shape,
         connect_strokes,
       }) {
-        const texture = texture_id
-          ? getProjectTexture(texture_id)
-          : Texture.getDefault();
-
-        if (!texture) {
-          throw new Error(
-            texture_id
-              ? `Texture with ID "${texture_id}" not found.`
-              : "No texture available."
-          );
-        }
+        const texture = getAndActivateTexture(texture_id);
 
         Undo.initEdit({
           textures: [texture],
@@ -743,20 +671,16 @@ export function registerPaintTools() {
 
         // Apply settings
         if (brush_size !== undefined) {
-          // @ts-ignore
-          BarItems.slider_brush_size.set(brush_size);
+          setBarItemValue("slider_brush_size", brush_size);
         }
         if (opacity !== undefined) {
-          // @ts-ignore
-          BarItems.slider_brush_opacity.set(opacity);
+          setBarItemValue("slider_brush_opacity", opacity);
         }
         if (softness !== undefined) {
-          // @ts-ignore
-          BarItems.slider_brush_softness.set(softness);
+          setBarItemValue("slider_brush_softness", softness);
         }
         if (shape !== undefined) {
-          // @ts-ignore
-          BarItems.brush_shape.set(shape);
+          setBarItemValue("brush_shape", shape);
         }
 
         // Select eraser tool
@@ -808,8 +732,7 @@ export function registerPaintTools() {
 
         // Mirror painting
         if (mirror_painting !== undefined) {
-          // @ts-ignore
-          BarItems.mirror_painting.set(mirror_painting.enabled);
+          setBarItemValue("mirror_painting", mirror_painting.enabled);
           Painter.mirror_painting = mirror_painting.enabled;
           settings.push(`Mirror painting: ${mirror_painting.enabled}`);
 
@@ -847,15 +770,13 @@ export function registerPaintTools() {
 
         // Pixel perfect
         if (pixel_perfect !== undefined) {
-          // @ts-ignore
-          BarItems.pixel_perfect_drawing.set(pixel_perfect);
+          setBarItemValue("pixel_perfect_drawing", pixel_perfect);
           settings.push(`Pixel perfect: ${pixel_perfect}`);
         }
 
         // Color erase mode
         if (color_erase_mode !== undefined) {
-          // @ts-ignore
-          BarItems.color_erase_mode.set(color_erase_mode);
+          setBarItemValue("color_erase_mode", color_erase_mode);
           Painter.erase_mode = color_erase_mode;
           settings.push(`Color erase mode: ${color_erase_mode}`);
         }
@@ -913,17 +834,7 @@ export function registerPaintTools() {
         brush_settings,
         connect_strokes,
       }) {
-        const texture = texture_id
-          ? getProjectTexture(texture_id)
-          : Texture.getDefault();
-
-        if (!texture) {
-          throw new Error(
-            texture_id
-              ? `Texture with ID "${texture_id}" not found.`
-              : "No texture available."
-          );
-        }
+        const texture = getAndActivateTexture(texture_id);
 
         Undo.initEdit({
           textures: [texture],
@@ -1057,17 +968,7 @@ export function registerPaintTools() {
     {
       ...paintToolDocs[10],
       async execute({ action, texture_id, coordinates, radius, mode }) {
-        const texture = texture_id
-          ? getProjectTexture(texture_id)
-          : Texture.getDefault();
-
-        if (!texture) {
-          throw new Error(
-            texture_id
-              ? `Texture with ID "${texture_id}" not found.`
-              : "No texture available."
-          );
-        }
+        const texture = getAndActivateTexture(texture_id);
 
         Undo.initEdit({
           textures: [texture],
@@ -1121,7 +1022,15 @@ export function registerPaintTools() {
             break;
 
           case "select_all":
-            selection.selectAll();
+            // `selection.selectAll()` doesn't exist on current Blockbench
+            // (`H.selectAll is not a function`). Emulate via a full-texture
+            // rectangular selection instead, matching what the UI does.
+            selection.clear();
+            selection.start_x = 0;
+            selection.start_y = 0;
+            selection.end_x = texture.width;
+            selection.end_y = texture.height;
+            selection.is_custom = false;
             break;
 
           case "clear_selection":
@@ -1177,17 +1086,7 @@ export function registerPaintTools() {
         blend_mode,
         target_index,
       }) {
-        const texture = texture_id
-          ? getProjectTexture(texture_id)
-          : Texture.selected;
-
-        if (!texture) {
-          throw new Error(
-            texture_id
-              ? `Texture with ID "${texture_id}" not found.`
-              : "No texture selected."
-          );
-        }
+        const texture = getAndActivateTexture(texture_id);
 
         Undo.initEdit({
           textures: [texture],

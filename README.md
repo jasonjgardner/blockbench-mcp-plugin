@@ -16,6 +16,13 @@ The following examples use the default values of `:3000/bb-mcp`
 
 ### Installation
 
+
+#### General
+
+```bash
+npx mcp-add --type http --url "http://localhost:3000/bb-mcp" --scope project
+```
+
 #### VS Code
 
 **`.vscode/mcp.json`**

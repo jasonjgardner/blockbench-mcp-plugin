@@ -13,6 +13,7 @@ import { uiSetup, uiTeardown } from "@/ui";
 import { settingsSetup, settingsTeardown } from "@/ui/settings";
 import { setupI18n } from "@/ui/i18n";
 import { sessionManager } from "@/lib/sessions";
+import { initPromptLoader } from "@/lib/promptLoader";
 import type { NetServer, SessionTransports } from "@/server/net";
 import createNetServer from "@/server/net";
 import { getIcon } from "@/macros/getIcon" with { type: "macro" };
@@ -47,6 +48,16 @@ BBPlugin.register("mcp", {
     setupI18n();
 
     settingsSetup();
+
+    // Load prompt manifest from CDN/cache before server starts.
+    // Must never abort onload — missing prompts should degrade gracefully,
+    // e.g. when a new version is tagged before the CDN asset is published.
+    try {
+      const cdnEnabled = Settings.get("mcp_prompt_cdn_enabled") !== false;
+      await initPromptLoader(cdnEnabled);
+    } catch (err) {
+      console.error("[MCP] Prompt loader initialization failed — continuing without prompts:", err);
+    }
 
     // Create TCP server to handle HTTP requests
     [httpServer, sessionTransports] = createNetServer(net, {

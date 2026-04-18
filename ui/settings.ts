@@ -29,6 +29,14 @@ export function settingsSetup() {
       value: "/bb-mcp",
       category,
       icon: "webhook",
+    }),
+    new Setting("mcp_prompt_cdn_enabled", {
+      name: tl("mcp.settings.prompt_cdn_name"),
+      description: tl("mcp.settings.prompt_cdn_desc"),
+      type: "toggle",
+      value: true,
+      category,
+      icon: "cloud_download",
     })
   );
 }

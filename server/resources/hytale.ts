@@ -2,6 +2,7 @@
 /// <reference types="blockbench-types" />
 
 import { createResource } from "@/lib/factories";
+import { findByResourceId, makeResourceId } from "@/lib/resourceUri";
 import {
   isHytalePluginInstalled,
   isHytaleFormat,
@@ -115,7 +116,7 @@ export function registerHytaleResources() {
     uriTemplate: "hytale://attachments/{id}",
     title: "Hytale Attachments",
     description:
-      "Returns information about attachment collections in the current Hytale project. Attachments are separate models that can be attached to bones.",
+      "Returns information about attachment collections in the current Hytale project. Attachments are separate models that can be attached to bones. List URIs use the slugified collection name (e.g. `hytale://attachments/helmet`) when unique, with a `~<uuid-prefix>` suffix on collision. Reads also accept the raw UUID or exact name.",
     async listCallback() {
       if (!isHytaleFormat()) {
         return { resources: [] };
@@ -124,7 +125,7 @@ export function registerHytaleResources() {
       const attachments = getAttachmentCollections();
       return {
         resources: attachments.map((a) => ({
-          uri: `hytale://attachments/${a.uuid}`,
+          uri: `hytale://attachments/${makeResourceId(a, attachments)}`,
           name: a.name,
           description: `Attachment collection${a.texture ? " with texture" : ""}`,
           mimeType: "application/json",
@@ -150,7 +151,7 @@ export function registerHytaleResources() {
 
       // If ID provided, find specific attachment
       if (id) {
-        const attachment = attachments.find((a) => a.uuid === id || a.name === id);
+        const attachment = findByResourceId(attachments, id);
         if (!attachment) {
           throw new Error(`Attachment "${id}" not found.`);
         }
@@ -203,7 +204,7 @@ export function registerHytaleResources() {
     uriTemplate: "hytale://pieces/{id}",
     title: "Hytale Attachment Pieces",
     description:
-      "Returns information about groups marked as attachment pieces. Attachment pieces connect to like-named bones in the main model.",
+      "Returns information about groups marked as attachment pieces. Attachment pieces connect to like-named bones in the main model. List URIs use the slugified bone name (e.g. `hytale://pieces/hand-right`) when unique, with a `~<uuid-prefix>` suffix on collision. Reads also accept the raw UUID or exact name.",
     async listCallback() {
       if (!isHytaleFormat()) {
         return { resources: [] };
@@ -212,7 +213,7 @@ export function registerHytaleResources() {
       const pieces = getAttachmentPieces();
       return {
         resources: pieces.map((p) => ({
-          uri: `hytale://pieces/${p.uuid}`,
+          uri: `hytale://pieces/${makeResourceId(p, pieces)}`,
           name: p.name,
           description: "Attachment piece bone",
           mimeType: "application/json",
@@ -238,7 +239,7 @@ export function registerHytaleResources() {
 
       // If ID provided, find specific piece
       if (id) {
-        const piece = pieces.find((p) => p.uuid === id || p.name === id);
+        const piece = findByResourceId(pieces, id);
         if (!piece) {
           throw new Error(`Attachment piece "${id}" not found.`);
         }
@@ -290,17 +291,17 @@ export function registerHytaleResources() {
     uriTemplate: "hytale://cubes/{id}",
     title: "Hytale Cubes",
     description:
-      "Returns information about cubes with Hytale-specific properties (shading_mode, double_sided, stretch).",
+      "Returns information about cubes with Hytale-specific properties (shading_mode, double_sided, stretch). List URIs use the slugified cube name (e.g. `hytale://cubes/torso`) when unique, with a `~<uuid-prefix>` suffix on collision. Reads also accept the raw UUID or exact name.",
     async listCallback() {
       if (!isHytaleFormat()) {
         return { resources: [] };
       }
 
       // @ts-ignore - Cube is globally available
-      const cubes = Cube.all ?? [];
+      const cubes: Cube[] = Cube.all ?? [];
       return {
         resources: cubes.map((c: Cube) => ({
-          uri: `hytale://cubes/${c.uuid}`,
+          uri: `hytale://cubes/${makeResourceId(c, cubes)}`,
           name: c.name,
           description: `Shading: ${getCubeShadingMode(c)}, Double-sided: ${isCubeDoubleSided(c)}`,
           mimeType: "application/json",
@@ -323,11 +324,11 @@ export function registerHytaleResources() {
       }
 
       // @ts-ignore - Cube is globally available
-      const cubes = Cube.all ?? [];
+      const cubes: Cube[] = Cube.all ?? [];
 
       // If ID provided, find specific cube
       if (id) {
-        const cube = cubes.find((c: Cube) => c.uuid === id || c.name === id);
+        const cube = findByResourceId(cubes, id);
         if (!cube) {
           throw new Error(`Cube "${id}" not found.`);
         }

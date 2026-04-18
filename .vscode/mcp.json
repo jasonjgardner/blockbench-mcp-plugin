@@ -1,7 +1,7 @@
 {
 	"servers": {
 		"blockbench": {
-			"url": "http://localhost:5007/bb-mcp",
+			"url": "http://localhost:3000/bb-mcp",
 			"type": "http"
 		}
 	},
