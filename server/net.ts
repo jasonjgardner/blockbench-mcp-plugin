@@ -68,17 +68,21 @@ export default function createNetServer (
     sessionManager.configure(sessionConfig)
   }
 
-  // Set up ping callback for session keep-alive
-  // Note: The MCP SDK doesn't expose a direct ping method on the server-side,
-  // so we verify the session is still registered. The actual connection health
-  // is maintained through TCP keep-alive and the inactivity timeout.
+  // Set up ping callback for session keep-alive.
+  // Sends a real MCP ping request to the client to verify the connection is alive.
   sessionManager.setPingCallback(async (sessionId: string) => {
     const session = sessionTransports.get(sessionId)
     if (!session) return false
 
-    // Session exists and transport is available - consider it healthy
-    // TCP keep-alive and inactivity timeouts handle actual connection failures
-    return true
+    try {
+      // Use the underlying Server's ping() method to send a JSON-RPC ping
+      // and wait for the client's response (pong).
+      await session.server.server.ping()
+      return true
+    } catch {
+      // Ping failed — transport is likely dead
+      return false
+    }
   })
 
   // Register callback to close transport when sessionManager removes a session (e.g., timeout)
