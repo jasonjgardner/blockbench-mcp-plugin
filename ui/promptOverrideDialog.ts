@@ -51,7 +51,7 @@ export function openPromptOverrideDialog(promptName: string): void {
     width: 700,
     lines: [
       `<p style="margin-bottom: 8px; color: var(--color-subtle_text);">
-        ${promptDef.description}
+        ${escapeHtml(promptDef.description)}
       </p>`,
       `<p style="margin-bottom: 12px; font-size: 11px;">
         <span style="
@@ -76,7 +76,7 @@ export function openPromptOverrideDialog(promptName: string): void {
         line-height: 1.5;
         resize: vertical;
         tab-size: 2;
-      ">${escapeForTextarea(currentContent)}</textarea>`,
+      ">${escapeHtml(currentContent)}</textarea>`,
     ],
     buttons: [
       tl("mcp.dialog.save_override"),
@@ -118,9 +118,15 @@ export function openPromptOverrideDialog(promptName: string): void {
   overrideDialog.show();
 }
 
-function escapeForTextarea(text: string): string {
+/**
+ * Escapes HTML special characters so untrusted text can be safely
+ * interpolated into the dialog's `lines` HTML.
+ */
+function escapeHtml(text: string): string {
   return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }

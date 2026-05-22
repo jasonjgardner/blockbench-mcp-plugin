@@ -67,13 +67,7 @@ async function buildPlugin(): Promise<boolean> {
       "os",
       "v8",
     ],
-    minify: isProduction
-      ? {
-          whitespace: true,
-          syntax: true,
-          identifiers: true,
-        }
-      : false,
+    minify: isProduction,
     // Compile-time constants for dead code elimination
     define: {
       "process.env.NODE_ENV": isProduction ? '"production"' : '"development"',
