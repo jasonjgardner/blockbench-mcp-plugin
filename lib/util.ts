@@ -99,17 +99,28 @@ export function setBarItemValue(id: string, value: unknown): void {
   // @ts-ignore - BarItems is a Blockbench global
   const item = BarItems?.[id];
   if (!item) return;
-  if (typeof item.change === "function") {
-    item.change(value);
-    return;
-  }
   if (typeof item.set === "function") {
-    item.set(value);
+    try {
+      item.set(value);
+      return;
+    } catch {
+      // Fall through to direct assignment for widgets whose runtime method
+      // signatures drifted from the public type surface.
+    }
+  }
+  if ("value" in item) {
+    item.value = value;
+    if (typeof item.update === "function") item.update();
     return;
   }
-  // Fallback: direct assignment covers NumSlider and similar modern widgets.
-  item.value = value;
-  if (typeof item.update === "function") item.update();
+  if (typeof item.change === "function") {
+    try {
+      item.change(value);
+    } catch {
+      // Best-effort UI setting; callers should not fail because Blockbench
+      // changed an optional widget mutator signature.
+    }
+  }
 }
 
 /**

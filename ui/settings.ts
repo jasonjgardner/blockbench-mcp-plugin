@@ -37,6 +37,26 @@ export function settingsSetup() {
       value: true,
       category,
       icon: "cloud_download",
+    }),
+    new Setting("mcp_session_timeout", {
+      name: tl("mcp.settings.session_timeout_name"),
+      description: tl("mcp.settings.session_timeout_desc"),
+      type: "number",
+      value: 5,
+      min: 1,
+      max: 1440,
+      category,
+      icon: "timer",
+    }),
+    new Setting("mcp_sse_heartbeat", {
+      name: tl("mcp.settings.sse_heartbeat_name"),
+      description: tl("mcp.settings.sse_heartbeat_desc"),
+      type: "number",
+      value: 15,
+      min: 0,
+      max: 600,
+      category,
+      icon: "favorite",
     })
   );
 }

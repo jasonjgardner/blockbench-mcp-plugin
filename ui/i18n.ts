@@ -63,6 +63,10 @@ const en: Record<string, string> = {
   "mcp.settings.endpoint_desc": "Endpoint for the MCP server.",
   "mcp.settings.prompt_cdn_name": "Enable Prompt CDN",
   "mcp.settings.prompt_cdn_desc": "Fetch prompt content from CDN on plugin load. Disable to use only cached prompts.",
+  "mcp.settings.session_timeout_name": "Session Inactivity Timeout (minutes)",
+  "mcp.settings.session_timeout_desc": "Disconnect MCP sessions after this many minutes of inactivity. Lower values free resources faster; higher values tolerate idle clients.",
+  "mcp.settings.sse_heartbeat_name": "SSE Heartbeat Interval (seconds)",
+  "mcp.settings.sse_heartbeat_desc": "Send keep-alive comments on streaming responses to prevent proxies/firewalls from closing idle connections. Set to 0 to disable.",
 
   // Tool test dialog
   "mcp.dialog.result_title": "Result: %0",
@@ -155,6 +159,10 @@ const de: Record<string, string> = {
   "mcp.settings.endpoint_desc": "Endpunkt für den MCP-Server.",
   "mcp.settings.prompt_cdn_name": "Prompt-CDN aktivieren",
   "mcp.settings.prompt_cdn_desc": "Prompt-Inhalte beim Laden des Plugins vom CDN abrufen. Deaktivieren, um nur zwischengespeicherte Prompts zu verwenden.",
+  "mcp.settings.session_timeout_name": "Sitzungs-Inaktivitäts-Timeout (Minuten)",
+  "mcp.settings.session_timeout_desc": "MCP-Sitzungen nach dieser Anzahl von Minuten Inaktivität trennen. Niedrigere Werte geben Ressourcen schneller frei; höhere Werte tolerieren inaktive Clients.",
+  "mcp.settings.sse_heartbeat_name": "SSE-Heartbeat-Intervall (Sekunden)",
+  "mcp.settings.sse_heartbeat_desc": "Sendet Keep-Alive-Kommentare auf Streaming-Antworten, um zu verhindern, dass Proxys/Firewalls inaktive Verbindungen schließen. Auf 0 setzen zum Deaktivieren.",
 
   // Tool test dialog
   "mcp.dialog.result_title": "Ergebnis: %0",
@@ -247,6 +255,10 @@ const ja: Record<string, string> = {
   "mcp.settings.endpoint_desc": "MCPサーバーのエンドポイント。",
   "mcp.settings.prompt_cdn_name": "プロンプトCDNを有効化",
   "mcp.settings.prompt_cdn_desc": "プラグイン読み込み時にCDNからプロンプト内容を取得します。無効にするとキャッシュされたプロンプトのみ使用します。",
+  "mcp.settings.session_timeout_name": "セッション非アクティブタイムアウト (分)",
+  "mcp.settings.session_timeout_desc": "この分数の非アクティブ後にMCPセッションを切断します。値が小さいほどリソースを早く解放し、大きいほどアイドルクライアントを許容します。",
+  "mcp.settings.sse_heartbeat_name": "SSEハートビート間隔 (秒)",
+  "mcp.settings.sse_heartbeat_desc": "ストリーミング応答にキープアライブコメントを送信し、プロキシ/ファイアウォールがアイドル接続を閉じるのを防ぎます。0に設定すると無効になります。",
 
   // Tool test dialog
   "mcp.dialog.result_title": "結果: %0",
@@ -339,6 +351,10 @@ const zh: Record<string, string> = {
   "mcp.settings.endpoint_desc": "MCP服务器的端点。",
   "mcp.settings.prompt_cdn_name": "启用提示词CDN",
   "mcp.settings.prompt_cdn_desc": "插件加载时从CDN获取提示词内容。禁用后仅使用缓存的提示词。",
+  "mcp.settings.session_timeout_name": "会话非活动超时（分钟）",
+  "mcp.settings.session_timeout_desc": "在非活动指定分钟数后断开 MCP 会话。较低的值更快释放资源；较高的值容忍空闲客户端。",
+  "mcp.settings.sse_heartbeat_name": "SSE 心跳间隔（秒）",
+  "mcp.settings.sse_heartbeat_desc": "在流式响应上发送保活注释，防止代理/防火墙关闭空闲连接。设为 0 表示禁用。",
 
   // Tool test dialog
   "mcp.dialog.result_title": "结果: %0",

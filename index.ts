@@ -60,9 +60,17 @@ BBPlugin.register("mcp", {
     }
 
     // Create TCP server to handle HTTP requests
+    const sessionTimeoutMin = Number(Settings.get("mcp_session_timeout") || 5);
+    const sseHeartbeatSec = Number(Settings.get("mcp_sse_heartbeat") ?? 15);
     [httpServer, sessionTransports] = createNetServer(net, {
       port: Number(Settings.get("mcp_port") || 3000),
-      endpoint: String(Settings.get("mcp_endpoint") || "/bb-mcp")
+      endpoint: String(Settings.get("mcp_endpoint") || "/bb-mcp"),
+      keepAlive: {
+        sseHeartbeatIntervalMs: Math.max(0, sseHeartbeatSec) * 1000,
+      },
+      sessionConfig: {
+        inactivityTimeoutMs: Math.max(1, sessionTimeoutMin) * 60 * 1000,
+      },
     });
 
     // Create a reference server for UI display purposes

@@ -11,17 +11,41 @@ import { sessionManager, type SessionConfig } from '@/lib/sessions'
 
 export type { NetServer }
 
-/** TCP Keep-alive configuration */
+/**
+ * Keep-alive configuration. Layered approach — TCP, HTTP, SSE, and MCP-level
+ * pings each catch different classes of dead/stale connections.
+ */
 interface KeepAliveConfig {
-  /** Enable TCP keep-alive */
+  /** Enable TCP keep-alive on accepted sockets */
   enabled: boolean
-  /** Initial delay before sending first keep-alive probe (ms) */
+  /** Initial delay before sending first TCP keep-alive probe (ms) */
   initialDelay: number
+  /**
+   * Per-socket idle timeout (ms). If the socket sees no I/O for this long
+   * it's destroyed at the OS level. 0 disables. Should exceed
+   * sseHeartbeatIntervalMs and the session inactivity timeout to avoid
+   * fighting application-level liveness.
+   */
+  idleTimeoutMs: number
+  /**
+   * Interval (ms) to write SSE comment heartbeats (`: keepalive\n\n`) during
+   * a streaming response. Keeps connections alive through proxies/firewalls
+   * that drop idle TCP. 0 disables.
+   */
+  sseHeartbeatIntervalMs: number
+  /** Per-ping timeout (ms) for MCP-level server.ping() calls. */
+  pingTimeoutMs: number
+  /** HTTP Keep-Alive: timeout=N seconds advertised to clients. */
+  httpKeepAliveTimeoutSec: number
 }
 
 const DEFAULT_KEEP_ALIVE: KeepAliveConfig = {
   enabled: true,
-  initialDelay: 30000 // 30 seconds
+  initialDelay: 30000,           // 30s before first TCP probe
+  idleTimeoutMs: 10 * 60 * 1000, // 10min hard socket timeout
+  sseHeartbeatIntervalMs: 15000, // 15s SSE comment heartbeat
+  pingTimeoutMs: 5000,           // 5s MCP ping timeout
+  httpKeepAliveTimeoutSec: 75    // matches typical browser/proxy defaults
 }
 
 export type SessionTransports = Map<
@@ -68,17 +92,36 @@ export default function createNetServer (
     sessionManager.configure(sessionConfig)
   }
 
-  // Set up ping callback for session keep-alive
-  // Note: The MCP SDK doesn't expose a direct ping method on the server-side,
-  // so we verify the session is still registered. The actual connection health
-  // is maintained through TCP keep-alive and the inactivity timeout.
+  // Real MCP-level ping. server.ping() works only when the client has an
+  // active SSE channel back (server-to-client requests need a stream). For
+  // JSON-only clients, the request will reject quickly — we treat that as
+  // "no signal", not "dead". Only true timeouts count as failures, so the
+  // session manager's failed-ping counter and inactivity timeout still
+  // protect against zombies.
   sessionManager.setPingCallback(async (sessionId: string) => {
     const session = sessionTransports.get(sessionId)
     if (!session) return false
 
-    // Session exists and transport is available - consider it healthy
-    // TCP keep-alive and inactivity timeouts handle actual connection failures
-    return true
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined
+    try {
+      const pingPromise = session.server.server.ping()
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutHandle = setTimeout(
+          () => reject(new Error('mcp_ping_timeout')),
+          keepAliveConfig.pingTimeoutMs
+        )
+      })
+      await Promise.race([pingPromise, timeoutPromise])
+      return true // real pong received
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      if (msg === 'mcp_ping_timeout') return false // counts as failure
+      // Non-timeout errors (e.g., no SSE stream available) are not signals
+      // of a dead client — treat as alive and rely on the inactivity timer.
+      return true
+    } finally {
+      if (timeoutHandle) clearTimeout(timeoutHandle)
+    }
   })
 
   // Register callback to close transport when sessionManager removes a session (e.g., timeout)
@@ -103,6 +146,19 @@ export default function createNetServer (
     // Configure TCP keep-alive for connection health
     if (keepAliveConfig.enabled) {
       socket.setKeepAlive(true, keepAliveConfig.initialDelay)
+    }
+
+    // OS-level idle timeout: if no I/O happens for this long, kill the
+    // socket. This catches half-open connections that TCP keep-alive misses
+    // (e.g., NAT entries silently dropped by intermediaries).
+    if (keepAliveConfig.idleTimeoutMs > 0) {
+      socket.setTimeout(keepAliveConfig.idleTimeoutMs)
+      socket.on('timeout', () => {
+        if (!socket.destroyed) {
+          console.log('[MCP] Socket idle timeout — closing connection')
+          socket.destroy()
+        }
+      })
     }
 
     socket.on('data', (chunk: Buffer) => {
@@ -365,6 +421,26 @@ export default function createNetServer (
               const reader = webResponse.body.getReader()
               const decoder = new TextDecoder()
 
+              // SSE heartbeat — write a comment line during silent periods so
+              // proxies/firewalls/NAT don't drop the idle TCP connection.
+              // Comments (`:`-prefixed lines) are ignored by SSE parsers.
+              // We only emit when there's been no real chunk for the full
+              // interval, to avoid splitting partial events.
+              let lastChunkAt = Date.now()
+              const heartbeatMs = keepAliveConfig.sseHeartbeatIntervalMs
+              const heartbeat = heartbeatMs > 0
+                ? setInterval(() => {
+                    if (socketEnded || socket.destroyed || !socket.writable) return
+                    if (Date.now() - lastChunkAt < heartbeatMs) return
+                    try {
+                      socket.write(': keepalive\n\n')
+                      lastChunkAt = Date.now()
+                    } catch (err) {
+                      console.error('[MCP] SSE heartbeat write failed:', err)
+                    }
+                  }, heartbeatMs)
+                : null
+
               try {
                 while (true) {
                   // Check socket is still writable before each chunk
@@ -375,10 +451,12 @@ export default function createNetServer (
 
                   const chunk = decoder.decode(value, { stream: true })
                   socket.write(chunk)
+                  lastChunkAt = Date.now()
                 }
               } catch (streamError) {
                 console.error('[MCP] SSE stream error:', streamError)
               } finally {
+                if (heartbeat) clearInterval(heartbeat)
                 socketEnded = true
                 socket.end()
               }
@@ -456,9 +534,17 @@ export default function createNetServer (
       const bodyBytes = Buffer.byteLength(body)
       headers['content-length'] = bodyBytes.toString()
 
-      // Set connection header based on client request
-      const keepAlive = connection?.toLowerCase() === 'keep-alive'
+      // Set connection header based on client request. HTTP/1.1 defaults to
+      // keep-alive unless the client explicitly opted out with `close`.
+      const keepAlive = connection?.toLowerCase() !== 'close'
       headers['connection'] = keepAlive ? 'keep-alive' : 'close'
+
+      // Tell the client how long we'll hold an idle connection. Helps clients
+      // size their pools and avoid sending requests on a socket we're about
+      // to close.
+      if (keepAlive && keepAliveConfig.httpKeepAliveTimeoutSec > 0) {
+        headers['keep-alive'] = `timeout=${keepAliveConfig.httpKeepAliveTimeoutSec}`
+      }
 
       // Add Date header for HTTP/1.1 compliance
       if (!headers['date']) {
