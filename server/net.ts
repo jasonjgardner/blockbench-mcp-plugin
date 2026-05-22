@@ -92,35 +92,20 @@ export default function createNetServer (
     sessionManager.configure(sessionConfig)
   }
 
-  // Real MCP-level ping. server.ping() works only when the client has an
-  // active SSE channel back (server-to-client requests need a stream). For
-  // JSON-only clients, the request will reject quickly — we treat that as
-  // "no signal", not "dead". Only true timeouts count as failures, so the
-  // session manager's failed-ping counter and inactivity timeout still
-  // protect against zombies.
+  // Set up ping callback for session keep-alive.
+  // Sends a real MCP ping request to the client to verify the connection is alive.
   sessionManager.setPingCallback(async (sessionId: string) => {
     const session = sessionTransports.get(sessionId)
     if (!session) return false
 
-    let timeoutHandle: ReturnType<typeof setTimeout> | undefined
     try {
-      const pingPromise = session.server.server.ping()
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        timeoutHandle = setTimeout(
-          () => reject(new Error('mcp_ping_timeout')),
-          keepAliveConfig.pingTimeoutMs
-        )
-      })
-      await Promise.race([pingPromise, timeoutPromise])
-      return true // real pong received
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      if (msg === 'mcp_ping_timeout') return false // counts as failure
-      // Non-timeout errors (e.g., no SSE stream available) are not signals
-      // of a dead client — treat as alive and rely on the inactivity timer.
+      // Use the underlying Server's ping() method to send a JSON-RPC ping
+      // and wait for the client's response (pong).
+      await session.server.server.ping()
       return true
-    } finally {
-      if (timeoutHandle) clearTimeout(timeoutHandle)
+    } catch {
+      // Ping failed — transport is likely dead
+      return false
     }
   })
 
