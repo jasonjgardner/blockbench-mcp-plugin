@@ -18,6 +18,7 @@ export interface PromptManifest {
 const CDN_BASE_URL =
   "https://cdn.jsdelivr.net/gh/jasonjgardner/blockbench-mcp-plugin";
 const MANIFEST_PATH = "prompts/manifest.json";
+const FETCH_TIMEOUT_MS = 10_000;
 
 const STORAGE_KEY_MANIFEST = "bbmcp_prompt_manifest";
 const STORAGE_KEY_VERSION = "bbmcp_prompt_manifest_version";
@@ -85,7 +86,22 @@ async function fetchManifestFromCDN(): Promise<PromptManifest> {
   const url = getManifestUrl();
   console.log(`[MCP] Fetching prompt manifest from ${url}`);
 
-  const response = await fetch(url);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(url, { signal: controller.signal });
+  } catch (err) {
+    if (controller.signal.aborted) {
+      throw new Error(
+        `Fetch timed out after ${FETCH_TIMEOUT_MS}ms while loading prompt manifest from ${url}`
+      );
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);

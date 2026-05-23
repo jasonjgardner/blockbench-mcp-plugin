@@ -202,8 +202,25 @@ export function registerExportTools() {
           : undefined);
 
       const rawResult = codec.compile(effectiveOptions);
-      const text = toTextContent(rawResult);
-      const byteLength = text.length;
+
+      const isArrayBuffer = rawResult instanceof ArrayBuffer;
+      const isBinaryView =
+        ArrayBuffer.isView(rawResult) && !(rawResult instanceof DataView);
+      const binaryBuffer = isArrayBuffer
+        ? Buffer.from(rawResult as ArrayBuffer)
+        : isBinaryView
+          ? Buffer.from(
+              (rawResult as ArrayBufferView).buffer,
+              (rawResult as ArrayBufferView).byteOffset,
+              (rawResult as ArrayBufferView).byteLength
+            )
+          : null;
+
+      const text = binaryBuffer ? null : toTextContent(rawResult);
+      const byteLength = binaryBuffer
+        ? binaryBuffer.byteLength
+        : Buffer.byteLength(text ?? "", "utf8");
+      const encoding: "utf-8" | "base64" = binaryBuffer ? "base64" : "utf-8";
 
       let wrote_to_path: string | null = null;
       if (path) {
@@ -216,16 +233,19 @@ export function registerExportTools() {
             "File system access was denied. Unable to write to path. You can omit `path` to retrieve the content in the response."
           );
         }
-        fs.writeFileSync(path, text);
+        fs.writeFileSync(path, binaryBuffer ?? (text ?? ""));
         wrote_to_path = path;
       }
 
-      const truncated = byteLength > max_content_length;
+      const fullContent = binaryBuffer
+        ? binaryBuffer.toString("base64")
+        : (text ?? "");
+      const truncated = fullContent.length > max_content_length;
       const returnedContent = max_content_length === 0
         ? null
         : truncated
-          ? text.slice(0, max_content_length)
-          : text;
+          ? fullContent.slice(0, max_content_length)
+          : fullContent;
 
       return JSON.stringify(
         {
@@ -238,6 +258,7 @@ export function registerExportTools() {
             ? codec.fileName()
             : Project.name,
           byte_length: byteLength,
+          encoding,
           wrote_to_path,
           truncated,
           content: returnedContent,

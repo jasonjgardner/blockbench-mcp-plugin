@@ -60,8 +60,18 @@ BBPlugin.register("mcp", {
     }
 
     // Create TCP server to handle HTTP requests
-    const sessionTimeoutMin = Number(Settings.get("mcp_session_timeout") || 5);
-    const sseHeartbeatSec = Number(Settings.get("mcp_sse_heartbeat") ?? 15);
+    const toFiniteNumber = (raw: unknown, fallback: number): number => {
+      const n = Number(raw);
+      return Number.isFinite(n) ? n : fallback;
+    };
+    const sessionTimeoutMin = toFiniteNumber(
+      Settings.get("mcp_session_timeout"),
+      5
+    );
+    const sseHeartbeatSec = toFiniteNumber(
+      Settings.get("mcp_sse_heartbeat"),
+      15
+    );
     [httpServer, sessionTransports] = createNetServer(net, {
       port: Number(Settings.get("mcp_port") || 3000),
       endpoint: String(Settings.get("mcp_endpoint") || "/bb-mcp"),

@@ -139,6 +139,9 @@ export function getAndActivateTexture(id?: string): Texture {
         "No texture available. Use create_texture first, or pass texture_id explicitly."
       );
     }
+    if (Texture.selected?.uuid !== active.uuid) {
+      active.select();
+    }
     return active;
   }
 

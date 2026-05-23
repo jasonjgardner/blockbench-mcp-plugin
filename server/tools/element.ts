@@ -285,6 +285,37 @@ function exceedsBounds(
   return false;
 }
 
+const MAX_REGEX_PATTERN_LENGTH = 512;
+// Heuristic: nested quantifiers like (a+)+, (.*)*, (a+|b)*, (foo){2,}+ are the
+// classic catastrophic-backtracking shape. Reject quantifiers applied to a
+// group whose body already contains a quantifier.
+const CATASTROPHIC_BACKTRACK_HEURISTIC = /\([^)]*[+*?][^)]*\)\s*[+*?{]/;
+
+function safeCompileRegex(pattern: string | undefined): RegExp | null {
+  if (!pattern) return null;
+  if (pattern.length > MAX_REGEX_PATTERN_LENGTH) {
+    console.warn(
+      `[MCP] find_elements_by_criteria: name_pattern rejected — exceeds ${MAX_REGEX_PATTERN_LENGTH} chars (got ${pattern.length}).`
+    );
+    return null;
+  }
+  if (CATASTROPHIC_BACKTRACK_HEURISTIC.test(pattern)) {
+    console.warn(
+      `[MCP] find_elements_by_criteria: name_pattern rejected — nested quantifiers risk catastrophic backtracking: ${pattern}`
+    );
+    return null;
+  }
+  try {
+    return new RegExp(pattern);
+  } catch (err) {
+    console.warn(
+      `[MCP] find_elements_by_criteria: name_pattern failed to compile, ignoring filter:`,
+      err
+    );
+    return null;
+  }
+}
+
 export function registerElementTools() {
   createTool(elementToolDocs[0].name, {
     ...elementToolDocs[0],
@@ -522,7 +553,7 @@ export function registerElementTools() {
       selected_only,
       limit,
     }) {
-      const regex = name_pattern ? new RegExp(name_pattern) : null;
+      const regex = safeCompileRegex(name_pattern);
       const needle = name_contains?.toLowerCase() ?? null;
       const parentScope = parent_group
         // @ts-ignore - Group is a Blockbench global
