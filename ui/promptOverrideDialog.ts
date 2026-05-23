@@ -61,7 +61,7 @@ export function openPromptOverrideDialog(promptName: string): void {
           background: ${isOverridden ? "var(--color-accent)" : "var(--color-back)"};
           color: ${isOverridden ? "var(--color-light)" : "var(--color-subtle_text)"};
           font-weight: ${isOverridden ? "bold" : "normal"};
-        ">${sourceLabel}</span>
+        ">${escapeHtml(sourceLabel)}</span>
       </p>`,
       `<textarea id="mcp_override_textarea" style="
         width: 100%;
