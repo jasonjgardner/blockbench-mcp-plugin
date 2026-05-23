@@ -3,7 +3,7 @@
 
 import { z } from "zod";
 import { createPrompt } from "@/lib/factories";
-import { readPrompt } from "@/macros/readPrompt" with { type: "macro" };
+import { getPromptContent } from "@/lib/promptLoader";
 import { isHytalePluginInstalled } from "@/lib/hytale";
 
 /**
@@ -33,7 +33,7 @@ export function registerHytalePrompts() {
           .default("both"),
       }),
       async generate({ format_type }) {
-        const baseGuide = await readPrompt("hytale_model_creation");
+        const baseGuide = getPromptContent("hytale_model_creation");
 
         let additionalInfo = "";
         if (format_type === "character") {
@@ -115,7 +115,7 @@ Common prop types:
           .default("general"),
       }),
       async generate({ animation_type }) {
-        const baseGuide = await readPrompt("hytale_animation_workflow");
+        const baseGuide = getPromptContent("hytale_animation_workflow");
 
         let specificTips = "";
         if (animation_type === "walk") {
@@ -215,7 +215,7 @@ Creating a combat animation:
         "Guide for creating and managing attachments in Hytale models. Covers attachment collections, piece bones, modular equipment, and best practices.",
       argsSchema: z.object({}),
       async generate() {
-        const guide = await readPrompt("hytale_attachments");
+        const guide = getPromptContent("hytale_attachments");
         return {
           messages: [
             {

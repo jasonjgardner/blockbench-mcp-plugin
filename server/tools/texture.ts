@@ -108,6 +108,12 @@ export const getTextureParameters = z.object({
   texture: textureIdOptionalSchema,
 });
 
+export const activateTextureParameters = z.object({
+  texture: textureIdSchema.describe(
+    "Texture ID, UUID, or name to activate in the texture panel."
+  ),
+});
+
 export const createPbrMaterialParameters = z.object({
   name: z.string().describe("Name of the material."),
   color_texture: z
@@ -359,6 +365,18 @@ export const textureToolDocs: ToolSpec[] = [
     parameters: saveMaterialConfigParameters,
     status: STATUS_EXPERIMENTAL,
   },
+  {
+    name: "activate_texture",
+    description:
+      "Activates the given texture in the Blockbench texture panel so that subsequent paint operations (draw_shape_tool, paint_with_brush, gradient_tool, etc.) target it. Most paint tools already call this internally when a texture_id is provided, but you can invoke it explicitly to pin the active texture across multiple calls.",
+    annotations: {
+      title: "Activate Texture",
+      destructiveHint: false,
+      idempotentHint: true,
+    },
+    parameters: activateTextureParameters,
+    status: STATUS_STABLE,
+  },
 ];
 
 // ============================================================================
@@ -457,24 +475,101 @@ export function registerTextureTools() {
         );
       }
 
+      // Resolve `id` to the concrete set of cubes/meshes to texture.
+      // - Group → all descendant cubes + meshes
+      // - Cube / Mesh → that single element
+      const targets: Array<Cube | Mesh> = [];
+      if (element instanceof Group) {
+        const collectDescendants = (group: Group) => {
+          for (const child of group.children ?? []) {
+            if (child instanceof Cube || child instanceof Mesh) {
+              targets.push(child);
+              continue;
+            }
+            if (child instanceof Group) collectDescendants(child);
+          }
+        };
+        collectDescendants(element);
+      } else if (element instanceof Cube || element instanceof Mesh) {
+        targets.push(element);
+      } else {
+        throw new Error(
+          `Element "${id}" is not a cube, mesh, or group — cannot apply texture to it.`
+        );
+      }
+
+      if (targets.length === 0) {
+        throw new Error(
+          `Element "${id}" resolved to no paintable cubes or meshes.`
+        );
+      }
+
+      // Save prior selection so the call is non-destructive to UI state.
+      const prevCubeSelection = [...Cube.selected];
+      const prevMeshSelection = [...Mesh.selected];
+      const prevGroup = Group.selected ?? null;
+
+      // Undo must capture the element face-texture state, not just outliner.
       Undo.initEdit({
-        elements: [],
-        outliner: true,
+        elements: targets,
+        outliner: false,
         collections: [],
       });
 
-      projectTexture.select();
+      try {
+        // Replace selection with the resolved targets so Texture.apply()
+        // operates on exactly this scope.
+        Cube.all.forEach((c: Cube) => {
+          if (c.selected) c.unselect?.();
+        });
+        Mesh.all.forEach((m: Mesh) => {
+          if (m.selected) m.unselect?.();
+        });
+        for (const target of targets) {
+          // @ts-ignore - select method available on outliner elements
+          target.select?.({ shiftKey: true });
+        }
+        updateSelection();
 
-      Texture.selected?.apply(
-        applyTo === "none" ? false : applyTo === "all" ? true : "blank"
-      );
+        projectTexture.select();
 
-      projectTexture.updateChangesAfterEdit();
+        Texture.selected?.apply(
+          applyTo === "none" ? false : applyTo === "all" ? true : "blank"
+        );
+
+        projectTexture.updateChangesAfterEdit();
+      } finally {
+        // Restore the caller's original selection.
+        Cube.all.forEach((c: Cube) => {
+          if (c.selected) c.unselect?.();
+        });
+        Mesh.all.forEach((m: Mesh) => {
+          if (m.selected) m.unselect?.();
+        });
+        for (const c of prevCubeSelection) {
+          // @ts-ignore - select method
+          c.select?.({ shiftKey: true });
+        }
+        for (const m of prevMeshSelection) {
+          // @ts-ignore - select method
+          m.select?.({ shiftKey: true });
+        }
+        if (prevGroup) prevGroup.selected = true;
+        updateSelection();
+      }
 
       Undo.finishEdit("Agent applied texture");
+
+      // Force face-level render refresh so the viewport matches the data.
+      // Canvas.updateAll() alone sometimes doesn't push new face materials
+      // into the THREE.js render targets.
+      Canvas.updateView({
+        elements: targets,
+        element_aspects: { faces: true, uv: true, geometry: false },
+      });
       Canvas.updateAll();
 
-      return `Applied texture ${projectTexture.name} to element with ID ${id}`;
+      return `Applied texture "${projectTexture.name}" to ${targets.length} element(s) scoped by "${id}" (${element instanceof Group ? "group" : element instanceof Cube ? "cube" : "mesh"}).`;
     },
   }, textureToolDocs[1].status);
 
@@ -881,4 +976,15 @@ export function registerTextureTools() {
       return `Saved material config to "${filePath}"`;
     },
   }, textureToolDocs[11].status);
+
+  createTool(textureToolDocs[12].name, {
+    ...textureToolDocs[12],
+    async execute({ texture }) {
+      const target = findTextureOrThrow(texture);
+      if (Texture.selected?.uuid !== target.uuid) {
+        target.select();
+      }
+      return `Activated texture "${target.name}" (uuid: ${target.uuid}). Paint tools will now target it by default.`;
+    },
+  }, textureToolDocs[12].status);
 }

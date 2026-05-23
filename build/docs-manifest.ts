@@ -16,6 +16,8 @@ import { uiToolDocs } from "../server/tools/ui";
 import { hytaleToolDocs } from "../server/tools/hytale";
 import { materialInstanceToolDocs } from "../server/tools/material-instances";
 import { uvToolDocs } from "../server/tools/uv";
+import { historyToolDocs } from "../server/tools/history";
+import { exportToolDocs } from "../server/tools/export";
 
 export interface CategoryGroup {
   category: string;
@@ -28,6 +30,8 @@ export const toolManifest: CategoryGroup[] = [
   { category: "Animation", tools: animationToolDocs },
   { category: "Armature", tools: armatureToolDocs },
   { category: "Elements", tools: elementToolDocs },
+  { category: "Export", tools: exportToolDocs },
+  { category: "History", tools: historyToolDocs },
   { category: "Import/Export", tools: importToolDocs },
   { category: "Material Instances", tools: materialInstanceToolDocs },
   { category: "Mesh Editing", tools: meshToolDocs },
@@ -113,27 +117,28 @@ export const resourceDocs: ResourceSpec[] = [
     uriTemplate: "projects://{id}",
     title: "Blockbench Projects",
     description:
-      "Returns information about available projects in Blockbench. Use without an ID to list all projects, or provide a project UUID/name to get details about a specific project.",
+      "Returns information about available projects. List URIs use the slugified project name (e.g. `projects://my-character`) when unique, or `projects://<slug>~<uuid-prefix>` on collision. Reads accept UUID, exact name, or slug.",
   },
   {
     name: "nodes",
     uriTemplate: "nodes://{id}",
     title: "Blockbench Nodes",
-    description: "Returns the current nodes in the Blockbench editor.",
+    description:
+      "Returns the current 3D nodes in the editor. List URIs use slugified names (e.g. `nodes://head`) when unique, with `~<uuid-prefix>` on collision. Reads accept UUID, exact name, or slug.",
   },
   {
     name: "textures",
     uriTemplate: "textures://{id}",
     title: "Blockbench Textures",
     description:
-      "Returns information about textures in the current Blockbench project. Use without an ID to list all textures, or provide a texture UUID/name to get details about a specific texture.",
+      "Returns information about textures. List URIs use slugified names (e.g. `textures://skin`) when unique, with `~<uuid-prefix>` on collision. Reads accept UUID, exact name, slug, or short numeric texture id.",
   },
   {
     name: "reference_models",
     uriTemplate: "reference_models://{id}",
     title: "Reference Models",
     description:
-      "Returns information about reference models in the current Blockbench project. Requires the Reference Models plugin.",
+      "Returns reference models in the current project. Requires the Reference Models plugin. List URIs use slugified names (e.g. `reference_models://turntable`) with `~<uuid-prefix>` on collision. Reads accept UUID, exact name, or slug.",
   },
   {
     name: "validator-status",
@@ -175,20 +180,20 @@ export const resourceDocs: ResourceSpec[] = [
     uriTemplate: "hytale://attachments/{id}",
     title: "Hytale Attachments",
     description:
-      "Returns information about attachment collections in the current Hytale project.",
+      "Returns information about attachment collections. List URIs use slugified collection names (e.g. `hytale://attachments/helmet`) with `~<uuid-prefix>` on collision. Reads accept UUID, exact name, or slug.",
   },
   {
     name: "hytale-pieces",
     uriTemplate: "hytale://pieces/{id}",
     title: "Hytale Attachment Pieces",
     description:
-      "Returns information about groups marked as attachment pieces. Attachment pieces connect to like-named bones in the main model.",
+      "Returns groups marked as attachment pieces — they connect to like-named bones in the main model. List URIs use slugified bone names (e.g. `hytale://pieces/hand-right`) with `~<uuid-prefix>` on collision.",
   },
   {
     name: "hytale-cubes",
     uriTemplate: "hytale://cubes/{id}",
     title: "Hytale Cubes",
     description:
-      "Returns information about cubes with Hytale-specific properties (shading_mode, double_sided, stretch).",
+      "Returns cubes with Hytale-specific properties (shading_mode, double_sided, stretch). List URIs use slugified cube names (e.g. `hytale://cubes/torso`) with `~<uuid-prefix>` on collision.",
   },
 ];

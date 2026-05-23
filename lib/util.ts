@@ -88,6 +88,78 @@ export function getProjectTexture(id: string): Texture | null {
   return texture || null;
 }
 
+/**
+ * Programmatically sets a BarItems slider/widget's value, tolerating the API
+ * drift between Blockbench versions where some items expose `.set(n)`,
+ * `.change(n)`, or only allow `.value = n`. Prior to this helper, calls like
+ * `BarItems.slider_brush_size.set(n)` crashed hollow-shape drawing with
+ * `… .set is not a function` on current Blockbench builds.
+ */
+export function setBarItemValue(id: string, value: unknown): void {
+  // @ts-ignore - BarItems is a Blockbench global
+  const item = BarItems?.[id];
+  if (!item) return;
+  if (typeof item.set === "function") {
+    try {
+      item.set(value);
+      return;
+    } catch {
+      // Fall through to direct assignment for widgets whose runtime method
+      // signatures drifted from the public type surface.
+    }
+  }
+  if ("value" in item) {
+    item.value = value;
+    if (typeof item.update === "function") item.update();
+    return;
+  }
+  if (typeof item.change === "function") {
+    try {
+      item.change(value);
+    } catch {
+      // Best-effort UI setting; callers should not fail because Blockbench
+      // changed an optional widget mutator signature.
+    }
+  }
+}
+
+/**
+ * Resolves a texture reference and activates it in the panel so that paint
+ * tools, which historically act on `Texture.selected` regardless of their
+ * `texture_id` argument, target the intended texture.
+ *
+ * If `id` is omitted, the currently selected texture is used as-is. Throws an
+ * actionable error when the reference cannot be resolved.
+ */
+export function getAndActivateTexture(id?: string): Texture {
+  if (!id) {
+    const active = Texture.selected ?? Texture.getDefault();
+    if (!active) {
+      throw new Error(
+        "No texture available. Use create_texture first, or pass texture_id explicitly."
+      );
+    }
+    if (Texture.selected?.uuid !== active.uuid) {
+      active.select();
+    }
+    return active;
+  }
+
+  const texture = getProjectTexture(id);
+  if (!texture) {
+    throw new Error(
+      `Texture "${id}" not found. Use the list_textures tool to see available textures.`
+    );
+  }
+  // Blockbench paint tools operate on Texture.selected, so activating the
+  // requested texture is the only reliable way to make texture_id behave like
+  // a real scope argument.
+  if (Texture.selected?.uuid !== texture.uuid) {
+    texture.select();
+  }
+  return texture;
+}
+
 // ============================================================================
 // Lookup Helpers with Actionable Error Messages
 // ============================================================================

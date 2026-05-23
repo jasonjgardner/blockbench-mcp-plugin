@@ -13,6 +13,7 @@ import { uiSetup, uiTeardown } from "@/ui";
 import { settingsSetup, settingsTeardown } from "@/ui/settings";
 import { setupI18n } from "@/ui/i18n";
 import { sessionManager } from "@/lib/sessions";
+import { initPromptLoader } from "@/lib/promptLoader";
 import type { NetServer, SessionTransports } from "@/server/net";
 import createNetServer from "@/server/net";
 import { getIcon } from "@/macros/getIcon" with { type: "macro" };
@@ -48,10 +49,38 @@ BBPlugin.register("mcp", {
 
     settingsSetup();
 
+    // Load prompt manifest from CDN/cache before server starts.
+    // Must never abort onload — missing prompts should degrade gracefully,
+    // e.g. when a new version is tagged before the CDN asset is published.
+    try {
+      const cdnEnabled = Settings.get("mcp_prompt_cdn_enabled") !== false;
+      await initPromptLoader(cdnEnabled);
+    } catch (err) {
+      console.error("[MCP] Prompt loader initialization failed — continuing without prompts:", err);
+    }
+
     // Create TCP server to handle HTTP requests
+    const toFiniteNumber = (raw: unknown, fallback: number): number => {
+      const n = Number(raw);
+      return Number.isFinite(n) ? n : fallback;
+    };
+    const sessionTimeoutMin = toFiniteNumber(
+      Settings.get("mcp_session_timeout"),
+      5
+    );
+    const sseHeartbeatSec = toFiniteNumber(
+      Settings.get("mcp_sse_heartbeat"),
+      15
+    );
     [httpServer, sessionTransports] = createNetServer(net, {
       port: Number(Settings.get("mcp_port") || 3000),
-      endpoint: String(Settings.get("mcp_endpoint") || "/bb-mcp")
+      endpoint: String(Settings.get("mcp_endpoint") || "/bb-mcp"),
+      keepAlive: {
+        sseHeartbeatIntervalMs: Math.max(0, sseHeartbeatSec) * 1000,
+      },
+      sessionConfig: {
+        inactivityTimeoutMs: Math.max(1, sessionTimeoutMin) * 60 * 1000,
+      },
     });
 
     // Create a reference server for UI display purposes
