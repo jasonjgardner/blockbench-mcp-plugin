@@ -1,6 +1,6 @@
 {
-  "version": "1.5.0",
-  "generatedAt": "2026-05-22T14:09:51.215Z",
+  "version": "1.6.0",
+  "generatedAt": "2026-05-23T15:59:18.827Z",
   "tools": [
     {
       "name": "place_cube",
@@ -2093,7 +2093,7 @@
     {
       "name": "list_outline",
       "title": "List Outline",
-      "description": "Returns a list of all groups and their children in the Blockbench editor.",
+      "description": "Returns the project outline as a hierarchical tree. Each node reports { name, uuid, type (cube|mesh|group), children? }. Groups contain child cubes, meshes, and sub-groups. Use `include_cubes=false` to get a group-only skeleton when you just need structure, or `max_depth` to bound very deep trees.",
       "status": "stable",
       "category": "Elements",
       "annotations": {
@@ -2104,7 +2104,28 @@
         "definitions": {
           "list_outline": {
             "type": "object",
-            "properties": {},
+            "properties": {
+              "include_cubes": {
+                "type": "boolean",
+                "default": true,
+                "description": "If true, include cubes as leaves. If false, return groups only.",
+                "markdownDescription": "If true, include cubes as leaves. If false, return groups only."
+              },
+              "include_meshes": {
+                "type": "boolean",
+                "default": true,
+                "description": "If true, include meshes as leaves. If false, omit meshes.",
+                "markdownDescription": "If true, include meshes as leaves. If false, omit meshes."
+              },
+              "max_depth": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 32,
+                "default": 32,
+                "description": "Maximum tree depth to traverse. Use a small value to summarize large projects.",
+                "markdownDescription": "Maximum tree depth to traverse. Use a small value to summarize large projects."
+              }
+            },
             "additionalProperties": false
           }
         },
@@ -2188,6 +2209,389 @@
             "required": [
               "id",
               "new_name"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "find_elements_by_criteria",
+      "title": "Find Elements by Criteria",
+      "description": "Searches the current project for elements matching the given criteria. Supports name pattern matching (regex or substring), type filtering, scoping to a parent group, cube size ranges, and selection scope. Returns element metadata, never modifies state.",
+      "status": "stable",
+      "category": "Elements",
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/find_elements_by_criteria",
+        "definitions": {
+          "find_elements_by_criteria": {
+            "type": "object",
+            "properties": {
+              "name_pattern": {
+                "type": "string",
+                "description": "Regex pattern to match element names (e.g., '^arm_.*'). Case-sensitive.",
+                "markdownDescription": "Regex pattern to match element names (e.g., '^arm_.*'). Case-sensitive."
+              },
+              "name_contains": {
+                "type": "string",
+                "description": "Substring to match in element names. Case-insensitive.",
+                "markdownDescription": "Substring to match in element names. Case-insensitive."
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "cube",
+                  "mesh",
+                  "group",
+                  "any"
+                ],
+                "default": "any",
+                "description": "Restrict to a single element type.",
+                "markdownDescription": "Restrict to a single element type."
+              },
+              "parent_group": {
+                "type": "string",
+                "description": "UUID or name of a parent group. Only descendants of this group are returned.",
+                "markdownDescription": "UUID or name of a parent group. Only descendants of this group are returned."
+              },
+              "min_size": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 3,
+                "maxItems": 3,
+                "description": "Minimum [x,y,z] size for cubes. Cubes smaller on any axis are excluded.",
+                "markdownDescription": "Minimum [x,y,z] size for cubes. Cubes smaller on any axis are excluded."
+              },
+              "max_size": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 3,
+                "maxItems": 3,
+                "description": "Maximum [x,y,z] size for cubes. Cubes larger on any axis are excluded.",
+                "markdownDescription": "Maximum [x,y,z] size for cubes. Cubes larger on any axis are excluded."
+              },
+              "selected_only": {
+                "type": "boolean",
+                "default": false,
+                "description": "Only consider currently selected elements.",
+                "markdownDescription": "Only consider currently selected elements."
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1000,
+                "default": 200,
+                "description": "Maximum number of results to return.",
+                "markdownDescription": "Maximum number of results to return."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "select_all_of_type",
+      "title": "Select All of Type",
+      "description": "Selects all elements of the given type (cube, mesh, or group) in the current project. Optionally restrict to descendants of a parent group, or add to (rather than replace) the current selection.",
+      "status": "stable",
+      "category": "Elements",
+      "annotations": {
+        "destructiveHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/select_all_of_type",
+        "definitions": {
+          "select_all_of_type": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "cube",
+                  "mesh",
+                  "group"
+                ],
+                "description": "Element type to select.",
+                "markdownDescription": "Element type to select."
+              },
+              "add_to_selection": {
+                "type": "boolean",
+                "default": false,
+                "description": "If true, add to current selection. If false, replace selection.",
+                "markdownDescription": "If true, add to current selection. If false, replace selection."
+              },
+              "parent_group": {
+                "type": "string",
+                "description": "UUID or name of a parent group. If provided, only descendants of this group are selected.",
+                "markdownDescription": "UUID or name of a parent group. If provided, only descendants of this group are selected."
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "filter_by_material",
+      "title": "Filter Elements by Material",
+      "description": "Returns all elements that reference the given texture. For cubes, includes the list of face keys (e.g., 'north', 'up') that use the texture. For meshes, returns the mesh if any face uses the texture.",
+      "status": "stable",
+      "category": "Elements",
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/filter_by_material",
+        "definitions": {
+          "filter_by_material": {
+            "type": "object",
+            "properties": {
+              "texture": {
+                "type": "string",
+                "description": "Texture ID, UUID or name to search for.",
+                "markdownDescription": "Texture ID, UUID or name to search for."
+              },
+              "include_face_keys": {
+                "type": "boolean",
+                "default": true,
+                "description": "Include the list of cube face keys (e.g., 'north') that reference the texture.",
+                "markdownDescription": "Include the list of cube face keys (e.g., 'north') that reference the texture."
+              }
+            },
+            "required": [
+              "texture"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_selection",
+      "title": "Get Selection",
+      "description": "Returns the current selection state: selected cube/mesh/group UUIDs and names, plus the active texture. Use this to verify what `apply_texture` or a paint tool with `fill_mode=\"selected_elements\"` will target.",
+      "status": "stable",
+      "category": "Elements",
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/get_selection",
+        "definitions": {
+          "get_selection": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "list_export_formats",
+      "title": "List Export Formats",
+      "description": "Lists all registered export codecs with their id, display name, file extension, and whether they support compile/export. Use before `export_model` to pick a codec.",
+      "status": "stable",
+      "category": "Export",
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/list_export_formats",
+        "definitions": {
+          "list_export_formats": {
+            "type": "object",
+            "properties": {
+              "only_current_format": {
+                "type": "boolean",
+                "default": false,
+                "description": "If true, only return codecs compatible with the current project's format.",
+                "markdownDescription": "If true, only return codecs compatible with the current project's format."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "export_model",
+      "title": "Export Model",
+      "description": "Compiles the current project through the named codec and returns the result as text. Optionally writes the compiled content to a filesystem path (requires user permission in Blockbench v5.0+). Use `list_export_formats` first to discover codec IDs.",
+      "status": "experimental",
+      "category": "Export",
+      "annotations": {
+        "destructiveHint": false,
+        "openWorldHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/export_model",
+        "definitions": {
+          "export_model": {
+            "type": "object",
+            "properties": {
+              "codec_id": {
+                "type": "string",
+                "description": "Codec ID to use for export (e.g., 'obj', 'gltf', 'project', 'bedrock'). If omitted, uses the current project format's codec. Use `list_export_formats` to see available IDs.",
+                "markdownDescription": "Codec ID to use for export (e.g., 'obj', 'gltf', 'project', 'bedrock'). If omitted, uses the current project format's codec. Use `list_export_formats` to see available IDs."
+              },
+              "options": {
+                "type": "object",
+                "additionalProperties": {},
+                "description": "Codec-specific export options. Defaults to the codec's configured export options.",
+                "markdownDescription": "Codec-specific export options. Defaults to the codec's configured export options."
+              },
+              "path": {
+                "type": "string",
+                "description": "Absolute filesystem path to write the compiled model to. Requires user permission (Blockbench v5.0+ prompts for 'fs' access). If omitted, content is returned in the response only.",
+                "markdownDescription": "Absolute filesystem path to write the compiled model to. Requires user permission (Blockbench v5.0+ prompts for 'fs' access). If omitted, content is returned in the response only."
+              },
+              "max_content_length": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2000000,
+                "default": 100000,
+                "description": "Maximum number of characters to include in the returned `content` field. Use 0 to omit content entirely (useful when only writing to disk). Larger values risk exceeding MCP context limits.",
+                "markdownDescription": "Maximum number of characters to include in the returned `content` field. Use 0 to omit content entirely (useful when only writing to disk). Larger values risk exceeding MCP context limits."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "undo",
+      "title": "Undo",
+      "description": "Undoes the most recent edit in the current project. Use `steps` to undo multiple edits in a single call. Returns the action(s) that were undone.",
+      "status": "stable",
+      "category": "History",
+      "annotations": {
+        "destructiveHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/undo",
+        "definitions": {
+          "undo": {
+            "type": "object",
+            "properties": {
+              "steps": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "default": 1,
+                "description": "Number of steps to undo.",
+                "markdownDescription": "Number of steps to undo."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "redo",
+      "title": "Redo",
+      "description": "Redoes the most recently undone edit. Use `steps` to redo multiple edits in a single call. Returns the action(s) that were redone.",
+      "status": "stable",
+      "category": "History",
+      "annotations": {
+        "destructiveHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/redo",
+        "definitions": {
+          "redo": {
+            "type": "object",
+            "properties": {
+              "steps": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "default": 1,
+                "description": "Number of steps to redo.",
+                "markdownDescription": "Number of steps to redo."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_undo_stack",
+      "title": "Get Undo Stack",
+      "description": "Returns the current undo/redo history: the list of edit entries, the current index, and which entries are undone vs. applied. Use this to inspect available undo/redo operations and find named checkpoints.",
+      "status": "stable",
+      "category": "History",
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/get_undo_stack",
+        "definitions": {
+          "get_undo_stack": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 200,
+                "default": 50,
+                "description": "Maximum number of entries to return (most recent first).",
+                "markdownDescription": "Maximum number of entries to return (most recent first)."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "save_checkpoint",
+      "title": "Save Checkpoint",
+      "description": "Inserts a named marker into the undo history. The marker can later be located with `get_undo_stack` so the agent knows how many times to call `undo` to return to this state. Does not modify the project.",
+      "status": "experimental",
+      "category": "History",
+      "annotations": {
+        "destructiveHint": false
+      },
+      "parameters": {
+        "$ref": "#/definitions/save_checkpoint",
+        "definitions": {
+          "save_checkpoint": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120,
+                "description": "Descriptive name for the checkpoint. Shown in undo history so agents can navigate back to this point.",
+                "markdownDescription": "Descriptive name for the checkpoint. Shown in undo history so agents can navigate back to this point."
+              }
+            },
+            "required": [
+              "name"
             ],
             "additionalProperties": false
           }
@@ -4303,6 +4707,27 @@
       }
     },
     {
+      "name": "get_project_info",
+      "title": "Get Project Info",
+      "description": "Returns read-only project orientation: format id and display name, project name/UUID, texture resolution (texture_width/height), element counts, and a summary of top-level groups. Prefer this over `risky_eval` for first-look inspection — no JavaScript execution required.",
+      "status": "stable",
+      "category": "Project",
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/get_project_info",
+        "definitions": {
+          "get_project_info": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
       "name": "create_texture",
       "title": "Create Texture",
       "description": "Creates a new texture with the given name and size.",
@@ -4875,6 +5300,36 @@
             },
             "required": [
               "material"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "activate_texture",
+      "title": "Activate Texture",
+      "description": "Activates the given texture in the Blockbench texture panel so that subsequent paint operations (draw_shape_tool, paint_with_brush, gradient_tool, etc.) target it. Most paint tools already call this internally when a texture_id is provided, but you can invoke it explicitly to pin the active texture across multiple calls.",
+      "status": "stable",
+      "category": "Textures",
+      "annotations": {
+        "destructiveHint": false
+      },
+      "parameters": {
+        "$ref": "#/definitions/activate_texture",
+        "definitions": {
+          "activate_texture": {
+            "type": "object",
+            "properties": {
+              "texture": {
+                "type": "string",
+                "description": "Texture ID, UUID, or name to activate in the texture panel.",
+                "markdownDescription": "Texture ID, UUID, or name to activate in the texture panel."
+              }
+            },
+            "required": [
+              "texture"
             ],
             "additionalProperties": false
           }
@@ -5778,25 +6233,25 @@
     {
       "name": "projects",
       "title": "Blockbench Projects",
-      "description": "Returns information about available projects in Blockbench. Use without an ID to list all projects, or provide a project UUID/name to get details about a specific project.",
+      "description": "Returns information about available projects. List URIs use the slugified project name (e.g. `projects://my-character`) when unique, or `projects://<slug>~<uuid-prefix>` on collision. Reads accept UUID, exact name, or slug.",
       "uriTemplate": "projects://{id}"
     },
     {
       "name": "nodes",
       "title": "Blockbench Nodes",
-      "description": "Returns the current nodes in the Blockbench editor.",
+      "description": "Returns the current 3D nodes in the editor. List URIs use slugified names (e.g. `nodes://head`) when unique, with `~<uuid-prefix>` on collision. Reads accept UUID, exact name, or slug.",
       "uriTemplate": "nodes://{id}"
     },
     {
       "name": "textures",
       "title": "Blockbench Textures",
-      "description": "Returns information about textures in the current Blockbench project. Use without an ID to list all textures, or provide a texture UUID/name to get details about a specific texture.",
+      "description": "Returns information about textures. List URIs use slugified names (e.g. `textures://skin`) when unique, with `~<uuid-prefix>` on collision. Reads accept UUID, exact name, slug, or short numeric texture id.",
       "uriTemplate": "textures://{id}"
     },
     {
       "name": "reference_models",
       "title": "Reference Models",
-      "description": "Returns information about reference models in the current Blockbench project. Requires the Reference Models plugin.",
+      "description": "Returns reference models in the current project. Requires the Reference Models plugin. List URIs use slugified names (e.g. `reference_models://turntable`) with `~<uuid-prefix>` on collision. Reads accept UUID, exact name, or slug.",
       "uriTemplate": "reference_models://{id}"
     },
     {
@@ -5832,19 +6287,19 @@
     {
       "name": "hytale-attachments",
       "title": "Hytale Attachments",
-      "description": "Returns information about attachment collections in the current Hytale project.",
+      "description": "Returns information about attachment collections. List URIs use slugified collection names (e.g. `hytale://attachments/helmet`) with `~<uuid-prefix>` on collision. Reads accept UUID, exact name, or slug.",
       "uriTemplate": "hytale://attachments/{id}"
     },
     {
       "name": "hytale-pieces",
       "title": "Hytale Attachment Pieces",
-      "description": "Returns information about groups marked as attachment pieces. Attachment pieces connect to like-named bones in the main model.",
+      "description": "Returns groups marked as attachment pieces — they connect to like-named bones in the main model. List URIs use slugified bone names (e.g. `hytale://pieces/hand-right`) with `~<uuid-prefix>` on collision.",
       "uriTemplate": "hytale://pieces/{id}"
     },
     {
       "name": "hytale-cubes",
       "title": "Hytale Cubes",
-      "description": "Returns information about cubes with Hytale-specific properties (shading_mode, double_sided, stretch).",
+      "description": "Returns cubes with Hytale-specific properties (shading_mode, double_sided, stretch). List URIs use slugified cube names (e.g. `hytale://cubes/torso`) with `~<uuid-prefix>` on collision.",
       "uriTemplate": "hytale://cubes/{id}"
     }
   ]

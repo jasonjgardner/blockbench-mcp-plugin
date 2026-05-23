@@ -11,14 +11,14 @@
     <nav class="sidebar">
       <div class="sidebar-brand">
         <h1>Blockbench MCP</h1>
-        <p>v1.5.0 — API Reference</p>
+        <p>v1.6.0 — API Reference</p>
       </div>
 
       <input id="search" type="text" placeholder="Search tools..." class="search-input" />
 
       <div class="nav-group">
         <p class="nav-heading">Overview</p>
-        <a href="#tools" class="nav-link">Tools <span class="count">(94)</span></a>
+        <a href="#tools" class="nav-link">Tools <span class="count">(106)</span></a>
         <a href="#prompts" class="nav-link">Prompts <span class="count">(6)</span></a>
         <a href="#resources" class="nav-link">Resources <span class="count">(12)</span></a>
       </div>
@@ -29,13 +29,15 @@
         <a href="#cat-camera-screenshots" class="nav-link">Camera &amp; Screenshots <span class="count">(3)</span></a>
         <a href="#cat-animation" class="nav-link">Animation <span class="count">(7)</span></a>
         <a href="#cat-armature" class="nav-link">Armature <span class="count">(16)</span></a>
-        <a href="#cat-elements" class="nav-link">Elements <span class="count">(5)</span></a>
+        <a href="#cat-elements" class="nav-link">Elements <span class="count">(9)</span></a>
+        <a href="#cat-export" class="nav-link">Export <span class="count">(2)</span></a>
+        <a href="#cat-history" class="nav-link">History <span class="count">(4)</span></a>
         <a href="#cat-import-export" class="nav-link">Import/Export <span class="count">(1)</span></a>
         <a href="#cat-material-instances" class="nav-link">Material Instances <span class="count">(5)</span></a>
         <a href="#cat-mesh-editing" class="nav-link">Mesh Editing <span class="count">(11)</span></a>
         <a href="#cat-paint-tools" class="nav-link">Paint Tools <span class="count">(12)</span></a>
-        <a href="#cat-project" class="nav-link">Project <span class="count">(1)</span></a>
-        <a href="#cat-textures" class="nav-link">Textures <span class="count">(12)</span></a>
+        <a href="#cat-project" class="nav-link">Project <span class="count">(2)</span></a>
+        <a href="#cat-textures" class="nav-link">Textures <span class="count">(13)</span></a>
         <a href="#cat-ui-interaction" class="nav-link">UI Interaction <span class="count">(4)</span></a>
         <a href="#cat-uv-mapping" class="nav-link">UV Mapping <span class="count">(3)</span></a>
         <a href="#cat-hytale-integration" class="nav-link">Hytale Integration <span class="count">(12)</span></a>
@@ -45,9 +47,9 @@
     <main class="main">
       <header class="page-header">
         <h1>Blockbench MCP Plugin</h1>
-        <p class="subtitle">API Reference — v1.5.0</p>
+        <p class="subtitle">API Reference — v1.6.0</p>
         <nav class="stats">
-          <a href="#tools"><strong>94</strong> tools (29 stable, 65 experimental)</a>
+          <a href="#tools"><strong>106</strong> tools (39 stable, 67 experimental)</a>
           <a href="#prompts"><strong>6</strong> prompts</a>
           <a href="#resources"><strong>12</strong> resources</a>
         </nav>
@@ -1377,9 +1379,34 @@
         </div>
       </div>
       <p class="card-title">List Outline</p>
-      <p class="card-desc">Returns a list of all groups and their children in the Blockbench editor.</p>
+      <p class="card-desc">Returns the project outline as a hierarchical tree. Each node reports { name, uuid, type (cube|mesh|group), children? }. Groups contain child cubes, meshes, and sub-groups. Use `include_cubes=false` to get a group-only skeleton when you just need structure, or `max_depth` to bound very deep trees.</p>
       <div class="overflow-x">
-        <p class="empty-params">No parameters</p>
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">include_cubes</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">If true, include cubes as leaves. If false, return groups only. <span class="param-meta">(default: <code>true</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">include_meshes</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">If true, include meshes as leaves. If false, omit meshes. <span class="param-meta">(default: <code>true</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">max_depth</td>
+      <td class="col-type">integer</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Maximum tree depth to traverse. Use a small value to summarize large projects. <span class="param-meta">(default: <code>32</code>) [min: 1, max: 32]</span></td>
+    </tr></tbody>
+    </table>
       </div>
     </div>
 <div id="tool-duplicate_element" class="card tool-card">
@@ -1451,6 +1478,352 @@
       <td class="col-type">string</td>
       <td><span class="param-required">required</span></td>
       <td class="col-desc">New name to assign.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-find_elements_by_criteria" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">find_elements_by_criteria</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">Find Elements by Criteria</p>
+      <p class="card-desc">Searches the current project for elements matching the given criteria. Supports name pattern matching (regex or substring), type filtering, scoping to a parent group, cube size ranges, and selection scope. Returns element metadata, never modifies state.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">name_pattern</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Regex pattern to match element names (e.g., '^arm_.*'). Case-sensitive.</td>
+    </tr><tr>
+      <td class="col-name">name_contains</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Substring to match in element names. Case-insensitive.</td>
+    </tr><tr>
+      <td class="col-name">type</td>
+      <td class="col-type">&quot;cube&quot; | &quot;mesh&quot; | &quot;group&quot; | &quot;any&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Restrict to a single element type. <span class="param-meta">(default: <code>&quot;any&quot;</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">parent_group</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">UUID or name of a parent group. Only descendants of this group are returned.</td>
+    </tr><tr>
+      <td class="col-name">min_size</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Minimum [x,y,z] size for cubes. Cubes smaller on any axis are excluded. <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
+    </tr><tr>
+      <td class="col-name">max_size</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Maximum [x,y,z] size for cubes. Cubes larger on any axis are excluded. <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
+    </tr><tr>
+      <td class="col-name">selected_only</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Only consider currently selected elements. <span class="param-meta">(default: <code>false</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">limit</td>
+      <td class="col-type">integer</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Maximum number of results to return. <span class="param-meta">(default: <code>200</code>) [min: 1, max: 1000]</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-select_all_of_type" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">select_all_of_type</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Select All of Type</p>
+      <p class="card-desc">Selects all elements of the given type (cube, mesh, or group) in the current project. Optionally restrict to descendants of a parent group, or add to (rather than replace) the current selection.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">type</td>
+      <td class="col-type">&quot;cube&quot; | &quot;mesh&quot; | &quot;group&quot;</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Element type to select.</td>
+    </tr><tr>
+      <td class="col-name">add_to_selection</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">If true, add to current selection. If false, replace selection. <span class="param-meta">(default: <code>false</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">parent_group</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">UUID or name of a parent group. If provided, only descendants of this group are selected.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-filter_by_material" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">filter_by_material</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">Filter Elements by Material</p>
+      <p class="card-desc">Returns all elements that reference the given texture. For cubes, includes the list of face keys (e.g., 'north', 'up') that use the texture. For meshes, returns the mesh if any face uses the texture.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">texture</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Texture ID, UUID or name to search for.</td>
+    </tr><tr>
+      <td class="col-name">include_face_keys</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Include the list of cube face keys (e.g., 'north') that reference the texture. <span class="param-meta">(default: <code>true</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-get_selection" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">get_selection</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">Get Selection</p>
+      <p class="card-desc">Returns the current selection state: selected cube/mesh/group UUIDs and names, plus the active texture. Use this to verify what `apply_texture` or a paint tool with `fill_mode=&quot;selected_elements&quot;` will target.</p>
+      <div class="overflow-x">
+        <p class="empty-params">No parameters</p>
+      </div>
+    </div>
+        </section>
+<section id="cat-export" class="category-section">
+          <h3 class="category-title">Export</h3>
+          <div id="tool-list_export_formats" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">list_export_formats</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">List Export Formats</p>
+      <p class="card-desc">Lists all registered export codecs with their id, display name, file extension, and whether they support compile/export. Use before `export_model` to pick a codec.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">only_current_format</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">If true, only return codecs compatible with the current project's format. <span class="param-meta">(default: <code>false</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-export_model" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">export_model</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-openworld">open-world</span>
+        </div>
+      </div>
+      <p class="card-title">Export Model</p>
+      <p class="card-desc">Compiles the current project through the named codec and returns the result as text. Optionally writes the compiled content to a filesystem path (requires user permission in Blockbench v5.0+). Use `list_export_formats` first to discover codec IDs.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">codec_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Codec ID to use for export (e.g., 'obj', 'gltf', 'project', 'bedrock'). If omitted, uses the current project format's codec. Use `list_export_formats` to see available IDs.</td>
+    </tr><tr>
+      <td class="col-name">options</td>
+      <td class="col-type">Record&lt;string, unknown&gt;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Codec-specific export options. Defaults to the codec's configured export options.</td>
+    </tr><tr>
+      <td class="col-name">path</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Absolute filesystem path to write the compiled model to. Requires user permission (Blockbench v5.0+ prompts for 'fs' access). If omitted, content is returned in the response only.</td>
+    </tr><tr>
+      <td class="col-name">max_content_length</td>
+      <td class="col-type">integer</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Maximum number of characters to include in the returned `content` field. Use 0 to omit content entirely (useful when only writing to disk). Larger values risk exceeding MCP context limits. <span class="param-meta">(default: <code>100000</code>) [min: 0, max: 2000000]</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+        </section>
+<section id="cat-history" class="category-section">
+          <h3 class="category-title">History</h3>
+          <div id="tool-undo" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">undo</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Undo</p>
+      <p class="card-desc">Undoes the most recent edit in the current project. Use `steps` to undo multiple edits in a single call. Returns the action(s) that were undone.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">steps</td>
+      <td class="col-type">integer</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Number of steps to undo. <span class="param-meta">(default: <code>1</code>) [min: 1, max: 100]</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-redo" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">redo</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Redo</p>
+      <p class="card-desc">Redoes the most recently undone edit. Use `steps` to redo multiple edits in a single call. Returns the action(s) that were redone.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">steps</td>
+      <td class="col-type">integer</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Number of steps to redo. <span class="param-meta">(default: <code>1</code>) [min: 1, max: 100]</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-get_undo_stack" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">get_undo_stack</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">Get Undo Stack</p>
+      <p class="card-desc">Returns the current undo/redo history: the list of edit entries, the current index, and which entries are undone vs. applied. Use this to inspect available undo/redo operations and find named checkpoints.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">limit</td>
+      <td class="col-type">integer</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Maximum number of entries to return (most recent first). <span class="param-meta">(default: <code>50</code>) [min: 1, max: 200]</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-save_checkpoint" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">save_checkpoint</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          
+        </div>
+      </div>
+      <p class="card-title">Save Checkpoint</p>
+      <p class="card-desc">Inserts a named marker into the undo history. The marker can later be located with `get_undo_stack` so the agent knows how many times to call `undo` to return to this state. Does not modify the project.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">name</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Descriptive name for the checkpoint. Shown in undo history so agents can navigate back to this point. <span class="param-meta">[minLength: 1, maxLength: 120]</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -2775,6 +3148,20 @@
     </table>
       </div>
     </div>
+<div id="tool-get_project_info" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">get_project_info</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">Get Project Info</p>
+      <p class="card-desc">Returns read-only project orientation: format id and display name, project name/UUID, texture resolution (texture_width/height), element counts, and a summary of top-level groups. Prefer this over `risky_eval` for first-look inspection — no JavaScript execution required.</p>
+      <div class="overflow-x">
+        <p class="empty-params">No parameters</p>
+      </div>
+    </div>
         </section>
 <section id="cat-textures" class="category-section">
           <h3 class="category-title">Textures</h3>
@@ -3237,6 +3624,35 @@
       <td class="col-type">string</td>
       <td><span class="param-required">required</span></td>
       <td class="col-desc">Material name or UUID to save.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-activate_texture" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">activate_texture</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          
+        </div>
+      </div>
+      <p class="card-title">Activate Texture</p>
+      <p class="card-desc">Activates the given texture in the Blockbench texture panel so that subsequent paint operations (draw_shape_tool, paint_with_brush, gradient_tool, etc.) target it. Most paint tools already call this internally when a texture_id is provided, but you can invoke it explicitly to pin the active texture across multiple calls.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">texture</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Texture ID, UUID, or name to activate in the texture panel.</td>
     </tr></tbody>
     </table>
       </div>
@@ -3975,7 +4391,7 @@
       </div>
       <p class="card-title">Blockbench Projects</p>
       <p class="uri-template">projects://{id}</p>
-      <p class="card-desc">Returns information about available projects in Blockbench. Use without an ID to list all projects, or provide a project UUID/name to get details about a specific project.</p>
+      <p class="card-desc">Returns information about available projects. List URIs use the slugified project name (e.g. `projects://my-character`) when unique, or `projects://&lt;slug&gt;~&lt;uuid-prefix&gt;` on collision. Reads accept UUID, exact name, or slug.</p>
     </div>
 <div class="card">
       <div class="card-header">
@@ -3983,7 +4399,7 @@
       </div>
       <p class="card-title">Blockbench Nodes</p>
       <p class="uri-template">nodes://{id}</p>
-      <p class="card-desc">Returns the current nodes in the Blockbench editor.</p>
+      <p class="card-desc">Returns the current 3D nodes in the editor. List URIs use slugified names (e.g. `nodes://head`) when unique, with `~&lt;uuid-prefix&gt;` on collision. Reads accept UUID, exact name, or slug.</p>
     </div>
 <div class="card">
       <div class="card-header">
@@ -3991,7 +4407,7 @@
       </div>
       <p class="card-title">Blockbench Textures</p>
       <p class="uri-template">textures://{id}</p>
-      <p class="card-desc">Returns information about textures in the current Blockbench project. Use without an ID to list all textures, or provide a texture UUID/name to get details about a specific texture.</p>
+      <p class="card-desc">Returns information about textures. List URIs use slugified names (e.g. `textures://skin`) when unique, with `~&lt;uuid-prefix&gt;` on collision. Reads accept UUID, exact name, slug, or short numeric texture id.</p>
     </div>
 <div class="card">
       <div class="card-header">
@@ -3999,7 +4415,7 @@
       </div>
       <p class="card-title">Reference Models</p>
       <p class="uri-template">reference_models://{id}</p>
-      <p class="card-desc">Returns information about reference models in the current Blockbench project. Requires the Reference Models plugin.</p>
+      <p class="card-desc">Returns reference models in the current project. Requires the Reference Models plugin. List URIs use slugified names (e.g. `reference_models://turntable`) with `~&lt;uuid-prefix&gt;` on collision. Reads accept UUID, exact name, or slug.</p>
     </div>
 <div class="card">
       <div class="card-header">
@@ -4047,7 +4463,7 @@
       </div>
       <p class="card-title">Hytale Attachments</p>
       <p class="uri-template">hytale://attachments/{id}</p>
-      <p class="card-desc">Returns information about attachment collections in the current Hytale project.</p>
+      <p class="card-desc">Returns information about attachment collections. List URIs use slugified collection names (e.g. `hytale://attachments/helmet`) with `~&lt;uuid-prefix&gt;` on collision. Reads accept UUID, exact name, or slug.</p>
     </div>
 <div class="card">
       <div class="card-header">
@@ -4055,7 +4471,7 @@
       </div>
       <p class="card-title">Hytale Attachment Pieces</p>
       <p class="uri-template">hytale://pieces/{id}</p>
-      <p class="card-desc">Returns information about groups marked as attachment pieces. Attachment pieces connect to like-named bones in the main model.</p>
+      <p class="card-desc">Returns groups marked as attachment pieces — they connect to like-named bones in the main model. List URIs use slugified bone names (e.g. `hytale://pieces/hand-right`) with `~&lt;uuid-prefix&gt;` on collision.</p>
     </div>
 <div class="card">
       <div class="card-header">
@@ -4063,12 +4479,12 @@
       </div>
       <p class="card-title">Hytale Cubes</p>
       <p class="uri-template">hytale://cubes/{id}</p>
-      <p class="card-desc">Returns information about cubes with Hytale-specific properties (shading_mode, double_sided, stretch).</p>
+      <p class="card-desc">Returns cubes with Hytale-specific properties (shading_mode, double_sided, stretch). List URIs use slugified cube names (e.g. `hytale://cubes/torso`) with `~&lt;uuid-prefix&gt;` on collision.</p>
     </div>
       </section>
 
       <footer class="page-footer">
-        Generated 2026-05-22T14:09:51.215Z from Zod schemas
+        Generated 2026-05-23T15:59:18.827Z from Zod schemas
       </footer>
     </main>
   </div>
