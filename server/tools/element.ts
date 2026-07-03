@@ -7,6 +7,7 @@ import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
 import {
   elementIdSchema,
   vector3Schema,
+  vec3,
   autoUvEnum,
 } from "@/lib/zodObjects";
 
@@ -37,12 +38,12 @@ export const findElementsByCriteriaParameters = z.object({
     .describe(
       "UUID or name of a parent group. Only descendants of this group are returned."
     ),
-  min_size: vector3Schema
-    .optional()
-    .describe("Minimum [x,y,z] size for cubes. Cubes smaller on any axis are excluded."),
-  max_size: vector3Schema
-    .optional()
-    .describe("Maximum [x,y,z] size for cubes. Cubes larger on any axis are excluded."),
+  min_size: vec3(
+    "Minimum [x,y,z] size for cubes. Cubes smaller on any axis are excluded."
+  ).optional(),
+  max_size: vec3(
+    "Maximum [x,y,z] size for cubes. Cubes larger on any axis are excluded."
+  ).optional(),
   selected_only: z
     .boolean()
     .optional()
@@ -92,8 +93,12 @@ export const getSelectionParameters = z.object({});
 
 export const addGroupParameters = z.object({
   name: z.string(),
-  origin: vector3Schema,
-  rotation: vector3Schema,
+  origin: vec3("Pivot point of the group as [x, y, z].")
+    .optional()
+    .default([0, 0, 0]),
+  rotation: vec3("Rotation of the group in degrees as [x, y, z].")
+    .optional()
+    .default([0, 0, 0]),
   parent: z.string().optional().default("root"),
   visibility: z.boolean().optional().default(true),
   autouv: autoUvEnum
