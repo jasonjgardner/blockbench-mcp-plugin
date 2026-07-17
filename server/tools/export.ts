@@ -165,7 +165,8 @@ export function registerExportTools() {
           id?: string;
           name?: string;
           extension?: string;
-          compile?: (opts?: unknown) => unknown;
+          // Some codecs (e.g. glTF) return a Promise from compile().
+          compile?: (opts?: unknown) => unknown | Promise<unknown>;
           getExportOptions?: () => Record<string, unknown>;
           fileName?: () => string;
         }
@@ -201,7 +202,9 @@ export function registerExportTools() {
           ? codec.getExportOptions()
           : undefined);
 
-      const rawResult = codec.compile(effectiveOptions);
+      // Await so async codecs (glTF/etc.) resolve before we stringify/write.
+      // Sync codecs (obj, bedrock, project) pass through via Promise.resolve.
+      const rawResult = await Promise.resolve(codec.compile(effectiveOptions));
 
       const isArrayBuffer = rawResult instanceof ArrayBuffer;
       const isBinaryView =
