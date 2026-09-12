@@ -131,3 +131,9 @@ Use Agent Skills to orchestrate tool usage.
 ## Plugin Development
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed instructions on setting up the development environment and how to add new tools, resources, and prompts.
+
+### Testing
+
+Run `bun test` for regression tests without opening Blockbench. To test the running plugin, build with `bun run build`, load or reload `dist/mcp.js` in Blockbench, and run `bun run test:live`. An optional endpoint can follow the command when using a different port or path.
+
+The live test creates a separate Generic Model project, checks tool/resource/prompt discovery, validation, mesh transforms, selection, undo/redo, face normals, screenshots, and export. It recreates the official MCP symbol and saves the `.bbmodel`, previews, and results in `artifacts/mcp-identity/`. Reloading the plugin expires existing MCP sessions; reconnect clients before continuing. See the [test report](artifacts/mcp-identity/TEST-REPORT.md) for findings and scope.

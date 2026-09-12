@@ -11,7 +11,8 @@
   "type": "module",
   "main": "dist/mcp.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "bun test",
+    "test:live": "bun run tests/live/mcp-identity-smoke.ts",
     "prompts:build": "bun run ./build/generate-manifest.ts",
     "dev": "bun run prompts:build && bun run ./build --sourcemap",
     "dev:watch": "bun run prompts:build && bun run dev --watch",

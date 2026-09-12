@@ -326,26 +326,38 @@ export const cubeSchema = z.object({
     .describe("Rotation of the cube."),
 });
 
-/** Mesh element schema */
+/**
+ * Mesh geometry in local coordinates. Faces reference zero-based vertex indices
+ * in perimeter order; omitting faces keeps the vertex-only creation workflow.
+ * Position becomes the pivot, rotation is in degrees, and scale is baked into
+ * the vertex coordinates because Blockbench meshes do not retain object scale.
+ */
 export const meshSchema = z.object({
   name: z.string(),
   position: vector3Schema
     .optional()
     .default([0, 0, 0])
-    .describe("Position of the mesh."),
+    .describe("Position of the mesh origin/pivot. Vertices are local to this point."),
   rotation: vector3Schema
     .optional()
     .default([0, 0, 0])
-    .describe("Rotation of the mesh."),
+    .describe("Rotation of the mesh in degrees around its origin."),
   scale: vector3Schema
     .optional()
     .default([1, 1, 1])
-    .describe("Scale of the mesh."),
+    .describe("Scale factors baked into local vertex coordinates before rotation."),
   vertices: z
     .array(vector3Schema.describe("Vertex coordinates in the mesh."))
     .optional()
     .default([])
     .describe("Vertices of the mesh."),
+  faces: z
+    .array(z.array(z.number().int().nonnegative()).min(3).max(4))
+    .optional()
+    .default([])
+    .describe(
+      "Triangle or quad faces as zero-based indices into vertices, in perimeter order. Counterclockwise winding faces outward. Omit for a vertex-only mesh."
+    ),
 });
 
 /** Keyframe data for animation tools */

@@ -19,6 +19,7 @@ import { getProjectTexture, getMeshOrSelected, findMeshOrThrow } from "@/lib/uti
 // Mesh Tool Parameter Schemas
 // ============================================================================
 
+/** Parameters for batched mesh creation, including local geometry and optional material/group references. */
 export const placeMeshParameters = z.object({
   elements: z
     .array(meshSchema)
@@ -47,6 +48,7 @@ export const subdivideMeshParameters = z.object({
     .describe("Number of subdivision cuts to make."),
 });
 
+/** Sphere primitive parameters; integer sides keep the generated rings closed and symmetric. */
 export const createSphereParameters = z.object({
   elements: z
     .array(
@@ -61,6 +63,7 @@ export const createSphereParameters = z.object({
           .describe("Diameter of the sphere."),
         sides: z
           .number()
+          .int()
           .min(3)
           .max(48)
           .default(12)
@@ -84,6 +87,7 @@ export const createSphereParameters = z.object({
   group: groupIdOptionalSchema.describe("Group/bone to which the sphere belongs."),
 });
 
+/** Select mesh components using the keys returned by mesh creation or inspection. */
 export const selectMeshElementsParameters = z.object({
   mesh_id: meshIdSchema.describe("ID or name of the mesh to select elements from."),
   mode: meshSelectionModeEnum.describe("Selection mode."),
@@ -152,6 +156,7 @@ export const createMeshFaceParameters = z.object({
   texture: textureIdOptionalSchema.describe("Texture ID or name to apply to the new face."),
 });
 
+/** Cylinder primitive parameters with optional end caps and integer radial segments. */
 export const createCylinderParameters = z.object({
   elements: z
     .array(
@@ -160,7 +165,7 @@ export const createCylinderParameters = z.object({
         position: vector3Schema,
         height: z.number().min(1).max(64).default(16),
         diameter: z.number().min(1).max(64).default(16),
-        sides: z.number().min(3).max(64).default(12),
+        sides: z.number().int().min(3).max(64).default(12),
         rotation: vector3Schema.optional().default([0, 0, 0]),
         capped: z.boolean().optional().default(true),
       })
@@ -194,7 +199,7 @@ export const meshToolDocs: ToolSpec[] = [
   {
     name: "place_mesh",
     description:
-      "Places a mesh at the specified position. Texture and group are optional.",
+      "Creates meshes from local vertices and optional indexed triangle/quad faces, with position, rotation, and scale. Texture and group are optional. Returns meshes with UUIDs and vertex_keys/face_keys arrays in input order for subsequent editing.",
     annotations: {
       title: "Place Mesh",
       destructiveHint: true,
@@ -308,60 +313,97 @@ export const meshToolDocs: ToolSpec[] = [
 // Registration
 // ============================================================================
 
-export function registerMeshTools() {
+/** Resolve references before beginning an edit so invalid inputs leave no undo state. */
+function resolveMeshCreationContext(texture?: string, group?: string): {
+  projectTexture: Texture | null | undefined;
+  outlinerGroup: Group | "root";
+} {
+  if (!Project) {
+    throw new Error("No project is open. Use create_project before creating meshes.");
+  }
+  if (!Format.meshes) {
+    throw new Error(`Project format "${Format.id}" does not support meshes. Use a mesh-capable format such as "free".`);
+  }
+
+  const projectTexture = texture ? getProjectTexture(texture) : Texture.getDefault();
+  if (texture && !projectTexture) {
+    throw new Error(`Texture "${texture}" not found. Use list_textures to find a texture.`);
+  }
+  if (!group || group === "root") {
+    return { projectTexture, outlinerGroup: "root" };
+  }
+
+  const outlinerGroup = Group.all.find((candidate) => candidate.name === group || candidate.uuid === group);
+  if (!outlinerGroup) {
+    throw new Error(`Group "${group}" not found. Use list_outline to find a group.`);
+  }
+  return { projectTexture, outlinerGroup };
+}
+
+/**
+ * Track new elements in the same array used by Blockbench's undo snapshots.
+ * The builder appends each mesh before initialization so a partial failure can
+ * restore the previous scene and discard the pending edit.
+ */
+function createMeshEdit(label: string, build: (meshes: Mesh[]) => void): Mesh[] {
+  const meshes: Mesh[] = [];
+  Undo.initEdit({ elements: meshes, outliner: true, collections: [] });
+  try {
+    build(meshes);
+  } catch (error) {
+    // Blockbench supports reverting a canceled edit; the published types omit the argument.
+    (Undo.cancelEdit as (revertChanges: boolean) => void)(true);
+    throw error;
+  }
+  Undo.finishEdit(label);
+  Canvas.updateAll();
+  return meshes;
+}
+
+/** Register mesh creation and editing tools against the active Blockbench runtime. */
+export function registerMeshTools(): void {
   createTool(meshToolDocs[0].name, {
     ...meshToolDocs[0],
-    async execute({ elements, texture, group }, { reportProgress }) {
-      Undo.initEdit({
-        elements: [],
-        outliner: true,
-        collections: [],
-      });
+    parameters: placeMeshParameters,
+    async execute({ elements, texture, group }, context) {
+      const { projectTexture, outlinerGroup } = resolveMeshCreationContext(texture, group);
       const total = elements.length;
-
-      const projectTexture = texture
-        ? getProjectTexture(texture)
-        : Texture.getDefault();
-
-      if (!projectTexture) {
-        throw new Error(`No texture found for "${texture}".`);
-      }
-
-      // @ts-expect-error getAllGroups is a utility function that returns all groups in the project
-      const groups = getAllGroups();
-      const outlinerGroup = group === "root"
-        ? "root"
-        : groups.find((g: Group) => g.name === group || g.uuid === group) ?? "root";
-
-      const meshes = elements.map((element, progress) => {
-        const mesh = new Mesh({
-          name: element.name,
-          vertices: {},
-        }).init();
-
-        element.vertices.forEach((vertex) => {
-          mesh.addVertices(vertex as ArrayVector3);
+      elements.forEach((element) => {
+        element.faces.forEach((face, faceIndex) => {
+          if (new Set(face).size !== face.length || face.some((index) => index >= element.vertices.length)) {
+            throw new Error(`Mesh "${element.name}" face ${faceIndex} must reference 3 or 4 distinct existing vertex indices.`);
+          }
         });
-
-        mesh.addTo(outlinerGroup);
-        mesh.applyTexture(projectTexture);
-
-        reportProgress({
-          progress,
-          total,
-        });
-
-        return mesh;
       });
 
-      Undo.finishEdit("Agent placed meshes");
-      Canvas.updateAll();
-
-      return await Promise.resolve(
-        JSON.stringify(
-          meshes.map((mesh) => `Added mesh ${mesh.name} with ID ${mesh.uuid}`)
-        )
-      );
+      const placed: Array<{ name: string; uuid: string; vertex_keys: string[]; face_keys: string[] }> = [];
+      createMeshEdit("Agent placed meshes", (created) => {
+        elements.forEach((element, index) => {
+          const mesh = new Mesh({
+            name: element.name,
+            vertices: {},
+            origin: element.position as ArrayVector3,
+            rotation: element.rotation as ArrayVector3,
+          });
+          created.push(mesh);
+          const vertexKeys = element.vertices.map((vertex) => mesh.addVertices([
+            vertex[0] * element.scale[0],
+            vertex[1] * element.scale[1],
+            vertex[2] * element.scale[2],
+          ])[0]);
+          const faceKeys = element.faces.map((face) => {
+            return mesh.addFaces(new MeshFace(mesh, {
+              vertices: face.map((vertexIndex) => vertexKeys[vertexIndex]),
+              uv: {},
+            }))[0];
+          });
+          mesh.addTo(outlinerGroup).init();
+          if (projectTexture) mesh.applyTexture(projectTexture, true);
+          context?.reportProgress({ progress: index + 1, total });
+          placed.push({ name: mesh.name, uuid: mesh.uuid, vertex_keys: vertexKeys, face_keys: faceKeys });
+        });
+      });
+      return JSON.stringify({ meshes: placed });
     },
   }, meshToolDocs[0].status);
 
@@ -404,29 +446,11 @@ export function registerMeshTools() {
 
   createTool(meshToolDocs[3].name, {
     ...meshToolDocs[3],
-    async execute({ elements, texture, group }, { reportProgress }) {
-      Undo.initEdit({
-        elements: [],
-        outliner: true,
-        collections: [],
-      });
+    parameters: createSphereParameters,
+    async execute({ elements, texture, group }, context) {
+      const { projectTexture, outlinerGroup } = resolveMeshCreationContext(texture, group);
       const total = elements.length;
-
-      const projectTexture = texture
-        ? getProjectTexture(texture)
-        : Texture.getDefault();
-
-      if (!projectTexture) {
-        throw new Error(`No texture found for "${texture}".`);
-      }
-
-      // @ts-expect-error getAllGroups is a utility function that returns all groups in the project
-      const groups = getAllGroups();
-      const outlinerGroup = group === "root"
-        ? "root"
-        : groups.find((g: Group) => g.name === group || g.uuid === group) ?? "root";
-
-      const spheres = elements.map((element, progress) => {
+      const spheres = createMeshEdit("Agent created spheres", (created) => elements.forEach((element, progress) => {
         const mesh = new Mesh({
           name: element.name,
           vertices: {},
@@ -436,7 +460,8 @@ export function registerMeshTools() {
             number,
             number
           ],
-        }).init();
+        });
+        created.push(mesh);
 
         // Create sphere vertices using spherical coordinates
         const radius = element.diameter / 2;
@@ -512,21 +537,17 @@ export function registerMeshTools() {
           }
         }
 
-        mesh.addTo(outlinerGroup);
+        mesh.addTo(outlinerGroup).init();
         if (projectTexture) {
-          mesh.applyTexture(projectTexture);
+          mesh.applyTexture(projectTexture, true);
         }
 
-        reportProgress({
-          progress,
+        context?.reportProgress({
+          progress: progress + 1,
           total,
         });
 
-        return mesh;
-      });
-
-      Undo.finishEdit("Agent created spheres");
-      Canvas.updateAll();
+      }));
 
       return await Promise.resolve(
         JSON.stringify(
@@ -540,7 +561,11 @@ export function registerMeshTools() {
 
   createTool(meshToolDocs[4].name, {
     ...meshToolDocs[4],
+    parameters: selectMeshElementsParameters,
     async execute({ mesh_id, mode, elements, action }) {
+      if (!Project) {
+        throw new Error("No project is open. Open a project before selecting mesh elements.");
+      }
       const mesh = findMeshOrThrow(mesh_id);
 
       Undo.initEdit({
@@ -549,10 +574,15 @@ export function registerMeshTools() {
         collections: [],
       });
 
+      // Object selection may clear component state. Preserve existing keys for
+      // add/remove/toggle and finish that lifecycle before installing the result.
+      const previousSelection = Project.mesh_selection[mesh.uuid];
+      mesh.select();
+
       // Set selection mode
       // @ts-expect-error Selection mode setter available at runtime
       BarItems.selection_mode.set(mode);
-      const selection = (Project?.mesh_selection[mesh.uuid] ??
+      const selection = (Project.mesh_selection[mesh.uuid] ??= previousSelection ??
       {
         vertices: [],
         edges: [],
@@ -667,7 +697,6 @@ export function registerMeshTools() {
         });
       }
 
-      mesh.select();
       Canvas.updateView({
         elements: [mesh],
         selection: true,
@@ -864,19 +893,11 @@ export function registerMeshTools() {
 
   createTool(meshToolDocs[9].name, {
     ...meshToolDocs[9],
-    async execute({ elements, texture, group }, { reportProgress }) {
-      Undo.initEdit({ elements: [], outliner: true, collections: [] });
+    parameters: createCylinderParameters,
+    async execute({ elements, texture, group }, context) {
+      const { projectTexture, outlinerGroup } = resolveMeshCreationContext(texture, group);
       const total = elements.length;
-      const projectTexture = texture
-        ? getProjectTexture(texture)
-        : Texture.getDefault();
-      if (!projectTexture) throw new Error(`Texture "${texture}" not found.`);
-      // @ts-expect-error getAllGroups is a utility function that returns all groups in the project
-      const groups = getAllGroups();
-      const outlinerGroup = group === "root"
-        ? "root"
-        : groups.find((g: Group) => g.name === group || g.uuid === group) ?? "root";
-      const cylinders = elements.map((element, progress) => {
+      const cylinders = createMeshEdit("Agent created cylinders", (created) => elements.forEach((element, progress) => {
         const mesh = new Mesh({
           name: element.name,
           vertices: {},
@@ -886,15 +907,16 @@ export function registerMeshTools() {
             number,
             number
           ],
-        }).init();
+        });
+        created.push(mesh);
         const radius = element.diameter / 2;
         const height = element.height;
         const sides = Math.round(element.sides);
         // centres for the caps
-        const topCenter = mesh.addVertices([0, height / 2, 0])[0];
-        const bottomCenter = mesh.addVertices([0, -height / 2, 0])[0];
-        const topRing: any[] = [];
-        const bottomRing: any[] = [];
+        const capCenters = element.capped ? mesh.addVertices([0, height / 2, 0], [0, -height / 2, 0]) : [];
+        const [topCenter, bottomCenter] = capCenters;
+        const topRing: string[] = [];
+        const bottomRing: string[] = [];
         for (let i = 0; i < sides; i++) {
           const ang = (i / sides) * Math.PI * 2;
           const x = Math.cos(ang) * radius;
@@ -908,10 +930,10 @@ export function registerMeshTools() {
           mesh.addFaces(
             new MeshFace(mesh, {
               vertices: [
-                bottomRing[i],
-                bottomRing[next],
-                topRing[next],
                 topRing[i],
+                topRing[next],
+                bottomRing[next],
+                bottomRing[i],
               ],
               uv: {},
             })
@@ -920,26 +942,23 @@ export function registerMeshTools() {
             // top cap (triangle fan)
             mesh.addFaces(
               new MeshFace(mesh, {
-                vertices: [topRing[i], topRing[next], topCenter],
+                vertices: [topRing[next], topRing[i], topCenter],
                 uv: {},
               })
             );
             // bottom cap
             mesh.addFaces(
               new MeshFace(mesh, {
-                vertices: [bottomRing[next], bottomRing[i], bottomCenter],
+                vertices: [bottomRing[i], bottomRing[next], bottomCenter],
                 uv: {},
               })
             );
           }
         }
-        mesh.addTo(outlinerGroup);
-        if (projectTexture) mesh.applyTexture(projectTexture);
-        reportProgress({ progress, total });
-        return mesh;
-      });
-      Undo.finishEdit("Agent created cylinders");
-      Canvas.updateAll();
+        mesh.addTo(outlinerGroup).init();
+        if (projectTexture) mesh.applyTexture(projectTexture, true);
+        context?.reportProgress({ progress: progress + 1, total });
+      }));
       return JSON.stringify(
         cylinders.map((c) => `Added cylinder ${c.name} (ID ${c.uuid})`)
       );

@@ -465,7 +465,9 @@ export function registerTextureTools() {
       if (render_sides) texture.render_sides = render_sides;
       texture.updateMaterial();
 
-      Undo.finishEdit("Agent created texture");
+      // The initial snapshot has no texture; include the created instance in
+      // the final snapshot so undo removes it and redo restores its contents.
+      Undo.finishEdit("Agent created texture", { textures: [texture] });
       Canvas.updateAll();
 
       return imageContent({

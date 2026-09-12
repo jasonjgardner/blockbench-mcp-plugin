@@ -1,6 +1,6 @@
 {
   "version": "1.7.0",
-  "generatedAt": "2026-07-03T17:35:32.369Z",
+  "generatedAt": "2026-09-12T19:17:40.989Z",
   "tools": [
     {
       "name": "place_cube",
@@ -3075,7 +3075,7 @@
     {
       "name": "place_mesh",
       "title": "Place Mesh",
-      "description": "Places a mesh at the specified position. Texture and group are optional.",
+      "description": "Creates meshes from local vertices and optional indexed triangle/quad faces, with position, rotation, and scale. Texture and group are optional. Returns meshes with UUIDs and vertex_keys/face_keys arrays in input order for subsequent editing.",
       "status": "experimental",
       "category": "Mesh Editing",
       "annotations": {
@@ -3102,8 +3102,8 @@
                       },
                       "minItems": 3,
                       "maxItems": 3,
-                      "description": "Position of the mesh.",
-                      "markdownDescription": "Position of the mesh.",
+                      "description": "Position of the mesh origin/pivot. Vertices are local to this point.",
+                      "markdownDescription": "Position of the mesh origin/pivot. Vertices are local to this point.",
                       "default": [
                         0,
                         0,
@@ -3117,8 +3117,8 @@
                       },
                       "minItems": 3,
                       "maxItems": 3,
-                      "description": "Rotation of the mesh.",
-                      "markdownDescription": "Rotation of the mesh.",
+                      "description": "Rotation of the mesh in degrees around its origin.",
+                      "markdownDescription": "Rotation of the mesh in degrees around its origin.",
                       "default": [
                         0,
                         0,
@@ -3132,8 +3132,8 @@
                       },
                       "minItems": 3,
                       "maxItems": 3,
-                      "description": "Scale of the mesh.",
-                      "markdownDescription": "Scale of the mesh.",
+                      "description": "Scale factors baked into local vertex coordinates before rotation.",
+                      "markdownDescription": "Scale factors baked into local vertex coordinates before rotation.",
                       "default": [
                         1,
                         1,
@@ -3155,6 +3155,21 @@
                       "default": [],
                       "description": "Vertices of the mesh.",
                       "markdownDescription": "Vertices of the mesh."
+                    },
+                    "faces": {
+                      "type": "array",
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "minItems": 3,
+                        "maxItems": 4
+                      },
+                      "default": [],
+                      "description": "Triangle or quad faces as zero-based indices into vertices, in perimeter order. Counterclockwise winding faces outward. Omit for a vertex-only mesh.",
+                      "markdownDescription": "Triangle or quad faces as zero-based indices into vertices, in perimeter order. Counterclockwise winding faces outward. Omit for a vertex-only mesh."
                     }
                   },
                   "required": [
@@ -3309,7 +3324,7 @@
                       "markdownDescription": "Diameter of the sphere."
                     },
                     "sides": {
-                      "type": "number",
+                      "type": "integer",
                       "minimum": 3,
                       "maximum": 48,
                       "default": 12,
@@ -3659,7 +3674,7 @@
                       "default": 16
                     },
                     "sides": {
-                      "type": "number",
+                      "type": "integer",
                       "minimum": 3,
                       "maximum": 64,
                       "default": 12

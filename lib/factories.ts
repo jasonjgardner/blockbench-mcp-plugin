@@ -13,6 +13,7 @@ export interface ToolSpec {
   annotations?: {
     title?: string;
     destructiveHint?: boolean;
+    idempotentHint?: boolean;
     readOnlyHint?: boolean;
     openWorldHint?: boolean;
   };
@@ -78,12 +79,16 @@ type ToolResult = string | { content: ToolContentItem[]; structuredContent?: unk
 interface ToolDefinition {
   title: string;
   description: string;
+  /** Raw fields used to build the plugin's tool test form. */
   inputSchema: Record<string, z.ZodType>;
+  /** Complete schema used by the SDK to validate and parse incoming calls. */
+  parameterSchema: z.ZodType;
   outputSchema?: Record<string, z.ZodType> | z.ZodType;
   execute: (args: Record<string, unknown>, context?: ToolContext) => Promise<ToolResult>;
   annotations?: {
     title?: string;
     destructiveHint?: boolean;
+    idempotentHint?: boolean;
     openWorldHint?: boolean;
     readOnlyHint?: boolean;
   };
@@ -113,6 +118,21 @@ function extractShape(schema: z.ZodType): Record<string, z.ZodType> {
 }
 
 /**
+ * Keeps the full parser while making refined object schemas discoverable by the SDK.
+ * SDK 1.x requires a public `shape` to publish an input JSON Schema for Zod 3
+ * effects. Add it to a clone so refinements, transforms, and unknown-key handling
+ * still run exactly once through the SDK's normal validation path.
+ */
+function createInputSchema(schema: z.ZodType): z.ZodType {
+  const def = schema._def as { typeName?: string };
+  if (def.typeName !== "ZodEffects") return schema;
+
+  return Object.assign(schema.describe(schema.description ?? ""), {
+    shape: extractShape(schema),
+  });
+}
+
+/**
  * Creates a new MCP tool and registers it with the server using the official SDK.
  * @param name - The tool name suffix (will be prefixed with "blockbench_").
  * @param tool - The tool configuration.
@@ -132,6 +152,7 @@ export function createTool<T extends z.ZodType>(
     annotations?: {
       title?: string;
       destructiveHint?: boolean;
+      idempotentHint?: boolean;
       openWorldHint?: boolean;
       readOnlyHint?: boolean;
     };
@@ -151,6 +172,7 @@ export function createTool<T extends z.ZodType>(
     title: tool.annotations?.title ?? tool.description,
     description: tool.description,
     inputSchema,
+    parameterSchema: createInputSchema(tool.parameters),
     execute: tool.execute,
     annotations: tool.annotations,
   };
@@ -169,7 +191,8 @@ export function createTool<T extends z.ZodType>(
       definition: {
         title: string;
         description: string;
-        inputSchema: Record<string, z.ZodType>;
+        inputSchema: z.ZodType;
+        annotations?: ToolDefinition["annotations"];
       },
       callback: (args: unknown, extra: unknown) => Promise<unknown>
     ) => void;
@@ -179,7 +202,8 @@ export function createTool<T extends z.ZodType>(
       {
         title: toolDef.title,
         description: toolDef.description,
-        inputSchema,
+        inputSchema: toolDef.parameterSchema,
+        annotations: toolDef.annotations,
       },
       async (args: unknown, _extra: unknown) => {
         // Provide a no-op reportProgress function
@@ -250,7 +274,8 @@ export function registerToolsOnServer(server: unknown) {
       definition: {
         title: string;
         description: string;
-        inputSchema: Record<string, z.ZodType>;
+        inputSchema: z.ZodType;
+        annotations?: ToolDefinition["annotations"];
       },
       callback: (args: unknown, extra: unknown) => Promise<unknown>
     ) => void;
@@ -262,7 +287,8 @@ export function registerToolsOnServer(server: unknown) {
       {
         title: toolDef.title,
         description: toolDef.description,
-        inputSchema: toolDef.inputSchema,
+        inputSchema: toolDef.parameterSchema,
+        annotations: toolDef.annotations,
       },
       async (args: unknown, _extra: unknown) => {
         const reportProgress: ToolContext["reportProgress"] = () => {};
