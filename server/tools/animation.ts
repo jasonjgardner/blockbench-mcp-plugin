@@ -324,6 +324,34 @@ export const animationToolDocs: ToolSpec[] = [
   },
 ];
 
+/**
+ * Applies a keyframe's data-point values through Blockbench's real per-axis
+ * `Keyframe.set()` API. A bare number (uniform scale) is expanded to all three
+ * axes; a `[x, y, z]` array is written component-wise.
+ *
+ * `Keyframe.extend()` only merges registered properties, so a `values` key is
+ * silently dropped and `set("values", …)` writes a stray, unread property —
+ * which is why `manage_keyframes` used to leave every data point at its channel
+ * default. Scale keyframes also default to `uniform: true`, where `set()`
+ * mirrors one value to all axes, so the flag is cleared before writing
+ * genuinely non-uniform components; otherwise x/y/z collapse to the last write.
+ *
+ * @param keyframe - The keyframe to write to.
+ * @param values - `[x, y, z]` for position/rotation, or a number for uniform scale.
+ */
+function applyKeyframeValues(
+  keyframe: _Keyframe,
+  values: number[] | number
+): void {
+  const vals = Array.isArray(values) ? values : [values, values, values];
+  if (keyframe.uniform && new Set(vals).size > 1) {
+    keyframe.uniform = false;
+  }
+  keyframe.set("x", vals[0]);
+  keyframe.set("y", vals[1]);
+  keyframe.set("z", vals[2]);
+}
+
 export function registerAnimationTools() {
 createTool(
   animationToolDocs[0].name,
@@ -413,17 +441,22 @@ createTool(
       switch (action) {
         case "create":
           keyframes.forEach((kf) => {
+            // `values` is intentionally omitted here: Keyframe.extend() ignores
+            // it. Values are applied below through the real per-axis set() API.
             const keyframe = animator.createKeyframe(
               {
                 time: kf.time,
                 channel,
-                values: kf.values,
                 interpolation: kf.interpolation,
               },
               kf.time,
               channel,
               false
             );
+
+            if (kf.values !== undefined) {
+              applyKeyframeValues(keyframe, kf.values);
+            }
 
             if (kf.interpolation === "bezier" && kf.bezier_handles) {
               // @ts-ignore
@@ -459,8 +492,8 @@ createTool(
               (k) => Math.abs(k.time - kf.time) < 0.001
             );
             if (keyframe) {
-              if (kf.values) {
-                keyframe.set("values", kf.values);
+              if (kf.values !== undefined) {
+                applyKeyframeValues(keyframe, kf.values);
               }
               if (kf.interpolation) {
                 keyframe.interpolation = kf.interpolation;

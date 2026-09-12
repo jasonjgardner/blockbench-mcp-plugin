@@ -16,6 +16,28 @@ export const vector3Schema = z
   .length(3)
   .describe("3D vector [x, y, z].");
 
+/**
+ * Returns a *fresh* 3D vector schema instance on every call.
+ *
+ * Prefer this over sharing the module-level {@link vector3Schema} instance
+ * across multiple fields of the same `z.object`. The MCP SDK converts input
+ * schemas with `zod-to-json-schema` using `$refStrategy: "root"`, which
+ * deduplicates repeated schema instances *by object identity*: the second
+ * occurrence of a shared instance is emitted as a bare `{ "$ref": "#/…" }`
+ * with no `type`/`items`/`description`. Clients that don't resolve local
+ * `$ref`s (Claude Code among them) then see an untyped property and send it
+ * as a string, which server-side validation rejects — making the tool
+ * uncallable. Giving each field its own instance keeps the advertised schema
+ * fully inlined and typed. See issue #44.
+ *
+ * @param description - Optional field description surfaced in the JSON schema.
+ * @returns A new `z.array(z.number()).length(3)` schema.
+ */
+export const vec3 = (description?: string) => {
+  const schema = z.array(z.number()).length(3);
+  return description ? schema.describe(description) : schema;
+};
+
 // ============================================================================
 // Enum Schemas
 // ============================================================================
@@ -112,6 +134,20 @@ export const renderSidesEnum = z.enum(["auto", "front", "double"]);
 
 /** Loop modes for animation */
 export const loopModeEnum = z.enum(["once", "loop", "hold"]);
+
+/** Java Edition display slots (keys of `Project.display_settings`) */
+export const displaySlotEnum = z.enum([
+  "thirdperson_righthand",
+  "thirdperson_lefthand",
+  "firstperson_righthand",
+  "firstperson_lefthand",
+  "ground",
+  "gui",
+  "head",
+  "embedded",
+  "fixed",
+  "on_shelf",
+]);
 
 // ============================================================================
 // Color Schemas

@@ -4,6 +4,7 @@ import type { ToolSpec, PromptSpec, ResourceSpec } from "../lib/factories";
 // Tool docs imports — each file exports schemas at module level with zero Blockbench deps
 import { cameraToolDocs } from "../server/tools/camera";
 import { cubeToolDocs } from "../server/tools/cubes";
+import { displayToolDocs } from "../server/tools/display";
 import { elementToolDocs } from "../server/tools/element";
 import { importToolDocs } from "../server/tools/import";
 import { meshToolDocs } from "../server/tools/mesh";
@@ -29,6 +30,7 @@ export const toolManifest: CategoryGroup[] = [
   { category: "Camera & Screenshots", tools: cameraToolDocs },
   { category: "Animation", tools: animationToolDocs },
   { category: "Armature", tools: armatureToolDocs },
+  { category: "Display Settings", tools: displayToolDocs },
   { category: "Elements", tools: elementToolDocs },
   { category: "Export", tools: exportToolDocs },
   { category: "History", tools: historyToolDocs },

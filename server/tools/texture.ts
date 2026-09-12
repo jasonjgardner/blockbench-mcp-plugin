@@ -395,6 +395,8 @@ export function registerTextureTools() {
       fill_color,
       group,
       layer_name,
+      render_mode,
+      render_sides,
     }) {
       Undo.initEdit({
         textures: [],
@@ -407,6 +409,8 @@ export function registerTextureTools() {
         height,
         group,
         pbr_channel,
+        render_mode,
+        render_sides,
         internal: true,
       });
 
@@ -451,6 +455,15 @@ export function registerTextureTools() {
       }
 
       texture.add();
+
+      // The file/data-URL import path reassigns `texture` (via fromFile) and
+      // neither path guarantees the constructor's render settings survived, so
+      // re-apply them on the final instance and rebuild the three.js material
+      // so emissive/additive/layered modes take effect in the viewport
+      // immediately (constructing alone does not rebuild the material).
+      if (render_mode) texture.render_mode = render_mode;
+      if (render_sides) texture.render_sides = render_sides;
+      texture.updateMaterial();
 
       Undo.finishEdit("Agent created texture");
       Canvas.updateAll();
