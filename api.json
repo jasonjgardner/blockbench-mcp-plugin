@@ -1,6 +1,6 @@
 {
-  "version": "1.6.1",
-  "generatedAt": "2026-09-12T18:51:32.217Z",
+  "version": "1.7.0",
+  "generatedAt": "2026-09-12T18:55:07.360Z",
   "tools": [
     {
       "name": "place_cube",
@@ -1984,6 +1984,201 @@
       }
     },
     {
+      "name": "get_display_transform",
+      "title": "Get Display Transform",
+      "description": "Reads Java Edition display settings (Project.display_settings). Returns translation, rotation, scale, mirror and pivots for a single slot, or a summary of every populated slot when no slot is given. Never modifies state.",
+      "status": "experimental",
+      "category": "Display Settings",
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/get_display_transform",
+        "definitions": {
+          "get_display_transform": {
+            "type": "object",
+            "properties": {
+              "slot": {
+                "type": "string",
+                "enum": [
+                  "thirdperson_righthand",
+                  "thirdperson_lefthand",
+                  "firstperson_righthand",
+                  "firstperson_lefthand",
+                  "ground",
+                  "gui",
+                  "head",
+                  "embedded",
+                  "fixed",
+                  "on_shelf"
+                ],
+                "description": "Display slot to read. If omitted, returns every populated slot in the project.",
+                "markdownDescription": "Display slot to read. If omitted, returns every populated slot in the project."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "set_display_transform",
+      "title": "Set Display Transform",
+      "description": "Writes a Java Edition display slot's transform (translation, rotation, scale, mirror, pivots). Creates the slot if it does not exist yet and wraps the change in an undo step. This edits data that ships in the exported model JSON — it changes the deliverable, not just the preview. Requires a format that supports display mode (e.g. Java Block/Item).",
+      "status": "experimental",
+      "category": "Display Settings",
+      "annotations": {
+        "destructiveHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/set_display_transform",
+        "definitions": {
+          "set_display_transform": {
+            "type": "object",
+            "properties": {
+              "slot": {
+                "type": "string",
+                "enum": [
+                  "thirdperson_righthand",
+                  "thirdperson_lefthand",
+                  "firstperson_righthand",
+                  "firstperson_lefthand",
+                  "ground",
+                  "gui",
+                  "head",
+                  "embedded",
+                  "fixed",
+                  "on_shelf"
+                ],
+                "description": "Display slot to modify.",
+                "markdownDescription": "Display slot to modify."
+              },
+              "translation": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 3,
+                "maxItems": 3,
+                "description": "Translation offset as [x, y, z] (Minecraft display units).",
+                "markdownDescription": "Translation offset as [x, y, z] (Minecraft display units)."
+              },
+              "rotation": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 3,
+                "maxItems": 3,
+                "description": "Rotation in degrees as [x, y, z].",
+                "markdownDescription": "Rotation in degrees as [x, y, z]."
+              },
+              "scale": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 3,
+                "maxItems": 3,
+                "description": "Scale factor as [x, y, z].",
+                "markdownDescription": "Scale factor as [x, y, z]."
+              },
+              "rotation_pivot": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 3,
+                "maxItems": 3,
+                "description": "Rotation pivot point as [x, y, z].",
+                "markdownDescription": "Rotation pivot point as [x, y, z]."
+              },
+              "scale_pivot": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 3,
+                "maxItems": 3,
+                "description": "Scale pivot point as [x, y, z].",
+                "markdownDescription": "Scale pivot point as [x, y, z]."
+              },
+              "mirror": {
+                "type": "array",
+                "items": {
+                  "type": "boolean"
+                },
+                "minItems": 3,
+                "maxItems": 3,
+                "description": "Per-axis mirror flags as [x, y, z].",
+                "markdownDescription": "Per-axis mirror flags as [x, y, z]."
+              },
+              "reset": {
+                "type": "boolean",
+                "default": false,
+                "description": "Reset the slot to its default (identity) transform before applying any of the other values.",
+                "markdownDescription": "Reset the slot to its default (identity) transform before applying any of the other values."
+              }
+            },
+            "required": [
+              "slot"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "enter_display_mode",
+      "title": "Enter Display Mode",
+      "description": "Switches Blockbench into Display mode, activates the given slot and optionally loads a reference model (player, zombie, armor stand, …), then returns a screenshot. Pair with set_camera_angle / capture_screenshot for multi-angle fit checks of cosmetics and handheld items. Requires a format that supports display mode.",
+      "status": "experimental",
+      "category": "Display Settings",
+      "annotations": {
+        "destructiveHint": true,
+        "openWorldHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/enter_display_mode",
+        "definitions": {
+          "enter_display_mode": {
+            "type": "object",
+            "properties": {
+              "slot": {
+                "type": "string",
+                "enum": [
+                  "thirdperson_righthand",
+                  "thirdperson_lefthand",
+                  "firstperson_righthand",
+                  "firstperson_lefthand",
+                  "ground",
+                  "gui",
+                  "head",
+                  "embedded",
+                  "fixed",
+                  "on_shelf"
+                ],
+                "description": "Display slot to switch to and activate.",
+                "markdownDescription": "Display slot to switch to and activate."
+              },
+              "reference": {
+                "type": "string",
+                "description": "Optional reference model to load for a fit check (e.g. 'player', 'zombie', 'armor_stand', 'baby_zombie', 'block'). Validated against the live reference model list; an unknown value returns the available names.",
+                "markdownDescription": "Optional reference model to load for a fit check (e.g. 'player', 'zombie', 'armor_stand', 'baby_zombie', 'block'). Validated against the live reference model list; an unknown value returns the available names."
+              }
+            },
+            "required": [
+              "slot"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
       "name": "remove_element",
       "title": "Remove Element",
       "description": "Removes the element with the given ID.",
@@ -2038,8 +2233,13 @@
                 },
                 "minItems": 3,
                 "maxItems": 3,
-                "description": "3D vector [x, y, z].",
-                "markdownDescription": "3D vector [x, y, z]."
+                "description": "Pivot point of the group as [x, y, z].",
+                "markdownDescription": "Pivot point of the group as [x, y, z].",
+                "default": [
+                  0,
+                  0,
+                  0
+                ]
               },
               "rotation": {
                 "type": "array",
@@ -2048,8 +2248,13 @@
                 },
                 "minItems": 3,
                 "maxItems": 3,
-                "description": "3D vector [x, y, z].",
-                "markdownDescription": "3D vector [x, y, z]."
+                "description": "Rotation of the group in degrees as [x, y, z].",
+                "markdownDescription": "Rotation of the group in degrees as [x, y, z].",
+                "default": [
+                  0,
+                  0,
+                  0
+                ]
               },
               "parent": {
                 "type": "string",
@@ -2080,9 +2285,7 @@
               }
             },
             "required": [
-              "name",
-              "origin",
-              "rotation"
+              "name"
             ],
             "additionalProperties": false
           }
