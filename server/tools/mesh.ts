@@ -14,6 +14,7 @@ import {
 } from "@/lib/zodObjects";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
 import { getProjectTexture, getMeshOrSelected, findMeshOrThrow } from "@/lib/util";
+import { deleteMeshSelection, extrudeMeshFaces, subdivideMeshFaces } from "@/lib/mesh-editing";
 
 // ============================================================================
 // Mesh Tool Parameter Schemas
@@ -29,23 +30,26 @@ export const placeMeshParameters = z.object({
   group: groupIdOptionalSchema.describe("Group/bone to which the mesh belongs."),
 });
 
+/** Face-region extrusion parameters; unsupported edge/vertex modes produce an actionable error. */
 export const extrudeMeshParameters = z.object({
   mesh_id: meshIdOptionalSchema,
-  distance: z.number().default(1).describe("Distance to extrude."),
+  distance: z.number().finite().refine(value => value !== 0, "Distance must be nonzero").default(1).describe("Signed distance along averaged selected face normals, in local model units."),
   mode: z
     .enum(["faces", "edges", "vertices"])
     .default("faces")
-    .describe("What to extrude: faces, edges, or vertices."),
+    .describe("Use faces. Edge and vertex extrusion are currently unsupported by this headless tool."),
 });
 
+/** Regular triangle/quad subdivision with cuts + 1 segments per edge. */
 export const subdivideMeshParameters = z.object({
   mesh_id: meshIdOptionalSchema,
   cuts: z
     .number()
+    .int()
     .min(1)
     .max(10)
     .default(1)
-    .describe("Number of subdivision cuts to make."),
+    .describe("Number of cuts per edge; each selected face becomes (cuts + 1) squared faces."),
 });
 
 /** Sphere primitive parameters; integer sides keep the generated rings closed and symmetric. */
@@ -120,6 +124,7 @@ export const moveMeshVerticesParameters = z.object({
     ),
 });
 
+/** Component deletion removes incident faces and optionally retains resulting orphan vertices. */
 export const deleteMeshElementsParameters = z.object({
   mesh_id: meshIdOptionalSchema,
   mode: z
@@ -209,7 +214,7 @@ export const meshToolDocs: ToolSpec[] = [
   },
   {
     name: "extrude_mesh",
-    description: "Extrudes selected faces or edges of a mesh.",
+    description: "Extrudes the target mesh's selected face region along averaged normals, honoring distance. Returns new vertex keys and cap/wall face keys. Edge/vertex modes are unsupported.",
     annotations: {
       title: "Extrude Mesh",
       destructiveHint: true,
@@ -219,7 +224,7 @@ export const meshToolDocs: ToolSpec[] = [
   },
   {
     name: "subdivide_mesh",
-    description: "Subdivides selected faces of a mesh to create more geometry.",
+    description: "Subdivides the target mesh's selected triangles/quads into a regular grid with interpolated UVs. Returns new geometry keys. Unselected neighboring faces remain unchanged and may need matching cuts.",
     annotations: {
       title: "Subdivide Mesh",
       destructiveHint: true,
@@ -261,7 +266,7 @@ export const meshToolDocs: ToolSpec[] = [
   },
   {
     name: "delete_mesh_elements",
-    description: "Deletes selected vertices, edges, or faces from a mesh.",
+    description: "Deletes selected components only from the target mesh. Vertex/edge deletion removes incident faces; keep_vertices retains vertices orphaned by face/edge removal.",
     annotations: {
       title: "Delete Mesh Elements",
       destructiveHint: true,
@@ -299,7 +304,7 @@ export const meshToolDocs: ToolSpec[] = [
   },
   {
     name: "knife_tool",
-    description: "Uses the knife tool to cut custom edges into mesh faces.",
+    description: "Currently unsupported: Blockbench's interactive Knife context requires pointer topology that this point-list API cannot safely provide. Use subdivide_mesh or create geometry with place_mesh, or use Knife manually.",
     annotations: {
       title: "Knife Tool",
       destructiveHint: true,
@@ -409,38 +414,20 @@ export function registerMeshTools(): void {
 
   createTool(meshToolDocs[1].name, {
     ...meshToolDocs[1],
+    parameters: extrudeMeshParameters,
     async execute({ mesh_id, distance, mode }) {
       const mesh = getMeshOrSelected(mesh_id);
-
-      // Use the extrude tool
-      const tool = BarItems.extrude_mesh_selection;
-
-      if (!tool) {
-        throw new Error(`Extrude tool for ${mode} not found.`);
-      }
-
-      // @ts-ignore
-      tool.click({}, distance);
-
-      return `Extruded ${mode} of mesh "${mesh.name}" by ${distance} units`;
+      if (mode !== "faces") throw new Error("Headless extrusion currently supports mode 'faces' only. Select faces with select_mesh_elements, or create explicit edge/vertex geometry with place_mesh.");
+      return JSON.stringify({ mesh: mesh.uuid, distance, ...extrudeMeshFaces(mesh, distance) });
     },
   }, meshToolDocs[1].status);
 
   createTool(meshToolDocs[2].name, {
     ...meshToolDocs[2],
+    parameters: subdivideMeshParameters,
     async execute({ mesh_id, cuts }) {
       const mesh = getMeshOrSelected(mesh_id);
-
-      // Use the loop cut tool with subdivision
-      const tool = BarItems.loop_cut;
-      if (!tool) {
-        throw new Error("Loop cut tool not found.");
-      }
-
-      // @ts-ignore
-      tool.click({}, undefined, undefined, cuts);
-
-      return `Subdivided mesh "${mesh.name}" with ${cuts} cuts`;
+      return JSON.stringify({ mesh: mesh.uuid, cuts, ...subdivideMeshFaces(mesh, cuts) });
     },
   }, meshToolDocs[2].status);
 
@@ -718,16 +705,12 @@ export function registerMeshTools(): void {
 
   createTool(meshToolDocs[5].name, {
     ...meshToolDocs[5],
+    parameters: moveMeshVerticesParameters,
     async execute({ mesh_id, offset, vertices }) {
       const mesh = getMeshOrSelected(mesh_id);
 
       Undo.initEdit({
         elements: [mesh],
-        element_aspects: {
-          geometry: true,
-          uv: true,
-          faces: true,
-        },
       });
 
       const verticesToMove = vertices || mesh.getSelectedVertices();
@@ -758,19 +741,10 @@ export function registerMeshTools(): void {
 
   createTool(meshToolDocs[6].name, {
     ...meshToolDocs[6],
+    parameters: deleteMeshElementsParameters,
     async execute({ mesh_id, mode, keep_vertices }) {
       const mesh = getMeshOrSelected(mesh_id);
-
-      // Use the delete tool
-      const tool = BarItems.delete_mesh_selection;
-      if (!tool) {
-        throw new Error("Delete mesh selection tool not found.");
-      }
-
-      // @ts-ignore
-      tool.click({}, keep_vertices);
-
-      return `Deleted selected ${mode} from mesh "${mesh.name}"`;
+      return JSON.stringify({ mesh: mesh.uuid, ...deleteMeshSelection(mesh, mode, keep_vertices) });
     },
   }, meshToolDocs[6].status);
 
@@ -781,11 +755,6 @@ export function registerMeshTools(): void {
 
       Undo.initEdit({
         elements: [mesh],
-        element_aspects: {
-          geometry: true,
-          uv: true,
-          faces: true,
-        },
       });
 
       const verticesToCheck = selected_only
@@ -856,11 +825,6 @@ export function registerMeshTools(): void {
 
       Undo.initEdit({
         elements: [mesh],
-        element_aspects: {
-          geometry: true,
-          uv: true,
-          faces: true,
-        },
       });
 
       // Create the face
@@ -967,45 +931,9 @@ export function registerMeshTools(): void {
 
   createTool(meshToolDocs[10].name, {
     ...meshToolDocs[10],
-    async execute({ mesh_id, points }) {
-      const mesh = findMeshOrThrow(mesh_id);
-
-      Undo.initEdit({
-        elements: [mesh],
-        element_aspects: {
-          geometry: true,
-          uv: true,
-          faces: true,
-        },
-      });
-
-      // Create knife tool context
-      // @ts-ignore
-      const knifeContext = new KnifeToolContext(mesh);
-
-      // Add points to the knife path
-      points.forEach((point) => {
-        knifeContext.points.push({
-          position: new THREE.Vector3(...point.position),
-          fkey: point.face,
-          type: point.face ? "face" : "edge",
-        });
-      });
-
-      // Apply the knife cut
-      knifeContext.apply();
-
-      Undo.finishEdit("Knife cut mesh");
-      Canvas.updateView({
-        elements: [mesh],
-        element_aspects: {
-          geometry: true,
-          uv: true,
-          faces: true,
-        },
-      });
-
-      return `Applied knife cut to mesh "${mesh.name}" with ${points.length} points`;
+    async execute({ mesh_id }) {
+      findMeshOrThrow(mesh_id);
+      throw new Error("Headless knife_tool is unsupported: Blockbench requires interactive pointer/edge topology. Use subdivide_mesh or place_mesh for explicit geometry, or use Knife manually in Blockbench.");
     },
   }, meshToolDocs[10].status);
 }

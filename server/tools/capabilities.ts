@@ -1,6 +1,6 @@
 /// <reference types="blockbench-types" />
 import { z } from "zod";
-import { STATUS_STABLE, VERSION } from "@/lib/constants";
+import { BUILD_ID, BUILD_MODE, STATUS_STABLE, VERSION } from "@/lib/constants";
 import { createTool, tools, type ToolSpec } from "@/lib/factories";
 import type { StatusType } from "@/types";
 
@@ -46,7 +46,7 @@ export type CapabilitiesSnapshot = {
     platform: string;
     is_mobile: boolean;
   };
-  plugin: { version: string };
+  plugin: { version: string; build_id: string; build_mode: "production" | "development" };
   project: {
     uuid: string;
     name: string;
@@ -141,7 +141,7 @@ function inspectCapabilities({ format_id, include_tools }: z.infer<typeof getCap
       platform: Blockbench.platform,
       is_mobile: Blockbench.isMobile,
     },
-    plugin: { version: VERSION },
+    plugin: { version: VERSION, build_id: BUILD_ID, build_mode: BUILD_MODE },
     project: projectSummary,
     format: format ? summarizeFormat(format) : null,
     formats: Object.values(formats)

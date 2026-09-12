@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { VERSION } from "@/lib/constants";
+import { BUILD_ID, BUILD_MODE, VERSION } from "@/lib/constants";
 import { getAllToolDefinitions, tools } from "@/lib/factories";
 import {
   capabilityToolDocs,
@@ -87,6 +87,8 @@ describe("capability discovery", () => {
     expect(result.project).toBeNull();
     expect(result.format).toBeNull();
     expect(result.plugin.version).toBe(VERSION);
+    expect(result.plugin.build_id).toBe(BUILD_ID);
+    expect(result.plugin.build_mode).toBe(BUILD_MODE);
     expect(result.blockbench).toEqual({ version: "5.0.6", environment: "desktop", platform: "win32", is_mobile: false });
     expect(result.formats.map(({ id }) => id)).toEqual(["free", "java_block"]);
     expect(result.formats[0]?.supported_features).toContain("meshes");

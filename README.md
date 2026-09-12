@@ -2,6 +2,8 @@
 
 https://github.com/user-attachments/assets/ab1b7e63-b6f0-4d5b-85ab-79d328de31db
 
+[![skills.sh](https://skills.sh/b/jasonjgardner/blockbench-mcp-project)](https://skills.sh/jasonjgardner/blockbench-mcp-project)
+
 ## Plugin Installation
 
 Open the desktop version of Blockbench, go to File > Plugins and click the "Load Plugin from URL" and paste in this URL:
@@ -141,3 +143,5 @@ Run `bun test` for regression tests without opening Blockbench. To test the runn
 The live test creates a separate Generic Model project, checks tool/resource/prompt discovery, validation, mesh transforms, selection, undo/redo, face normals, screenshots, and export. It recreates the official MCP symbol and saves the `.bbmodel`, previews, and results in `artifacts/mcp-identity/`. Generated artifacts are ignored by Git; test scripts and written reports stay versioned. Reloading the plugin expires existing MCP sessions; reconnect clients before continuing. See the [test report](docs/reports/2026-09-12-mcp-identity-test.md) for findings and scope.
 
 Run `bun run test:inspection:live` with a mesh project open for read-only capability and geometry inspection checks. It saves results to the ignored `artifacts/inspection/` directory. An intentional reference asset needed by automated tests belongs in `tests/fixtures/` and should be committed separately from generated run outputs.
+
+Before tagging a release, build and reload the plugin in Blockbench desktop, then run `bun run release:smoke`. This runs the regression and desktop suites and writes `releases/desktop-smoke.json`; commit that record with the tested source. Tag deployments reject missing or stale evidence. See [required desktop release checks](CONTRIBUTING.md#required-desktop-checks-before-releases).

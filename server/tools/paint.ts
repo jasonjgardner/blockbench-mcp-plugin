@@ -33,7 +33,7 @@ export const paintFillToolParameters = z.object({
     .min(0)
     .max(100)
     .optional()
-    .describe("Color tolerance for fill."),
+    .describe("Only zero (exact color matching) is supported by the native fill API. Nonzero tolerance is rejected."),
   fill_mode: fillModeEnum
     .optional()
     .default("color_connected")
@@ -119,6 +119,7 @@ export const eraserToolParameters = z.object({
         y: z.number().describe("Y coordinate to erase at."),
       })
     )
+    .min(1)
     .describe("Array of coordinates to erase at."),
   brush_size: brushSizeSchema.describe("Eraser brush size."),
   opacity: opacitySchema.describe("Eraser opacity (0-255)."),
@@ -128,7 +129,7 @@ export const eraserToolParameters = z.object({
     .boolean()
     .optional()
     .default(true)
-    .describe("Whether to connect erase strokes with lines."),
+    .describe("Whether to connect erase strokes with lines. Disconnected points are separate native strokes and separate undo entries."),
 });
 
 export const paintSettingsParameters = z.object({
@@ -192,13 +193,14 @@ export const paintWithBrushParameters = z.object({
         y: z.number().describe("Y coordinate on texture."),
       })
     )
+    .min(1)
     .describe("Array of coordinates to paint at."),
   brush_settings: brushSettingsSchema,
   connect_strokes: z
     .boolean()
     .optional()
     .default(true)
-    .describe("Whether to connect paint strokes with lines."),
+    .describe("Whether to interpolate brush samples between coordinates, at no more than one texture pixel per step."),
 });
 
 export const createBrushPresetParameters = z.object({
@@ -408,11 +410,80 @@ export const paintToolDocs: ToolSpec[] = [
   },
 ];
 
-export function registerPaintTools() {
+/** Native stroke methods omitted from published blockbench-types, verified in the desktop Painter implementation. */
+interface INativePainter {
+  paint_stroke_canceled?: boolean;
+  brushChanges: boolean;
+  current: { element?: unknown; face?: unknown; face_matrices?: unknown };
+  startPaintTool(texture: Texture, x: number, y: number, uvTag: unknown, event: Record<string, unknown>): void;
+  movePaintTool(texture: Texture, x: number, y: number, event: Record<string, unknown>): void;
+  useShapeTool(texture: Texture, x: number, y: number, event: Record<string, unknown>): void;
+  useGradientTool(texture: Texture, x: number, y: number, event: Record<string, unknown>): void;
+  stopPaintTool(): void;
+}
+
+function nativePainter(): INativePainter {
+  return Painter as unknown as INativePainter;
+}
+
+function prepareTexturePaint(): INativePainter {
+  const undo = Undo as typeof Undo & { current_save?: unknown };
+  if (undo.current_save) throw new Error("A Blockbench edit is already in progress. Finish the active edit before painting.");
+  const painter = nativePainter();
+  // Match the UV editor's texture-coordinate entry point rather than inheriting
+  // raycast element/face context from a previous viewport stroke.
+  delete painter.current.element;
+  delete painter.current.face;
+  delete painter.current.face_matrices;
+  return painter;
+}
+
+/** Let Painter own its stroke transaction, discarding unchanged or canceled native edits. */
+function nativePaintStroke(start: () => void, move?: () => void): void {
+  const undo = Undo as typeof Undo & { current_save?: unknown };
+  const painter = prepareTexturePaint();
+  try {
+    start();
+    if (painter.paint_stroke_canceled) {
+      painter.stopPaintTool();
+      throw new Error("Blockbench canceled this paint stroke. Check paint mode, stylus-only settings, and the selected tool.");
+    }
+    move?.();
+    painter.stopPaintTool();
+    if (undo.current_save) (Undo.cancelEdit as (revert: boolean) => void)(false);
+  } catch (error) {
+    if (undo.current_save) (Undo.cancelEdit as (revert: boolean) => void)(true);
+    painter.brushChanges = false;
+    painter.stopPaintTool();
+    throw error;
+  }
+}
+
+type PaintPoint = { x: number; y: number };
+
+function brushStrokeCoordinates(coordinates: PaintPoint[], connect: boolean): PaintPoint[] {
+  if (coordinates.some(point => !Number.isFinite(point.x) || !Number.isFinite(point.y))) {
+    throw new Error("Brush coordinates must be finite texture positions.");
+  }
+  return coordinates.reduce<PaintPoint[]>((points, point, index) => {
+    if (!connect || index === 0) return [...points, point];
+    const previous = coordinates[index - 1];
+    const steps = Math.ceil(Math.max(Math.abs(point.x - previous.x), Math.abs(point.y - previous.y)));
+    if (points.length + steps > 100000) throw new Error("Connected brush strokes exceed 100000 samples. Split the stroke into shorter calls.");
+    return [...points, ...Array.from({ length: steps }, (_, step) => ({
+      x: previous.x + (point.x - previous.x) * (step + 1) / steps,
+      y: previous.y + (point.y - previous.y) * (step + 1) / steps,
+    }))];
+  }, []);
+}
+
+/** Register painting tools; native Painter strokes and Texture.edit own their undo transactions. */
+export function registerPaintTools(): void {
   createTool(
     paintToolDocs[0].name,
     {
       ...paintToolDocs[0],
+      parameters: paintFillToolParameters,
       async execute({
         texture_id,
         x,
@@ -423,12 +494,8 @@ export function registerPaintTools() {
         fill_mode,
         blend_mode,
       }) {
+        if (tolerance !== undefined && tolerance !== 0) throw new Error("Native fill supports exact color matching only. Omit tolerance or set it to 0; nonzero tolerance is unsupported.");
         const texture = getAndActivateTexture(texture_id);
-
-        Undo.initEdit({
-          textures: [texture],
-          bitmap: true,
-        });
 
         // Apply settings
         if (color) {
@@ -449,10 +516,7 @@ export function registerPaintTools() {
         BarItems.fill_tool.select();
 
         // Perform fill
-        Painter.startPaintTool(texture, x, y, {}, { shiftKey: false });
-        Painter.stopPaintTool();
-
-        Undo.finishEdit("Fill tool");
+        nativePaintStroke(() => nativePainter().startPaintTool(texture, x, y, undefined, { shiftKey: false }));
         Canvas.updateAll();
 
         return `Filled area at (${x}, ${y}) on texture "${texture.name}"`;
@@ -465,6 +529,7 @@ export function registerPaintTools() {
     paintToolDocs[1].name,
     {
       ...paintToolDocs[1],
+      parameters: drawShapeToolParameters,
       async execute({
         texture_id,
         shape,
@@ -476,11 +541,6 @@ export function registerPaintTools() {
         blend_mode,
       }) {
         const texture = getAndActivateTexture(texture_id);
-
-        Undo.initEdit({
-          textures: [texture],
-          bitmap: true,
-        });
 
         // Apply settings
         if (color) {
@@ -504,11 +564,10 @@ export function registerPaintTools() {
         BarItems.draw_shape_tool.select();
 
         // Draw shape
-        Painter.startPaintTool(texture, start.x, start.y, {}, { shiftKey: false });
-        Painter.useShapeTool(texture, end.x, end.y, {});
-        Painter.stopPaintTool();
-
-        Undo.finishEdit("Draw shape");
+        nativePaintStroke(
+          () => nativePainter().startPaintTool(texture, start.x, start.y, undefined, { shiftKey: false }),
+          () => nativePainter().useShapeTool(texture, end.x, end.y, {})
+        );
         Canvas.updateAll();
 
         return `Drew ${shape} from (${start.x}, ${start.y}) to (${end.x}, ${end.y}) on texture "${texture.name}"`;
@@ -521,6 +580,7 @@ export function registerPaintTools() {
     paintToolDocs[2].name,
     {
       ...paintToolDocs[2],
+      parameters: gradientToolParameters,
       async execute({
         texture_id,
         start,
@@ -531,11 +591,6 @@ export function registerPaintTools() {
         blend_mode,
       }) {
         const texture = getAndActivateTexture(texture_id);
-
-        Undo.initEdit({
-          textures: [texture],
-          bitmap: true,
-        });
 
         // Apply settings
         ColorPanel.set(start_color);
@@ -554,11 +609,10 @@ export function registerPaintTools() {
         BarItems.gradient_tool.select();
 
         // Apply gradient
-        Painter.startPaintTool(texture, start.x, start.y, {}, { shiftKey: false });
-        Painter.useGradientTool(texture, end.x, end.y, {});
-        Painter.stopPaintTool();
-
-        Undo.finishEdit("Apply gradient");
+        nativePaintStroke(
+          () => nativePainter().startPaintTool(texture, start.x, start.y, undefined, { shiftKey: false }),
+          () => nativePainter().useGradientTool(texture, end.x, end.y, {})
+        );
         Canvas.updateAll();
 
         return `Applied gradient from (${start.x}, ${start.y}) to (${end.x}, ${end.y}) on texture "${texture.name}"`;
@@ -608,13 +662,9 @@ export function registerPaintTools() {
     paintToolDocs[4].name,
     {
       ...paintToolDocs[4],
+      parameters: copyBrushToolParameters,
       async execute({ texture_id, source, target, brush_size, opacity, mode }) {
         const texture = getAndActivateTexture(texture_id);
-
-        Undo.initEdit({
-          textures: [texture],
-          bitmap: true,
-        });
 
         // Apply settings
         if (brush_size !== undefined) {
@@ -632,15 +682,14 @@ export function registerPaintTools() {
         BarItems.copy_brush.select();
 
         // Set source point (Ctrl+click equivalent)
-        Painter.startPaintTool(texture, source.x, source.y, {}, {
+        prepareTexturePaint();
+        nativePainter().startPaintTool(texture, source.x, source.y, undefined, {
           ctrlOrCmd: true,
         });
+        nativePainter().stopPaintTool();
 
         // Apply at target point
-        Painter.startPaintTool(texture, target.x, target.y, {}, { shiftKey: false });
-        Painter.stopPaintTool();
-
-        Undo.finishEdit("Copy brush");
+        nativePaintStroke(() => nativePainter().startPaintTool(texture, target.x, target.y, undefined, { shiftKey: false }));
         Canvas.updateAll();
 
         return `Copied from (${source.x}, ${source.y}) to (${target.x}, ${target.y}) on texture "${texture.name}"`;
@@ -653,6 +702,7 @@ export function registerPaintTools() {
     paintToolDocs[5].name,
     {
       ...paintToolDocs[5],
+      parameters: eraserToolParameters,
       async execute({
         texture_id,
         coordinates,
@@ -663,11 +713,6 @@ export function registerPaintTools() {
         connect_strokes,
       }) {
         const texture = getAndActivateTexture(texture_id);
-
-        Undo.initEdit({
-          textures: [texture],
-          bitmap: true,
-        });
 
         // Apply settings
         if (brush_size !== undefined) {
@@ -687,23 +732,11 @@ export function registerPaintTools() {
         // @ts-ignore
         BarItems.eraser.select();
 
-        // Erase at coordinates
-        for (let i = 0; i < coordinates.length; i++) {
-          const coord = coordinates[i];
-
-          if (i === 0 || !connect_strokes) {
-            // Start new stroke
-            Painter.startPaintTool(texture, coord.x, coord.y, {}, { shiftKey: false });
-          } else {
-            // Continue stroke
-            Painter.movePaintTool(texture, coord.x, coord.y, {});
-          }
-        }
-
-        // Finish erasing
-        Painter.stopPaintTool();
-
-        Undo.finishEdit("Erase texture");
+        const strokes = connect_strokes ? [coordinates] : coordinates.map(point => [point]);
+        strokes.forEach(stroke => nativePaintStroke(
+          () => nativePainter().startPaintTool(texture, stroke[0].x, stroke[0].y, undefined, { shiftKey: false }),
+          () => stroke.slice(1).forEach(point => nativePainter().movePaintTool(texture, point.x, point.y, {}))
+        ));
         Canvas.updateAll();
 
         return `Erased ${coordinates.length} points on texture "${texture.name}"`;
@@ -828,19 +861,15 @@ export function registerPaintTools() {
     paintToolDocs[7].name,
     {
       ...paintToolDocs[7],
+      parameters: paintWithBrushParameters,
       async execute({
         texture_id,
         coordinates,
         brush_settings,
         connect_strokes,
       }) {
+        const points = brushStrokeCoordinates(coordinates, connect_strokes);
         const texture = getAndActivateTexture(texture_id);
-
-        Undo.initEdit({
-          textures: [texture],
-          selected_texture: true,
-          bitmap: true,
-        });
 
         // Parse brush color to RGB values
         const colorHex = brush_settings?.color ?? "#000000";
@@ -868,7 +897,7 @@ export function registerPaintTools() {
         texture.edit(
           (canvas: HTMLCanvasElement) => {
             const ctx = canvas.getContext("2d")!;
-            for (const coord of coordinates) {
+            for (const coord of points) {
               if (shape === "circle") {
                 Painter.editCircle(
                   ctx,
@@ -893,7 +922,6 @@ export function registerPaintTools() {
           { edit_name: "Paint with brush" }
         );
 
-        Undo.finishEdit("Paint with brush");
         Canvas.updateAll();
 
         return `Painted ${coordinates.length} points on texture "${texture.name}"`;

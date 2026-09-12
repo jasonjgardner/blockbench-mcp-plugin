@@ -122,3 +122,19 @@ See `server/prompts.ts` for examples using the `readPrompt` macro to embed promp
 - Resources: In Inspector, resolve a sample URI (e.g., `nodes://<id>` or `textures://<name>`); confirm autocompletion and returned data.
 - Prompts: Load the prompt; check argument autocompletion and that `load` returns content without errors.
 - UI: Sanity check layout in light/dark themes; verify tool status badges and descriptions render and truncate gracefully.
+
+## Required Desktop Checks Before Releases
+
+Tag deployments require a passing local desktop record in `releases/desktop-smoke.json`.
+
+1. Finish the source changes and set the intended version in `package.json`.
+2. Run `bun install --frozen-lockfile` and `bun run build`.
+3. Load or reload this repository's `dist/mcp.js` in Blockbench desktop. Reconnect existing MCP clients after reloading.
+4. Run `bun run release:smoke`. For a custom server address, append its URL, for example `bun run release:smoke http://localhost:3100/bb-mcp`.
+5. Review the passing record and outputs in `artifacts/`. Commit the record together with the tested source. Run `bun run release:verify v<version>` before creating the matching version tag.
+
+The command checks the loaded plugin's source build ID, production build mode and desktop environment, runs Bun regression tests and the action, PBR, MCP identity, and read-only inspection suites, then writes the record. The live suites create separate temporary projects and leave the MCP identity project open. Save other work before testing. A failed repeat replaces the prior passing record with a failed result.
+
+The tag workflow runs regression tests and rejects missing, failed, incomplete, or stale desktop evidence before deployment. Changes to runtime source, assets, dependencies, build scripts, tests, or the deployment workflow require a rebuild, reload, and fresh run. The fingerprint normalizes checkout line endings; it excludes generated docs, the timestamped prompt manifest, and the receipt itself. Prompt sources and the manifest generator remain covered.
+
+The record includes the tested local bundle hash, Bun version, Blockbench version/platform, timestamps, and individual assertions. CI verifies the source fingerprint and version tag; it rebuilds the release and does not require a byte-identical bundle across platforms. This is a reviewable maintainer test record, not a signed desktop attestation. Generated models, screenshots, and raw logs remain ignored under `artifacts/`; the small release record is tracked in Git.

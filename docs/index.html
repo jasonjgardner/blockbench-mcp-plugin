@@ -11,7 +11,7 @@
     <nav class="sidebar">
       <div class="sidebar-brand">
         <h1>Blockbench MCP</h1>
-        <p>v1.7.0 — API Reference</p>
+        <p>v1.8.0 — API Reference</p>
       </div>
 
       <input id="search" type="text" placeholder="Search tools..." class="search-input" />
@@ -49,7 +49,7 @@
     <main class="main">
       <header class="page-header">
         <h1>Blockbench MCP Plugin</h1>
-        <p class="subtitle">API Reference — v1.7.0</p>
+        <p class="subtitle">API Reference — v1.8.0</p>
         <nav class="stats">
           <a href="#tools"><strong>111</strong> tools (41 stable, 70 experimental)</a>
           <a href="#prompts"><strong>6</strong> prompts</a>
@@ -2238,7 +2238,7 @@
         </div>
       </div>
       <p class="card-title">Extrude Mesh</p>
-      <p class="card-desc">Extrudes selected faces or edges of a mesh.</p>
+      <p class="card-desc">Extrudes the target mesh's selected face region along averaged normals, honoring distance. Returns new vertex keys and cap/wall face keys. Edge/vertex modes are unsupported.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -2258,12 +2258,12 @@
       <td class="col-name">distance</td>
       <td class="col-type">number</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Distance to extrude. <span class="param-meta">(default: <code>1</code>)</span></td>
+      <td class="col-desc">Signed distance along averaged selected face normals, in local model units. <span class="param-meta">(default: <code>1</code>)</span></td>
     </tr><tr>
       <td class="col-name">mode</td>
       <td class="col-type">&quot;faces&quot; | &quot;edges&quot; | &quot;vertices&quot;</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">What to extrude: faces, edges, or vertices. <span class="param-meta">(default: <code>&quot;faces&quot;</code>)</span></td>
+      <td class="col-desc">Use faces. Edge and vertex extrusion are currently unsupported by this headless tool. <span class="param-meta">(default: <code>&quot;faces&quot;</code>)</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -2277,7 +2277,7 @@
         </div>
       </div>
       <p class="card-title">Subdivide Mesh</p>
-      <p class="card-desc">Subdivides selected faces of a mesh to create more geometry.</p>
+      <p class="card-desc">Subdivides the target mesh's selected triangles/quads into a regular grid with interpolated UVs. Returns new geometry keys. Unselected neighboring faces remain unchanged and may need matching cuts.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -2295,9 +2295,9 @@
       <td class="col-desc">ID or name of the mesh. If not provided, uses selected mesh.</td>
     </tr><tr>
       <td class="col-name">cuts</td>
-      <td class="col-type">number</td>
+      <td class="col-type">integer</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Number of subdivision cuts to make. <span class="param-meta">(default: <code>1</code>) [min: 1, max: 10]</span></td>
+      <td class="col-desc">Number of cuts per edge; each selected face becomes (cuts + 1) squared faces. <span class="param-meta">(default: <code>1</code>) [min: 1, max: 10]</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -2433,7 +2433,7 @@
         </div>
       </div>
       <p class="card-title">Delete Mesh Elements</p>
-      <p class="card-desc">Deletes selected vertices, edges, or faces from a mesh.</p>
+      <p class="card-desc">Deletes selected components only from the target mesh. Vertex/edge deletion removes incident faces; keep_vertices retains vertices orphaned by face/edge removal.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -2589,7 +2589,7 @@
         </div>
       </div>
       <p class="card-title">Knife Tool</p>
-      <p class="card-desc">Uses the knife tool to cut custom edges into mesh faces.</p>
+      <p class="card-desc">Currently unsupported: Blockbench's interactive Knife context requires pointer topology that this point-list API cannot safely provide. Use subdivide_mesh or create geometry with place_mesh, or use Knife manually.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -2725,7 +2725,7 @@
       <td class="col-name">tolerance</td>
       <td class="col-type">number</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Color tolerance for fill. <span class="param-meta">[min: 0, max: 100]</span></td>
+      <td class="col-desc">Only zero (exact color matching) is supported by the native fill API. Nonzero tolerance is rejected. <span class="param-meta">[min: 0, max: 100]</span></td>
     </tr><tr>
       <td class="col-name">fill_mode</td>
       <td class="col-type">&quot;color&quot; | &quot;color_connected&quot; | &quot;face&quot; | &quot;element&quot; | &quot;selected_elements&quot; | &quot;selection&quot;</td>
@@ -2995,7 +2995,7 @@
       <td class="col-name">coordinates</td>
       <td class="col-type">object[]</td>
       <td><span class="param-required">required</span></td>
-      <td class="col-desc">Array of coordinates to erase at.</td>
+      <td class="col-desc">Array of coordinates to erase at. <span class="param-meta">[minItems: 1]</span></td>
     </tr><tr>
       <td class="col-name">brush_size</td>
       <td class="col-type">number</td>
@@ -3020,7 +3020,7 @@
       <td class="col-name">connect_strokes</td>
       <td class="col-type">boolean</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Whether to connect erase strokes with lines. <span class="param-meta">(default: <code>true</code>)</span></td>
+      <td class="col-desc">Whether to connect erase strokes with lines. Disconnected points are separate native strokes and separate undo entries. <span class="param-meta">(default: <code>true</code>)</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -3128,7 +3128,7 @@
       <td class="col-name">coordinates</td>
       <td class="col-type">object[]</td>
       <td><span class="param-required">required</span></td>
-      <td class="col-desc">Array of coordinates to paint at.</td>
+      <td class="col-desc">Array of coordinates to paint at. <span class="param-meta">[minItems: 1]</span></td>
     </tr><tr>
       <td class="col-name">brush_settings</td>
       <td class="col-type">object</td>
@@ -3138,7 +3138,7 @@
       <td class="col-name">connect_strokes</td>
       <td class="col-type">boolean</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Whether to connect paint strokes with lines. <span class="param-meta">(default: <code>true</code>)</span></td>
+      <td class="col-desc">Whether to interpolate brush samples between coordinates, at no more than one texture pixel per step. <span class="param-meta">(default: <code>true</code>)</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -3515,7 +3515,7 @@
         </div>
       </div>
       <p class="card-title">Add Texture Group</p>
-      <p class="card-desc">Adds a new texture group with the given name.</p>
+      <p class="card-desc">Adds a reversible texture group. All texture references must exist. Material groups require one texture per channel, either normal or height, and a color map alongside a MER map; use is_material=false for ordinary grouping.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -3597,7 +3597,7 @@
         </div>
       </div>
       <p class="card-title">Create PBR Material</p>
-      <p class="card-desc">Creates a new PBR material (texture group with is_material=true) and optionally assigns textures to PBR channels. Use this for Minecraft Bedrock resource packs or any format supporting PBR.</p>
+      <p class="card-desc">Creates a new PBR material (texture group with is_material=true) and optionally assigns textures to PBR channels. Requires a PBR-capable format, distinct textures per channel, either normal or height, and a color texture alongside a MER texture. Uniform values require the corresponding map to be absent. Creation and texture moves are one undoable edit.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -3635,12 +3635,12 @@
       <td class="col-desc">Texture ID/name for the MER (Metalness/Emissive/Roughness) channel.</td>
     </tr><tr>
       <td class="col-name">color_value</td>
-      <td class="col-type">number[]</td>
+      <td class="col-type">unknown[]</td>
       <td><span class="param-optional">optional</span></td>
       <td class="col-desc">Uniform RGBA color [R,G,B,A] when no color texture is provided. <span class="param-meta">[minItems: 4, maxItems: 4]</span></td>
     </tr><tr>
       <td class="col-name">mer_value</td>
-      <td class="col-type">number[]</td>
+      <td class="col-type">unknown[]</td>
       <td><span class="param-optional">optional</span></td>
       <td class="col-desc">Uniform MER values [Metalness, Emissive, Roughness] (0-255) when no MER texture is provided. <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
     </tr><tr>
@@ -3661,7 +3661,7 @@
         </div>
       </div>
       <p class="card-title">Configure Material</p>
-      <p class="card-desc">Configures an existing PBR material's properties including channel assignments, uniform values, and subsurface scattering.</p>
+      <p class="card-desc">Configures a PBR material in one undoable edit. Replaced maps are detached without deleting their textures. Use 'none' to clear a channel before using uniform values or switching between normal and height; a MER map requires a color map.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -3699,12 +3699,12 @@
       <td class="col-desc">Texture ID/name for MER channel, or 'none' to use uniform values.</td>
     </tr><tr>
       <td class="col-name">color_value</td>
-      <td class="col-type">number[]</td>
+      <td class="col-type">unknown[]</td>
       <td><span class="param-optional">optional</span></td>
       <td class="col-desc">Uniform RGBA color [R,G,B,A] when no color texture. <span class="param-meta">[minItems: 4, maxItems: 4]</span></td>
     </tr><tr>
       <td class="col-name">mer_value</td>
-      <td class="col-type">number[]</td>
+      <td class="col-type">unknown[]</td>
       <td><span class="param-optional">optional</span></td>
       <td class="col-desc">Uniform MER values [Metalness, Emissive, Roughness] (0-255). <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
     </tr><tr>
@@ -3768,7 +3768,7 @@
         </div>
       </div>
       <p class="card-title">Import Texture Set</p>
-      <p class="card-desc">Imports a Minecraft Bedrock texture_set.json file and creates a PBR material with the associated textures.</p>
+      <p class="card-desc">Imports a Minecraft Bedrock texture_set.json on desktop. Validates supported JSON and decodes referenced images before one undoable edit. Returns JSON with material name/UUID and path. Reuses already loaded image paths without deleting textures. Normal and height, or MER and MERS, cannot coexist; MER images require a color image.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -3797,7 +3797,7 @@
         </div>
       </div>
       <p class="card-title">Assign Texture Channel</p>
-      <p class="card-desc">Assigns a texture to a specific PBR channel within a material.</p>
+      <p class="card-desc">Assigns a texture to one PBR channel in a single undoable edit. Detaches the previous map without deleting it or changing its channel. Normal and height cannot coexist; a MER map requires a color map, including in the source material after moving textures.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -3897,7 +3897,7 @@
         </div>
       </div>
       <p class="card-title">Trigger Action</p>
-      <p class="card-desc">Triggers an action in the Blockbench editor.</p>
+      <p class="card-desc">Triggers an available Blockbench Action and respects its condition. The native action owns Undo; only a newly opened dialog may be auto-confirmed.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -3917,12 +3917,12 @@
       <td class="col-name">confirmDialog</td>
       <td class="col-type">boolean</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Whether or not to automatically confirm any dialogs that appear as a result of the action. <span class="param-meta">(default: <code>true</code>)</span></td>
+      <td class="col-desc">Whether to confirm a newly opened dialog from this action. Existing unrelated dialogs are never confirmed. <span class="param-meta">(default: <code>true</code>)</span></td>
     </tr><tr>
       <td class="col-name">confirmEvent</td>
       <td class="col-type">string</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Stringified form of event arguments.</td>
+      <td class="col-desc">JSON object of MouseEvent options, with optional event type (default click).</td>
     </tr></tbody>
     </table>
       </div>
@@ -3936,7 +3936,7 @@
         </div>
       </div>
       <p class="card-title">Eval</p>
-      <p class="card-desc">Evaluates the given expression and logs it to the console. Do not pass `console` commands as they will not work.</p>
+      <p class="card-desc">Evaluates JavaScript and returns its JSON result. Does not create an Undo entry. Mutating code must manage its own correctly scoped Undo transaction; read-only evaluation leaves history unchanged.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -4075,7 +4075,7 @@
         </div>
       </div>
       <p class="card-title">Auto UV Mesh</p>
-      <p class="card-desc">Automatically generates UV mapping for selected mesh faces.</p>
+      <p class="card-desc">Maps only the specified/selected faces of the target mesh. project uses the active camera, unwrap projects each face to its own plane, and cylinder/sphere map around the local origin. This does not pack UV islands.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -4095,7 +4095,7 @@
       <td class="col-name">mode</td>
       <td class="col-type">&quot;project&quot; | &quot;unwrap&quot; | &quot;cylinder&quot; | &quot;sphere&quot;</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">UV mapping mode: project from view, unwrap, cylinder, or sphere mapping. <span class="param-meta">(default: <code>&quot;project&quot;</code>)</span></td>
+      <td class="col-desc">project uses the active preview; unwrap is per-face planar projection; cylinder and sphere use the local origin. <span class="param-meta">(default: <code>&quot;project&quot;</code>)</span></td>
     </tr><tr>
       <td class="col-name">faces</td>
       <td class="col-type">string[]</td>
@@ -4114,7 +4114,7 @@
         </div>
       </div>
       <p class="card-title">Rotate Mesh UV</p>
-      <p class="card-desc">Rotates UV coordinates of selected mesh faces.</p>
+      <p class="card-desc">Rotates only the target mesh's specified/selected faces around their combined UV bounding-box center, without clamping or changing selection.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -4712,7 +4712,7 @@
       </section>
 
       <footer class="page-footer">
-        Generated 2026-09-12T19:37:28.438Z from Zod schemas
+        Generated 2026-09-12T20:29:02.473Z from Zod schemas
       </footer>
     </main>
   </div>

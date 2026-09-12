@@ -20,12 +20,12 @@ export const triggerActionParametersSchema = z.object({
     .optional()
     .default(true)
     .describe(
-      "Whether or not to automatically confirm any dialogs that appear as a result of the action."
+      "Whether to confirm a newly opened dialog from this action. Existing unrelated dialogs are never confirmed."
     ),
   confirmEvent: z
     .string()
     .optional()
-    .describe("Stringified form of event arguments."),
+    .describe("JSON object of MouseEvent options, with optional event type (default click)."),
 });
 
 /** Parameters for risky eval */
@@ -88,7 +88,7 @@ export const fillDialogParametersSchema = z.object({
 export const uiToolDocs: ToolSpec[] = [
   {
     name: "trigger_action",
-    description: "Triggers an action in the Blockbench editor.",
+    description: "Triggers an available Blockbench Action and respects its condition. The native action owns Undo; only a newly opened dialog may be auto-confirmed.",
     annotations: {
       title: "Trigger Action",
       destructiveHint: true,
@@ -100,7 +100,7 @@ export const uiToolDocs: ToolSpec[] = [
   {
     name: "risky_eval",
     description:
-      "Evaluates the given expression and logs it to the console. Do not pass `console` commands as they will not work.",
+      "Evaluates JavaScript and returns its JSON result. Does not create an Undo entry. Mutating code must manage its own correctly scoped Undo transaction; read-only evaluation leaves history unchanged.",
     annotations: {
       title: "Eval",
       destructiveHint: true,
@@ -133,47 +133,40 @@ export const uiToolDocs: ToolSpec[] = [
   },
 ];
 
-export function registerUITools() {
+function parseObjectJSON(value: string, name: string): Record<string, unknown> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch (error) {
+    throw new Error(`Invalid JSON in ${name}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error(`${name} must be a JSON object.`);
+  return parsed as Record<string, unknown>;
+}
+
+/** Register UI bridges without wrapping native action/evaluation transactions in a second Undo edit. */
+export function registerUITools(): void {
   createTool(
     uiToolDocs[0].name,
     {
       ...uiToolDocs[0],
+      parameters: triggerActionParametersSchema,
       async execute({ action, confirmEvent: args, confirmDialog }) {
-        Undo.initEdit({
-          elements: [],
-          outliner: true,
-          collections: [],
-        });
-        let parsedArgs: Record<string, unknown> = {};
-        if (args) {
-          try {
-            parsedArgs = JSON.parse(args);
-          } catch (e) {
-            throw new Error(
-              `Invalid JSON in confirmEvent: ${e instanceof Error ? e.message : e}`
-            );
-          }
-        }
-
-        if (!(action in BarItems)) {
+        const parsedArgs = args ? parseObjectJSON(args, "confirmEvent") : {};
+        if (!Object.hasOwn(BarItems, action)) {
           throw new Error(`Action "${action}" not found.`);
         }
         const barItem = BarItems[action];
-
-        if (barItem && barItem instanceof Action) {
-          const { event, ...rest } = parsedArgs;
-          barItem.trigger(
-            new Event(event || "click", {
-              ...rest,
-            })
-          );
+        if (!(barItem instanceof Action)) throw new Error(`Bar item "${action}" is not a triggerable Action.`);
+        const { event = "click", ...rest } = parsedArgs;
+        if (typeof event !== "string" || !event) throw new Error("confirmEvent.event must be a nonempty event type string.");
+        const previousDialogs = new Set([...Dialog.stack, ...(Dialog.open ? [Dialog.open] : [])]);
+        const triggered = barItem.trigger(new MouseEvent(event, rest));
+        if (triggered === false) throw new Error(`Action "${action}" is unavailable in the current mode, format, or selection.`);
+        const opened = Dialog.open;
+        if (confirmDialog && opened && !previousDialogs.has(opened)) {
+          opened.confirm();
         }
-
-        if (confirmDialog) {
-          Dialog.open?.confirm();
-        }
-
-        Undo.finishEdit("Agent triggered action");
 
         let result;
 
@@ -195,12 +188,6 @@ export function registerUITools() {
       ...uiToolDocs[1],
       async execute({ code }) {
         try {
-          Undo.initEdit({
-            elements: [],
-            outliner: true,
-            collections: [],
-          });
-
           const result = await eval(code.trim());
 
           if (result !== undefined) {
@@ -209,9 +196,7 @@ export function registerUITools() {
 
           return "(Code executed successfully, but no result was returned.)";
         } catch (error) {
-          return `Error executing code: ${error}`;
-        } finally {
-          Undo.finishEdit("Agent executed code");
+          throw new Error(`Error executing code: ${error}`);
         }
       },
     },
@@ -222,33 +207,25 @@ export function registerUITools() {
     uiToolDocs[2].name,
     {
       ...uiToolDocs[2],
+      parameters: emulateClicksParametersSchema,
       async execute({ position, drag }) {
-        // Emulate a click at the specified position
         const { x, y, button } = position;
-        const mouseEvent = new MouseEvent("click", {
-          clientX: x,
-          clientY: y,
-          button: button === "left" ? 0 : 2,
-        });
-        document.dispatchEvent(mouseEvent);
-        if (drag) {
-          const { to, duration } = drag;
-          const dragStartEvent = new MouseEvent("mousedown", {
-            clientX: x,
-            clientY: y,
-            button: button === "left" ? 0 : 2,
-          });
-          const dragEndEvent = new MouseEvent("mouseup", {
-            clientX: to.x,
-            clientY: to.y,
-            button: button === "left" ? 0 : 2,
-          });
-          document.dispatchEvent(dragStartEvent);
-          await new Promise((resolve) => setTimeout(resolve, duration));
-          document.dispatchEvent(dragEndEvent);
+        const target = document.elementFromPoint(x, y);
+        if (!target) throw new Error("No interface element exists at the requested position.");
+        const mouseButton = button === "left" ? 0 : 2;
+        const dispatch = (element: Element, type: string, point: { x: number; y: number }, pressed = false): void => {
+          element.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window, clientX: point.x, clientY: point.y, button: mouseButton, buttons: pressed ? (mouseButton === 0 ? 1 : 2) : 0 }));
+        };
+        dispatch(target, "mousedown", position, true);
+        if (!drag) {
+          dispatch(target, "mouseup", position);
+          dispatch(target, mouseButton === 0 ? "click" : "contextmenu", position);
+          return await captureAppScreenshot();
         }
-
-        // Capture a screenshot after the click
+        const destination = document.elementFromPoint(drag.to.x, drag.to.y) ?? target;
+        dispatch(destination, "mousemove", drag.to, true);
+        await new Promise(resolve => setTimeout(resolve, drag.duration));
+        dispatch(destination, "mouseup", drag.to);
         return await captureAppScreenshot();
       },
     },
@@ -259,6 +236,7 @@ export function registerUITools() {
     uiToolDocs[3].name,
     {
       ...uiToolDocs[3],
+      parameters: fillDialogParametersSchema,
       async execute({ values, confirm }) {
         if (!Dialog.stack.length) {
           throw new Error("No dialogs found in the Blockbench editor.");
@@ -266,32 +244,15 @@ export function registerUITools() {
         if (!Dialog.open) {
           Dialog.stack[Dialog.stack.length - 1]?.focus();
         }
-        let parsedValues: Record<string, unknown>;
-        try {
-          parsedValues = JSON.parse(values);
-        } catch (e) {
-          throw new Error(
-            `Invalid JSON in values: ${e instanceof Error ? e.message : e}`
-          );
-        }
-
+        const parsedValues = parseObjectJSON(values, "values");
         const keys = Object.keys(Dialog.open?.getFormResult() ?? {});
-        const valuesToFill = Object.entries(parsedValues).reduce(
-          (acc, [key, value]) => {
-            if (keys.includes(key)) {
-              acc[key as keyof FormResultValue] = value as FormResultValue;
-            }
-            return acc;
-          },
-          {} as Record<keyof FormResultValue, FormResultValue>
-        );
+        const unknownKeys = Object.keys(parsedValues).filter(key => !keys.includes(key));
+        if (unknownKeys.length) throw new Error(`Unknown dialog field(s): ${unknownKeys.join(", ")}. Inspect the current dialog fields before filling it.`);
+        const valuesToFill = parsedValues as Record<string, FormResultValue>;
         Dialog.open?.setFormValues(valuesToFill, true);
 
-        if (confirm) {
-          Dialog.open?.confirm();
-        } else {
-          Dialog.open?.cancel();
-        }
+        if (confirm) Dialog.open?.confirm();
+        if (!confirm) Dialog.open?.cancel();
 
         return JSON.stringify({
           result: `Current dialog stack is now ${Dialog.stack.length} deep.`,

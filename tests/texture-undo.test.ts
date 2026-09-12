@@ -8,7 +8,7 @@ type TextureSnapshot = {
   render_sides: string;
 };
 
-type TextureAspects = { textures: TestTexture[] };
+type TextureAspects = { textures: TestTexture[]; bitmap?: boolean };
 type TextureTool = {
   parameters: z.ZodType<unknown>;
   execute: (input: unknown) => Promise<unknown>;
@@ -36,13 +36,18 @@ function restore(target: TextureSnapshot[], reference: TextureSnapshot[]): void 
 
 class TestTexture {
   static all: TestTexture[] = [];
+  uuid = crypto.randomUUID();
+  id = this.uuid;
   name = "";
+  group = "";
+  pbr_channel = "color";
   source = "data:image/png;base64,Ymxhbms=";
   render_mode = "default";
   render_sides = "auto";
   width = 16;
   height = 16;
   layers_enabled = false;
+  img = { decode: async () => {} };
 
   constructor(input: Partial<TextureSnapshot> = {}) {
     Object.assign(this, input);
@@ -60,6 +65,7 @@ class TestTexture {
   updateSource(source: string) { this.source = source; }
   updateLayerChanges() {}
   updateMaterial() {}
+  fromDataURL(source: string) { this.source = source; return this; }
   load() {}
   fillParticle() {}
   getDataURL() { return this.source; }
@@ -105,6 +111,9 @@ beforeEach(() => {
   before = [];
   after = [];
   const globals = {
+    Project: { get textures() { return TestTexture.all; } },
+    Format: { id: "free", pbr: true },
+    Blockbench: { isWeb: false },
     Texture: TestTexture,
     Canvas: { updateAll() {} },
     tinycolor: (value: string) => ({ toRgbString: () => value }),
@@ -114,6 +123,10 @@ beforeEach(() => {
         before = capture(value);
       },
       finishEdit(_message: string, value = aspects) { after = capture(value); },
+      cancelEdit(revert: boolean) {
+        if (revert) restore(before, capture(aspects));
+        after = [];
+      },
     },
   };
   Object.entries(globals).forEach(([key, value]) => {
@@ -137,7 +150,7 @@ describe("create_texture undo", () => {
   test.each([
     { name: "blank" },
     { name: "filled", fill_color: "#ff0000", layer_name: "Base" },
-    { name: "imported", data: "data:image/png;base64,aW1wb3J0ZWQ=" },
+    { name: "imported", data: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j17sAAAAASUVORK5CYII=" },
   ])("undo removes $name and redo restores its bitmap and render settings", async (input) => {
     const parameters = createTexture.parameters.parse({
       ...input, render_mode: "emissive", render_sides: "double",

@@ -12,6 +12,8 @@ Call `get_capabilities` with `{}` before planning a modeling operation. The resp
 - `format`: active format with detailed feature flags, or `null` without an active project.
 - `formats`: registered format IDs/names and compact `supported_features` lists.
 
+`plugin.build_id` is the compiled source fingerprint used to match local desktop release evidence to a candidate build. `plugin.build_mode` distinguishes production and development bundles; release checks require production. See the [desktop release audit](reports/2026-09-12-desktop-release-audit.md).
+
 Inspect another format without switching projects:
 
 ```json

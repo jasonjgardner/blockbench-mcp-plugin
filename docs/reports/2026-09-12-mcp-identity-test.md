@@ -2,6 +2,8 @@
 
 Date: 2026-09-12. Live application: Blockbench 5.1.6; plugin: 1.7.0 loaded from this repository's `dist/mcp.js`.
 
+Follow-up: the [desktop release and wrapper audit](2026-09-12-desktop-release-audit.md) implements the release evidence gate, skill corrections, and mesh/paint/PBR audit recommendations, with updated validation results for plugin 1.8.0.
+
 The requested reference is the official Model Context Protocol symbol, confirmed by the user. Geometry reference: [official favicon.svg](https://github.com/modelcontextprotocol/docs/blob/573dc60c2e7aab2605b29d0bf27194aa7b02e4fb/favicon.svg). The recreation uses rounded, extruded ribbons with an ivory finish. It is a test model, not an official brand asset.
 
 ## Reproduced problems

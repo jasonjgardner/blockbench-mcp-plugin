@@ -61,6 +61,7 @@ try {
   const capabilities = await json("get_capabilities", { include_tools: true });
   check(typeof record(capabilities.blockbench).version === "string", "capabilities reports Blockbench version");
   check(typeof record(capabilities.plugin).version === "string", "capabilities reports plugin version");
+  check(typeof record(capabilities.plugin).build_id === "string" && /^[a-f0-9]{64}$/.test(String(record(capabilities.plugin).build_id)), "capabilities reports compiled source build ID");
   check(records(capabilities.formats).some(format => format.id === "free"), "available formats include Generic Model");
   check(records(capabilities.tools).some(tool => tool.name === "get_mesh_info" && tool.enabled === true),
     "capabilities reports enabled inspection tool");

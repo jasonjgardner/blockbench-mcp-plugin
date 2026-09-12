@@ -1,6 +1,6 @@
 {
-  "version": "1.7.0",
-  "generatedAt": "2026-09-12T19:37:28.438Z",
+  "version": "1.8.0",
+  "generatedAt": "2026-09-12T20:29:02.473Z",
   "tools": [
     {
       "name": "place_cube",
@@ -3240,7 +3240,7 @@
     {
       "name": "extrude_mesh",
       "title": "Extrude Mesh",
-      "description": "Extrudes selected faces or edges of a mesh.",
+      "description": "Extrudes the target mesh's selected face region along averaged normals, honoring distance. Returns new vertex keys and cap/wall face keys. Edge/vertex modes are unsupported.",
       "status": "experimental",
       "category": "Mesh Editing",
       "annotations": {
@@ -3260,8 +3260,8 @@
               "distance": {
                 "type": "number",
                 "default": 1,
-                "description": "Distance to extrude.",
-                "markdownDescription": "Distance to extrude."
+                "description": "Signed distance along averaged selected face normals, in local model units.",
+                "markdownDescription": "Signed distance along averaged selected face normals, in local model units."
               },
               "mode": {
                 "type": "string",
@@ -3271,8 +3271,8 @@
                   "vertices"
                 ],
                 "default": "faces",
-                "description": "What to extrude: faces, edges, or vertices.",
-                "markdownDescription": "What to extrude: faces, edges, or vertices."
+                "description": "Use faces. Edge and vertex extrusion are currently unsupported by this headless tool.",
+                "markdownDescription": "Use faces. Edge and vertex extrusion are currently unsupported by this headless tool."
               }
             },
             "additionalProperties": false
@@ -3284,7 +3284,7 @@
     {
       "name": "subdivide_mesh",
       "title": "Subdivide Mesh",
-      "description": "Subdivides selected faces of a mesh to create more geometry.",
+      "description": "Subdivides the target mesh's selected triangles/quads into a regular grid with interpolated UVs. Returns new geometry keys. Unselected neighboring faces remain unchanged and may need matching cuts.",
       "status": "experimental",
       "category": "Mesh Editing",
       "annotations": {
@@ -3302,12 +3302,12 @@
                 "markdownDescription": "ID or name of the mesh. If not provided, uses selected mesh."
               },
               "cuts": {
-                "type": "number",
+                "type": "integer",
                 "minimum": 1,
                 "maximum": 10,
                 "default": 1,
-                "description": "Number of subdivision cuts to make.",
-                "markdownDescription": "Number of subdivision cuts to make."
+                "description": "Number of cuts per edge; each selected face becomes (cuts + 1) squared faces.",
+                "markdownDescription": "Number of cuts per edge; each selected face becomes (cuts + 1) squared faces."
               }
             },
             "additionalProperties": false
@@ -3534,7 +3534,7 @@
     {
       "name": "delete_mesh_elements",
       "title": "Delete Mesh Elements",
-      "description": "Deletes selected vertices, edges, or faces from a mesh.",
+      "description": "Deletes selected components only from the target mesh. Vertex/edge deletion removes incident faces; keep_vertices retains vertices orphaned by face/edge removal.",
       "status": "experimental",
       "category": "Mesh Editing",
       "annotations": {
@@ -3766,7 +3766,7 @@
     {
       "name": "knife_tool",
       "title": "Knife Tool",
-      "description": "Uses the knife tool to cut custom edges into mesh faces.",
+      "description": "Currently unsupported: Blockbench's interactive Knife context requires pointer topology that this point-list API cannot safely provide. Use subdivide_mesh or create geometry with place_mesh, or use Knife manually.",
       "status": "experimental",
       "category": "Mesh Editing",
       "annotations": {
@@ -3940,8 +3940,8 @@
                 "type": "number",
                 "minimum": 0,
                 "maximum": 100,
-                "description": "Color tolerance for fill.",
-                "markdownDescription": "Color tolerance for fill."
+                "description": "Only zero (exact color matching) is supported by the native fill API. Nonzero tolerance is rejected.",
+                "markdownDescription": "Only zero (exact color matching) is supported by the native fill API. Nonzero tolerance is rejected."
               },
               "fill_mode": {
                 "type": "string",
@@ -4399,6 +4399,7 @@
                   ],
                   "additionalProperties": false
                 },
+                "minItems": 1,
                 "description": "Array of coordinates to erase at.",
                 "markdownDescription": "Array of coordinates to erase at."
               },
@@ -4435,8 +4436,8 @@
               "connect_strokes": {
                 "type": "boolean",
                 "default": true,
-                "description": "Whether to connect erase strokes with lines.",
-                "markdownDescription": "Whether to connect erase strokes with lines."
+                "description": "Whether to connect erase strokes with lines. Disconnected points are separate native strokes and separate undo entries.",
+                "markdownDescription": "Whether to connect erase strokes with lines. Disconnected points are separate native strokes and separate undo entries."
               }
             },
             "required": [
@@ -4623,6 +4624,7 @@
                   ],
                   "additionalProperties": false
                 },
+                "minItems": 1,
                 "description": "Array of coordinates to paint at.",
                 "markdownDescription": "Array of coordinates to paint at."
               },
@@ -4688,8 +4690,8 @@
               "connect_strokes": {
                 "type": "boolean",
                 "default": true,
-                "description": "Whether to connect paint strokes with lines.",
-                "markdownDescription": "Whether to connect paint strokes with lines."
+                "description": "Whether to interpolate brush samples between coordinates, at no more than one texture pixel per step.",
+                "markdownDescription": "Whether to interpolate brush samples between coordinates, at no more than one texture pixel per step."
               }
             },
             "required": [
@@ -5221,7 +5223,7 @@
     {
       "name": "add_texture_group",
       "title": "Add Texture Group",
-      "description": "Adds a new texture group with the given name.",
+      "description": "Adds a reversible texture group. All texture references must exist. Material groups require one texture per channel, either normal or height, and a color map alongside a MER map; use is_material=false for ordinary grouping.",
       "status": "experimental",
       "category": "Textures",
       "annotations": {
@@ -5311,7 +5313,7 @@
     {
       "name": "create_pbr_material",
       "title": "Create PBR Material",
-      "description": "Creates a new PBR material (texture group with is_material=true) and optionally assigns textures to PBR channels. Use this for Minecraft Bedrock resource packs or any format supporting PBR.",
+      "description": "Creates a new PBR material (texture group with is_material=true) and optionally assigns textures to PBR channels. Requires a PBR-capable format, distinct textures per channel, either normal or height, and a color texture alongside a MER texture. Uniform values require the corresponding map to be absent. Creation and texture moves are one undoable edit.",
       "status": "experimental",
       "category": "Textures",
       "annotations": {
@@ -5350,25 +5352,54 @@
               },
               "color_value": {
                 "type": "array",
-                "items": {
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 255
-                },
                 "minItems": 4,
                 "maxItems": 4,
+                "items": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 255
+                  }
+                ],
                 "description": "Uniform RGBA color [R,G,B,A] when no color texture is provided.",
                 "markdownDescription": "Uniform RGBA color [R,G,B,A] when no color texture is provided."
               },
               "mer_value": {
                 "type": "array",
-                "items": {
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 255
-                },
                 "minItems": 3,
                 "maxItems": 3,
+                "items": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 255
+                  }
+                ],
                 "description": "Uniform MER values [Metalness, Emissive, Roughness] (0-255) when no MER texture is provided.",
                 "markdownDescription": "Uniform MER values [Metalness, Emissive, Roughness] (0-255) when no MER texture is provided."
               },
@@ -5392,7 +5423,7 @@
     {
       "name": "configure_material",
       "title": "Configure Material",
-      "description": "Configures an existing PBR material's properties including channel assignments, uniform values, and subsurface scattering.",
+      "description": "Configures a PBR material in one undoable edit. Replaced maps are detached without deleting their textures. Use 'none' to clear a channel before using uniform values or switching between normal and height; a MER map requires a color map.",
       "status": "experimental",
       "category": "Textures",
       "annotations": {
@@ -5431,25 +5462,54 @@
               },
               "color_value": {
                 "type": "array",
-                "items": {
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 255
-                },
                 "minItems": 4,
                 "maxItems": 4,
+                "items": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 255
+                  }
+                ],
                 "description": "Uniform RGBA color [R,G,B,A] when no color texture.",
                 "markdownDescription": "Uniform RGBA color [R,G,B,A] when no color texture."
               },
               "mer_value": {
                 "type": "array",
-                "items": {
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 255
-                },
                 "minItems": 3,
                 "maxItems": 3,
+                "items": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 255
+                  }
+                ],
                 "description": "Uniform MER values [Metalness, Emissive, Roughness] (0-255).",
                 "markdownDescription": "Uniform MER values [Metalness, Emissive, Roughness] (0-255)."
               },
@@ -5524,7 +5584,7 @@
     {
       "name": "import_texture_set",
       "title": "Import Texture Set",
-      "description": "Imports a Minecraft Bedrock texture_set.json file and creates a PBR material with the associated textures.",
+      "description": "Imports a Minecraft Bedrock texture_set.json on desktop. Validates supported JSON and decodes referenced images before one undoable edit. Returns JSON with material name/UUID and path. Reuses already loaded image paths without deleting textures. Normal and height, or MER and MERS, cannot coexist; MER images require a color image.",
       "status": "experimental",
       "category": "Textures",
       "annotations": {
@@ -5555,7 +5615,7 @@
     {
       "name": "assign_texture_channel",
       "title": "Assign Texture Channel",
-      "description": "Assigns a texture to a specific PBR channel within a material.",
+      "description": "Assigns a texture to one PBR channel in a single undoable edit. Detaches the previous map without deleting it or changing its channel. Normal and height cannot coexist; a MER map requires a color map, including in the source material after moving textures.",
       "status": "experimental",
       "category": "Textures",
       "annotations": {
@@ -5664,7 +5724,7 @@
     {
       "name": "trigger_action",
       "title": "Trigger Action",
-      "description": "Triggers an action in the Blockbench editor.",
+      "description": "Triggers an available Blockbench Action and respects its condition. The native action owns Undo; only a newly opened dialog may be auto-confirmed.",
       "status": "experimental",
       "category": "UI Interaction",
       "annotations": {
@@ -5685,13 +5745,13 @@
               "confirmDialog": {
                 "type": "boolean",
                 "default": true,
-                "description": "Whether or not to automatically confirm any dialogs that appear as a result of the action.",
-                "markdownDescription": "Whether or not to automatically confirm any dialogs that appear as a result of the action."
+                "description": "Whether to confirm a newly opened dialog from this action. Existing unrelated dialogs are never confirmed.",
+                "markdownDescription": "Whether to confirm a newly opened dialog from this action. Existing unrelated dialogs are never confirmed."
               },
               "confirmEvent": {
                 "type": "string",
-                "description": "Stringified form of event arguments.",
-                "markdownDescription": "Stringified form of event arguments."
+                "description": "JSON object of MouseEvent options, with optional event type (default click).",
+                "markdownDescription": "JSON object of MouseEvent options, with optional event type (default click)."
               }
             },
             "required": [
@@ -5706,7 +5766,7 @@
     {
       "name": "risky_eval",
       "title": "Eval",
-      "description": "Evaluates the given expression and logs it to the console. Do not pass `console` commands as they will not work.",
+      "description": "Evaluates JavaScript and returns its JSON result. Does not create an Undo entry. Mutating code must manage its own correctly scoped Undo transaction; read-only evaluation leaves history unchanged.",
       "status": "stable",
       "category": "UI Interaction",
       "annotations": {
@@ -5915,7 +5975,7 @@
     {
       "name": "auto_uv_mesh",
       "title": "Auto UV Mesh",
-      "description": "Automatically generates UV mapping for selected mesh faces.",
+      "description": "Maps only the specified/selected faces of the target mesh. project uses the active camera, unwrap projects each face to its own plane, and cylinder/sphere map around the local origin. This does not pack UV islands.",
       "status": "experimental",
       "category": "UV Mapping",
       "annotations": {
@@ -5941,8 +6001,8 @@
                   "sphere"
                 ],
                 "default": "project",
-                "description": "UV mapping mode: project from view, unwrap, cylinder, or sphere mapping.",
-                "markdownDescription": "UV mapping mode: project from view, unwrap, cylinder, or sphere mapping."
+                "description": "project uses the active preview; unwrap is per-face planar projection; cylinder and sphere use the local origin.",
+                "markdownDescription": "project uses the active preview; unwrap is per-face planar projection; cylinder and sphere use the local origin."
               },
               "faces": {
                 "type": "array",
@@ -5962,7 +6022,7 @@
     {
       "name": "rotate_mesh_uv",
       "title": "Rotate Mesh UV",
-      "description": "Rotates UV coordinates of selected mesh faces.",
+      "description": "Rotates only the target mesh's specified/selected faces around their combined UV bounding-box center, without clamping or changing selection.",
       "status": "experimental",
       "category": "UV Mapping",
       "annotations": {
