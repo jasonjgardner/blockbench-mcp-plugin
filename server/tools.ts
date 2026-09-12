@@ -5,12 +5,14 @@ import { tools, prompts } from "@/lib/factories";
 
 // Import tool registration functions
 import { registerCameraTools } from "./tools/camera";
+import { registerCapabilityTools } from "./tools/capabilities";
 import { registerAnimationTools } from "./tools/animation";
 import { registerCubesTools } from "./tools/cubes";
 import { registerDisplayTools } from "./tools/display";
 import { registerElementTools } from "./tools/element";
 import { registerImportTools } from "./tools/import";
 import { registerMeshTools } from "./tools/mesh";
+import { registerMeshInspectionTools } from "./tools/mesh-inspection";
 import { registerPaintTools } from "./tools/paint";
 import { registerProjectTools } from "./tools/project";
 import { registerTextureTools } from "./tools/texture";
@@ -34,6 +36,7 @@ const registrationFunctions = [
   registerAnimationTools,
   registerArmatureTools,
   registerCameraTools,
+  registerCapabilityTools,
   registerCubesTools,
   registerDisplayTools,
   registerElementTools,
@@ -42,6 +45,7 @@ const registrationFunctions = [
   registerImportTools,
   registerMaterialInstanceTools,
   registerMeshTools,
+  registerMeshInspectionTools,
   registerPaintTools,
   registerProjectTools,
   registerTextureTools,

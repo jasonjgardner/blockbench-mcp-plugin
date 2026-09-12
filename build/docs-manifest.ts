@@ -3,11 +3,13 @@ import type { ToolSpec, PromptSpec, ResourceSpec } from "../lib/factories";
 
 // Tool docs imports — each file exports schemas at module level with zero Blockbench deps
 import { cameraToolDocs } from "../server/tools/camera";
+import { capabilityToolDocs } from "../server/tools/capabilities";
 import { cubeToolDocs } from "../server/tools/cubes";
 import { displayToolDocs } from "../server/tools/display";
 import { elementToolDocs } from "../server/tools/element";
 import { importToolDocs } from "../server/tools/import";
 import { meshToolDocs } from "../server/tools/mesh";
+import { meshInspectionToolDocs } from "../server/tools/mesh-inspection";
 import { paintToolDocs } from "../server/tools/paint";
 import { projectToolDocs } from "../server/tools/project";
 import { textureToolDocs } from "../server/tools/texture";
@@ -28,6 +30,7 @@ export interface CategoryGroup {
 export const toolManifest: CategoryGroup[] = [
   { category: "Cubes", tools: cubeToolDocs },
   { category: "Camera & Screenshots", tools: cameraToolDocs },
+  { category: "Capabilities", tools: capabilityToolDocs },
   { category: "Animation", tools: animationToolDocs },
   { category: "Armature", tools: armatureToolDocs },
   { category: "Display Settings", tools: displayToolDocs },
@@ -36,7 +39,7 @@ export const toolManifest: CategoryGroup[] = [
   { category: "History", tools: historyToolDocs },
   { category: "Import/Export", tools: importToolDocs },
   { category: "Material Instances", tools: materialInstanceToolDocs },
-  { category: "Mesh Editing", tools: meshToolDocs },
+  { category: "Mesh Editing", tools: [...meshToolDocs, ...meshInspectionToolDocs] },
   { category: "Paint Tools", tools: paintToolDocs },
   { category: "Project", tools: projectToolDocs },
   { category: "Textures", tools: textureToolDocs },

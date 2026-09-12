@@ -128,6 +128,8 @@ opencode mcp add
 
 Use Agent Skills to orchestrate tool usage.
 
+Call `get_capabilities` to discover the running application/plugin versions and supported model formats. Use `get_mesh_info` to inspect existing vertex/face keys, local bounds, normals, UVs, and texture assignments without changing selection. See [inspection tools](docs/inspection-tools.md) for examples and pagination details.
+
 ## Plugin Development
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed instructions on setting up the development environment and how to add new tools, resources, and prompts.
@@ -136,4 +138,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed instructions on setting up t
 
 Run `bun test` for regression tests without opening Blockbench. To test the running plugin, build with `bun run build`, load or reload `dist/mcp.js` in Blockbench, and run `bun run test:live`. An optional endpoint can follow the command when using a different port or path.
 
-The live test creates a separate Generic Model project, checks tool/resource/prompt discovery, validation, mesh transforms, selection, undo/redo, face normals, screenshots, and export. It recreates the official MCP symbol and saves the `.bbmodel`, previews, and results in `artifacts/mcp-identity/`. Reloading the plugin expires existing MCP sessions; reconnect clients before continuing. See the [test report](artifacts/mcp-identity/TEST-REPORT.md) for findings and scope.
+The live test creates a separate Generic Model project, checks tool/resource/prompt discovery, validation, mesh transforms, selection, undo/redo, face normals, screenshots, and export. It recreates the official MCP symbol and saves the `.bbmodel`, previews, and results in `artifacts/mcp-identity/`. Generated artifacts are ignored by Git; test scripts and written reports stay versioned. Reloading the plugin expires existing MCP sessions; reconnect clients before continuing. See the [test report](docs/reports/2026-09-12-mcp-identity-test.md) for findings and scope.
+
+Run `bun run test:inspection:live` with a mesh project open for read-only capability and geometry inspection checks. It saves results to the ignored `artifacts/inspection/` directory. An intentional reference asset needed by automated tests belongs in `tests/fixtures/` and should be committed separately from generated run outputs.

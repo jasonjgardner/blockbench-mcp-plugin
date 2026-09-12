@@ -1,6 +1,6 @@
 {
   "version": "1.7.0",
-  "generatedAt": "2026-09-12T19:17:40.989Z",
+  "generatedAt": "2026-09-12T19:37:28.438Z",
   "tools": [
     {
       "name": "place_cube",
@@ -413,6 +413,42 @@
               "position",
               "projection"
             ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_capabilities",
+      "title": "Get Capabilities",
+      "description": "Discover Blockbench/plugin versions, desktop or web environment, active project summary, and registered model formats. Returns detailed boolean format features (null means unknown), compact supported-feature lists for all formats, and optional tool registration states. Works with no open project. Format features do not guarantee that every enabled MCP tool can run in the current mode or selection.",
+      "status": "stable",
+      "category": "Capabilities",
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
+      "parameters": {
+        "$ref": "#/definitions/get_capabilities",
+        "definitions": {
+          "get_capabilities": {
+            "type": "object",
+            "properties": {
+              "format_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional registered format ID to inspect, such as 'free'. Defaults to the active project's format. Does not switch or create a project.",
+                "markdownDescription": "Optional registered format ID to inspect, such as 'free'. Defaults to the active project's format. Does not switch or create a project."
+              },
+              "include_tools": {
+                "type": "boolean",
+                "default": false,
+                "description": "Include all registered MCP tool names, stability status, and enabled state. Enabled tools may still require a compatible format, project, mode, or selection.",
+                "markdownDescription": "Include all registered MCP tool names, stability status, and enabled state. Enabled tools may still require a compatible format, project, mode, or selection."
+              }
+            },
             "additionalProperties": false
           }
         },
@@ -3782,6 +3818,76 @@
               "mesh_id",
               "points"
             ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_mesh_info",
+      "title": "Get Mesh Info",
+      "description": "Inspects a mesh by UUID/name or the first selected mesh without changing geometry, selection, or undo history. Returns transforms, parent, total counts, mesh-local bounds, selection counts, and optional paginated vertices/faces with actual runtime keys. Faces use perimeter vertex order and normalized mesh-local normals (zero for degenerate faces), stored texture references, and optional UVs. Texture status distinguishes resolved, missing, unassigned (false), disabled (null), and unset; default format materials are not resolved. Pages sort keys lexicographically and expose next_offset; geometry must remain unchanged between calls. Set include_vertices/include_faces false for a compact summary.",
+      "status": "stable",
+      "category": "Mesh Editing",
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
+      "parameters": {
+        "$ref": "#/definitions/get_mesh_info",
+        "definitions": {
+          "get_mesh_info": {
+            "type": "object",
+            "properties": {
+              "mesh_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Mesh UUID or name. Omit to inspect the first selected mesh.",
+                "markdownDescription": "Mesh UUID or name. Omit to inspect the first selected mesh."
+              },
+              "include_vertices": {
+                "type": "boolean",
+                "default": true,
+                "description": "Include a page of vertex keys, local positions, and selection flags.",
+                "markdownDescription": "Include a page of vertex keys, local positions, and selection flags."
+              },
+              "include_faces": {
+                "type": "boolean",
+                "default": true,
+                "description": "Include a page of face keys, perimeter vertices, local normals, texture references, and selection flags.",
+                "markdownDescription": "Include a page of face keys, perimeter vertices, local normals, texture references, and selection flags."
+              },
+              "include_uv": {
+                "type": "boolean",
+                "default": false,
+                "description": "Include per-vertex UV coordinates for returned faces, in Blockbench texture units.",
+                "markdownDescription": "Include per-vertex UV coordinates for returned faces, in Blockbench texture units."
+              },
+              "vertex_offset": {
+                "type": "integer",
+                "minimum": 0,
+                "default": 0,
+                "description": "Zero-based offset into lexicographically sorted vertex keys.",
+                "markdownDescription": "Zero-based offset into lexicographically sorted vertex keys."
+              },
+              "face_offset": {
+                "type": "integer",
+                "minimum": 0,
+                "default": 0,
+                "description": "Zero-based offset into lexicographically sorted face keys.",
+                "markdownDescription": "Zero-based offset into lexicographically sorted face keys."
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 500,
+                "default": 100,
+                "description": "Maximum items in each included page. Continue using that page's next_offset; avoid editing geometry between pages.",
+                "markdownDescription": "Maximum items in each included page. Continue using that page's next_offset; avoid editing geometry between pages."
+              }
+            },
             "additionalProperties": false
           }
         },
