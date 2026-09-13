@@ -1,11 +1,11 @@
 {
   "version": "1.8.0",
-  "generatedAt": "2026-09-13T17:54:29.660Z",
+  "generatedAt": "2026-09-13T20:44:59.501Z",
   "tools": [
     {
       "name": "place_cube",
       "title": "Place Cube",
-      "description": "Places a cube of the given size at the specified position. Texture and group are optional.",
+      "description": "Creates cubes in one reversible edit. Texture and group are optional, allowing untextured blockouts. Explicit face targets never use the current UV selection; partial/custom faces require per-face UV support.",
       "status": "stable",
       "category": "Cubes",
       "annotations": {
@@ -97,13 +97,13 @@
               },
               "texture": {
                 "type": "string",
-                "description": "Texture ID or name to apply to the cube.",
-                "markdownDescription": "Texture ID or name to apply to the cube."
+                "description": "Texture UUID, ID or name. When omitted, uses the default texture if one exists; otherwise creates untextured cubes.",
+                "markdownDescription": "Texture UUID, ID or name. When omitted, uses the default texture if one exists; otherwise creates untextured cubes."
               },
               "group": {
                 "type": "string",
-                "description": "Group/bone to which the cube belongs.",
-                "markdownDescription": "Group/bone to which the cube belongs."
+                "description": "Parent group UUID or unique name, or root (default). Missing or ambiguous names are rejected.",
+                "markdownDescription": "Parent group UUID or unique name, or root (default). Missing or ambiguous names are rejected."
               },
               "faces": {
                 "anyOf": [
@@ -132,8 +132,8 @@
                         "type": "boolean"
                       }
                     ],
-                    "description": "Whether to apply the texture to all faces. Set to `true` to enable auto UV mapping.",
-                    "markdownDescription": "Whether to apply the texture to all faces. Set to `true` to enable auto UV mapping."
+                    "description": "true applies texture to all faces with Auto UV; false skips texture assignment and disables Auto UV except in Hytale, which requires Auto UV 1.",
+                    "markdownDescription": "true applies texture to all faces with Auto UV; false skips texture assignment and disables Auto UV except in Hytale, which requires Auto UV 1."
                   },
                   {
                     "type": "array",
@@ -160,8 +160,8 @@
                           },
                           "minItems": 4,
                           "maxItems": 4,
-                          "description": "Custom UV mapping for the face.",
-                          "markdownDescription": "Custom UV mapping for the face."
+                          "description": "Custom UV rectangle. Hytale requires absolute width/height to match the cube's face dimensions: north/south XY, east/west ZY, up/down XZ.",
+                          "markdownDescription": "Custom UV rectangle. Hytale requires absolute width/height to match the cube's face dimensions: north/south XY, east/west ZY, up/down XZ."
                         }
                       },
                       "required": [
@@ -175,8 +175,8 @@
                   }
                 ],
                 "default": true,
-                "description": "Faces to apply the texture to. Set to `true` to enable auto UV mapping.",
-                "markdownDescription": "Faces to apply the texture to. Set to `true` to enable auto UV mapping."
+                "description": "true applies texture to all faces with Auto UV; false skips texture assignment. Named faces use Auto UV; false/custom rectangles disable Auto UV outside Hytale. Hytale always retains Auto UV 1 and custom rectangles must match the geometry's face dimensions. Partial/custom faces require per-face UV support. Single-texture formats may still display the project texture.",
+                "markdownDescription": "true applies texture to all faces with Auto UV; false skips texture assignment. Named faces use Auto UV; false/custom rectangles disable Auto UV outside Hytale. Hytale always retains Auto UV 1 and custom rectangles must match the geometry's face dimensions. Partial/custom faces require per-face UV support. Single-texture formats may still display the project texture."
               }
             },
             "required": [
@@ -1068,7 +1068,7 @@
     {
       "name": "batch_keyframe_operations",
       "title": "Batch Keyframe Operations",
-      "description": "Performs batch operations on multiple keyframes at once.",
+      "description": "Edits keyframes in the active animation atomically; all includes hidden animators. Numeric value edits use native transform values. Bake samples continuous numeric curves within selected channel spans, caps output at 10000 samples, and restores the playhead. Expressions, step/pre-post curves and effect channels require native baking.",
       "status": "experimental",
       "category": "Animation",
       "annotations": {
@@ -1089,8 +1089,8 @@
                   "pattern"
                 ],
                 "default": "selected",
-                "description": "Which keyframes to operate on.",
-                "markdownDescription": "Which keyframes to operate on."
+                "description": "Which active-animation keyframes to operate on. all includes hidden or collapsed animators.",
+                "markdownDescription": "Which active-animation keyframes to operate on. all includes hidden or collapsed animators."
               },
               "range": {
                 "type": "object",
@@ -1119,8 +1119,9 @@
                 "properties": {
                   "interval": {
                     "type": "number",
-                    "description": "Time interval between keyframes.",
-                    "markdownDescription": "Time interval between keyframes."
+                    "exclusiveMinimum": 0,
+                    "description": "Positive time interval between keyframes.",
+                    "markdownDescription": "Positive time interval between keyframes."
                   },
                   "offset": {
                     "type": "number",
@@ -1154,8 +1155,8 @@
                 "properties": {
                   "offset_time": {
                     "type": "number",
-                    "description": "Time offset to apply.",
-                    "markdownDescription": "Time offset to apply."
+                    "description": "Time offset to apply; resulting keyframes must remain between 0 and 10000 seconds.",
+                    "markdownDescription": "Time offset to apply; resulting keyframes must remain between 0 and 10000 seconds."
                   },
                   "offset_values": {
                     "type": "array",
@@ -1164,13 +1165,13 @@
                     },
                     "minItems": 3,
                     "maxItems": 3,
-                    "description": "Value offset to apply.",
-                    "markdownDescription": "Value offset to apply."
+                    "description": "Numeric [x,y,z] value offset. Requires transform keyframes with a single numeric data point; expressions and pre/post values require native tools.",
+                    "markdownDescription": "Numeric [x,y,z] value offset. Requires transform keyframes with a single numeric data point; expressions and pre/post values require native tools."
                   },
                   "scale_factor": {
                     "type": "number",
-                    "description": "Scale factor for time or values.",
-                    "markdownDescription": "Scale factor for time or values."
+                    "description": "Scale factor for keyframe times around scale_pivot. Does not scale values; zero is accepted only when it creates no timestamp collisions.",
+                    "markdownDescription": "Scale factor for keyframe times around scale_pivot. Does not scale values; zero is accepted only when it creates no timestamp collisions."
                   },
                   "scale_pivot": {
                     "type": "number",
@@ -1184,13 +1185,14 @@
                       "y",
                       "z"
                     ],
-                    "description": "Axis to mirror values across.",
-                    "markdownDescription": "Axis to mirror values across."
+                    "description": "Numeric component to negate. Requires transform keyframes with a single numeric data point.",
+                    "markdownDescription": "Numeric component to negate. Requires transform keyframes with a single numeric data point."
                   },
                   "bake_interval": {
                     "type": "number",
-                    "description": "Interval for baking keyframes.",
-                    "markdownDescription": "Interval for baking keyframes."
+                    "minimum": 0.001,
+                    "description": "Sampling interval in seconds (minimum 0.001; at most 10000 samples). Bakes only selected transform channels between their selected times. Requires continuous numeric single-data-point keyframes; expressions, effects and stepped/pre-post curves require native baking.",
+                    "markdownDescription": "Sampling interval in seconds (minimum 0.001; at most 10000 samples). Bakes only selected transform channels between their selected times. Requires continuous numeric single-data-point keyframes; expressions, effects and stepped/pre-post curves require native baking."
                   }
                 },
                 "additionalProperties": false,
@@ -1210,7 +1212,7 @@
     {
       "name": "animation_copy_paste",
       "title": "Animation Copy/Paste",
-      "description": "Copies and pastes animation data between bones or animations.",
+      "description": "Copies native keyframe data points and curve metadata into a plugin-local clipboard. Paste preserves exact timestamps, replaces same-channel/time collisions and is undoable, including newly created animators. Mirror paste uses native position/rotation/curve mirroring; scale is unchanged.",
       "status": "experimental",
       "category": "Animation",
       "annotations": {
@@ -1309,8 +1311,8 @@
                   "time_offset": {
                     "type": "number",
                     "default": 0,
-                    "description": "Time offset for pasted keyframes.",
-                    "markdownDescription": "Time offset for pasted keyframes."
+                    "description": "Offset for exact, unsnapped pasted timestamps; results must remain between 0 and 10000 seconds. Existing keys at the same channel/time are replaced.",
+                    "markdownDescription": "Offset for exact, unsnapped pasted timestamps; results must remain between 0 and 10000 seconds. Existing keys at the same channel/time are replaced."
                   },
                   "mirror_axis": {
                     "type": "string",
@@ -1319,8 +1321,8 @@
                       "y",
                       "z"
                     ],
-                    "description": "Axis to mirror across for mirror_paste.",
-                    "markdownDescription": "Axis to mirror across for mirror_paste."
+                    "description": "Native mirror axis for mirror_paste (default x). Position negates this axis, rotation negates the other two axes, scale is unchanged; curve handles follow native mirroring.",
+                    "markdownDescription": "Native mirror axis for mirror_paste (default x). Position negates this axis, rotation negates the other two axes, scale is unchanged; curve handles follow native mirroring."
                   }
                 },
                 "required": [
@@ -5107,6 +5109,18 @@
                 "maximum": 4096,
                 "default": 16
               },
+              "uv_width": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Logical UV width for formats with per_texture_uv_size. Supply uv_height too. Independent of bitmap width; omit both to preserve native defaults.",
+                "markdownDescription": "Logical UV width for formats with per_texture_uv_size. Supply uv_height too. Independent of bitmap width; omit both to preserve native defaults."
+              },
+              "uv_height": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Logical UV height for formats with per_texture_uv_size. Supply uv_width too. Independent of bitmap height.",
+                "markdownDescription": "Logical UV height for formats with per_texture_uv_size. Supply uv_width too. Independent of bitmap height."
+              },
               "data": {
                 "type": "string",
                 "description": "Path to the image file or data URL.",
@@ -6034,8 +6048,8 @@
                   "description": "2D vector [x, y].",
                   "markdownDescription": "2D vector [x, y]."
                 },
-                "description": "UV coordinates for each vertex of the face.",
-                "markdownDescription": "UV coordinates for each vertex of the face."
+                "description": "UV coordinates for each vertex of the face, in logical UV units (not necessarily bitmap pixels).",
+                "markdownDescription": "UV coordinates for each vertex of the face, in logical UV units (not necessarily bitmap pixels)."
               }
             },
             "required": [
@@ -6052,7 +6066,7 @@
     {
       "name": "auto_uv_mesh",
       "title": "Auto UV Mesh",
-      "description": "Maps only the specified/selected faces of the target mesh. project uses the active camera, unwrap projects each face to its own plane, and cylinder/sphere map around the local origin. This does not pack UV islands.",
+      "description": "Maps only the specified/selected faces of the target mesh. project uses the active camera, unwrap projects each face to its own plane, and cylinder/sphere map around the local origin using each face's logical texture UV size (project UV size for untextured faces). Coordinates are logical UV units, not necessarily bitmap pixels. This does not pack UV islands.",
       "status": "experimental",
       "category": "UV Mapping",
       "annotations": {
@@ -6078,8 +6092,8 @@
                   "sphere"
                 ],
                 "default": "project",
-                "description": "project uses the active preview; unwrap is per-face planar projection; cylinder and sphere use the local origin.",
-                "markdownDescription": "project uses the active preview; unwrap is per-face planar projection; cylinder and sphere use the local origin."
+                "description": "project uses the active preview; unwrap is per-face planar projection; cylinder and sphere use the local origin and each face's logical texture UV dimensions.",
+                "markdownDescription": "project uses the active preview; unwrap is per-face planar projection; cylinder and sphere use the local origin and each face's logical texture UV dimensions."
               },
               "faces": {
                 "type": "array",
@@ -6143,6 +6157,363 @@
       }
     },
     {
+      "name": "get_cube_uv",
+      "title": "Get Cube UV",
+      "description": "Inspect a cube's UV mode, offset, mirroring, six face rectangles/rotations, stored and effective texture references, logical UV sizes and bitmap sizes. Read-only; no selection or preview changes.",
+      "status": "stable",
+      "category": "UV Mapping",
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
+      "parameters": {
+        "$ref": "#/definitions/get_cube_uv",
+        "definitions": {
+          "get_cube_uv": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Cube UUID or unique name. UUID takes precedence over names.",
+                "markdownDescription": "Cube UUID or unique name. UUID takes precedence over names."
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "set_cube_uv",
+      "title": "Set Cube UV",
+      "description": "Edit box UV offsets/mirroring or per-face rectangles, rotation and texture references in one reversible edit. Preserves untargeted faces and selection. Validates UV mode, texture references and rotation support. Hytale rectangles must retain geometry-linked extents and Auto UV; texture assignments use the project/attachment collection, and quads cannot use box UV. Does not pack islands or repaint textures.",
+      "status": "experimental",
+      "category": "UV Mapping",
+      "annotations": {
+        "destructiveHint": true,
+        "openWorldHint": false
+      },
+      "parameters": {
+        "$ref": "#/definitions/set_cube_uv",
+        "definitions": {
+          "set_cube_uv": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Cube UUID or unique name. Does not use or change selection.",
+                "markdownDescription": "Cube UUID or unique name. Does not use or change selection."
+              },
+              "box_uv": {
+                "type": "boolean",
+                "description": "Explicitly convert UV mode using the native cube operation. Requires optional_box_uv to change mode. Conversion can reset rotations and enable disabled faces.",
+                "markdownDescription": "Explicitly convert UV mode using the native cube operation. Requires optional_box_uv to change mode. Conversion can reset rotations and enable disabled faces."
+              },
+              "uv_offset": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2,
+                "description": "Box UV net offset [u, v]; requires box UV mode.",
+                "markdownDescription": "Box UV net offset [u, v]; requires box UV mode."
+              },
+              "mirror_uv": {
+                "type": "boolean",
+                "description": "Mirror the box UV net; requires box UV mode. For per-face mirroring, reverse rectangle endpoints.",
+                "markdownDescription": "Mirror the box UV net; requires box UV mode. For per-face mirroring, reverse rectangle endpoints."
+              },
+              "faces": {
+                "type": "object",
+                "properties": {
+                  "north": {
+                    "type": "object",
+                    "properties": {
+                      "uv": {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        },
+                        "minItems": 4,
+                        "maxItems": 4,
+                        "description": "[u1, v1, u2, v2] in logical UV units, not necessarily bitmap pixels. Reversed and out-of-bounds rectangles are preserved. Hytale requires extents matching cube face dimensions, swapped for 90/270-degree rotation; offsets and mirroring are supported.",
+                        "markdownDescription": "[u1, v1, u2, v2] in logical UV units, not necessarily bitmap pixels. Reversed and out-of-bounds rectangles are preserved. Hytale requires extents matching cube face dimensions, swapped for 90/270-degree rotation; offsets and mirroring are supported."
+                      },
+                      "rotation": {
+                        "type": "number",
+                        "enum": [
+                          0,
+                          90,
+                          180,
+                          270
+                        ],
+                        "description": "UV rotation in degrees; nonzero rotation requires format uv_rotation support.",
+                        "markdownDescription": "UV rotation in degrees; nonzero rotation requires format uv_rotation support."
+                      },
+                      "texture": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          {
+                            "type": "boolean",
+                            "const": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Texture UUID, ID or unique name; false unassigns, null disables the face. Omit to preserve.",
+                        "markdownDescription": "Texture UUID, ID or unique name; false unassigns, null disables the face. Omit to preserve."
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "east": {
+                    "type": "object",
+                    "properties": {
+                      "uv": {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        },
+                        "minItems": 4,
+                        "maxItems": 4,
+                        "description": "[u1, v1, u2, v2] in logical UV units, not necessarily bitmap pixels. Reversed and out-of-bounds rectangles are preserved. Hytale requires extents matching cube face dimensions, swapped for 90/270-degree rotation; offsets and mirroring are supported.",
+                        "markdownDescription": "[u1, v1, u2, v2] in logical UV units, not necessarily bitmap pixels. Reversed and out-of-bounds rectangles are preserved. Hytale requires extents matching cube face dimensions, swapped for 90/270-degree rotation; offsets and mirroring are supported."
+                      },
+                      "rotation": {
+                        "type": "number",
+                        "enum": [
+                          0,
+                          90,
+                          180,
+                          270
+                        ],
+                        "description": "UV rotation in degrees; nonzero rotation requires format uv_rotation support.",
+                        "markdownDescription": "UV rotation in degrees; nonzero rotation requires format uv_rotation support."
+                      },
+                      "texture": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          {
+                            "type": "boolean",
+                            "const": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Texture UUID, ID or unique name; false unassigns, null disables the face. Omit to preserve.",
+                        "markdownDescription": "Texture UUID, ID or unique name; false unassigns, null disables the face. Omit to preserve."
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "south": {
+                    "type": "object",
+                    "properties": {
+                      "uv": {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        },
+                        "minItems": 4,
+                        "maxItems": 4,
+                        "description": "[u1, v1, u2, v2] in logical UV units, not necessarily bitmap pixels. Reversed and out-of-bounds rectangles are preserved. Hytale requires extents matching cube face dimensions, swapped for 90/270-degree rotation; offsets and mirroring are supported.",
+                        "markdownDescription": "[u1, v1, u2, v2] in logical UV units, not necessarily bitmap pixels. Reversed and out-of-bounds rectangles are preserved. Hytale requires extents matching cube face dimensions, swapped for 90/270-degree rotation; offsets and mirroring are supported."
+                      },
+                      "rotation": {
+                        "type": "number",
+                        "enum": [
+                          0,
+                          90,
+                          180,
+                          270
+                        ],
+                        "description": "UV rotation in degrees; nonzero rotation requires format uv_rotation support.",
+                        "markdownDescription": "UV rotation in degrees; nonzero rotation requires format uv_rotation support."
+                      },
+                      "texture": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          {
+                            "type": "boolean",
+                            "const": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Texture UUID, ID or unique name; false unassigns, null disables the face. Omit to preserve.",
+                        "markdownDescription": "Texture UUID, ID or unique name; false unassigns, null disables the face. Omit to preserve."
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "west": {
+                    "type": "object",
+                    "properties": {
+                      "uv": {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        },
+                        "minItems": 4,
+                        "maxItems": 4,
+                        "description": "[u1, v1, u2, v2] in logical UV units, not necessarily bitmap pixels. Reversed and out-of-bounds rectangles are preserved. Hytale requires extents matching cube face dimensions, swapped for 90/270-degree rotation; offsets and mirroring are supported.",
+                        "markdownDescription": "[u1, v1, u2, v2] in logical UV units, not necessarily bitmap pixels. Reversed and out-of-bounds rectangles are preserved. Hytale requires extents matching cube face dimensions, swapped for 90/270-degree rotation; offsets and mirroring are supported."
+                      },
+                      "rotation": {
+                        "type": "number",
+                        "enum": [
+                          0,
+                          90,
+                          180,
+                          270
+                        ],
+                        "description": "UV rotation in degrees; nonzero rotation requires format uv_rotation support.",
+                        "markdownDescription": "UV rotation in degrees; nonzero rotation requires format uv_rotation support."
+                      },
+                      "texture": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          {
+                            "type": "boolean",
+                            "const": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Texture UUID, ID or unique name; false unassigns, null disables the face. Omit to preserve.",
+                        "markdownDescription": "Texture UUID, ID or unique name; false unassigns, null disables the face. Omit to preserve."
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "up": {
+                    "type": "object",
+                    "properties": {
+                      "uv": {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        },
+                        "minItems": 4,
+                        "maxItems": 4,
+                        "description": "[u1, v1, u2, v2] in logical UV units, not necessarily bitmap pixels. Reversed and out-of-bounds rectangles are preserved. Hytale requires extents matching cube face dimensions, swapped for 90/270-degree rotation; offsets and mirroring are supported.",
+                        "markdownDescription": "[u1, v1, u2, v2] in logical UV units, not necessarily bitmap pixels. Reversed and out-of-bounds rectangles are preserved. Hytale requires extents matching cube face dimensions, swapped for 90/270-degree rotation; offsets and mirroring are supported."
+                      },
+                      "rotation": {
+                        "type": "number",
+                        "enum": [
+                          0,
+                          90,
+                          180,
+                          270
+                        ],
+                        "description": "UV rotation in degrees; nonzero rotation requires format uv_rotation support.",
+                        "markdownDescription": "UV rotation in degrees; nonzero rotation requires format uv_rotation support."
+                      },
+                      "texture": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          {
+                            "type": "boolean",
+                            "const": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Texture UUID, ID or unique name; false unassigns, null disables the face. Omit to preserve.",
+                        "markdownDescription": "Texture UUID, ID or unique name; false unassigns, null disables the face. Omit to preserve."
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "down": {
+                    "type": "object",
+                    "properties": {
+                      "uv": {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        },
+                        "minItems": 4,
+                        "maxItems": 4,
+                        "description": "[u1, v1, u2, v2] in logical UV units, not necessarily bitmap pixels. Reversed and out-of-bounds rectangles are preserved. Hytale requires extents matching cube face dimensions, swapped for 90/270-degree rotation; offsets and mirroring are supported.",
+                        "markdownDescription": "[u1, v1, u2, v2] in logical UV units, not necessarily bitmap pixels. Reversed and out-of-bounds rectangles are preserved. Hytale requires extents matching cube face dimensions, swapped for 90/270-degree rotation; offsets and mirroring are supported."
+                      },
+                      "rotation": {
+                        "type": "number",
+                        "enum": [
+                          0,
+                          90,
+                          180,
+                          270
+                        ],
+                        "description": "UV rotation in degrees; nonzero rotation requires format uv_rotation support.",
+                        "markdownDescription": "UV rotation in degrees; nonzero rotation requires format uv_rotation support."
+                      },
+                      "texture": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          {
+                            "type": "boolean",
+                            "const": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Texture UUID, ID or unique name; false unassigns, null disables the face. Omit to preserve.",
+                        "markdownDescription": "Texture UUID, ID or unique name; false unassigns, null disables the face. Omit to preserve."
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Patch only these faces in per-face UV mode. Other faces are preserved. Explicit rectangles disable automatic UV remapping except in Hytale, where dimension-linked UVs retain native Auto UV. Hytale textures resolve through the project/attachment collection, so only null is accepted as an explicit face texture.",
+                "markdownDescription": "Patch only these faces in per-face UV mode. Other faces are preserved. Explicit rectangles disable automatic UV remapping except in Hytale, where dimension-linked UVs retain native Auto UV. Hytale textures resolve through the project/attachment collection, so only null is accepted as an explicit face texture."
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
       "name": "hytale_get_format_info",
       "title": "Get Hytale Format Info",
       "description": "Returns information about the current Hytale format. Requires the Hytale plugin and a Hytale format project to be active.",
@@ -6166,7 +6537,7 @@
     {
       "name": "hytale_validate_model",
       "title": "Validate Hytale Model",
-      "description": "Validates the current Hytale model against Hytale engine constraints (node count, UV sizes, etc.).",
+      "description": "Checks exported main-model node count using the installed Hytale codec and verifies bitmap dimensions are multiples of 32. Does not validate attachment exports, shading, all UVs, animation integration or target-engine rendering.",
       "status": "experimental",
       "category": "Hytale Integration",
       "annotations": {

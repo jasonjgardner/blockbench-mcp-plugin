@@ -38,7 +38,7 @@ Use `hytale_list_attachment_pieces` to see marked pieces.
    - Set export codec to `blockymodel`
 
 2. **Build Geometry**
-   - Add cubes/meshes to the collection
+   - Add Hytale cubes/quads to the collection; generic meshes are not supported primitives
    - Structure under bones as needed
 
 3. **Mark Piece Bones**
@@ -52,6 +52,7 @@ Use `hytale_list_attachment_pieces` to see marked pieces.
 4. **Assign Texture**
    - Each attachment can have its own texture
    - Texture is stored in collection metadata
+   - The native collection/default-texture workflow controls rendering even when `single_texture=false`; stored per-face UUIDs do not override it
 
 ### Attachment Naming Convention
 
@@ -87,11 +88,11 @@ Lists all attachment piece bones with:
 Set piece bone origins carefully:
 - Origin = attachment point
 - Rotation = attachment orientation
-- Match base model's bone origin for perfect fit
+- Inspect the assembled attachment's transform and alignment against the target bone
 
 ### Animation Inheritance
 Attached pieces inherit animation from base:
-- No separate animation needed
+- Verify any attachment-specific animation and game-side activation requirements
 - Follows parent bone transforms
 - Visibility can be animated
 
@@ -105,6 +106,8 @@ Keep attachment textures separate:
 - Attachments are lightweight
 - Only active attachment is rendered
 - Use for equipment variations instead of model variants
+
+Validate each attachment's exported model separately; `hytale_validate_model` counts the active main-model output. The [native model exporter](https://github.com/JannisX11/hytale-blockbench-plugin/blob/main/src/blockymodel.ts) and [attachment texture implementation](https://github.com/JannisX11/hytale-blockbench-plugin/blob/main/src/attachment_texture.ts) define the current export/texture behavior (checked 2026-09-13).
 
 ## Common Patterns
 

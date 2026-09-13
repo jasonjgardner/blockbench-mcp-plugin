@@ -30,7 +30,7 @@ export const setMeshUvParametersSchema = z.object({
       z.string(), // vertex key
       vector2Schema // UV coordinates
     )
-    .describe("UV coordinates for each vertex of the face."),
+    .describe("UV coordinates for each vertex of the face, in logical UV units (not necessarily bitmap pixels)."),
 });
 
 /**
@@ -43,7 +43,7 @@ export const autoUvMeshParametersSchema = z.object({
   mode: uvMappingModeEnum
     .default("project")
     .describe(
-      "project uses the active preview; unwrap is per-face planar projection; cylinder and sphere use the local origin."
+      "project uses the active preview; unwrap is per-face planar projection; cylinder and sphere use the local origin and each face's logical texture UV dimensions."
     ),
   faces: faceKeysOptionalSchema.describe(
     "Specific face keys to UV map. If not provided, maps all selected faces."
@@ -84,7 +84,7 @@ export const uvToolDocs: IToolSpec[] = [
   {
     name: "auto_uv_mesh",
     condition: { project: true, features: ["meshes"] },
-    description: "Maps only the specified/selected faces of the target mesh. project uses the active camera, unwrap projects each face to its own plane, and cylinder/sphere map around the local origin. This does not pack UV islands.",
+    description: "Maps only the specified/selected faces of the target mesh. project uses the active camera, unwrap projects each face to its own plane, and cylinder/sphere map around the local origin using each face's logical texture UV size (project UV size for untextured faces). Coordinates are logical UV units, not necessarily bitmap pixels. This does not pack UV islands.",
     annotations: {
       title: "Auto UV Mesh",
       destructiveHint: true,
@@ -109,8 +109,10 @@ export const uvToolDocs: IToolSpec[] = [
 // UV Mapping Math
 // ============================================================================
 
-/** A UV coordinate `[u, v]` in texture pixels. */
+/** A UV coordinate `[u, v]` in logical UV units, independent of bitmap resolution. */
 type UV = [number, number];
+/** Finite positive logical UV width and height resolved for a face's texture. */
+type UvSize = readonly [width: number, height: number];
 /** Index of a UV axis: 0 for U, 1 for V. */
 type UvAxis = 0 | 1;
 /** Face key -> vertex key -> UV; the shape written back to mesh faces. */
@@ -143,9 +145,9 @@ const AUTO_MAPPERS: Record<UvMappingMode, AutoMapper> = {
   unwrap: (mesh, keys) =>
     Object.fromEntries(keys.map((key): [string, Record<string, UV>] => [key, unwrapFace(mesh, key)])),
   cylinder: (mesh, keys, project) =>
-    mapSortedVertices(mesh, keys, vertex => cylinderUv(mesh.vertices[vertex], project)),
+    mapTextureSpace(mesh, keys, project, (_vertex, point, size) => cylinderUv(point, size)),
   sphere: (mesh, keys, project) =>
-    mapSortedVertices(mesh, keys, vertex => sphereUv(vertex, mesh.vertices[vertex], project)),
+    mapTextureSpace(mesh, keys, project, sphereUv),
 };
 
 /** Evaluates `valueAt` for the U then V axis. */
@@ -170,6 +172,34 @@ function mapSortedVertices(mesh: Mesh, keys: string[], uvFor: (vertex: string) =
     key,
     Object.fromEntries(mesh.faces[key].getSortedVertices().map((vertex): [string, UV] => [vertex, uvFor(vertex)])),
   ]));
+}
+
+/** Resolves native per-face texture UV dimensions before mutation, falling back to the project's UV size for untextured faces. */
+function faceUvSize(face: MeshFace, key: string, project: ModelProject): UvSize {
+  const texture = Format.per_texture_uv_size ? face.getTexture() : undefined;
+  const size: UvSize = texture
+    ? [texture.getUVWidth(), texture.getUVHeight()]
+    : [project.texture_width, project.texture_height];
+  if (size.some(value => !Number.isFinite(value) || value <= 0)) {
+    throw new Error(`Face "${key}" requires finite positive logical UV dimensions. Check its texture or project UV size.`);
+  }
+  return size;
+}
+
+/** Maps faces independently so shared geometry can carry different coordinates for different material UV sizes. */
+function mapTextureSpace(
+  mesh: Mesh,
+  keys: string[],
+  project: ModelProject,
+  uvFor: (vertex: string, point: ArrayVector3, size: UvSize) => UV
+): Mapping {
+  return Object.fromEntries(keys.map((key): [string, Record<string, UV>] => {
+    const face = mesh.faces[key];
+    const size = faceUvSize(face, key, project);
+    return [key, Object.fromEntries(face.getSortedVertices().map((vertex): [string, UV] => [
+      vertex, uvFor(vertex, mesh.vertices[vertex], size),
+    ]))];
+  }));
 }
 
 /** blockbench-types omits `Preview#calculateControlScale`; this guard verifies it and the camera/canvas at runtime. */
@@ -228,24 +258,24 @@ function unwrapFace(mesh: Mesh, key: string): Record<string, UV> {
 }
 
 /** Angle around the local Y axis scaled to texture width; the U axis shared by cylinder and sphere mapping. */
-function azimuthU(point: ArrayVector3, project: ModelProject): number {
-  return (Math.atan2(point[0], point[2]) + Math.PI) / (2 * Math.PI) * project.texture_width;
+function azimuthU(point: ArrayVector3, size: UvSize): number {
+  return (Math.atan2(point[0], point[2]) + Math.PI) / (2 * Math.PI) * size[0];
 }
 
 /** Cylindrical UV: azimuth for U, height within the centered one-block span for V. */
-function cylinderUv(point: ArrayVector3, project: ModelProject): UV {
+function cylinderUv(point: ArrayVector3, size: UvSize): UV {
   const height = (point[1] + CYLINDER_SPAN_UNITS / 2) / CYLINDER_SPAN_UNITS;
-  return [azimuthU(point, project), height * project.texture_height];
+  return [azimuthU(point, size), height * size[1]];
 }
 
 /** Spherical UV: azimuth for U, polar angle from +Y for V; rejects vertices at the local origin. */
-function sphereUv(vertex: string, point: ArrayVector3, project: ModelProject): UV {
+function sphereUv(vertex: string, point: ArrayVector3, size: UvSize): UV {
   const length = Math.hypot(...point);
   if (length < GEOMETRY_EPSILON) {
     throw new Error(`Cannot sphere-map vertex "${vertex}" at the local origin. Move it or use unwrap.`);
   }
   const polar = Math.acos(Math.max(-1, Math.min(1, point[1] / length)));
-  return [azimuthU(point, project), polar / Math.PI * project.texture_height];
+  return [azimuthU(point, size), polar / Math.PI * size[1]];
 }
 
 /** Rotates `uv` counter-clockwise by `radians` around `center`. */

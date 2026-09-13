@@ -2,7 +2,7 @@
 import type { z } from "zod";
 import { createTool } from "@/lib/factories";
 import { findGroupOrThrow } from "@/lib/util";
-import { runUndoableEdit } from "@/lib/undo";
+import { runUndoableAnimationEdit } from "@/lib/animation-undo";
 import { animationToolDocs } from "./docs";
 import { manageKeyframesParameters } from "./schemas";
 import {
@@ -114,7 +114,7 @@ export function registerManageKeyframesTool(): void {
           return `Selected ${matches.length} keyframes for ${bone_name}.${channel}`;
         }
 
-        runUndoableEdit({ animations: [animation] }, `${action} keyframes`, () => {
+        runUndoableAnimationEdit({ animations: [animation] }, `${action} keyframes`, () => {
           const animator = animation.getBoneAnimator(group);
           keyframes.forEach((data, index) => KEYFRAME_EDITORS[action]({ animator, channel, data, existing: matches[index] }));
           animation.setLength();

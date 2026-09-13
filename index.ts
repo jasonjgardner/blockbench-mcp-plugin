@@ -15,6 +15,7 @@ import { setupI18n } from "@/ui/i18n";
 import { sessionManager } from "@/lib/sessions";
 import { initPromptLoader } from "@/lib/promptLoader";
 import { setupMaterialUndoRefresh, teardownMaterialUndoRefresh } from "@/lib/material-preview";
+import { setupAnimationUndoRestore, teardownAnimationUndoRestore } from "@/lib/animation-undo";
 import { setupEditorStateSync, teardownEditorStateSync } from "@/lib/editor-state";
 import type { NetServer, SessionTransports } from "@/server/net";
 import createNetServer from "@/server/net";
@@ -55,6 +56,7 @@ BBPlugin.register("mcp", {
 
     settingsSetup();
     setupMaterialUndoRefresh();
+    setupAnimationUndoRestore();
     setupEditorStateSync();
 
     // Load prompt manifest from CDN/cache before server starts.
@@ -104,6 +106,7 @@ BBPlugin.register("mcp", {
   onunload() {
     teardownEditorStateSync();
     teardownMaterialUndoRefresh();
+    teardownAnimationUndoRestore();
     // Close HTTP server
     if (httpServer) {
       httpServer.close();

@@ -8,6 +8,7 @@ import { registerCameraTools } from "@/server/tools/camera";
 import { registerCapabilityTools } from "@/server/tools/capabilities";
 import { registerAnimationTools } from "@/server/tools/animation";
 import { registerCubesTools } from "@/server/tools/cubes";
+import { registerCubeUvTools } from "@/server/tools/cube-uv";
 import { registerDisplayTools } from "@/server/tools/display";
 import { registerElementTools } from "@/server/tools/element";
 import { registerImportTools } from "@/server/tools/import";
@@ -39,6 +40,7 @@ const registrationFunctions = [
   registerCameraTools,
   registerCapabilityTools,
   registerCubesTools,
+  registerCubeUvTools,
   registerDisplayTools,
   registerElementTools,
   registerExportTools,

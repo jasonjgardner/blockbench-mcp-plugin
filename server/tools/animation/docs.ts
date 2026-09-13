@@ -47,7 +47,7 @@ export const animationToolDocs: IToolSpec[] = [
     name: "animation_graph_editor",
     condition: { project: true, features: ["animation_mode"] },
     description:
-      "Controls animation curves in the graph editor for fine-tuning animations.",
+      "Edits a bone channel's interpolation or numeric Bezier easing in one reversible edit. Uses native per-axis handle arrays and chronological segment durations. Custom points are normalized time/value fractions. Partial-axis edits require existing Bezier keys; key-wide mode changes require all axes. Rejects curve edits ignored by quaternion rotation. Inspect neighboring segments after range edits.",
     annotations: {
       title: "Animation Graph Editor",
       destructiveHint: true,
@@ -82,7 +82,7 @@ export const animationToolDocs: IToolSpec[] = [
   {
     name: "batch_keyframe_operations",
     condition: { project: true, features: ["animation_mode"] },
-    description: "Performs batch operations on multiple keyframes at once.",
+    description: "Edits keyframes in the active animation atomically; all includes hidden animators. Numeric value edits use native transform values. Bake samples continuous numeric curves within selected channel spans, caps output at 10000 samples, and restores the playhead. Expressions, step/pre-post curves and effect channels require native baking.",
     annotations: {
       title: "Batch Keyframe Operations",
       destructiveHint: true,
@@ -94,7 +94,7 @@ export const animationToolDocs: IToolSpec[] = [
     name: "animation_copy_paste",
     condition: { project: true, features: ["animation_mode"] },
     description:
-      "Copies and pastes animation data between bones or animations.",
+      "Copies native keyframe data points and curve metadata into a plugin-local clipboard. Paste preserves exact timestamps, replaces same-channel/time collisions and is undoable, including newly created animators. Mirror paste uses native position/rotation/curve mirroring; scale is unchanged.",
     annotations: {
       title: "Animation Copy/Paste",
       destructiveHint: true,

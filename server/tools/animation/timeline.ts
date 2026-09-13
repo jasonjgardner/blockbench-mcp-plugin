@@ -1,7 +1,7 @@
 /// <reference types="blockbench-types" />
 import type { z } from "zod";
 import { createTool } from "@/lib/factories";
-import { runUndoableEdit } from "@/lib/undo";
+import { runUndoableAnimationEdit } from "@/lib/animation-undo";
 import { animationToolDocs } from "./docs";
 import { animationTimelineParameters } from "./schemas";
 import { findAnimationOrSelected, replaceTimelineSelection } from "./shared";
@@ -72,7 +72,7 @@ function runTimelineEdit(
   { animation, input }: ITimelineRequest,
   apply: (animation: _Animation, input: TimelineInput) => void
 ): string {
-  runUndoableEdit({ animations: [animation] }, `Animation timeline: ${input.action}`, () => {
+  runUndoableAnimationEdit({ animations: [animation] }, `Animation timeline: ${input.action}`, () => {
     apply(animation, input);
     Animator.preview();
   });

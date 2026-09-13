@@ -5,6 +5,7 @@ import type { IToolSpec, IPromptSpec, IResourceSpec } from "@/lib/factories";
 import { cameraToolDocs } from "@/server/tools/camera";
 import { capabilityToolDocs } from "@/server/tools/capabilities";
 import { cubeToolDocs } from "@/server/tools/cubes";
+import { cubeUvToolDocs } from "@/server/tools/cube-uv";
 import { displayToolDocs } from "@/server/tools/display";
 import { elementToolDocs } from "@/server/tools/element";
 import { importToolDocs } from "@/server/tools/import";
@@ -45,7 +46,7 @@ export const toolManifest: ICategoryGroup[] = [
   { category: "Project", tools: projectToolDocs },
   { category: "Textures", tools: textureToolDocs },
   { category: "UI Interaction", tools: [...uiToolDocs, ...modeToolDocs] },
-  { category: "UV Mapping", tools: uvToolDocs },
+  { category: "UV Mapping", tools: [...uvToolDocs, ...cubeUvToolDocs] },
   { category: "Hytale Integration", tools: hytaleToolDocs },
 ];
 

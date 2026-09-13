@@ -155,39 +155,48 @@ export function getHytaleMaxNodes(): number {
 }
 
 /**
- * Count total nodes in the current project (for validation).
+ * Count nodes in the active Hytale codec's main-model output without writing a
+ * file. The codec decides which cubes fold into group shapes, export toggles,
+ * and attachment exclusions; an outliner object count cannot reproduce that.
+ *
+ * @returns Exported main-model node count; zero outside a Hytale project.
+ * @throws When the installed codec is unavailable or returns an invalid tree.
+ *   Never substitute a guessed count that could falsely pass the engine limit.
  */
 export function countProjectNodes(): number {
-  // @ts-ignore - Group is globally available in Blockbench
-  if (typeof Group === "undefined") return 0;
-  // @ts-ignore - Cube is globally available in Blockbench
-  if (typeof Cube === "undefined") return 0;
-
-  let count = 0;
-  // @ts-ignore - Group.all contains all groups
-  const groups = Group.all ?? [];
-  // @ts-ignore - Cube.all contains all cubes
-  const cubes = Cube.all ?? [];
-
-  // Count groups
-  count += groups.length;
-
-  // Count cubes (excluding main shape cubes that are part of their parent group)
-  for (const cube of cubes) {
-    // If cube has a parent group and is the only child, it's likely the "shape"
-    // and counted as part of the group. Otherwise count separately.
-    const parent = cube.parent;
-    if (parent instanceof Group) {
-      const siblings = parent.children.filter((c: OutlinerElement) => c instanceof Cube);
-      if (siblings.length > 1) {
-        count += 1;
-      }
-    } else {
-      count += 1;
-    }
+  if (!isHytaleFormat()) return 0;
+  const codec = typeof Codecs === "undefined" ? undefined : Codecs.blockymodel;
+  if (!codec || typeof codec.compile !== "function") throw new Error("Hytale blockymodel codec is unavailable; cannot validate exported node count.");
+  const compiled: unknown = codec.compile({ raw: true });
+  const model: unknown = typeof compiled === "string" ? JSON.parse(compiled) : compiled;
+  if (!model || typeof model !== "object" || !("nodes" in model) || !Array.isArray(model.nodes)) {
+    throw new Error("Hytale codec did not return a model with a nodes array.");
   }
+  const seen = new Set<object>();
+  const countNodes = (nodes: unknown[]): number => nodes.reduce<number>((total, node) => {
+    if (!node || typeof node !== "object" || seen.has(node)) throw new Error("Hytale codec returned an invalid or cyclic node tree.");
+    seen.add(node);
+    if (!("children" in node) || node.children === undefined) return total + 1;
+    if (!Array.isArray(node.children)) throw new Error("Hytale codec returned invalid node children.");
+    return total + 1 + countNodes(node.children);
+  }, 0);
+  return countNodes(model.nodes);
+}
 
-  return count;
+/**
+ * Checks the published Hytale atlas-size rule independently of 64/32 character
+ * and prop texel density. Both bitmap dimensions must be positive multiples of
+ * 32; rectangular textures are valid. Does not infer flipbooks from dimensions.
+ *
+ * @param textures - Texture names and actual decoded bitmap dimensions.
+ * @returns One actionable issue per invalid bitmap; no host state is changed.
+ */
+export function getHytaleTextureDimensionIssues(textures: readonly { name: string; width: number; height: number }[]): string[] {
+  return textures.flatMap(texture => {
+    const valid = [texture.width, texture.height].every(value => Number.isInteger(value) && value > 0 && value % 32 === 0);
+    if (valid) return [];
+    return [`Texture "${texture.name}" has invalid dimensions (${texture.width}x${texture.height}). Width and height must each be positive multiples of 32 pixels; non-square atlases are supported.`];
+  });
 }
 
 /**

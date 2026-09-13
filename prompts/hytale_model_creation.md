@@ -7,14 +7,14 @@ This guide covers creating 3D models for Hytale using Blockbench with the Hytale
 Hytale uses two model formats:
 
 ### Character Format (`hytale_character`)
-- **Block Size**: 64 pixels
-- **Use Case**: Humanoid/creature models with complex rigs
+- **Block Size / Intended Density**: 64 pixels per world unit
+- **Use Case**: Characters and attachments, including held weapons, tools and food
 - **Features**: Full bone hierarchy, attachments, animations
 
 ### Prop Format (`hytale_prop`)
-- **Block Size**: 32 pixels
-- **Use Case**: Items, weapons, decorative objects
-- **Features**: Simpler structure, optimized for props
+- **Block Size / Intended Density**: 32 pixels per world unit
+- **Use Case**: Environmental props and decorative objects
+- **Features**: Use the actual format flags and codec; do not infer a rig restriction from the word prop
 
 ## Key Concepts
 
@@ -23,11 +23,11 @@ Hytale has a **maximum of 255 nodes** per model. Nodes include:
 - Groups/bones
 - Individual cubes (excluding the main shape cube of a group)
 
-Use `hytale_validate_model` tool to check node count.
+Use `hytale_validate_model` to count the installed codec's exported main-model nodes. Export toggles and main-shape folding affect the count. Attachment exports need separate validation; this tool does not certify every UV, material or engine integration rule.
 
 ### Shading Modes
 Cubes support four shading modes:
-- `standard` - Normal lighting (default)
+- `standard` - Normal lighting
 - `flat` - No lighting/shadows
 - `fullbright` - Always fully lit (emissive effect)
 - `reflective` - Reflective material
@@ -54,7 +54,7 @@ Hytale supports single-face quads (2D planes):
 
 ## Workflow
 
-1. **Create Project**: Use `create_project` with format `bedrock` (Hytale uses similar format structure)
+1. **Create Project**: Discover `hytale_character` or `hytale_prop` with `get_capabilities`, then pass that exact format to `create_project`. The Hytale Models plugin must be installed; Bedrock is not a Hytale substitute.
 2. **Build Skeleton**: Create bone hierarchy using `add_group` with proper origins
 3. **Add Geometry**: Use `place_cube` for cubes, `hytale_create_quad` for flat surfaces
 4. **Set Properties**: Apply shading modes and double-sided as needed
@@ -62,14 +62,17 @@ Hytale supports single-face quads (2D planes):
 
 ## Texture Guidelines
 
-- Character textures: 64x64 or multiples for flipbooks
-- Prop textures: 32x32 or multiples for flipbooks
-- UV size must match texture resolution
-- Use integer positions for pixel-perfect UVs
+- Width and height must each be positive multiples of 32; rectangular atlases such as 128x96 are valid.
+- Atlas dimensions are separate from character/prop density. Aspect ratio alone does not identify a flipbook.
+- Match logical UV size to the intended static bitmap dimensions. `create_texture` accepts `uv_width` and `uv_height` together; inspect `list_textures` afterward.
+- Face UV dimensions stay linked to base geometry. `set_cube_uv` permits matching-size offsets/mirroring and rotation; Hytale retains Auto UV 1. Quads cannot use box UV.
+- Use integer base dimensions with the native default size setting and stretch for finer visible sizes; arbitrary integer-position rules are not universal.
 
 ## Tips
 
-- Keep node count under 255
+- Keep exported node count within the 255-node limit
 - Use stretch for scaling instead of fractional sizes
 - Group related cubes under bones for animation
 - Mark attachment bones with `is_piece: true` using `hytale_set_attachment_piece`
+
+Technical guidance checked against the [official Hytale art introduction](https://hytale.com/news/2025/12/an-introduction-to-making-models-for-hytale) and [format declarations](https://github.com/JannisX11/hytale-blockbench-plugin/blob/main/src/formats.ts) on 2026-09-13. Inspect the installed format when versions differ.

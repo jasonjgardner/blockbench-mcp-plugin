@@ -18,7 +18,7 @@
 
       <div class="nav-group">
         <p class="nav-heading">Overview</p>
-        <a href="#tools" class="nav-link">Tools <span class="count">(113)</span></a>
+        <a href="#tools" class="nav-link">Tools <span class="count">(115)</span></a>
         <a href="#prompts" class="nav-link">Prompts <span class="count">(6)</span></a>
         <a href="#resources" class="nav-link">Resources <span class="count">(13)</span></a>
       </div>
@@ -41,7 +41,7 @@
         <a href="#cat-project" class="nav-link">Project <span class="count">(2)</span></a>
         <a href="#cat-textures" class="nav-link">Textures <span class="count">(13)</span></a>
         <a href="#cat-ui-interaction" class="nav-link">UI Interaction <span class="count">(6)</span></a>
-        <a href="#cat-uv-mapping" class="nav-link">UV Mapping <span class="count">(3)</span></a>
+        <a href="#cat-uv-mapping" class="nav-link">UV Mapping <span class="count">(5)</span></a>
         <a href="#cat-hytale-integration" class="nav-link">Hytale Integration <span class="count">(12)</span></a>
       </div>
     </nav>
@@ -51,7 +51,7 @@
         <h1>Blockbench MCP Plugin</h1>
         <p class="subtitle">API Reference — v1.8.0</p>
         <nav class="stats">
-          <a href="#tools"><strong>113</strong> tools (43 stable, 70 experimental)</a>
+          <a href="#tools"><strong>115</strong> tools (44 stable, 71 experimental)</a>
           <a href="#prompts"><strong>6</strong> prompts</a>
           <a href="#resources"><strong>13</strong> resources</a>
         </nav>
@@ -79,7 +79,7 @@
         </div>
       </div>
       <p class="card-title">Place Cube</p>
-      <p class="card-desc">Places a cube of the given size at the specified position. Texture and group are optional.</p>
+      <p class="card-desc">Creates cubes in one reversible edit. Texture and group are optional, allowing untextured blockouts. Explicit face targets never use the current UV selection; partial/custom faces require per-face UV support.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -99,17 +99,17 @@
       <td class="col-name">texture</td>
       <td class="col-type">string</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Texture ID or name to apply to the cube.</td>
+      <td class="col-desc">Texture UUID, ID or name. When omitted, uses the default texture if one exists; otherwise creates untextured cubes.</td>
     </tr><tr>
       <td class="col-name">group</td>
       <td class="col-type">string</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Group/bone to which the cube belongs.</td>
+      <td class="col-desc">Parent group UUID or unique name, or root (default). Missing or ambiguous names are rejected.</td>
     </tr><tr>
       <td class="col-name">faces</td>
       <td class="col-type">&quot;north&quot; | &quot;south&quot; | &quot;east&quot; | &quot;west&quot; | &quot;up&quot; | &quot;down&quot;[] | unknown | boolean | object[]</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Faces to apply the texture to. Set to `true` to enable auto UV mapping. <span class="param-meta">(default: <code>true</code>)</span></td>
+      <td class="col-desc">true applies texture to all faces with Auto UV; false skips texture assignment. Named faces use Auto UV; false/custom rectangles disable Auto UV outside Hytale. Hytale always retains Auto UV 1 and custom rectangles must match the geometry's face dimensions. Partial/custom faces require per-face UV support. Single-texture formats may still display the project texture. <span class="param-meta">(default: <code>true</code>)</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -592,7 +592,7 @@
         </div>
       </div>
       <p class="card-title">Batch Keyframe Operations</p>
-      <p class="card-desc">Performs batch operations on multiple keyframes at once.</p>
+      <p class="card-desc">Edits keyframes in the active animation atomically; all includes hidden animators. Numeric value edits use native transform values. Bake samples continuous numeric curves within selected channel spans, caps output at 10000 samples, and restores the playhead. Expressions, step/pre-post curves and effect channels require native baking.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -607,7 +607,7 @@
       <td class="col-name">selection</td>
       <td class="col-type">&quot;all&quot; | &quot;selected&quot; | &quot;range&quot; | &quot;pattern&quot;</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Which keyframes to operate on. <span class="param-meta">(default: <code>&quot;selected&quot;</code>)</span></td>
+      <td class="col-desc">Which active-animation keyframes to operate on. all includes hidden or collapsed animators. <span class="param-meta">(default: <code>&quot;selected&quot;</code>)</span></td>
     </tr><tr>
       <td class="col-name">range</td>
       <td class="col-type">object</td>
@@ -641,7 +641,7 @@
         </div>
       </div>
       <p class="card-title">Animation Copy/Paste</p>
-      <p class="card-desc">Copies and pastes animation data between bones or animations.</p>
+      <p class="card-desc">Copies native keyframe data points and curve metadata into a plugin-local clipboard. Paste preserves exact timestamps, replaces same-channel/time collisions and is undoable, including newly created animators. Mirror paste uses native position/rotation/curve mirroring; scale is unchanged.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -3439,6 +3439,16 @@
       <td><span class="param-optional">optional</span></td>
       <td class="col-desc"> <span class="param-meta">(default: <code>16</code>) [min: 16, max: 4096]</span></td>
     </tr><tr>
+      <td class="col-name">uv_width</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Logical UV width for formats with per_texture_uv_size. Supply uv_height too. Independent of bitmap width; omit both to preserve native defaults.</td>
+    </tr><tr>
+      <td class="col-name">uv_height</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Logical UV height for formats with per_texture_uv_size. Supply uv_width too. Independent of bitmap height.</td>
+    </tr><tr>
       <td class="col-name">data</td>
       <td class="col-type">string</td>
       <td><span class="param-optional">optional</span></td>
@@ -4053,7 +4063,7 @@
         <h3 class="card-name">set_mode</h3>
         <div class="card-badges">
           <span class="badge badge-stable">stable</span>
-
+          
         </div>
       </div>
       <p class="card-title">Set Mode</p>
@@ -4114,7 +4124,7 @@
       <td class="col-name">uv_mapping</td>
       <td class="col-type">Record&lt;string, number[]&gt;</td>
       <td><span class="param-required">required</span></td>
-      <td class="col-desc">UV coordinates for each vertex of the face.</td>
+      <td class="col-desc">UV coordinates for each vertex of the face, in logical UV units (not necessarily bitmap pixels).</td>
     </tr></tbody>
     </table>
       </div>
@@ -4128,7 +4138,7 @@
         </div>
       </div>
       <p class="card-title">Auto UV Mesh</p>
-      <p class="card-desc">Maps only the specified/selected faces of the target mesh. project uses the active camera, unwrap projects each face to its own plane, and cylinder/sphere map around the local origin. This does not pack UV islands.</p>
+      <p class="card-desc">Maps only the specified/selected faces of the target mesh. project uses the active camera, unwrap projects each face to its own plane, and cylinder/sphere map around the local origin using each face's logical texture UV size (project UV size for untextured faces). Coordinates are logical UV units, not necessarily bitmap pixels. This does not pack UV islands.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -4148,7 +4158,7 @@
       <td class="col-name">mode</td>
       <td class="col-type">&quot;project&quot; | &quot;unwrap&quot; | &quot;cylinder&quot; | &quot;sphere&quot;</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">project uses the active preview; unwrap is per-face planar projection; cylinder and sphere use the local origin. <span class="param-meta">(default: <code>&quot;project&quot;</code>)</span></td>
+      <td class="col-desc">project uses the active preview; unwrap is per-face planar projection; cylinder and sphere use the local origin and each face's logical texture UV dimensions. <span class="param-meta">(default: <code>&quot;project&quot;</code>)</span></td>
     </tr><tr>
       <td class="col-name">faces</td>
       <td class="col-type">string[]</td>
@@ -4197,6 +4207,84 @@
     </table>
       </div>
     </div>
+<div id="tool-get_cube_uv" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">get_cube_uv</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">Get Cube UV</p>
+      <p class="card-desc">Inspect a cube's UV mode, offset, mirroring, six face rectangles/rotations, stored and effective texture references, logical UV sizes and bitmap sizes. Read-only; no selection or preview changes.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Cube UUID or unique name. UUID takes precedence over names. <span class="param-meta">[minLength: 1]</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-set_cube_uv" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">set_cube_uv</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Set Cube UV</p>
+      <p class="card-desc">Edit box UV offsets/mirroring or per-face rectangles, rotation and texture references in one reversible edit. Preserves untargeted faces and selection. Validates UV mode, texture references and rotation support. Hytale rectangles must retain geometry-linked extents and Auto UV; texture assignments use the project/attachment collection, and quads cannot use box UV. Does not pack islands or repaint textures.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Cube UUID or unique name. Does not use or change selection. <span class="param-meta">[minLength: 1]</span></td>
+    </tr><tr>
+      <td class="col-name">box_uv</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Explicitly convert UV mode using the native cube operation. Requires optional_box_uv to change mode. Conversion can reset rotations and enable disabled faces.</td>
+    </tr><tr>
+      <td class="col-name">uv_offset</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Box UV net offset [u, v]; requires box UV mode. <span class="param-meta">[minItems: 2, maxItems: 2]</span></td>
+    </tr><tr>
+      <td class="col-name">mirror_uv</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Mirror the box UV net; requires box UV mode. For per-face mirroring, reverse rectangle endpoints.</td>
+    </tr><tr>
+      <td class="col-name">faces</td>
+      <td class="col-type">object</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Patch only these faces in per-face UV mode. Other faces are preserved. Explicit rectangles disable automatic UV remapping except in Hytale, where dimension-linked UVs retain native Auto UV. Hytale textures resolve through the project/attachment collection, so only null is accepted as an explicit face texture.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
         </section>
 <section id="cat-hytale-integration" class="category-section">
           <h3 class="category-title">Hytale Integration</h3>
@@ -4223,7 +4311,7 @@
         </div>
       </div>
       <p class="card-title">Validate Hytale Model</p>
-      <p class="card-desc">Validates the current Hytale model against Hytale engine constraints (node count, UV sizes, etc.).</p>
+      <p class="card-desc">Checks exported main-model node count using the installed Hytale codec and verifies bitmap dimensions are multiples of 32. Does not validate attachment exports, shading, all UVs, animation integration or target-engine rendering.</p>
       <div class="overflow-x">
         <p class="empty-params">No parameters</p>
       </div>
@@ -4773,7 +4861,7 @@
       </section>
 
       <footer class="page-footer">
-        Generated 2026-09-13T17:54:29.660Z from Zod schemas
+        Generated 2026-09-13T20:44:59.501Z from Zod schemas
       </footer>
     </main>
   </div>

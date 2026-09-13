@@ -54,12 +54,19 @@ function paintBlankCanvas(ctx: CanvasRenderingContext2D, texture: Texture, fillC
   ctx.fillRect(0, 0, texture.width, texture.height);
 }
 
-/** Paints a blank texture and commits the canvas as its source and layer data. */
-function fillBlankTexture(texture: Texture, fillColor: TextureFillColor | undefined): void {
+/**
+ * Sizes and paints the detached bitmap, then waits for native image decoding.
+ * Texture construction leaves a 16x16 canvas even when width/height were supplied;
+ * serializing it unchanged would replace the requested dimensions on image load.
+ */
+async function fillBlankTexture(texture: Texture, fillColor: TextureFillColor | undefined): Promise<void> {
   const { ctx } = texture.getActiveCanvas();
+  ctx.canvas.width = texture.width;
+  ctx.canvas.height = texture.height;
   paintBlankCanvas(ctx, texture, fillColor);
   texture.updateSource(ctx.canvas.toDataURL("image/png", 1));
   texture.updateLayerChanges(true);
+  await decodeTextureImage(texture, "Cannot decode the newly created texture bitmap.");
 }
 
 /** Loads an image data URL into `texture` and waits for it to decode. */
@@ -99,7 +106,7 @@ export async function loadTextureData(
   channel: PbrChannel
 ): Promise<Texture> {
   if (!data) {
-    fillBlankTexture(blank, fillColor);
+    await fillBlankTexture(blank, fillColor);
     return blank;
   }
   if (!data.startsWith(IMAGE_DATA_URL_PREFIX)) return loadTextureFile(data, channel);

@@ -2,7 +2,7 @@
 import type { z } from "zod";
 import { createTool } from "@/lib/factories";
 import { findGroupOrThrow } from "@/lib/util";
-import { runUndoableEdit } from "@/lib/undo";
+import { runUndoableAnimationEdit } from "@/lib/animation-undo";
 import { animationToolDocs } from "./docs";
 import { createAnimationParameters } from "./schemas";
 import { TRANSFORM_CHANNELS, applyKeyframeValues, getAnimationClass } from "./shared";
@@ -125,7 +125,7 @@ export function registerCreateAnimationTool(): void {
         }
         const validated = validateAnimationInput(input);
         const animations: _Animation[] = [];
-        const animation = runUndoableEdit({ animations }, "Create animation", () => {
+        const animation = runUndoableAnimationEdit({ animations }, "Create animation", () => {
           const AnimationClass = getAnimationClass();
           const created = new AnimationClass({
             name: `animation.${input.name}`, loop: input.loop ? "loop" : "once",

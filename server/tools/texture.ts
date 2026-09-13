@@ -45,12 +45,14 @@ import { importMaterial } from "@/server/tools/texture/texture-set-import";
 // Texture Tool Parameter Schemas
 // ============================================================================
 
-/** Create a texture from a data URL, desktop image path, or fill color; `pbr_channel` requires a material `group`. */
+/** Create a texture from pixels or a fill, with optional paired logical UV dimensions for per-texture formats; `pbr_channel` requires a material `group`. */
 export const createTextureParameters = z
   .object({
     name: z.string(),
     width: z.number().min(16).max(4096).default(16),
     height: z.number().min(16).max(4096).default(16),
+    uv_width: z.number().finite().positive().optional().describe("Logical UV width for formats with per_texture_uv_size. Supply uv_height too. Independent of bitmap width; omit both to preserve native defaults."),
+    uv_height: z.number().finite().positive().optional().describe("Logical UV height for formats with per_texture_uv_size. Supply uv_width too. Independent of bitmap height."),
     data: z
       .string()
       .optional()
@@ -80,6 +82,10 @@ export const createTextureParameters = z
       .optional()
       .default("auto")
       .describe("Render sides for the texture. Auto, front, or double."),
+  })
+  .refine(params => (params.uv_width === undefined) === (params.uv_height === undefined), {
+    message: "Supply both uv_width and uv_height, or omit both.",
+    path: ["uv_width"],
   })
   .refine((params) => !(params.data && params.fill_color), {
     message:
@@ -436,8 +442,11 @@ export function registerTextureTools(): void {
   createTool(textureToolDocs[0].name, {
     ...textureToolDocs[0],
     parameters: createTextureParameters,
-    async execute({ name, width, height, data, pbr_channel, fill_color, group, render_mode, render_sides }) {
+    async execute({ name, width, height, uv_width, uv_height, data, pbr_channel, fill_color, group, render_mode, render_sides }) {
       requireTextureProject(false);
+      if (uv_width !== undefined && !Format.per_texture_uv_size) {
+        throw new Error("The current format uses project-wide UV dimensions. Per-texture uv_width/uv_height would have no effect; edit project UV size through the native project workflow.");
+      }
       const textureGroup = group ? findTextureGroupOrThrow(group) : undefined;
       if (textureGroup?.is_material) requireTextureProject();
       if (pbr_channel && !textureGroup?.is_material) {
@@ -453,6 +462,10 @@ export function registerTextureTools(): void {
       texture.pbr_channel = pbr_channel ?? "color";
       texture.render_mode = render_mode;
       texture.render_sides = render_sides;
+      if (uv_width !== undefined && uv_height !== undefined) {
+        texture.uv_width = uv_width;
+        texture.uv_height = uv_height;
+      }
       texture.updateMaterial();
       const result = imageContent({ url: texture.getDataURL() });
       addCreatedTexture(texture, textureGroup);
@@ -517,6 +530,9 @@ export function registerTextureTools(): void {
           uuid: texture.uuid,
           id: texture.id,
           group: texture.group,
+          uv_size: [texture.getUVWidth(), texture.getUVHeight()],
+          bitmap_size: [texture.width, texture.height],
+          frame_size: [texture.width, texture.display_height],
         }))
       );
     },

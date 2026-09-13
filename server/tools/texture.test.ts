@@ -80,6 +80,7 @@ class TestTexture {
   path = "";
   width = 16;
   height = 16;
+  img = { decode: async () => {} };
   render_mode = "default";
   render_sides = "auto";
   constructor(data: ITextureData) {

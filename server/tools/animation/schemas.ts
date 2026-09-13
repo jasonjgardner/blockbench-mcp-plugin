@@ -79,7 +79,7 @@ export const animationGraphEditorParameters = z.object({
   animation_id: animationIdOptionalSchema,
   bone_name: boneNameSchema.describe("Name of the bone/group to modify curves for."),
   channel: animationChannelEnum.describe("Animation channel to modify."),
-  axis: axisWithAllEnum.default("all").describe("Axis to modify curves for."),
+  axis: axisWithAllEnum.default("all").describe("Axes to edit. Linear, stepped and smooth require all because interpolation is key-wide. Partial-axis easing/custom edits require selected keys already using Bezier interpolation, preserving other axes' handles."),
   action: z
     .enum([
       "smooth",
@@ -90,26 +90,26 @@ export const animationGraphEditorParameters = z.object({
       "stepped",
       "custom",
     ])
-    .describe("Type of curve modification to apply."),
+    .describe("Curve modification. Easing/custom require at least two distinct chronological numeric single-data-point keys. Smooth and Bezier rotation edits are unavailable when native quaternion interpolation would ignore them."),
   keyframe_range: timeRangeSchema
     .optional()
     .describe(
-      "Time range to apply the curve modification. If not provided, applies to all keyframes."
+      "Finite ordered time range selecting existing keys; omitted means the full channel. Key-wide interpolation can affect neighboring segments at range boundaries, so edit the full channel when boundary continuity matters."
     ),
   custom_curve: z
     .object({
       control_point_1: z
-        .array(z.number())
+        .array(z.number().finite())
         .length(2)
-        .describe("First control point [time, value]."),
+        .describe("Outgoing normalized control point [time fraction in 0..1, value fraction] for each selected adjacent-key segment. Finite value fractions outside 0..1 allow overshoot."),
       control_point_2: z
-        .array(z.number())
+        .array(z.number().finite())
         .length(2)
-        .describe("Second control point [time, value]."),
+        .describe("Incoming normalized control point [time fraction in 0..1, value fraction], measured from the segment start. Converted to native per-axis offsets relative to the ending key."),
     })
     .optional()
     .describe(
-      "Custom bezier curve control points (only for 'custom' action)."
+      "Normalized cubic Bezier control points, required for custom action. Conversion uses each segment's duration and edited-axis endpoint values; unrelated axis handles are preserved."
     ),
 });
 
@@ -206,13 +206,14 @@ export const batchKeyframeOperationsParameters = z.object({
   selection: z
     .enum(["all", "selected", "range", "pattern"])
     .default("selected")
-    .describe("Which keyframes to operate on."),
+    .describe("Which active-animation keyframes to operate on. all includes hidden or collapsed animators."),
   range: timeRangeSchema.optional().describe("Time range for keyframe selection."),
   pattern: z
     .object({
-      interval: z.number().describe("Time interval between keyframes."),
+      interval: z.number().finite().positive().describe("Positive time interval between keyframes."),
       offset: z
         .number()
+        .finite()
         .optional()
         .default(0)
         .describe("Time offset for the pattern."),
@@ -224,21 +225,25 @@ export const batchKeyframeOperationsParameters = z.object({
     .describe("Operation to perform on keyframes."),
   parameters: z
     .object({
-      offset_time: z.number().optional().describe("Time offset to apply."),
-      offset_values: vector3Schema.optional().describe("Value offset to apply."),
+      offset_time: z.number().finite().optional().describe("Time offset to apply; resulting keyframes must remain between 0 and 10000 seconds."),
+      offset_values: vector3Schema.optional().describe("Numeric [x,y,z] value offset. Requires transform keyframes with a single numeric data point; expressions and pre/post values require native tools."),
       scale_factor: z
         .number()
+        .finite()
         .optional()
-        .describe("Scale factor for time or values."),
+        .describe("Scale factor for keyframe times around scale_pivot. Does not scale values; zero is accepted only when it creates no timestamp collisions."),
       scale_pivot: z
         .number()
+        .finite()
         .optional()
         .describe("Pivot point for scaling."),
-      mirror_axis: axisEnum.optional().describe("Axis to mirror values across."),
+      mirror_axis: axisEnum.optional().describe("Numeric component to negate. Requires transform keyframes with a single numeric data point."),
       bake_interval: z
         .number()
+        .finite()
+        .min(0.001)
         .optional()
-        .describe("Interval for baking keyframes."),
+        .describe("Sampling interval in seconds (minimum 0.001; at most 10000 samples). Bakes only selected transform channels between their selected times. Requires continuous numeric single-data-point keyframes; expressions, effects and stepped/pre-post curves require native baking."),
     })
     .optional()
     .describe("Operation-specific parameters."),
@@ -281,10 +286,11 @@ export const animationCopyPasteParameters = z.object({
       bone: z.string().describe("Target bone name."),
       time_offset: z
         .number()
+        .finite()
         .optional()
         .default(0)
-        .describe("Time offset for pasted keyframes."),
-      mirror_axis: axisEnum.optional().describe("Axis to mirror across for mirror_paste."),
+        .describe("Offset for exact, unsnapped pasted timestamps; results must remain between 0 and 10000 seconds. Existing keys at the same channel/time are replaced."),
+      mirror_axis: axisEnum.optional().describe("Native mirror axis for mirror_paste (default x). Position negates this axis, rotation negates the other two axes, scale is unchanged; curve handles follow native mirroring."),
     })
     .optional()
     .describe("Target data for paste operation."),
