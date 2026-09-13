@@ -1,8 +1,24 @@
 import { describe, expect, test } from "bun:test";
 import { createIdentityMeshes } from "./identity-geometry";
 
-/** SHA-256 of `JSON.stringify(createIdentityMeshes())` captured before the helper refactor. */
-const REFERENCE_OUTPUT_SHA256 = "96121aab3958069d7de9f5cfe26f9ff623c6760cbbb6ca71d905107d68ca1dcf";
+/**
+ * Rounding steps per Blockbench unit applied to every number before hashing. Bun's float
+ * math lands 1–2 ULP (~1e-15) apart across operating systems and CPUs, so raw doubles
+ * cannot hash identically on every machine. Each reference coordinate sits at least
+ * 1e-12 from a rounding boundary, far outside that noise, while any real geometry change
+ * still moves the hash.
+ */
+const HASH_STEPS_PER_UNIT = 1e9;
+
+/**
+ * SHA-256 of the pre-refactor `createIdentityMeshes()` JSON with numbers rounded to
+ * {@link HASH_STEPS_PER_UNIT}; verified identical on Windows and Linux.
+ */
+const REFERENCE_OUTPUT_SHA256 = "c148c654cf06e18aee27e46fb89c7c667e99523fdfc10aab4c42d963944826f7";
+
+/** Serializes meshes with every number rounded so the hash is platform-independent. */
+const serializeRounded = (value: unknown): string =>
+  JSON.stringify(value, (_key, entry: unknown) => typeof entry === "number" ? Math.round(entry * HASH_STEPS_PER_UNIT) / HASH_STEPS_PER_UNIT : entry);
 
 /** `[name, vertex count, face count]` per ribbon, in reference path order. */
 const REFERENCE_COUNTS = [
@@ -16,8 +32,8 @@ describe("identity geometry", () => {
     expect(createIdentityMeshes().map(mesh => [mesh.name, mesh.vertices.length, mesh.faces.length])).toEqual(REFERENCE_COUNTS);
   });
 
-  test("serializes byte-identically to the pre-refactor output", () => {
-    const serialized = JSON.stringify(createIdentityMeshes());
+  test("serializes identically to the pre-refactor output at nano-unit precision", () => {
+    const serialized = serializeRounded(createIdentityMeshes());
     expect(new Bun.CryptoHasher("sha256").update(serialized).digest("hex")).toBe(REFERENCE_OUTPUT_SHA256);
   });
 
