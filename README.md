@@ -1,6 +1,12 @@
 # Blockbench MCP
 
+<img width="2554" height="1390" alt="Blockbench MCP Plugin screenshot" src="https://github.com/user-attachments/assets/fc897c9c-e4be-403d-803b-e981047a4575" />
+
+<details><summary>Video</summary>
+  
 https://github.com/user-attachments/assets/ab1b7e63-b6f0-4d5b-85ab-79d328de31db
+
+</details>
 
 [![skills.sh](https://skills.sh/b/jasonjgardner/blockbench-mcp-project)](https://skills.sh/jasonjgardner/blockbench-mcp-project)
 
