@@ -80,6 +80,17 @@ npx mcp-add --type http --url "http://localhost:3000/bb-mcp" --scope project
 claude mcp add blockbench --transport http http://localhost:3000/bb-mcp
 ```
 
+#### ChatGPT
+
+<img width="601" height="426" alt="ChatGPT add plugin marketplace screenshot" src="https://github.com/user-attachments/assets/348471c3-f215-47bb-ae12-9c140d53186e" />
+
+##### Codex
+
+```bash
+codex plugin marketplace add jasonjgardner/blockbench-mcp-project --ref codex
+codex plugin add blockbench-mcp@blockbench-mcp-project
+```
+
 #### [Antigravity](https://antigravity.google/docs/mcp#connecting-custom-mcp-servers)
 
 ```json
