@@ -1,4 +1,4 @@
-import { version } from "../package.json" assert { type: "json" };
+import { version } from "@/package.json" assert { type: "json" };
 
 /** Bundler build profile: production builds enable release-only runtime checks. */
 export type BuildMode = "production" | "development";

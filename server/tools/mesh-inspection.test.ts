@@ -3,6 +3,7 @@ import { getAllToolDefinitions } from "@/lib/factories";
 import { getMeshInfoParameters, registerMeshInspectionTools, type IMeshInspectionResult } from "@/server/tools/mesh-inspection";
 import { isRecord, required } from "@/tests/helpers/assertions";
 import { useGlobals } from "@/tests/helpers/globals";
+import { evaluateHostCondition } from "@/tests/helpers/condition-host";
 import type { IMeshSelection, ITextureReference, MeshSelectionMap, UvTuple, Vector3Tuple } from "@/tests/helpers/shapes";
 import { executeStructured } from "@/tests/helpers/tool-execution";
 
@@ -53,7 +54,9 @@ beforeEach(() => {
 
 // Registered after the reset above so the factory reads this test's fresh fixtures.
 useGlobals(() => ({
+  Condition: evaluateHostCondition,
   Project: project,
+  Format: { id: "free", meshes: true },
   Mesh: { all: meshes, selected },
   Undo: { initEdit: forbiddenMutation, finishEdit: forbiddenMutation },
   Canvas: { updateView: forbiddenMutation, updateAll: forbiddenMutation },
@@ -209,7 +212,7 @@ describe("mesh inspection", () => {
     await expect(inspect({ mesh_id: "missing" })).rejects.toThrow('Mesh "missing" not found');
     await expect(inspect()).rejects.toThrow("No mesh selected");
     Object.assign(globalThis, { Project: undefined });
-    await expect(inspect({ mesh_id: "Mark" })).rejects.toThrow("No project is open");
+    await expect(inspect({ mesh_id: "Mark" })).rejects.toThrow('Tool "get_mesh_info" is unavailable');
   });
 
   test.each([

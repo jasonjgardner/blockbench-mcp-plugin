@@ -2,14 +2,18 @@ import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { z } from "zod";
+import { ToolListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js";
 import {
   createTool,
   getAllToolDefinitions,
   registerToolsOnServer,
+  refreshToolAvailability,
   tools,
 } from "@/lib/factories";
 import { createServer, getServer, setServer } from "@/server/server";
 import { createTextureParameters } from "@/server/tools/texture";
+import { registerModeTools } from "@/server/tools/modes";
+import { installGlobals } from "@/tests/helpers/globals";
 
 type RegistrationMode = "initial" | "session";
 
@@ -20,10 +24,14 @@ interface ITransformFields {
 }
 
 const originalServer = getServer();
+const originalCondition = Object.getOwnPropertyDescriptor(globalThis, "Condition");
 let clients: Client[] = [];
 let servers: ReturnType<typeof createServer>[] = [];
 
 beforeEach(() => {
+  Object.keys(tools).forEach((name) => delete tools[name]);
+  const definitions = getAllToolDefinitions();
+  Object.keys(definitions).forEach((name) => delete definitions[name]);
   const server = createServer();
   servers = [server];
   setServer(server);
@@ -38,6 +46,11 @@ afterEach(async () => {
   const definitions = getAllToolDefinitions();
   Object.keys(definitions).forEach((name) => delete definitions[name]);
   setServer(originalServer);
+  if (originalCondition) {
+    Object.defineProperty(globalThis, "Condition", originalCondition);
+    return;
+  }
+  Reflect.deleteProperty(globalThis, "Condition");
 });
 
 async function connectClient(mode: RegistrationMode): Promise<Client> {
@@ -56,6 +69,138 @@ async function connectClient(mode: RegistrationMode): Promise<Client> {
 }
 
 describe.each<RegistrationMode>(["initial", "session"])("%s registration", (mode) => {
+  test("mode switching enables dependent tools in every connected session", async () => {
+    interface IHostMode {
+      id: string;
+      name: string;
+      condition: boolean;
+      trigger(): void;
+    }
+    const host: { selected: IHostMode | false; options: Record<string, IHostMode> } = { selected: false, options: {} };
+    ["edit", "animate"].forEach(id => {
+      host.options[id] = { id, name: id, condition: true, trigger() { host.selected = this; } };
+    });
+    host.selected = host.options.edit!;
+    const restore = installGlobals({
+      Modes: host,
+      Condition: (condition: unknown) => typeof condition === "function" ? condition() : condition !== false,
+    });
+    try {
+      registerModeTools();
+      createTool("animation_only", {
+        description: "Requires Animate.", parameters: z.object({}),
+        condition: () => Boolean(host.selected && host.selected.id === "animate"),
+        execute: async () => "ready",
+      });
+      const first = await connectClient(mode);
+      const second = await connectClient("session");
+      const firstNotification = mock(() => {});
+      const secondNotification = mock(() => {});
+      first.setNotificationHandler(ToolListChangedNotificationSchema, firstNotification);
+      second.setNotificationHandler(ToolListChangedNotificationSchema, secondNotification);
+      expect((await first.listTools()).tools.map(tool => tool.name)).toEqual(["list_modes", "set_mode"]);
+
+      const switched = await first.callTool({ name: "set_mode", arguments: { mode_id: "animate" } });
+      expect(switched.isError).not.toBe(true);
+      expect(switched.structuredContent).toMatchObject({ previous_mode: "edit", current_mode: "animate", changed: true });
+      expect((await second.listTools()).tools.map(tool => tool.name)).toContain("animation_only");
+      expect(firstNotification).toHaveBeenCalledTimes(1);
+      expect(secondNotification).toHaveBeenCalledTimes(1);
+      expect((await second.callTool({ name: "animation_only", arguments: {} })).isError).not.toBe(true);
+
+      const repeated = await second.callTool({ name: "set_mode", arguments: { mode_id: "animate" } });
+      expect(repeated.structuredContent).toMatchObject({ current_mode: "animate", changed: false });
+      expect(firstNotification).toHaveBeenCalledTimes(1);
+      await second.callTool({ name: "set_mode", arguments: { mode_id: "edit" } });
+      expect((await first.listTools()).tools.map(tool => tool.name)).toEqual(["list_modes", "set_mode"]);
+      expect(firstNotification).toHaveBeenCalledTimes(2);
+      expect(secondNotification).toHaveBeenCalledTimes(2);
+    } finally {
+      restore();
+    }
+  });
+
+  test("updates every session using native conditions and coalesces change notifications", async () => {
+    let available = false;
+    const condition = { project: true, features: ["meshes"] };
+    const evaluate = mock(() => available);
+    Object.defineProperty(globalThis, "Condition", { configurable: true, value: evaluate });
+    ["conditional_one", "conditional_two"].forEach(name => createTool(name, {
+      description: "Requires native editor state.", parameters: z.object({}), condition,
+      execute: async () => "done",
+    }));
+    createTool("manually_disabled", {
+      description: "Explicitly disabled.", parameters: z.object({}), condition,
+      execute: async () => "must not run",
+    }, "stable", false);
+    const first = await connectClient(mode);
+    const second = await connectClient("session");
+    const firstNotification = mock(() => {});
+    const secondNotification = mock(() => {});
+    first.setNotificationHandler(ToolListChangedNotificationSchema, firstNotification);
+    second.setNotificationHandler(ToolListChangedNotificationSchema, secondNotification);
+    expect(first.getServerCapabilities()?.tools).toEqual({ listChanged: true });
+    expect((await first.listTools()).tools).toEqual([]);
+    expect((await second.listTools()).tools).toEqual([]);
+    expect(evaluate).toHaveBeenCalledWith(condition);
+
+    available = true;
+    refreshToolAvailability();
+    expect((await first.listTools()).tools.map(tool => tool.name)).toEqual(["conditional_one", "conditional_two"]);
+    expect((await second.listTools()).tools).toHaveLength(2);
+    expect(firstNotification).toHaveBeenCalledTimes(1);
+    expect(secondNotification).toHaveBeenCalledTimes(1);
+    expect(tools.conditional_one?.enabled).toBe(true);
+    expect(tools.manually_disabled?.enabled).toBe(false);
+    refreshToolAvailability();
+    await first.listTools();
+    expect(firstNotification).toHaveBeenCalledTimes(1);
+
+    available = false;
+    refreshToolAvailability();
+    expect((await second.listTools()).tools).toEqual([]);
+    expect(firstNotification).toHaveBeenCalledTimes(2);
+    expect(secondNotification).toHaveBeenCalledTimes(2);
+    const result = await first.callTool({ name: "conditional_one", arguments: {} });
+    expect(result.isError).toBe(true);
+  });
+
+  test("rechecks conditions before execution even when a client has a stale enabled list", async () => {
+    let available = true;
+    Object.defineProperty(globalThis, "Condition", { configurable: true, value: () => available });
+    const execute = mock(async () => "must not run");
+    createTool("stale_condition", {
+      description: "Requires state.", parameters: z.object({}), condition: { project: true }, execute,
+    });
+    const client = await connectClient(mode);
+    expect((await client.listTools()).tools).toHaveLength(1);
+    available = false;
+    const result = await client.callTool({ name: "stale_condition", arguments: {} });
+    expect(result.isError).toBe(true);
+    expect(result.content).toEqual([{ type: "text", text: expect.stringContaining("unavailable") }]);
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  test("preserves embedded resources, resource links, and explicit tool errors", async () => {
+    const content = [
+      { type: "resource" as const, resource: { uri: "blockbench://project/model.bbmodel", mimeType: "application/json", text: "{}" } },
+      { type: "resource_link" as const, uri: "blockbench://project/model.bbmodel", name: "model.bbmodel", mimeType: "application/json" },
+    ];
+    createTool("resources", {
+      description: "Return files.", parameters: z.object({}),
+      execute: async () => ({ content, structuredContent: { uri: "blockbench://project/model.bbmodel" } }),
+    });
+    createTool("failure", {
+      description: "Return an execution failure.", parameters: z.object({}),
+      execute: async () => ({ content: [{ type: "text", text: "Unable to compile." }], isError: true }),
+    });
+    const client = await connectClient(mode);
+    const result = await client.callTool({ name: "resources", arguments: {} });
+    expect(result.content).toEqual(content);
+    expect(result.structuredContent).toEqual({ uri: "blockbench://project/model.bbmodel" });
+    expect((await client.callTool({ name: "failure", arguments: {} })).isError).toBe(true);
+  });
+
   test("publishes annotations and the refined schema's input fields", async () => {
     const annotations = {
       title: "Create texture",

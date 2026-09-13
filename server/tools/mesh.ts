@@ -224,6 +224,7 @@ export const knifeToolParameters = z.object({
 export const meshToolDocs: IToolSpec[] = [
   {
     name: "place_mesh",
+    condition: { project: true, features: ["meshes"] },
     description:
       "Creates meshes from local vertices and optional indexed triangle/quad faces, with position, rotation, and scale. Texture and group are optional. Returns meshes with UUIDs and vertex_keys/face_keys arrays in input order for subsequent editing.",
     annotations: {
@@ -235,6 +236,7 @@ export const meshToolDocs: IToolSpec[] = [
   },
   {
     name: "extrude_mesh",
+    condition: { project: true, features: ["meshes"] },
     description: "Extrudes the target mesh's selected face region along averaged normals, honoring distance. Returns new vertex keys and cap/wall face keys. Edge/vertex modes are unsupported.",
     annotations: {
       title: "Extrude Mesh",
@@ -245,6 +247,7 @@ export const meshToolDocs: IToolSpec[] = [
   },
   {
     name: "subdivide_mesh",
+    condition: { project: true, features: ["meshes"] },
     description: "Subdivides the target mesh's selected triangles/quads into a regular grid with interpolated UVs. Returns new geometry keys. Unselected neighboring faces remain unchanged and may need matching cuts.",
     annotations: {
       title: "Subdivide Mesh",
@@ -255,6 +258,7 @@ export const meshToolDocs: IToolSpec[] = [
   },
   {
     name: "create_sphere",
+    condition: { project: true, features: ["meshes"] },
     description:
       "Creates a sphere mesh at the specified position with the given parameters. The sphere is created as a mesh with vertices and faces using spherical coordinates.",
     annotations: {
@@ -266,6 +270,7 @@ export const meshToolDocs: IToolSpec[] = [
   },
   {
     name: "select_mesh_elements",
+    condition: { project: true, features: ["meshes"] },
     description:
       "Selects vertices, edges, or faces of a mesh for manipulation.",
     annotations: {
@@ -277,6 +282,7 @@ export const meshToolDocs: IToolSpec[] = [
   },
   {
     name: "move_mesh_vertices",
+    condition: { project: true, features: ["meshes"] },
     description: "Moves selected vertices of a mesh by the specified offset.",
     annotations: {
       title: "Move Mesh Vertices",
@@ -287,6 +293,7 @@ export const meshToolDocs: IToolSpec[] = [
   },
   {
     name: "delete_mesh_elements",
+    condition: { project: true, features: ["meshes"] },
     description: "Deletes selected components only from the target mesh. Vertex/edge deletion removes incident faces; keep_vertices retains vertices orphaned by face/edge removal.",
     annotations: {
       title: "Delete Mesh Elements",
@@ -297,6 +304,7 @@ export const meshToolDocs: IToolSpec[] = [
   },
   {
     name: "merge_mesh_vertices",
+    condition: { project: true, features: ["meshes"] },
     description:
       "Merges vertices that are within a specified distance of each other.",
     annotations: {
@@ -308,6 +316,7 @@ export const meshToolDocs: IToolSpec[] = [
   },
   {
     name: "create_mesh_face",
+    condition: { project: true, features: ["meshes"] },
     description: "Creates a new face from selected vertices.",
     annotations: {
       title: "Create Mesh Face",
@@ -318,6 +327,7 @@ export const meshToolDocs: IToolSpec[] = [
   },
   {
     name: "create_cylinder",
+    condition: { project: true, features: ["meshes"] },
     description: "Creates one or more cylinder meshes with optional end caps.",
     annotations: { title: "Create Cylinder", destructiveHint: true },
     parameters: createCylinderParameters,
@@ -325,6 +335,7 @@ export const meshToolDocs: IToolSpec[] = [
   },
   {
     name: "knife_tool",
+    condition: false,
     description: "Currently unsupported: Blockbench's interactive Knife context requires pointer topology that this point-list API cannot safely provide. Use subdivide_mesh or create geometry with place_mesh, or use Knife manually.",
     annotations: {
       title: "Knife Tool",

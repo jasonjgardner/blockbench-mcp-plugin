@@ -123,6 +123,7 @@ export const uiToolDocs: IToolSpec[] = [
   },
   {
     name: "emulate_clicks",
+    condition: () => !Blockbench.isWeb,
     description: "Emulates clicks on the given interface elements.",
     annotations: {
       title: "Emulate Clicks",
@@ -134,6 +135,7 @@ export const uiToolDocs: IToolSpec[] = [
   },
   {
     name: "fill_dialog",
+    condition: () => Dialog.stack.length > 0,
     description: "Fills the dialog with the given values.",
     annotations: {
       title: "Fill Dialog",

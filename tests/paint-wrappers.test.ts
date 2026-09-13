@@ -2,6 +2,7 @@ import { beforeAll, beforeEach, expect, test } from "bun:test";
 import { registerPaintTools } from "@/server/tools/paint";
 import { required } from "@/tests/helpers/assertions";
 import { useGlobals } from "@/tests/helpers/globals";
+import { evaluateHostCondition } from "@/tests/helpers/condition-host";
 import { executeTool } from "@/tests/helpers/tool-execution";
 import { createUndoHost } from "@/tests/helpers/undo-host";
 
@@ -121,7 +122,7 @@ const painter = {
 
 function createBarItems(): Record<string, unknown> {
   const settings = Object.fromEntries(BRUSH_SETTING_KEYS.map(key => [key, { value: 0, set() {} }]));
-  const tools = Object.fromEntries(PAINT_TOOL_KEYS.map(key => [key, { select() { strokeTool = key; } }]));
+  const tools = Object.fromEntries(PAINT_TOOL_KEYS.map(key => [key, { condition: { modes: ["paint"] }, select() { strokeTool = key; } }]));
   return { ...settings, ...tools };
 }
 
@@ -140,12 +141,15 @@ beforeEach(() => {
   painter.current = emptyPainterContext();
 });
 useGlobals(() => ({
+  Condition: evaluateHostCondition,
   BarItems: createBarItems(),
   Canvas: { updateAll() {} },
   ColorPanel: { set() {} },
   Painter: painter,
   Project: { textures: [texture] },
-  Texture: { selected: texture },
+  Format: { paint_mode: true },
+  Modes: { id: "paint" },
+  Texture: { all: [texture], selected: texture },
   Undo: undo,
 }));
 

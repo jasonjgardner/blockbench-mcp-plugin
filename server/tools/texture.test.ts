@@ -3,6 +3,7 @@ import { win32 } from "node:path";
 import { registerTextureTools } from "@/server/tools/texture";
 import { required } from "@/tests/helpers/assertions";
 import { useGlobals } from "@/tests/helpers/globals";
+import { evaluateHostCondition } from "@/tests/helpers/condition-host";
 import type { IMaterialUniforms, PbrChannel } from "@/tests/helpers/shapes";
 import { executeTool } from "@/tests/helpers/tool-execution";
 import { createUndoHost } from "@/tests/helpers/undo-host";
@@ -201,6 +202,7 @@ beforeEach(() => {
   undo.reset();
 });
 useGlobals(() => ({
+  Condition: evaluateHostCondition,
   Blockbench: { isWeb: false },
   Canvas: { updateAll() {} },
   Format: { id: "free", pbr: true },
@@ -454,9 +456,9 @@ describe("PBR material transactions", () => {
     const group = new TestGroup({ name: "Ordinary" }).add();
     await expect(executeTool("configure_material", { material: group.uuid, color_value: [0, 0, 0, 255] })).rejects.toThrow("not a PBR material");
     Object.assign(globalThis, { Format: { pbr: false } });
-    await expect(executeTool("create_pbr_material", { name: "Unsupported" })).rejects.toThrow("does not support PBR");
+    await expect(executeTool("create_pbr_material", { name: "Unsupported" })).rejects.toThrow('Tool "create_pbr_material" is unavailable');
     Object.assign(globalThis, { Project: null });
-    await expect(executeTool("create_pbr_material", { name: "No project" })).rejects.toThrow("Open a project");
+    await expect(executeTool("create_pbr_material", { name: "No project" })).rejects.toThrow('Tool "create_pbr_material" is unavailable');
     expect(undo.starts).toBe(0);
   });
 

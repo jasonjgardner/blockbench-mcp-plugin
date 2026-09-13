@@ -15,6 +15,7 @@ import { setupI18n } from "@/ui/i18n";
 import { sessionManager } from "@/lib/sessions";
 import { initPromptLoader } from "@/lib/promptLoader";
 import { setupMaterialUndoRefresh, teardownMaterialUndoRefresh } from "@/lib/material-preview";
+import { setupEditorStateSync, teardownEditorStateSync } from "@/lib/editor-state";
 import type { NetServer, SessionTransports } from "@/server/net";
 import createNetServer from "@/server/net";
 import { getIcon } from "@/macros/getIcon" with { type: "macro" };
@@ -54,6 +55,7 @@ BBPlugin.register("mcp", {
 
     settingsSetup();
     setupMaterialUndoRefresh();
+    setupEditorStateSync();
 
     // Load prompt manifest from CDN/cache before server starts.
     // Must never abort onload — missing prompts should degrade gracefully,
@@ -100,6 +102,7 @@ BBPlugin.register("mcp", {
   },
 
   onunload() {
+    teardownEditorStateSync();
     teardownMaterialUndoRefresh();
     // Close HTTP server
     if (httpServer) {

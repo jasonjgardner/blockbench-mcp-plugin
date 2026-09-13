@@ -22,6 +22,7 @@ import {
 export const animationToolDocs: IToolSpec[] = [
   {
     name: "create_animation",
+    condition: { project: true, features: ["animation_mode"] },
     description: "Creates and selects an undoable animation with linear keyframes for existing bones, using Blockbench editor coordinates. Returns its UUID and actual name.",
     annotations: {
       title: "Create Animation",
@@ -32,6 +33,7 @@ export const animationToolDocs: IToolSpec[] = [
   },
   {
     name: "manage_keyframes",
+    condition: { project: true, features: ["animation_mode"] },
     description:
       "Creates, deletes, or edits keyframes in the animation timeline for specific bones and channels.",
     annotations: {
@@ -43,6 +45,7 @@ export const animationToolDocs: IToolSpec[] = [
   },
   {
     name: "animation_graph_editor",
+    condition: { project: true, features: ["animation_mode"] },
     description:
       "Controls animation curves in the graph editor for fine-tuning animations.",
     annotations: {
@@ -54,6 +57,7 @@ export const animationToolDocs: IToolSpec[] = [
   },
   {
     name: "bone_rigging",
+    condition: { project: true, features: ["bone_rig"] },
     description:
       "Creates and manipulates the bone structure (rig) of a model for animation.",
     annotations: {
@@ -65,6 +69,7 @@ export const animationToolDocs: IToolSpec[] = [
   },
   {
     name: "animation_timeline",
+    condition: { project: true, features: ["animation_mode"] },
     description:
       "Controls the animation timeline, including playback, time scrubbing, and timeline settings.",
     annotations: {
@@ -76,6 +81,7 @@ export const animationToolDocs: IToolSpec[] = [
   },
   {
     name: "batch_keyframe_operations",
+    condition: { project: true, features: ["animation_mode"] },
     description: "Performs batch operations on multiple keyframes at once.",
     annotations: {
       title: "Batch Keyframe Operations",
@@ -86,6 +92,7 @@ export const animationToolDocs: IToolSpec[] = [
   },
   {
     name: "animation_copy_paste",
+    condition: { project: true, features: ["animation_mode"] },
     description:
       "Copies and pastes animation data between bones or animations.",
     annotations: {

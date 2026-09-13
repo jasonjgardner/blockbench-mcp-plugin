@@ -155,6 +155,7 @@ export const renameElementParameters = z.object({
 export const elementToolDocs: IToolSpec[] = [
   {
     name: "remove_element",
+    condition: { project: true, features: ["edit_mode"] },
     description: "Removes the element with the given ID.",
     annotations: {
       title: "Remove Element",
@@ -165,6 +166,7 @@ export const elementToolDocs: IToolSpec[] = [
   },
   {
     name: "add_group",
+    condition: { project: true, features: ["edit_mode"] },
     description: "Adds a new group with the given name and options.",
     annotations: {
       title: "Add Group",
@@ -175,6 +177,7 @@ export const elementToolDocs: IToolSpec[] = [
   },
   {
     name: "list_outline",
+    condition: { project: true },
     description:
       "Returns the project outline as a hierarchical tree. Each node reports { name, uuid, type (cube|mesh|group), children? }. Groups contain child cubes, meshes, and sub-groups. Use `include_cubes=false` to get a group-only skeleton when you just need structure, or `max_depth` to bound very deep trees.",
     annotations: {
@@ -186,6 +189,7 @@ export const elementToolDocs: IToolSpec[] = [
   },
   {
     name: "duplicate_element",
+    condition: { project: true, features: ["edit_mode"] },
     description:
       "Duplicates a cube, mesh or group by ID or name.  You may offset the duplicate or assign a new name.",
     annotations: { title: "Duplicate Element", destructiveHint: true },
@@ -194,6 +198,7 @@ export const elementToolDocs: IToolSpec[] = [
   },
   {
     name: "rename_element",
+    condition: { project: true, features: ["edit_mode"] },
     description: "Renames a cube, mesh or group by ID or name.",
     annotations: { title: "Rename Element", destructiveHint: true },
     parameters: renameElementParameters,
@@ -201,6 +206,7 @@ export const elementToolDocs: IToolSpec[] = [
   },
   {
     name: "find_elements_by_criteria",
+    condition: { project: true },
     description:
       "Searches the current project for elements matching the given criteria. Supports name pattern matching (regex or substring), type filtering, scoping to a parent group, cube size ranges, and selection scope. Returns element metadata, never modifies state.",
     annotations: {
@@ -212,6 +218,7 @@ export const elementToolDocs: IToolSpec[] = [
   },
   {
     name: "select_all_of_type",
+    condition: { project: true },
     description:
       "Selects all elements of the given type (cube, mesh, or group) in the current project. Optionally restrict to descendants of a parent group, or add to (rather than replace) the current selection.",
     annotations: {
@@ -223,6 +230,7 @@ export const elementToolDocs: IToolSpec[] = [
   },
   {
     name: "filter_by_material",
+    condition: { project: true },
     description:
       "Returns all elements that reference the given texture. For cubes, includes the list of face keys (e.g., 'north', 'up') that use the texture. For meshes, returns the mesh if any face uses the texture.",
     annotations: {
@@ -234,6 +242,7 @@ export const elementToolDocs: IToolSpec[] = [
   },
   {
     name: "get_selection",
+    condition: { project: true },
     description:
       "Returns the current selection state: selected cube/mesh/group UUIDs and names, plus the active texture. Use this to verify what `apply_texture` or a paint tool with `fill_mode=\"selected_elements\"` will target.",
     annotations: {

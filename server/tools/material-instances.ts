@@ -97,6 +97,7 @@ function findCubeOrThrow(id: string): Cube {
 export const materialInstanceToolDocs: IToolSpec[] = [
   {
     name: "get_face_material_instances",
+    condition: { project: true, formats: ["bedrock_block"] },
     description:
       "Gets the material instance names for cube faces. Material instances are used in Bedrock Block format to map faces to materials defined in the minecraft:material_instances component.",
     annotations: {
@@ -108,6 +109,7 @@ export const materialInstanceToolDocs: IToolSpec[] = [
   },
   {
     name: "set_face_material_instance",
+    condition: { project: true, formats: ["bedrock_block"] },
     description:
       "Sets the material instance name for one or more cube faces. Material instances are strings that map to materials defined in the minecraft:material_instances component for Bedrock Block format.",
     annotations: {
@@ -119,6 +121,7 @@ export const materialInstanceToolDocs: IToolSpec[] = [
   },
   {
     name: "list_material_instances",
+    condition: { project: true, formats: ["bedrock_block"] },
     description:
       "Lists all unique material instance names used in the project. Returns the material instance names along with which cubes and faces use them.",
     annotations: {
@@ -130,6 +133,7 @@ export const materialInstanceToolDocs: IToolSpec[] = [
   },
   {
     name: "bulk_set_material_instances",
+    condition: { project: true, formats: ["bedrock_block"] },
     description:
       "Sets material instance names on multiple cubes at once. Useful for assigning different material instances to different faces across the project.",
     annotations: {
@@ -141,6 +145,7 @@ export const materialInstanceToolDocs: IToolSpec[] = [
   },
   {
     name: "clear_material_instances",
+    condition: { project: true, formats: ["bedrock_block"] },
     description:
       "Clears (removes) material instance names from cube faces. Useful for resetting material assignments.",
     annotations: {

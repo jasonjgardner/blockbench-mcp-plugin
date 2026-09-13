@@ -5,7 +5,8 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   registerToolsOnServer,
   registerResourcesOnServer,
-  registerPromptsOnServer
+  registerPromptsOnServer,
+  refreshToolAvailability
 } from '@/lib/factories'
 import { createServer as createMcpServer } from '@/server/server'
 import { sessionManager, type ISessionConfig } from '@/lib/sessions'
@@ -438,6 +439,7 @@ export default function createNetServer (
           }
 
           // Let the transport handle the MCP protocol
+          refreshToolAvailability()
           const webResponse = await session.transport.handleRequest(webRequest)
 
           // Convert Web Standard Response to HTTP

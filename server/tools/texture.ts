@@ -266,6 +266,7 @@ export const saveMaterialConfigParameters = z.object({
 export const textureToolDocs: IToolSpec[] = [
   {
     name: "create_texture",
+    condition: { project: true },
     description: "Creates a new texture with the given name and size.",
     annotations: {
       title: "Create Texture",
@@ -277,6 +278,7 @@ export const textureToolDocs: IToolSpec[] = [
   },
   {
     name: "apply_texture",
+    condition: { project: true, features: ["edit_mode"], method: () => Texture.all.length > 0 },
     description:
       "Applies the given texture to the element with the specified ID.",
     annotations: {
@@ -288,6 +290,7 @@ export const textureToolDocs: IToolSpec[] = [
   },
   {
     name: "add_texture_group",
+    condition: { project: true },
     description: "Adds a reversible texture group. All texture references must exist. Material groups require one texture per channel, either normal or height, and a color map alongside a MER map; use is_material=false for ordinary grouping.",
     annotations: {
       title: "Add Texture Group",
@@ -298,6 +301,7 @@ export const textureToolDocs: IToolSpec[] = [
   },
   {
     name: "list_textures",
+    condition: { project: true },
     description: "Returns a list of all textures in the Blockbench editor.",
     annotations: {
       title: "List Textures",
@@ -308,6 +312,7 @@ export const textureToolDocs: IToolSpec[] = [
   },
   {
     name: "get_texture",
+    condition: { project: true, method: () => Texture.all.length > 0 },
     description:
       "Returns the image data of the given texture or default texture.",
     annotations: {
@@ -319,6 +324,7 @@ export const textureToolDocs: IToolSpec[] = [
   },
   {
     name: "create_pbr_material",
+    condition: { project: true, features: ["pbr"] },
     description:
       "Creates a new PBR material (texture group with is_material=true) and optionally assigns textures to PBR channels. Requires a PBR-capable format, distinct textures per channel, either normal or height, and a color texture alongside a MER texture. Uniform values require the corresponding map to be absent. Creation and texture moves are one undoable edit.",
     annotations: {
@@ -330,6 +336,7 @@ export const textureToolDocs: IToolSpec[] = [
   },
   {
     name: "configure_material",
+    condition: { project: true, features: ["pbr"] },
     description:
       "Configures a PBR material in one undoable edit. Replaced maps are detached without deleting their textures. Use 'none' to clear a channel before using uniform values or switching between normal and height; a MER map requires a color map.",
     annotations: {
@@ -341,6 +348,7 @@ export const textureToolDocs: IToolSpec[] = [
   },
   {
     name: "list_materials",
+    condition: { project: true, features: ["pbr"] },
     description:
       "Lists all PBR materials (texture groups with is_material=true) and their assigned textures per channel.",
     annotations: {
@@ -352,6 +360,7 @@ export const textureToolDocs: IToolSpec[] = [
   },
   {
     name: "get_material_info",
+    condition: { project: true },
     description:
       "Gets detailed information about a PBR material including the compiled texture_set.json preview for Bedrock export.",
     annotations: {
@@ -363,6 +372,7 @@ export const textureToolDocs: IToolSpec[] = [
   },
   {
     name: "import_texture_set",
+    condition: { project: true, features: ["pbr"], method: () => !Blockbench.isWeb },
     description:
       "Imports a Minecraft Bedrock texture_set.json on desktop. Validates supported JSON and decodes referenced images before one undoable edit. Returns JSON with material name/UUID and path. Reuses already loaded image paths without deleting textures. Normal and height, or MER and MERS, cannot coexist; MER images require a color image.",
     annotations: {
@@ -375,6 +385,7 @@ export const textureToolDocs: IToolSpec[] = [
   },
   {
     name: "assign_texture_channel",
+    condition: { project: true, features: ["pbr"] },
     description:
       "Assigns a texture to one PBR channel in a single undoable edit. Detaches the previous map without deleting it or changing its channel. Normal and height cannot coexist; a MER map requires a color map, including in the source material after moving textures.",
     annotations: {
@@ -386,6 +397,7 @@ export const textureToolDocs: IToolSpec[] = [
   },
   {
     name: "save_material_config",
+    condition: { project: true, features: ["pbr"], method: () => !Blockbench.isWeb },
     description:
       "Saves the material's texture_set.json file to disk (Bedrock format). Requires the color texture to have a valid file path.",
     annotations: {
@@ -398,6 +410,7 @@ export const textureToolDocs: IToolSpec[] = [
   },
   {
     name: "activate_texture",
+    condition: { project: true, method: () => Texture.all.length > 0 },
     description:
       "Activates the given texture in the Blockbench texture panel so that subsequent paint operations (draw_shape_tool, paint_with_brush, gradient_tool, etc.) target it. Most paint tools already call this internally when a texture_id is provided, but you can invoke it explicitly to pin the active texture across multiple calls.",
     annotations: {

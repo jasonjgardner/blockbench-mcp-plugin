@@ -27,6 +27,7 @@ import {
 export const paintToolDocs: IToolSpec[] = [
   {
     name: "paint_fill_tool",
+    condition: { project: true, features: ["paint_mode"], method: () => Texture.all.length > 0 && Boolean(BarItems.fill_tool) && Condition(BarItems.fill_tool.condition) },
     description: "Uses the fill/bucket tool to fill areas with color.",
     annotations: {
       title: "Paint Fill Tool",
@@ -37,6 +38,7 @@ export const paintToolDocs: IToolSpec[] = [
   },
   {
     name: "draw_shape_tool",
+    condition: { project: true, features: ["paint_mode"], method: () => Texture.all.length > 0 && Boolean(BarItems.draw_shape_tool) && Condition(BarItems.draw_shape_tool.condition) },
     description: "Draws geometric shapes on textures.",
     annotations: {
       title: "Draw Shape Tool",
@@ -47,6 +49,7 @@ export const paintToolDocs: IToolSpec[] = [
   },
   {
     name: "gradient_tool",
+    condition: { project: true, features: ["paint_mode"], method: () => Texture.all.length > 0 && Boolean(BarItems.gradient_tool) && Condition(BarItems.gradient_tool.condition) },
     description: "Applies gradients to textures.",
     annotations: {
       title: "Gradient Tool",
@@ -57,6 +60,7 @@ export const paintToolDocs: IToolSpec[] = [
   },
   {
     name: "color_picker_tool",
+    condition: { project: true, features: ["paint_mode"], method: () => Texture.all.length > 0 },
     description:
       "Picks colors from textures and sets them as the active color.",
     annotations: {
@@ -68,6 +72,7 @@ export const paintToolDocs: IToolSpec[] = [
   },
   {
     name: "copy_brush_tool",
+    condition: { project: true, features: ["paint_mode"], method: () => Texture.all.length > 0 && Boolean(BarItems.copy_brush) && Condition(BarItems.copy_brush.condition) },
     description: "Uses the copy/clone brush to copy texture areas.",
     annotations: {
       title: "Copy Brush Tool",
@@ -78,6 +83,7 @@ export const paintToolDocs: IToolSpec[] = [
   },
   {
     name: "eraser_tool",
+    condition: { project: true, features: ["paint_mode"], method: () => Texture.all.length > 0 && Boolean(BarItems.eraser) && Condition(BarItems.eraser.condition) },
     description: "Erases parts of textures with customizable settings.",
     annotations: {
       title: "Eraser Tool",
@@ -88,6 +94,7 @@ export const paintToolDocs: IToolSpec[] = [
   },
   {
     name: "paint_settings",
+    condition: { project: true, features: ["paint_mode"] },
     description: "Configures paint mode settings and preferences.",
     annotations: {
       title: "Paint Settings",
@@ -98,6 +105,7 @@ export const paintToolDocs: IToolSpec[] = [
   },
   {
     name: "paint_with_brush",
+    condition: { project: true, features: ["paint_mode"], method: () => Texture.all.length > 0 },
     description:
       "Paints on textures using the brush tool with customizable settings.",
     annotations: {
@@ -119,6 +127,7 @@ export const paintToolDocs: IToolSpec[] = [
   },
   {
     name: "load_brush_preset",
+    condition: { project: true, features: ["paint_mode"] },
     description: "Loads and applies a brush preset by name.",
     annotations: {
       title: "Load Brush Preset",
@@ -129,6 +138,7 @@ export const paintToolDocs: IToolSpec[] = [
   },
   {
     name: "texture_selection",
+    condition: { project: true, features: ["paint_mode"], method: () => Texture.all.length > 0 },
     description:
       "Creates, modifies, or manipulates texture selections for painting.",
     annotations: {
@@ -140,6 +150,7 @@ export const paintToolDocs: IToolSpec[] = [
   },
   {
     name: "texture_layer_management",
+    condition: { project: true, features: ["paint_mode"], method: () => Texture.all.length > 0 },
     description: "Creates, manages, and manipulates texture layers.",
     annotations: {
       title: "Texture Layer Management",

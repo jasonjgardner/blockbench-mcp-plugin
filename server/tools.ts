@@ -13,6 +13,7 @@ import { registerElementTools } from "@/server/tools/element";
 import { registerImportTools } from "@/server/tools/import";
 import { registerMeshTools } from "@/server/tools/mesh";
 import { registerMeshInspectionTools } from "@/server/tools/mesh-inspection";
+import { registerModeTools } from "@/server/tools/modes";
 import { registerPaintTools } from "@/server/tools/paint";
 import { registerProjectTools } from "@/server/tools/project";
 import { registerTextureTools } from "@/server/tools/texture";
@@ -26,7 +27,7 @@ import { registerExportTools } from "@/server/tools/export";
 // Core resource registrations
 import { registerValidatorResources } from "@/server/resources/validator";
 
-// Optional plugin integrations (conditionally registered)
+// Optional plugin integrations (tool availability is checked by native conditions)
 import { registerHytaleTools } from "@/server/tools/hytale";
 import { registerHytaleResources } from "@/server/resources/hytale";
 import { registerHytalePrompts } from "@/server/prompts/hytale";
@@ -46,6 +47,7 @@ const registrationFunctions = [
   registerMaterialInstanceTools,
   registerMeshTools,
   registerMeshInspectionTools,
+  registerModeTools,
   registerPaintTools,
   registerProjectTools,
   registerTextureTools,
@@ -54,8 +56,9 @@ const registrationFunctions = [
   registerValidatorResources,
 ];
 
-// Optional plugin registration functions
-// These check internally if their plugin is installed before registering
+// Optional integration registrations: Hytale tools always register definitions
+// so availability can follow later plugin load/unload; resources and prompts
+// retain their own registration rules.
 const optionalRegistrationFunctions = [
   registerHytaleTools,
   registerHytaleResources,
@@ -65,8 +68,7 @@ const optionalRegistrationFunctions = [
 // Register all core tools immediately when this module loads
 registrationFunctions.forEach(register => register());
 
-// Register optional plugin integrations
-// Each function checks if its plugin is installed before registering
+// Register optional plugin integrations according to their lifecycle rules.
 optionalRegistrationFunctions.forEach(register => register());
 
 /**

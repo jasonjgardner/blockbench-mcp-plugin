@@ -79,7 +79,7 @@ interface IRegisteredFormatSummary {
   unknown_features?: FormatFeatureName[];
 }
 
-/** Registration state of one MCP tool; not a per-project compatibility guarantee. */
+/** Current effective tool availability; individual arguments still need runtime validation. */
 interface IToolRegistrationSummary {
   name: string;
   status: StatusType;
@@ -91,7 +91,7 @@ interface IToolRegistrationSummary {
  * `format` describes the requested format, or the active project's format.
  * `formats` lists true feature flags; absent flags are false unless listed in
  * `unknown_features`. Null feature values mean the host did not declare them.
- * Optional `tools` describes registration state, not per-project compatibility.
+ * Optional `tools` describes current availability under the native editor conditions.
  */
 export interface ICapabilitiesSnapshot {
   blockbench: IBlockbenchSummary;
@@ -116,7 +116,7 @@ export const getCapabilitiesParameters = z.object({
   include_tools: z
     .boolean()
     .default(false)
-    .describe("Include all registered MCP tool names, stability status, and enabled state. Enabled tools may still require a compatible format, project, mode, or selection."),
+    .describe("Include all registered MCP tool names, stability status, and current enabled state. Use list_modes and set_mode to navigate before calling mode-dependent tools."),
 });
 
 /**
@@ -214,7 +214,7 @@ function inspectCapabilities({ format_id, include_tools }: z.infer<typeof getCap
     ...(include_tools ? { tools: summarizeTools() } : {}),
     notes: [
       "Format features are host declarations, not guarantees of MCP tool compatibility. Null or unknown_features means the host did not declare a boolean value; supported_features lists true flags.",
-      "Tool enabled state reflects plugin registration. Calls may also require a compatible project format, editor mode, or selection.",
+      "Tool enabled state reflects native editor conditions. Use list_modes and set_mode to change editor tabs, then refresh tools/list. Calls still validate individual arguments.",
     ],
   };
 }
@@ -235,7 +235,7 @@ export function registerCapabilityTools(): void {
       const result = inspectCapabilities(args);
       return {
         content: [{ type: "text", text: JSON.stringify(result) }],
-        structuredContent: result,
+        structuredContent: { ...result },
       };
     },
   }, spec.status);

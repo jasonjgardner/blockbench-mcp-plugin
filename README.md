@@ -132,6 +132,10 @@ Use Agent Skills to orchestrate tool usage.
 
 Call `get_capabilities` to discover the running application/plugin versions and supported model formats. Use `get_mesh_info` to inspect existing vertex/face keys, local bounds, normals, UVs, and texture assignments without changing selection. See [inspection tools](docs/inspection-tools.md) for examples and pagination details.
 
+Tools follow Blockbench's native availability conditions and notify connected clients when the list changes. Read the active project's live `.bbmodel` through MCP resources, or request embedded exports. See [tool availability and project resources](docs/resources-and-availability.md) for examples and error behavior.
+
+Use `list_modes` to discover available editor tabs, then `set_mode` with `{ "mode_id": "animate" }` to enter Animate before animation work. Switching respects the project's supported modes and updates tool availability.
+
 ## Plugin Development
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed instructions on setting up the development environment and how to add new tools, resources, and prompts.

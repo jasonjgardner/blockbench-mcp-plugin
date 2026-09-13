@@ -2,6 +2,7 @@
 /// <reference types="blockbench-types" />
 
 import { createResource } from "@/lib/factories";
+import { resourceNotFound } from "@/lib/resourceErrors";
 
 // ============================================================================
 // Types for Validator (not fully typed in blockbench-types)
@@ -240,7 +241,7 @@ export function registerValidatorResources() {
       // Find specific check
       const check = Validator.checks.find((c) => c.id === id);
       if (!check) {
-        throw new Error(`Validator check with ID "${id}" not found.`);
+        throw resourceNotFound(uri, `Validator check with ID "${id}" not found.`);
       }
 
       return {

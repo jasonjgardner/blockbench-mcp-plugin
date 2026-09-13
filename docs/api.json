@@ -1,6 +1,6 @@
 {
   "version": "1.8.0",
-  "generatedAt": "2026-09-12T21:09:30.338Z",
+  "generatedAt": "2026-09-13T17:54:29.660Z",
   "tools": [
     {
       "name": "place_cube",
@@ -445,8 +445,8 @@
               "include_tools": {
                 "type": "boolean",
                 "default": false,
-                "description": "Include all registered MCP tool names, stability status, and enabled state. Enabled tools may still require a compatible format, project, mode, or selection.",
-                "markdownDescription": "Include all registered MCP tool names, stability status, and enabled state. Enabled tools may still require a compatible format, project, mode, or selection."
+                "description": "Include all registered MCP tool names, stability status, and current enabled state. Use list_modes and set_mode to navigate before calling mode-dependent tools.",
+                "markdownDescription": "Include all registered MCP tool names, stability status, and current enabled state. Use list_modes and set_mode to navigate before calling mode-dependent tools."
               }
             },
             "additionalProperties": false
@@ -2657,7 +2657,7 @@
     {
       "name": "list_export_formats",
       "title": "List Export Formats",
-      "description": "Lists all registered export codecs with their id, display name, file extension, and whether they support compile/export. Use before `export_model` to pick a codec.",
+      "description": "Lists registered export codecs, file extensions, compile/export support, and availability under the native export action's condition. Use before `export_model` to pick a codec.",
       "status": "stable",
       "category": "Export",
       "annotations": {
@@ -2685,7 +2685,7 @@
     {
       "name": "export_model",
       "title": "Export Model",
-      "description": "Compiles the current project through the named codec and returns the result as text. Optionally writes the compiled content to a filesystem path (requires user permission in Blockbench v5.0+). Use `list_export_formats` first to discover codec IDs.",
+      "description": "Compiles the current project through a codec whose native export action is available. Returns JSON metadata and a live .bbmodel resource link; result_format='embedded' returns complete exports as text/blob resources with URI and MIME type. Optionally writes to a local path (requires Blockbench filesystem permission). Use `list_export_formats` to discover codecs.",
       "status": "experimental",
       "category": "Export",
       "annotations": {
@@ -2719,8 +2719,18 @@
                 "minimum": 0,
                 "maximum": 2000000,
                 "default": 100000,
-                "description": "Maximum number of characters to include in the returned `content` field. Use 0 to omit content entirely (useful when only writing to disk). Larger values risk exceeding MCP context limits.",
-                "markdownDescription": "Maximum number of characters to include in the returned `content` field. Use 0 to omit content entirely (useful when only writing to disk). Larger values risk exceeding MCP context limits."
+                "description": "Maximum characters of text or base64 to return. Use 0 to omit file content. In embedded mode, only complete files within this limit are embedded; larger files return a truncated preview in metadata.content.",
+                "markdownDescription": "Maximum characters of text or base64 to return. Use 0 to omit file content. In embedded mode, only complete files within this limit are embedded; larger files return a truncated preview in metadata.content."
+              },
+              "result_format": {
+                "type": "string",
+                "enum": [
+                  "text",
+                  "embedded"
+                ],
+                "default": "text",
+                "description": "text preserves the JSON metadata.content payload. embedded moves a complete file into an MCP resource block with URI and MIME type, sets metadata.content to null, and reports its resource_uri. Both modes include a link to the live .bbmodel project resource.",
+                "markdownDescription": "text preserves the JSON metadata.content payload. embedded moves a complete file into an MCP resource block with URI and MIME type, sets metadata.content to null, and reports its resource_uri. Both modes include a link to the live .bbmodel project resource."
               }
             },
             "additionalProperties": false
@@ -5013,7 +5023,7 @@
     {
       "name": "create_project",
       "title": "Create Project",
-      "description": "Creates a new project with the given name and project type.",
+      "description": "Creates a project with the given name and format, and returns a resource link to its live .bbmodel file.",
       "status": "stable",
       "category": "Project",
       "annotations": {
@@ -5048,7 +5058,7 @@
     {
       "name": "get_project_info",
       "title": "Get Project Info",
-      "description": "Returns read-only project orientation: format id and display name, project name/UUID, texture resolution (texture_width/height), element counts, and a summary of top-level groups. Prefer this over `risky_eval` for first-look inspection — no JavaScript execution required.",
+      "description": "Returns read-only project orientation: format id and display name, project name/UUID, texture resolution (texture_width/height), element counts, and a summary of top-level groups. Includes structured JSON and a resource link to the live .bbmodel project file. Prefer this over `risky_eval` for first-look inspection.",
       "status": "stable",
       "category": "Project",
       "annotations": {
@@ -5934,6 +5944,60 @@
       }
     },
     {
+      "name": "list_modes",
+      "title": "List Modes",
+      "description": "Lists Blockbench editor tabs/modes with IDs, names, native availability, and the current mode. Includes plugin-added modes. Use before set_mode to discover whether Edit, Paint, Animate, or Display is available for the current project. Camera angles are controlled separately by set_camera_angle.",
+      "status": "stable",
+      "category": "UI Interaction",
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
+      "parameters": {
+        "$ref": "#/definitions/list_modes",
+        "definitions": {
+          "list_modes": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "set_mode",
+      "title": "Set Mode",
+      "description": "Switches Blockbench's editor tab through its native mode trigger, respecting the mode's condition. Use mode_id='animate' to enter Animate before animation work, 'paint' before native painting tools, or 'edit' to return. Returns the resulting mode and available modes; refresh tools/list for changed tool availability. Selecting the current mode does nothing. Does not change the project's format.",
+      "status": "stable",
+      "category": "UI Interaction",
+      "annotations": {
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "parameters": {
+        "$ref": "#/definitions/set_mode",
+        "definitions": {
+          "set_mode": {
+            "type": "object",
+            "properties": {
+              "mode_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Mode ID returned by list_modes, such as 'edit', 'paint', 'animate', or 'display'. The Animate tab uses 'animate'. The current project must satisfy the mode's native condition.",
+                "markdownDescription": "Mode ID returned by list_modes, such as 'edit', 'paint', 'animate', or 'display'. The Animate tab uses 'animate'. The current project must satisfy the mode's native condition."
+              }
+            },
+            "required": [
+              "mode_id"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
       "name": "set_mesh_uv",
       "title": "Set Mesh UV",
       "description": "Sets UV coordinates for mesh faces or vertices.",
@@ -6628,6 +6692,12 @@
   ],
   "resources": [
     {
+      "name": "project-files",
+      "title": "Blockbench Project Files",
+      "description": "Returns the active project's live .bbmodel file with unsaved edits and embedded textures. UUID-based URIs remain stable across renames. Select a project before reading its file; reading never switches tabs or saves to disk.",
+      "uriTemplate": "blockbench://project/{id}.bbmodel"
+    },
+    {
       "name": "projects",
       "title": "Blockbench Projects",
       "description": "Returns information about available projects. List URIs use the slugified project name (e.g. `projects://my-character`) when unique, or `projects://<slug>~<uuid-prefix>` on collision. Reads accept UUID, exact name, or slug.",
@@ -6648,8 +6718,8 @@
     {
       "name": "reference_models",
       "title": "Reference Models",
-      "description": "Returns reference models in the current project. Requires the Reference Models plugin. List URIs use slugified names (e.g. `reference_models://turntable`) with `~<uuid-prefix>` on collision. Reads accept UUID, exact name, or slug.",
-      "uriTemplate": "reference_models://{id}"
+      "description": "Returns reference models in the current project. Requires the Reference Models plugin. List URIs use slugified names (e.g. `reference-models://turntable`) with `~<uuid-prefix>` on collision. Reads accept UUID, exact name, or slug.",
+      "uriTemplate": "reference-models://{id}"
     },
     {
       "name": "validator-status",

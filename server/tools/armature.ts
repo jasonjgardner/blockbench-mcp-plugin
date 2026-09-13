@@ -275,6 +275,7 @@ export const clearVertexWeightsParameters = z.object({
 export const armatureToolDocs: IToolSpec[] = [
   {
     name: "list_armatures",
+    condition: { project: true, features: ["armature_rig"] },
     description:
       "Lists all armatures in the current project with their basic info.",
     annotations: {
@@ -286,6 +287,7 @@ export const armatureToolDocs: IToolSpec[] = [
   },
   {
     name: "get_armature",
+    condition: { project: true, features: ["armature_rig"] },
     description:
       "Gets detailed information about a specific armature including its bones.",
     annotations: {
@@ -297,6 +299,7 @@ export const armatureToolDocs: IToolSpec[] = [
   },
   {
     name: "add_armature",
+    condition: { project: true, features: ["armature_rig"] },
     description:
       "Creates a new armature in the project. An armature is a skeletal rig used for mesh deformation.",
     annotations: {
@@ -308,6 +311,7 @@ export const armatureToolDocs: IToolSpec[] = [
   },
   {
     name: "remove_armature",
+    condition: { project: true, features: ["armature_rig"] },
     description: "Removes an armature and all its bones from the project.",
     annotations: {
       title: "Remove Armature",
@@ -318,6 +322,7 @@ export const armatureToolDocs: IToolSpec[] = [
   },
   {
     name: "update_armature",
+    condition: { project: true, features: ["armature_rig"] },
     description: "Updates properties of an existing armature.",
     annotations: {
       title: "Update Armature",
@@ -328,6 +333,7 @@ export const armatureToolDocs: IToolSpec[] = [
   },
   {
     name: "list_armature_bones",
+    condition: { project: true, features: ["armature_rig"] },
     description:
       "Lists all armature bones, optionally filtered by a specific armature.",
     annotations: {
@@ -339,6 +345,7 @@ export const armatureToolDocs: IToolSpec[] = [
   },
   {
     name: "get_armature_bone",
+    condition: { project: true, features: ["armature_rig"] },
     description: "Gets detailed information about a specific armature bone.",
     annotations: {
       title: "Get Armature Bone",
@@ -349,6 +356,7 @@ export const armatureToolDocs: IToolSpec[] = [
   },
   {
     name: "add_armature_bone",
+    condition: { project: true, features: ["armature_rig"] },
     description:
       "Creates a new bone and adds it to an armature or parent bone.",
     annotations: {
@@ -360,6 +368,7 @@ export const armatureToolDocs: IToolSpec[] = [
   },
   {
     name: "remove_armature_bone",
+    condition: { project: true, features: ["armature_rig"] },
     description: "Removes an armature bone from the project.",
     annotations: {
       title: "Remove Armature Bone",
@@ -370,6 +379,7 @@ export const armatureToolDocs: IToolSpec[] = [
   },
   {
     name: "update_armature_bone",
+    condition: { project: true, features: ["armature_rig"] },
     description: "Updates properties of an existing armature bone.",
     annotations: {
       title: "Update Armature Bone",
@@ -380,6 +390,7 @@ export const armatureToolDocs: IToolSpec[] = [
   },
   {
     name: "update_armature_bones_batch",
+    condition: { project: true, features: ["armature_rig"] },
     description: "Updates multiple armature bones at once with the same properties.",
     annotations: {
       title: "Update Armature Bones (Batch)",
@@ -390,6 +401,7 @@ export const armatureToolDocs: IToolSpec[] = [
   },
   {
     name: "select_armature_bones",
+    condition: { project: true, features: ["armature_rig"] },
     description:
       "Selects armature bones by ID. Can select single bone, multiple bones, or bone hierarchy.",
     annotations: {
@@ -401,6 +413,7 @@ export const armatureToolDocs: IToolSpec[] = [
   },
   {
     name: "get_vertex_weights",
+    condition: { project: true, features: ["armature_rig", "meshes"] },
     description:
       "Gets vertex weights for a mesh from all bones affecting it.",
     annotations: {
@@ -412,6 +425,7 @@ export const armatureToolDocs: IToolSpec[] = [
   },
   {
     name: "set_vertex_weight",
+    condition: { project: true, features: ["armature_rig", "meshes"] },
     description: "Sets the weight of a specific vertex on a bone.",
     annotations: {
       title: "Set Vertex Weight",
@@ -422,6 +436,7 @@ export const armatureToolDocs: IToolSpec[] = [
   },
   {
     name: "set_vertex_weights_batch",
+    condition: { project: true, features: ["armature_rig", "meshes"] },
     description: "Sets multiple vertex weights at once on a bone.",
     annotations: {
       title: "Set Vertex Weights (Batch)",
@@ -432,6 +447,7 @@ export const armatureToolDocs: IToolSpec[] = [
   },
   {
     name: "clear_vertex_weights",
+    condition: { project: true, features: ["armature_rig", "meshes"] },
     description: "Clears all vertex weights from a bone for a specific mesh.",
     annotations: {
       title: "Clear Vertex Weights",

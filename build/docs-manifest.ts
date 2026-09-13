@@ -16,6 +16,7 @@ import { textureToolDocs } from "@/server/tools/texture";
 import { armatureToolDocs } from "@/server/tools/armature";
 import { animationToolDocs } from "@/server/tools/animation";
 import { uiToolDocs } from "@/server/tools/ui";
+import { modeToolDocs } from "@/server/tools/modes";
 import { hytaleToolDocs } from "@/server/tools/hytale";
 import { materialInstanceToolDocs } from "@/server/tools/material-instances";
 import { uvToolDocs } from "@/server/tools/uv";
@@ -43,7 +44,7 @@ export const toolManifest: ICategoryGroup[] = [
   { category: "Paint Tools", tools: paintToolDocs },
   { category: "Project", tools: projectToolDocs },
   { category: "Textures", tools: textureToolDocs },
-  { category: "UI Interaction", tools: uiToolDocs },
+  { category: "UI Interaction", tools: [...uiToolDocs, ...modeToolDocs] },
   { category: "UV Mapping", tools: uvToolDocs },
   { category: "Hytale Integration", tools: hytaleToolDocs },
 ];
@@ -118,6 +119,13 @@ export const promptDocs: IPromptSpec[] = [
 // Resource specs defined inline — server/resources.ts uses Blockbench globals at module level
 export const resourceDocs: IResourceSpec[] = [
   {
+    name: "project-files",
+    uriTemplate: "blockbench://project/{id}.bbmodel",
+    title: "Blockbench Project Files",
+    description:
+      "Returns the active project's live .bbmodel file with unsaved edits and embedded textures. UUID-based URIs remain stable across renames. Select a project before reading its file; reading never switches tabs or saves to disk.",
+  },
+  {
     name: "projects",
     uriTemplate: "projects://{id}",
     title: "Blockbench Projects",
@@ -140,10 +148,10 @@ export const resourceDocs: IResourceSpec[] = [
   },
   {
     name: "reference_models",
-    uriTemplate: "reference_models://{id}",
+    uriTemplate: "reference-models://{id}",
     title: "Reference Models",
     description:
-      "Returns reference models in the current project. Requires the Reference Models plugin. List URIs use slugified names (e.g. `reference_models://turntable`) with `~<uuid-prefix>` on collision. Reads accept UUID, exact name, or slug.",
+      "Returns reference models in the current project. Requires the Reference Models plugin. List URIs use slugified names (e.g. `reference-models://turntable`) with `~<uuid-prefix>` on collision. Reads accept UUID, exact name, or slug.",
   },
   {
     name: "validator-status",

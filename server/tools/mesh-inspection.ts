@@ -98,6 +98,7 @@ export interface IMeshInspectionResult {
  */
 export const meshInspectionToolDocs: IToolSpec[] = [{
   name: "get_mesh_info",
+  condition: { project: true, features: ["meshes"] },
   description: "Inspects a mesh by UUID/name or the first selected mesh without changing geometry, selection, or undo history. Returns transforms, parent, total counts, mesh-local bounds, selection counts, and optional paginated vertices/faces with actual runtime keys. Faces use perimeter vertex order and normalized mesh-local normals (zero for degenerate faces), stored texture references, and optional UVs. Texture status distinguishes resolved, missing, unassigned (false), disabled (null), and unset; default format materials are not resolved. Pages sort keys lexicographically and expose next_offset; geometry must remain unchanged between calls. Set include_vertices/include_faces false for a compact summary.",
   annotations: {
     title: "Get Mesh Info",

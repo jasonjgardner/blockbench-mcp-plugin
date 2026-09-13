@@ -2,6 +2,7 @@ import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { Vector3 } from "three";
 import { createCylinderParameters, createSphereParameters, placeMeshParameters, registerMeshTools } from "@/server/tools/mesh";
 import { useGlobals } from "@/tests/helpers/globals";
+import { evaluateHostCondition } from "@/tests/helpers/condition-host";
 import type { ITextureReference, MeshSelectionMap, Vector3Tuple } from "@/tests/helpers/shapes";
 import { executeText } from "@/tests/helpers/tool-execution";
 import { createUndoHost } from "@/tests/helpers/undo-host";
@@ -143,6 +144,7 @@ beforeEach(() => {
 
 // Registered after the reset above so the factory installs this test's fresh project.
 useGlobals(() => ({
+  Condition: evaluateHostCondition,
   Project: project,
   Format: { id: "free", meshes: true },
   Mesh: TestMesh,
@@ -224,7 +226,7 @@ describe("mesh creation", () => {
     await expect(executeText("place_mesh", { elements: [triangle], texture: "missing" })).rejects.toThrow('Texture "missing" not found');
     await expect(executeText("place_mesh", { elements: [triangle], group: "missing" })).rejects.toThrow('Group "missing" not found');
     Object.assign(globalThis, { Format: { id: "java_block", meshes: false } });
-    await expect(executeText("place_mesh", { elements: [triangle] })).rejects.toThrow("does not support meshes");
+    await expect(executeText("place_mesh", { elements: [triangle] })).rejects.toThrow('Tool "place_mesh" is unavailable');
     expect(undoHost.starts).toBe(0);
   });
 

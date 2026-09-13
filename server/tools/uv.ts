@@ -72,6 +72,7 @@ export const rotateMeshUvParametersSchema = z.object({
 export const uvToolDocs: IToolSpec[] = [
   {
     name: "set_mesh_uv",
+    condition: { project: true, features: ["meshes"] },
     description: "Sets UV coordinates for mesh faces or vertices.",
     annotations: {
       title: "Set Mesh UV",
@@ -82,6 +83,7 @@ export const uvToolDocs: IToolSpec[] = [
   },
   {
     name: "auto_uv_mesh",
+    condition: { project: true, features: ["meshes"] },
     description: "Maps only the specified/selected faces of the target mesh. project uses the active camera, unwrap projects each face to its own plane, and cylinder/sphere map around the local origin. This does not pack UV islands.",
     annotations: {
       title: "Auto UV Mesh",
@@ -92,6 +94,7 @@ export const uvToolDocs: IToolSpec[] = [
   },
   {
     name: "rotate_mesh_uv",
+    condition: { project: true, features: ["meshes"] },
     description: "Rotates only the target mesh's specified/selected faces around their combined UV bounding-box center, without clamping or changing selection.",
     annotations: {
       title: "Rotate Mesh UV",

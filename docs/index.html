@@ -18,9 +18,9 @@
 
       <div class="nav-group">
         <p class="nav-heading">Overview</p>
-        <a href="#tools" class="nav-link">Tools <span class="count">(111)</span></a>
+        <a href="#tools" class="nav-link">Tools <span class="count">(113)</span></a>
         <a href="#prompts" class="nav-link">Prompts <span class="count">(6)</span></a>
-        <a href="#resources" class="nav-link">Resources <span class="count">(12)</span></a>
+        <a href="#resources" class="nav-link">Resources <span class="count">(13)</span></a>
       </div>
 
       <div class="nav-group">
@@ -40,7 +40,7 @@
         <a href="#cat-paint-tools" class="nav-link">Paint Tools <span class="count">(12)</span></a>
         <a href="#cat-project" class="nav-link">Project <span class="count">(2)</span></a>
         <a href="#cat-textures" class="nav-link">Textures <span class="count">(13)</span></a>
-        <a href="#cat-ui-interaction" class="nav-link">UI Interaction <span class="count">(4)</span></a>
+        <a href="#cat-ui-interaction" class="nav-link">UI Interaction <span class="count">(6)</span></a>
         <a href="#cat-uv-mapping" class="nav-link">UV Mapping <span class="count">(3)</span></a>
         <a href="#cat-hytale-integration" class="nav-link">Hytale Integration <span class="count">(12)</span></a>
       </div>
@@ -51,9 +51,9 @@
         <h1>Blockbench MCP Plugin</h1>
         <p class="subtitle">API Reference — v1.8.0</p>
         <nav class="stats">
-          <a href="#tools"><strong>111</strong> tools (41 stable, 70 experimental)</a>
+          <a href="#tools"><strong>113</strong> tools (43 stable, 70 experimental)</a>
           <a href="#prompts"><strong>6</strong> prompts</a>
-          <a href="#resources"><strong>12</strong> resources</a>
+          <a href="#resources"><strong>13</strong> resources</a>
         </nav>
       </header>
 
@@ -325,7 +325,7 @@
       <td class="col-name">include_tools</td>
       <td class="col-type">boolean</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Include all registered MCP tool names, stability status, and enabled state. Enabled tools may still require a compatible format, project, mode, or selection. <span class="param-meta">(default: <code>false</code>)</span></td>
+      <td class="col-desc">Include all registered MCP tool names, stability status, and current enabled state. Use list_modes and set_mode to navigate before calling mode-dependent tools. <span class="param-meta">(default: <code>false</code>)</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -1819,7 +1819,7 @@
         </div>
       </div>
       <p class="card-title">List Export Formats</p>
-      <p class="card-desc">Lists all registered export codecs with their id, display name, file extension, and whether they support compile/export. Use before `export_model` to pick a codec.</p>
+      <p class="card-desc">Lists registered export codecs, file extensions, compile/export support, and availability under the native export action's condition. Use before `export_model` to pick a codec.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -1848,7 +1848,7 @@
         </div>
       </div>
       <p class="card-title">Export Model</p>
-      <p class="card-desc">Compiles the current project through the named codec and returns the result as text. Optionally writes the compiled content to a filesystem path (requires user permission in Blockbench v5.0+). Use `list_export_formats` first to discover codec IDs.</p>
+      <p class="card-desc">Compiles the current project through a codec whose native export action is available. Returns JSON metadata and a live .bbmodel resource link; result_format='embedded' returns complete exports as text/blob resources with URI and MIME type. Optionally writes to a local path (requires Blockbench filesystem permission). Use `list_export_formats` to discover codecs.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -1878,7 +1878,12 @@
       <td class="col-name">max_content_length</td>
       <td class="col-type">integer</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Maximum number of characters to include in the returned `content` field. Use 0 to omit content entirely (useful when only writing to disk). Larger values risk exceeding MCP context limits. <span class="param-meta">(default: <code>100000</code>) [min: 0, max: 2000000]</span></td>
+      <td class="col-desc">Maximum characters of text or base64 to return. Use 0 to omit file content. In embedded mode, only complete files within this limit are embedded; larger files return a truncated preview in metadata.content. <span class="param-meta">(default: <code>100000</code>) [min: 0, max: 2000000]</span></td>
+    </tr><tr>
+      <td class="col-name">result_format</td>
+      <td class="col-type">&quot;text&quot; | &quot;embedded&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">text preserves the JSON metadata.content payload. embedded moves a complete file into an MCP resource block with URI and MIME type, sets metadata.content to null, and reports its resource_uri. Both modes include a link to the live .bbmodel project resource. <span class="param-meta">(default: <code>&quot;text&quot;</code>)</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -3356,7 +3361,7 @@
         </div>
       </div>
       <p class="card-title">Create Project</p>
-      <p class="card-desc">Creates a new project with the given name and project type.</p>
+      <p class="card-desc">Creates a project with the given name and format, and returns a resource link to its live .bbmodel file.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -3390,7 +3395,7 @@
         </div>
       </div>
       <p class="card-title">Get Project Info</p>
-      <p class="card-desc">Returns read-only project orientation: format id and display name, project name/UUID, texture resolution (texture_width/height), element counts, and a summary of top-level groups. Prefer this over `risky_eval` for first-look inspection — no JavaScript execution required.</p>
+      <p class="card-desc">Returns read-only project orientation: format id and display name, project name/UUID, texture resolution (texture_width/height), element counts, and a summary of top-level groups. Includes structured JSON and a resource link to the live .bbmodel project file. Prefer this over `risky_eval` for first-look inspection.</p>
       <div class="overflow-x">
         <p class="empty-params">No parameters</p>
       </div>
@@ -4029,6 +4034,49 @@
     </table>
       </div>
     </div>
+<div id="tool-list_modes" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">list_modes</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">List Modes</p>
+      <p class="card-desc">Lists Blockbench editor tabs/modes with IDs, names, native availability, and the current mode. Includes plugin-added modes. Use before set_mode to discover whether Edit, Paint, Animate, or Display is available for the current project. Camera angles are controlled separately by set_camera_angle.</p>
+      <div class="overflow-x">
+        <p class="empty-params">No parameters</p>
+      </div>
+    </div>
+<div id="tool-set_mode" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">set_mode</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+
+        </div>
+      </div>
+      <p class="card-title">Set Mode</p>
+      <p class="card-desc">Switches Blockbench's editor tab through its native mode trigger, respecting the mode's condition. Use mode_id='animate' to enter Animate before animation work, 'paint' before native painting tools, or 'edit' to return. Returns the resulting mode and available modes; refresh tools/list for changed tool availability. Selecting the current mode does nothing. Does not change the project's format.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">mode_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Mode ID returned by list_modes, such as 'edit', 'paint', 'animate', or 'display'. The Animate tab uses 'animate'. The current project must satisfy the mode's native condition. <span class="param-meta">[minLength: 1]</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
         </section>
 <section id="cat-uv-mapping" class="category-section">
           <h3 class="category-title">UV Mapping</h3>
@@ -4620,6 +4668,14 @@
         <h2 class="section-title">Resources</h2>
         <div class="card">
       <div class="card-header">
+        <h3 class="card-name">project-files</h3>
+      </div>
+      <p class="card-title">Blockbench Project Files</p>
+      <p class="uri-template">blockbench://project/{id}.bbmodel</p>
+      <p class="card-desc">Returns the active project's live .bbmodel file with unsaved edits and embedded textures. UUID-based URIs remain stable across renames. Select a project before reading its file; reading never switches tabs or saves to disk.</p>
+    </div>
+<div class="card">
+      <div class="card-header">
         <h3 class="card-name">projects</h3>
       </div>
       <p class="card-title">Blockbench Projects</p>
@@ -4647,8 +4703,8 @@
         <h3 class="card-name">reference_models</h3>
       </div>
       <p class="card-title">Reference Models</p>
-      <p class="uri-template">reference_models://{id}</p>
-      <p class="card-desc">Returns reference models in the current project. Requires the Reference Models plugin. List URIs use slugified names (e.g. `reference_models://turntable`) with `~&lt;uuid-prefix&gt;` on collision. Reads accept UUID, exact name, or slug.</p>
+      <p class="uri-template">reference-models://{id}</p>
+      <p class="card-desc">Returns reference models in the current project. Requires the Reference Models plugin. List URIs use slugified names (e.g. `reference-models://turntable`) with `~&lt;uuid-prefix&gt;` on collision. Reads accept UUID, exact name, or slug.</p>
     </div>
 <div class="card">
       <div class="card-header">
@@ -4717,7 +4773,7 @@
       </section>
 
       <footer class="page-footer">
-        Generated 2026-09-12T21:09:30.338Z from Zod schemas
+        Generated 2026-09-13T17:54:29.660Z from Zod schemas
       </footer>
     </main>
   </div>

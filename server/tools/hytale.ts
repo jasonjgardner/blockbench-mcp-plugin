@@ -124,6 +124,7 @@ export const hytaleGetCubeStretchParametersSchema = z.object({
 export const hytaleToolDocs: IToolSpec[] = [
   {
     name: "hytale_get_format_info",
+    condition: { project: true, method: () => isHytalePluginInstalled() && isHytaleFormat() },
     description:
       "Returns information about the current Hytale format. Requires the Hytale plugin and a Hytale format project to be active.",
     annotations: {
@@ -135,6 +136,7 @@ export const hytaleToolDocs: IToolSpec[] = [
   },
   {
     name: "hytale_validate_model",
+    condition: { project: true, method: () => isHytalePluginInstalled() && isHytaleFormat() },
     description:
       "Validates the current Hytale model against Hytale engine constraints (node count, UV sizes, etc.).",
     annotations: {
@@ -146,6 +148,7 @@ export const hytaleToolDocs: IToolSpec[] = [
   },
   {
     name: "hytale_set_cube_properties",
+    condition: { project: true, method: () => isHytalePluginInstalled() && isHytaleFormat() },
     description:
       "Sets Hytale-specific properties on a cube: shading_mode (flat, standard, fullbright, reflective) and double_sided.",
     annotations: {
@@ -157,6 +160,7 @@ export const hytaleToolDocs: IToolSpec[] = [
   },
   {
     name: "hytale_get_cube_properties",
+    condition: { project: true, method: () => isHytalePluginInstalled() && isHytaleFormat() },
     description: "Gets Hytale-specific properties from a cube (shading_mode, double_sided).",
     annotations: {
       title: "Get Hytale Cube Properties",
@@ -167,6 +171,7 @@ export const hytaleToolDocs: IToolSpec[] = [
   },
   {
     name: "hytale_create_quad",
+    condition: { project: true, method: () => isHytalePluginInstalled() && isHytaleFormat() },
     description:
       "Creates a Hytale quad (2D plane) with a specified normal direction. Quads are single-face elements useful for flat surfaces.",
     annotations: {
@@ -178,6 +183,7 @@ export const hytaleToolDocs: IToolSpec[] = [
   },
   {
     name: "hytale_list_attachments",
+    condition: { project: true, method: () => isHytalePluginInstalled() && isHytaleFormat() },
     description: "Lists all attachment collections in the current Hytale project.",
     annotations: {
       title: "List Hytale Attachments",
@@ -188,6 +194,7 @@ export const hytaleToolDocs: IToolSpec[] = [
   },
   {
     name: "hytale_set_attachment_piece",
+    condition: { project: true, method: () => isHytalePluginInstalled() && isHytaleFormat() },
     description:
       "Marks or unmarks a group as an attachment piece. Attachment pieces attach to like-named bones in the main model.",
     annotations: {
@@ -199,6 +206,7 @@ export const hytaleToolDocs: IToolSpec[] = [
   },
   {
     name: "hytale_list_attachment_pieces",
+    condition: { project: true, method: () => isHytalePluginInstalled() && isHytaleFormat() },
     description: "Lists all groups marked as attachment pieces.",
     annotations: {
       title: "List Attachment Pieces",
@@ -209,6 +217,7 @@ export const hytaleToolDocs: IToolSpec[] = [
   },
   {
     name: "hytale_create_visibility_keyframe",
+    condition: { project: true, method: () => isHytalePluginInstalled() && isHytaleFormat() },
     description:
       "Creates a visibility keyframe for a bone. Hytale supports toggling node visibility at keyframes.",
     annotations: {
@@ -220,6 +229,7 @@ export const hytaleToolDocs: IToolSpec[] = [
   },
   {
     name: "hytale_set_animation_loop",
+    condition: { project: true, method: () => isHytalePluginInstalled() && isHytaleFormat() },
     description:
       'Sets the loop mode for a Hytale animation. Hytale supports "loop" (continuous) or "hold" (freeze on last frame).',
     annotations: {
@@ -231,6 +241,7 @@ export const hytaleToolDocs: IToolSpec[] = [
   },
   {
     name: "hytale_set_cube_stretch",
+    condition: { project: true, method: () => isHytalePluginInstalled() && isHytaleFormat() },
     description:
       "Sets the stretch values for a cube. Hytale uses stretch instead of float sizes for better UV handling.",
     annotations: {
@@ -242,6 +253,7 @@ export const hytaleToolDocs: IToolSpec[] = [
   },
   {
     name: "hytale_get_cube_stretch",
+    condition: { project: true, method: () => isHytalePluginInstalled() && isHytaleFormat() },
     description: "Gets the stretch values for a cube.",
     annotations: {
       title: "Get Cube Stretch",
@@ -257,13 +269,8 @@ export const hytaleToolDocs: IToolSpec[] = [
  * These tools are only functional when the Hytale plugin is installed.
  */
 export function registerHytaleTools() {
-  // Only register if Hytale plugin is available
-  if (!isHytalePluginInstalled()) {
-    console.log("[MCP] Hytale plugin not detected, skipping Hytale tools registration");
-    return;
-  }
-
-  console.log("[MCP] Hytale plugin detected, registering Hytale tools");
+  // Keep definitions registered so native conditions can enable them when the
+  // Hytale plugin is loaded after MCP, or disable them when it is unloaded.
 
   // ============================================================================
   // Format & Project Tools

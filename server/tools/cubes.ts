@@ -100,6 +100,7 @@ export const modifyCubeParameters = z.object({
 export const cubeToolDocs: IToolSpec[] = [
   {
     name: "place_cube",
+    condition: { project: true, features: ["edit_mode"] },
     description:
       "Places a cube of the given size at the specified position. Texture and group are optional.",
     annotations: {
@@ -111,6 +112,7 @@ export const cubeToolDocs: IToolSpec[] = [
   },
   {
     name: "modify_cube",
+    condition: { project: true, features: ["edit_mode"] },
     description:
       "Modifies the cube with the given ID. Auto UV setting: saved as an integer, where 0 means disabled, 1 means enabled, and 2 means relative auto UV (cube position affects UV)",
     annotations: {

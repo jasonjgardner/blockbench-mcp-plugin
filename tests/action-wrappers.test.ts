@@ -5,6 +5,7 @@ import { registerUVTools } from "@/server/tools/uv";
 import { registerUITools } from "@/server/tools/ui";
 import { required } from "@/tests/helpers/assertions";
 import { useGlobals } from "@/tests/helpers/globals";
+import { evaluateHostCondition } from "@/tests/helpers/condition-host";
 import type { IMeshSelection, MeshSelectionMap, UvTuple, Vector3Tuple } from "@/tests/helpers/shapes";
 import { executeTool } from "@/tests/helpers/tool-execution";
 import { createUndoHost } from "@/tests/helpers/undo-host";
@@ -182,7 +183,9 @@ beforeEach(() => {
 // Registered after the reset above so the factory installs this test's fresh project;
 // Preview and window are assigned by individual tests and restored with the rest.
 useGlobals(() => ({
+  Condition: evaluateHostCondition,
   Project: project,
+  Format: { id: "free", meshes: true },
   Mesh: HostMesh,
   MeshFace: HostFace,
   Undo: undo,

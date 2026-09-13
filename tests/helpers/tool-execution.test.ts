@@ -55,6 +55,7 @@ describe("executeTool", () => {
     const name = "__helpers_execution_probe";
     const definitions = getAllToolDefinitions();
     definitions[name] = {
+      configuredEnabled: true,
       description: "Probe", execute: async (args) => `probe:${String(args.value)}`, inputSchema: {},
       parameterSchema: z.object({ value: z.number().default(7) }), title: "Probe",
     };

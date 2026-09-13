@@ -3,7 +3,10 @@
 import { z } from "zod";
 import { createTool, type IToolSpec } from "@/lib/factories";
 import { STATUS_STABLE } from "@/lib/constants";
+import { getProjectFileResource } from "@/lib/projectResources";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 
+/** New project name and native format ID, resolved against Formats at execution time. */
 export const createProjectParameters = z.object({
   name: z.string(),
   format: z
@@ -12,12 +15,14 @@ export const createProjectParameters = z.object({
     .describe("Project format ID from Blockbench's Formats registry."),
 });
 
+/** Project inspection needs no arguments because it targets the active project. */
 export const getProjectInfoParameters = z.object({});
 
+/** Project creation/inspection metadata, safe for the documentation build to import. */
 export const projectToolDocs: IToolSpec[] = [
   {
     name: "create_project",
-    description: "Creates a new project with the given name and project type.",
+    description: "Creates a project with the given name and format, and returns a resource link to its live .bbmodel file.",
     annotations: {
       title: "Create Project",
       destructiveHint: true,
@@ -29,7 +34,8 @@ export const projectToolDocs: IToolSpec[] = [
   {
     name: "get_project_info",
     description:
-      "Returns read-only project orientation: format id and display name, project name/UUID, texture resolution (texture_width/height), element counts, and a summary of top-level groups. Prefer this over `risky_eval` for first-look inspection — no JavaScript execution required.",
+      "Returns read-only project orientation: format id and display name, project name/UUID, texture resolution (texture_width/height), element counts, and a summary of top-level groups. Includes structured JSON and a resource link to the live .bbmodel project file. Prefer this over `risky_eval` for first-look inspection.",
+    condition: { project: true },
     annotations: {
       title: "Get Project Info",
       readOnlyHint: true,
@@ -39,10 +45,11 @@ export const projectToolDocs: IToolSpec[] = [
   },
 ];
 
-export function registerProjectTools() {
+/** Registers active-project tools; project resource bytes are compiled only when read. */
+export function registerProjectTools(): void {
   createTool(projectToolDocs[0].name, {
     ...projectToolDocs[0],
-    async execute({ name, format }) {
+    async execute({ name, format }): Promise<CallToolResult> {
       const created = newProject(Formats[format]);
 
       if (!created) {
@@ -51,13 +58,18 @@ export function registerProjectTools() {
 
       Project!.name = name;
 
-      return `Created project with name "${name}" (UUID: ${Project?.uuid}) and format "${format}".`;
+      return {
+        content: [
+          { type: "text", text: `Created project with name "${name}" (UUID: ${Project?.uuid}) and format "${format}".` },
+          { type: "resource_link", ...getProjectFileResource(Project!) },
+        ],
+      };
     },
   }, projectToolDocs[0].status);
 
   createTool(projectToolDocs[1].name, {
     ...projectToolDocs[1],
-    async execute() {
+    async execute(): Promise<CallToolResult> {
       if (!Project) {
         throw new Error(
           "No project is open. Use create_project to start a new one, or open an existing file in Blockbench."
@@ -74,33 +86,36 @@ export function registerProjectTools() {
           children: g.children?.length ?? 0,
         }));
 
-      return JSON.stringify(
-        {
-          project: {
-            name: Project.name,
-            uuid: Project.uuid,
-            save_path: (Project as { save_path?: string }).save_path ?? null,
-          },
-          format: {
-            id: format?.id ?? null,
-            name: format?.display_name ?? format?.name ?? null,
-          },
-          resolution: {
-            texture_width: Project.texture_width ?? null,
-            texture_height: Project.texture_height ?? null,
-          },
-          counts: {
-            cubes: Cube.all.length,
-            meshes: Mesh.all.length,
-            groups: Group.all.length,
-            textures: Texture.all.length,
-            outliner_elements: Outliner.elements.length,
-          },
-          root_groups: rootGroups,
+      const summary = {
+        project: {
+          name: Project.name,
+          uuid: Project.uuid,
+          save_path: (Project as { save_path?: string }).save_path ?? null,
         },
-        null,
-        2
-      );
+        format: {
+          id: format?.id ?? null,
+          name: format?.display_name ?? format?.name ?? null,
+        },
+        resolution: {
+          texture_width: Project.texture_width ?? null,
+          texture_height: Project.texture_height ?? null,
+        },
+        counts: {
+          cubes: Cube.all.length,
+          meshes: Mesh.all.length,
+          groups: Group.all.length,
+          textures: Texture.all.length,
+          outliner_elements: Outliner.elements.length,
+        },
+        root_groups: rootGroups,
+      };
+      return {
+        content: [
+          { type: "text", text: JSON.stringify(summary, null, 2) },
+          { type: "resource_link", ...getProjectFileResource(Project) },
+        ],
+        structuredContent: summary,
+      };
     },
   }, projectToolDocs[1].status);
 }

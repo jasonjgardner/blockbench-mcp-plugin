@@ -16,6 +16,7 @@ export const fromGeoJsonParameters = z.object({
 export const importToolDocs: IToolSpec[] = [
   {
     name: "from_geo_json",
+    condition: { project: true, method: () => !Blockbench.isWeb && typeof Codecs.bedrock?.parse === "function" },
     description: "Imports a model from a GeoJSON file.",
     annotations: {
       title: "Import GeoJSON",

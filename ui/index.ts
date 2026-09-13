@@ -75,12 +75,8 @@ export function uiSetup({
           name: "Blockbench MCP",
           version: VERSION,
         },
-        tools: Object.values(tools).map((tool) => ({
-          name: tool.name,
-          description: tool.description,
-          enabled: tool.enabled,
-          status: tool.status,
-        })),
+        // Observe shared metadata so native condition changes refresh the panel.
+        tools: Object.values(tools),
         resources: Object.values(resources).map((resource) => ({
           name: resource.name,
           description: resource.description,
@@ -111,7 +107,8 @@ export function uiSetup({
           // @ts-ignore - Vue component context
           const { tools, toolsFilter } = this;
           const searchLower = toolsFilter.search.toLowerCase();
-          return tools.filter((tool: { name: string; status: string }) => {
+          return tools.filter((tool: { name: string; status: string; enabled: boolean }) => {
+            if (!tool.enabled) return false;
             // Check status filter (stable always visible, experimental based on toggle)
             if (tool.status === "experimental" && !toolsFilter.showExperimental) return false;
             // Check search filter (name only)
