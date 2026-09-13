@@ -1,7 +1,7 @@
 /// <reference types="three" />
 /// <reference types="blockbench-types" />
 import { z } from "zod";
-import { createTool, type ToolSpec } from "@/lib/factories";
+import { createTool, type IToolSpec } from "@/lib/factories";
 import { captureScreenshot, captureAppScreenshot } from "@/lib/util";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
 import { vector3Schema, projectionEnum } from "@/lib/zodObjects";
@@ -19,9 +19,10 @@ export const setCameraAngleParameters = z.object({
   projection: projectionEnum.describe("Camera projection type."),
 });
 
-export const cameraToolDocs: ToolSpec[] = [
+export const cameraToolDocs: IToolSpec[] = [
   {
     name: "capture_screenshot",
+    condition: () => ModelProject.all.length > 0,
     description: "Returns the image data of the current view.",
     annotations: {
       title: "Capture Screenshot",
@@ -32,6 +33,7 @@ export const cameraToolDocs: ToolSpec[] = [
   },
   {
     name: "capture_app_screenshot",
+    condition: () => !Blockbench.isWeb,
     description: "Returns the image data of the Blockbench app.",
     annotations: {
       title: "Capture App Screenshot",
@@ -42,6 +44,7 @@ export const cameraToolDocs: ToolSpec[] = [
   },
   {
     name: "set_camera_angle",
+    condition: { project: true, method: () => Boolean(Preview.selected) },
     description: "Sets the camera angle to the specified value.",
     annotations: {
       title: "Set Camera Angle",

@@ -1,33 +1,38 @@
 import { z } from "zod";
-import type { ToolSpec, PromptSpec, ResourceSpec } from "../lib/factories";
+import type { IToolSpec, IPromptSpec, IResourceSpec } from "@/lib/factories";
 
 // Tool docs imports — each file exports schemas at module level with zero Blockbench deps
-import { cameraToolDocs } from "../server/tools/camera";
-import { cubeToolDocs } from "../server/tools/cubes";
-import { displayToolDocs } from "../server/tools/display";
-import { elementToolDocs } from "../server/tools/element";
-import { importToolDocs } from "../server/tools/import";
-import { meshToolDocs } from "../server/tools/mesh";
-import { paintToolDocs } from "../server/tools/paint";
-import { projectToolDocs } from "../server/tools/project";
-import { textureToolDocs } from "../server/tools/texture";
-import { armatureToolDocs } from "../server/tools/armature";
-import { animationToolDocs } from "../server/tools/animation";
-import { uiToolDocs } from "../server/tools/ui";
-import { hytaleToolDocs } from "../server/tools/hytale";
-import { materialInstanceToolDocs } from "../server/tools/material-instances";
-import { uvToolDocs } from "../server/tools/uv";
-import { historyToolDocs } from "../server/tools/history";
-import { exportToolDocs } from "../server/tools/export";
+import { cameraToolDocs } from "@/server/tools/camera";
+import { capabilityToolDocs } from "@/server/tools/capabilities";
+import { cubeToolDocs } from "@/server/tools/cubes";
+import { cubeUvToolDocs } from "@/server/tools/cube-uv";
+import { displayToolDocs } from "@/server/tools/display";
+import { elementToolDocs } from "@/server/tools/element";
+import { importToolDocs } from "@/server/tools/import";
+import { meshToolDocs } from "@/server/tools/mesh";
+import { meshInspectionToolDocs } from "@/server/tools/mesh-inspection";
+import { paintToolDocs } from "@/server/tools/paint";
+import { projectToolDocs } from "@/server/tools/project";
+import { textureToolDocs } from "@/server/tools/texture";
+import { armatureToolDocs } from "@/server/tools/armature";
+import { animationToolDocs } from "@/server/tools/animation";
+import { uiToolDocs } from "@/server/tools/ui";
+import { modeToolDocs } from "@/server/tools/modes";
+import { hytaleToolDocs } from "@/server/tools/hytale";
+import { materialInstanceToolDocs } from "@/server/tools/material-instances";
+import { uvToolDocs } from "@/server/tools/uv";
+import { historyToolDocs } from "@/server/tools/history";
+import { exportToolDocs } from "@/server/tools/export";
 
-export interface CategoryGroup {
+export interface ICategoryGroup {
   category: string;
-  tools: ToolSpec[];
+  tools: IToolSpec[];
 }
 
-export const toolManifest: CategoryGroup[] = [
+export const toolManifest: ICategoryGroup[] = [
   { category: "Cubes", tools: cubeToolDocs },
   { category: "Camera & Screenshots", tools: cameraToolDocs },
+  { category: "Capabilities", tools: capabilityToolDocs },
   { category: "Animation", tools: animationToolDocs },
   { category: "Armature", tools: armatureToolDocs },
   { category: "Display Settings", tools: displayToolDocs },
@@ -36,17 +41,17 @@ export const toolManifest: CategoryGroup[] = [
   { category: "History", tools: historyToolDocs },
   { category: "Import/Export", tools: importToolDocs },
   { category: "Material Instances", tools: materialInstanceToolDocs },
-  { category: "Mesh Editing", tools: meshToolDocs },
+  { category: "Mesh Editing", tools: [...meshToolDocs, ...meshInspectionToolDocs] },
   { category: "Paint Tools", tools: paintToolDocs },
   { category: "Project", tools: projectToolDocs },
   { category: "Textures", tools: textureToolDocs },
-  { category: "UI Interaction", tools: uiToolDocs },
-  { category: "UV Mapping", tools: uvToolDocs },
+  { category: "UI Interaction", tools: [...uiToolDocs, ...modeToolDocs] },
+  { category: "UV Mapping", tools: [...uvToolDocs, ...cubeUvToolDocs] },
   { category: "Hytale Integration", tools: hytaleToolDocs },
 ];
 
 // Prompt specs defined inline — server/prompts.ts uses macros that complicate direct import
-export const promptDocs: PromptSpec[] = [
+export const promptDocs: IPromptSpec[] = [
   {
     name: "blockbench_native_apis",
     description:
@@ -113,7 +118,14 @@ export const promptDocs: PromptSpec[] = [
 ];
 
 // Resource specs defined inline — server/resources.ts uses Blockbench globals at module level
-export const resourceDocs: ResourceSpec[] = [
+export const resourceDocs: IResourceSpec[] = [
+  {
+    name: "project-files",
+    uriTemplate: "blockbench://project/{id}.bbmodel",
+    title: "Blockbench Project Files",
+    description:
+      "Returns the active project's live .bbmodel file with unsaved edits and embedded textures. UUID-based URIs remain stable across renames. Select a project before reading its file; reading never switches tabs or saves to disk.",
+  },
   {
     name: "projects",
     uriTemplate: "projects://{id}",
@@ -137,10 +149,10 @@ export const resourceDocs: ResourceSpec[] = [
   },
   {
     name: "reference_models",
-    uriTemplate: "reference_models://{id}",
+    uriTemplate: "reference-models://{id}",
     title: "Reference Models",
     description:
-      "Returns reference models in the current project. Requires the Reference Models plugin. List URIs use slugified names (e.g. `reference_models://turntable`) with `~<uuid-prefix>` on collision. Reads accept UUID, exact name, or slug.",
+      "Returns reference models in the current project. Requires the Reference Models plugin. List URIs use slugified names (e.g. `reference-models://turntable`) with `~<uuid-prefix>` on collision. Reads accept UUID, exact name, or slug.",
   },
   {
     name: "validator-status",

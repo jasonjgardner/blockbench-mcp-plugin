@@ -2,7 +2,7 @@
 import { z } from "zod";
 import { getAllToolDefinitions } from "@/lib/factories";
 
-interface FormElementOptions {
+interface IFormElementOptions {
   label?: string;
   description?: string;
   type?: string;
@@ -15,7 +15,7 @@ interface FormElementOptions {
   height?: number;
 }
 
-type InputFormConfig = Record<string, "_" | FormElementOptions>;
+type InputFormConfig = Record<string, "_" | IFormElementOptions>;
 
 /**
  * Extracts metadata from a Zod schema type
@@ -131,7 +131,7 @@ function zodSchemaToFormConfig(
     const meta = getZodTypeMeta(zodType);
     const def = zodType._def as Record<string, unknown>;
 
-    const fieldConfig: FormElementOptions = {
+    const fieldConfig: IFormElementOptions = {
       label: `${fieldName}${meta.isOptional ? "" : " *"}`,
       description: meta.description || `Parameter: ${fieldName}`,
       type: meta.type,

@@ -2,44 +2,45 @@
 /// <reference types="blockbench-types" />
 
 import { createResource } from "@/lib/factories";
+import { resourceNotFound } from "@/lib/resourceErrors";
 
 // ============================================================================
 // Types for Validator (not fully typed in blockbench-types)
 // ============================================================================
 
-interface ValidatorButton {
+interface IValidatorButton {
   name: string;
   icon: string;
   color?: string;
   click: (event?: Event) => void;
 }
 
-interface ValidatorProblem {
+interface IValidatorProblem {
   message: string;
-  buttons?: ValidatorButton[];
+  buttons?: IValidatorButton[];
   error?: boolean;
 }
 
-interface ValidatorCheckInstance {
+interface IValidatorCheckInstance {
   id: string;
   type?: string;
   update_triggers: string[];
   condition?: unknown;
-  errors: ValidatorProblem[];
-  warnings: ValidatorProblem[];
+  errors: IValidatorProblem[];
+  warnings: IValidatorProblem[];
   plugin?: string;
 }
 
-interface ValidatorSingleton {
-  checks: ValidatorCheckInstance[];
-  warnings: ValidatorProblem[];
-  errors: ValidatorProblem[];
+interface IValidatorSingleton {
+  checks: IValidatorCheckInstance[];
+  warnings: IValidatorProblem[];
+  errors: IValidatorProblem[];
   triggers: string[];
   validate: (trigger?: string) => void;
 }
 
 // Access the global Validator
-declare const Validator: ValidatorSingleton;
+declare const Validator: IValidatorSingleton;
 
 // ============================================================================
 // Helper Functions
@@ -49,7 +50,7 @@ declare const Validator: ValidatorSingleton;
  * Extract element references from a problem's buttons
  * Looks for common patterns like "Select Cube", "Select Texture", etc.
  */
-function extractElementRefs(problem: ValidatorProblem): {
+function extractElementRefs(problem: IValidatorProblem): {
   type?: string;
   name?: string;
   uuid?: string;
@@ -109,7 +110,7 @@ function extractElementRefs(problem: ValidatorProblem): {
 /**
  * Serialize a validator problem with element references
  */
-function serializeProblem(problem: ValidatorProblem, isError: boolean) {
+function serializeProblem(problem: IValidatorProblem, isError: boolean) {
   const elementRefs = extractElementRefs(problem);
 
   return {
@@ -124,7 +125,7 @@ function serializeProblem(problem: ValidatorProblem, isError: boolean) {
 /**
  * Serialize a validator check definition
  */
-function serializeCheck(check: ValidatorCheckInstance) {
+function serializeCheck(check: IValidatorCheckInstance) {
   return {
     id: check.id,
     type: check.type ?? null,
@@ -240,7 +241,7 @@ export function registerValidatorResources() {
       // Find specific check
       const check = Validator.checks.find((c) => c.id === id);
       if (!check) {
-        throw new Error(`Validator check with ID "${id}" not found.`);
+        throw resourceNotFound(uri, `Validator check with ID "${id}" not found.`);
       }
 
       return {

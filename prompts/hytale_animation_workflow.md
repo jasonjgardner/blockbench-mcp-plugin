@@ -5,7 +5,7 @@ This guide covers creating animations for Hytale models using Blockbench with th
 ## Animation Basics
 
 ### Frame Rate
-Hytale animations run at **60 FPS**. When setting keyframe times:
+The native `.blockyanim` exporter uses a **60-frame-per-second timebase**. This is not a universal editor or renderer frame-rate requirement. When setting keyframe times:
 - 1 second = 60 frames
 - 0.5 seconds = 30 frames
 - Use decimal seconds in tools (e.g., 0.5, 1.0, 2.5)
@@ -24,7 +24,7 @@ Hytale supports these animation channels per bone:
 ### Rotation (Quaternion)
 - Channel: `rotation`
 - Hytale uses **quaternion interpolation** for smooth 3D rotations
-- Avoids gimbal lock issues
+- Preview shortest-path interpolation; full turns need intermediate orientations less than 180 degrees apart
 
 ### Scale (Stretch)
 - Channel: `scale`
@@ -40,15 +40,19 @@ Hytale supports these animation channels per bone:
 ## Interpolation Types
 
 - `linear` - Constant rate between keyframes
-- `smooth` - Catmull-Rom spline for natural easing (default for Hytale)
+- Native keyframes use `catmullrom`; the inspected exporter maps that to `smooth`
 
-## Loop Modes
+Other editor interpolation types are not preserved as distinct `.blockyanim` curve types by the inspected exporter. Verify exported motion rather than assuming editor Bezier or step settings survive unchanged.
+
+## Editor Loop Modes
 
 Set with `hytale_set_animation_loop`:
 
 - `loop` - Continuous playback, restarts from beginning
 - `hold` - Play once, freeze on last frame
-- `once` - Play once, return to rest pose
+- `once` - One-shot editor playback
+
+Inspect the exported hold/loop-related properties and game-side playback bindings; editor loop mode alone does not prove runtime behavior.
 
 ## Workflow
 
@@ -69,13 +73,10 @@ Use animation tools to add keyframes:
 Use `animation_graph_editor` to adjust curves:
 - `smooth` for organic movements
 - `linear` for mechanical movements
-- `stepped` for snappy transitions
+- `stepped` only when its editor behavior is intended; verify delivery because the native Hytale exporter maps non-Catmull-Rom interpolation to linear
 
 ### 4. Multi-Bone Animation
-Hytale supports **duplicate bone names**:
-- Multiple bones with same name receive same animation
-- Useful for symmetrical limbs (left_leg, left_leg)
-- Animation is automatically copied
+Hytale can use repeated bone names for shared animation semantics. Use this deliberately: it can prevent independent limb motion. MCP targeting should retain returned UUIDs when names repeat, and the exported animation must be checked against the intended rig. Do not assume the tool copies separate editable tracks automatically.
 
 ## Tips
 
@@ -93,7 +94,9 @@ Attachment pieces inherit parent bone animation:
 ### Performance
 - Keep keyframes sparse, interpolation fills gaps
 - Use linear interpolation for simple movements
-- Quaternion rotation prevents flip issues
+- Preview rotation direction and the loop seam; quaternion interpolation does not preserve an unkeyed full revolution
+
+Export animation through the discovered native `export_blockyanim` action. Do not invent a `blockyanim` model-codec argument for `export_model`. See the [native animation exporter](https://github.com/JannisX11/hytale-blockbench-plugin/blob/main/src/blockyanim.ts), checked 2026-09-13.
 
 ## Common Patterns
 

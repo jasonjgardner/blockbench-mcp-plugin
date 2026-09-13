@@ -5,10 +5,11 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   registerToolsOnServer,
   registerResourcesOnServer,
-  registerPromptsOnServer
+  registerPromptsOnServer,
+  refreshToolAvailability
 } from '@/lib/factories'
 import { createServer as createMcpServer } from '@/server/server'
-import { sessionManager, type SessionConfig } from '@/lib/sessions'
+import { sessionManager, type ISessionConfig } from '@/lib/sessions'
 
 export type { NetServer }
 
@@ -16,7 +17,7 @@ export type { NetServer }
  * Keep-alive configuration. Layered approach — TCP, HTTP, SSE, and MCP-level
  * pings each catch different classes of dead/stale connections.
  */
-interface KeepAliveConfig {
+interface IKeepAliveConfig {
   /** Enable TCP keep-alive on accepted sockets */
   enabled: boolean
   /** Initial delay before sending first TCP keep-alive probe (ms) */
@@ -40,7 +41,7 @@ interface KeepAliveConfig {
   httpKeepAliveTimeoutSec: number
 }
 
-const DEFAULT_KEEP_ALIVE: KeepAliveConfig = {
+const DEFAULT_KEEP_ALIVE: IKeepAliveConfig = {
   enabled: true,
   initialDelay: 30000,           // 30s before first TCP probe
   idleTimeoutMs: 10 * 60 * 1000, // 10min hard socket timeout
@@ -103,8 +104,8 @@ export default function createNetServer (
     endpoint: string
     port: number
     host?: string
-    keepAlive?: Partial<KeepAliveConfig>
-    sessionConfig?: Partial<SessionConfig>
+    keepAlive?: Partial<IKeepAliveConfig>
+    sessionConfig?: Partial<ISessionConfig>
   }
 ): [NetServer, SessionTransports] {
   const sessionTransports: SessionTransports = new Map()
@@ -438,6 +439,7 @@ export default function createNetServer (
           }
 
           // Let the transport handle the MCP protocol
+          refreshToolAvailability()
           const webResponse = await session.transport.handleRequest(webRequest)
 
           // Convert Web Standard Response to HTTP

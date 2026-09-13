@@ -1,21 +1,29 @@
 /// <reference types="three" />
 /// <reference types="blockbench-types" />
 import { z } from "zod";
-import { createTool, type ToolSpec } from "@/lib/factories";
+import { createTool, type IToolSpec } from "@/lib/factories";
 import { cubeSchema } from "@/lib/zodObjects";
-import { STATUS_STABLE } from "@/lib/constants";
+import { GEOMETRY_EPSILON, STATUS_STABLE } from "@/lib/constants";
 import { getProjectTexture } from "@/lib/util";
+import { runUndoableEdit } from "@/lib/undo";
+import { isHytaleFormat } from "@/lib/hytale";
 
+/**
+ * Creates a nonempty batch of cubes with optional texture and parent references.
+ * Faces default to automatic UV on all sides; false skips texture assignment
+ * and disables Auto UV outside Hytale, which always requires Auto UV 1.
+ * Explicit arrays never depend on UV editor selection.
+ */
 export const placeCubeParameters = z.object({
   elements: z.array(cubeSchema).min(1).describe("Array of cubes to place."),
   texture: z
     .string()
     .optional()
-    .describe("Texture ID or name to apply to the cube."),
+    .describe("Texture UUID, ID or name. When omitted, uses the default texture if one exists; otherwise creates untextured cubes."),
   group: z
     .string()
     .optional()
-    .describe("Group/bone to which the cube belongs."),
+    .describe("Parent group UUID or unique name, or root (default). Missing or ambiguous names are rejected."),
   faces: z
     .union([
       z
@@ -25,7 +33,7 @@ export const placeCubeParameters = z.object({
         .boolean()
         .optional()
         .describe(
-          "Whether to apply the texture to all faces. Set to `true` to enable auto UV mapping."
+          "true applies texture to all faces with Auto UV; false skips texture assignment and disables Auto UV except in Hytale, which requires Auto UV 1."
         ),
       z
         .array(
@@ -34,8 +42,8 @@ export const placeCubeParameters = z.object({
               .enum(["north", "south", "east", "west", "up", "down"])
               .describe("Face to apply the texture to."),
             uv: z
-              .array(z.number()).length(4)
-              .describe("Custom UV mapping for the face."),
+              .array(z.number().finite()).length(4)
+              .describe("Custom UV rectangle. Hytale requires absolute width/height to match the cube's face dimensions: north/south XY, east/west ZY, up/down XZ."),
           })
         )
         .describe("Array of faces with custom UV mapping."),
@@ -43,10 +51,11 @@ export const placeCubeParameters = z.object({
     .optional()
     .default(true)
     .describe(
-      "Faces to apply the texture to. Set to `true` to enable auto UV mapping."
+      "true applies texture to all faces with Auto UV; false skips texture assignment. Named faces use Auto UV; false/custom rectangles disable Auto UV outside Hytale. Hytale always retains Auto UV 1 and custom rectangles must match the geometry's face dimensions. Partial/custom faces require per-face UV support. Single-texture formats may still display the project texture."
     ),
 });
 
+/** Optional geometry, appearance and UV properties for existing cube targets. */
 export const modifyCubeParameters = z.object({
   id: z
     .string()
@@ -97,11 +106,13 @@ export const modifyCubeParameters = z.object({
     .describe("Whether the cube is visible or not."),
 });
 
-export const cubeToolDocs: ToolSpec[] = [
+/** Schema-only cube tool specifications used by registration and generated API documentation. */
+export const cubeToolDocs: IToolSpec[] = [
   {
     name: "place_cube",
+    condition: { project: true, features: ["edit_mode"] },
     description:
-      "Places a cube of the given size at the specified position. Texture and group are optional.",
+      "Creates cubes in one reversible edit. Texture and group are optional, allowing untextured blockouts. Explicit face targets never use the current UV selection; partial/custom faces require per-face UV support.",
     annotations: {
       title: "Place Cube",
       destructiveHint: true,
@@ -111,6 +122,7 @@ export const cubeToolDocs: ToolSpec[] = [
   },
   {
     name: "modify_cube",
+    condition: { project: true, features: ["edit_mode"] },
     description:
       "Modifies the cube with the given ID. Auto UV setting: saved as an integer, where 0 means disabled, 1 means enabled, and 2 means relative auto UV (cube position affects UV)",
     annotations: {
@@ -122,37 +134,73 @@ export const cubeToolDocs: ToolSpec[] = [
   },
 ];
 
-export function registerCubesTools() {
-createTool(cubeToolDocs[0].name, {
-  ...cubeToolDocs[0],
-  async execute({ elements, texture, faces, group }) {
-    Undo.initEdit({
-      elements: [],
-      outliner: true,
-      collections: [],
+/** Accepted creation arguments after schema defaults have been applied. */
+type PlaceCubeInput = z.infer<typeof placeCubeParameters>;
+/** A named side of a native cube. */
+type CubeSide = CubeFaceDirection;
+/** An explicit side and its UV rectangle in texture coordinates. */
+type FaceRectangle = { face: CubeSide; uv: number[] };
+
+/** Native unrotated face axes used by Auto UV 1; creation does not set face UV rotation. */
+const faceSizeAxes: Record<CubeSide, readonly [number, number]> = {
+  north: [0, 1], south: [0, 1], east: [2, 1], west: [2, 1], up: [0, 2], down: [0, 2],
+};
+
+/** Rejects an entire Hytale creation batch before Undo when a rectangle would be remapped by the host. */
+function validateHytaleRectangles(elements: PlaceCubeInput["elements"], rectangles: FaceRectangle[]): void {
+  elements.forEach(element => {
+    const size = element.to.map((value, axis) => Math.abs(value - element.from[axis]));
+    if (size.some(value => !Number.isFinite(value))) throw new Error("Hytale cube dimensions must be finite.");
+    rectangles.forEach(({ face, uv }) => {
+      const expected = faceSizeAxes[face].map(axis => size[axis]);
+      const actual = [Math.abs(uv[2] - uv[0]), Math.abs(uv[3] - uv[1])];
+      if (actual.some((value, axis) => !Number.isFinite(value) || Math.abs(value - expected[axis]) > GEOMETRY_EPSILON)) {
+        throw new Error(`Hytale cube "${element.name}" face "${face}" requires UV extents ${expected[0]}x${expected[1]} for its dimensions. Move or mirror the rectangle while preserving those extents.`);
+      }
     });
-    const total = elements.length;
+  });
+}
 
-    const projectTexture = texture
-      ? getProjectTexture(texture)
-      : Texture.getDefault();
+/** Resolves an explicit parent without silently placing cubes at the root. */
+function cubeParent(reference: string | undefined): Group | "root" {
+  if (reference === undefined || reference === "root") return "root";
+  const byUuid = Group.all.find(candidate => candidate.uuid === reference);
+  if (byUuid) return byUuid;
+  const matches = Group.all.filter(candidate => candidate.name === reference);
+  if (matches.length === 0) throw new Error(`Parent group "${reference}" not found. Use list_outline to inspect group UUIDs and names.`);
+  if (matches.length > 1) throw new Error(`Parent group name "${reference}" is ambiguous. Use its UUID.`);
+  return matches[0];
+}
 
-    if (!projectTexture) {
-      throw new Error(`No texture found for "${texture}".`);
-    }
+/** Narrows the public face union without assuming the first array entry exists. */
+function isFaceRectangle(face: CubeSide | FaceRectangle): face is FaceRectangle {
+  return typeof face !== "string";
+}
 
-    // @ts-expect-error Blockbench global utility available at runtime
-    const groups = getAllGroups();
-    const outlinerGroup = group === "root"
-      ? "root"
-      : groups.find((g: any) => g.name === group || g.uuid === group) ?? "root";
+/** Creates validated cubes, tracking new elements before initialization can fail. */
+async function placeCubes({ elements, texture, faces, group }: PlaceCubeInput): Promise<string> {
+  if (typeof Project === "undefined" || !Project) throw new Error("Open a project before creating cubes.");
+  if (elements.some(element => [element.from, element.to, element.origin, element.rotation].flat().some(value => !Number.isFinite(value)))) {
+    throw new Error("Cube coordinates and rotations must contain only finite numbers.");
+  }
+  const parent = cubeParent(group);
+  const projectTexture = texture === undefined ? Texture.getDefault() : getProjectTexture(texture);
+  if (texture !== undefined && !projectTexture) throw new Error(`No texture found for "${texture}".`);
 
-    const autouv =
-      faces === true ||
-      (Array.isArray(faces) &&
-        faces.every((face) => typeof face === "string"));
-
-    const cubes = elements.map((element: Cube) => {
+  const explicitFaces = Array.isArray(faces) ? faces : [];
+  const rectangles = explicitFaces.filter(isFaceRectangle);
+  const sides = explicitFaces.map(face => typeof face === "string" ? face : face.face);
+  if (new Set(sides).size !== sides.length) throw new Error("Each cube face may only be specified once.");
+  const needsPerFace = rectangles.length > 0 || (sides.length > 0 && sides.length < 6);
+  if (needsPerFace && Format.box_uv && !Format.optional_box_uv) {
+    throw new Error("The current format only supports box UV. Custom UV rectangles and partial face texture assignments require per-face UV support.");
+  }
+  const hytale = isHytaleFormat();
+  if (hytale) validateHytaleRectangles(elements, rectangles);
+  const autouv = hytale || faces === true || (Array.isArray(faces) && rectangles.length === 0 && sides.length > 0);
+  const cubes: Cube[] = [];
+  runUndoableEdit({ elements: cubes, outliner: true }, "Agent placed cubes", () => {
+    elements.forEach(element => {
       const cube = new Cube({
         autouv: autouv ? 1 : 0,
         name: element.name,
@@ -160,36 +208,30 @@ createTool(cubeToolDocs[0].name, {
         to: element.to as [number, number, number],
         origin: element.origin as [number, number, number],
         rotation: element.rotation as [number, number, number],
-      }).init();
-
-      cube.addTo(outlinerGroup);
-
-      if (!autouv && Array.isArray(faces)) {
-        faces.forEach(({ face, uv }) => {
-          cube.faces[face].extend({
-            uv: uv as [number, number, number, number],
-          });
-        });
-      } else {
-        cube.applyTexture(
-          projectTexture,
-          faces !== false ? faces : undefined
-        );
-        cube.mapAutoUV();
+      });
+      cubes.push(cube);
+      if (needsPerFace) cube.box_uv = false;
+      cube.init().addTo(parent);
+      if (cube.parent !== parent) throw new Error("The current format does not allow the requested cube parent.");
+      if (projectTexture && faces !== false && (faces === true || sides.length > 0)) {
+        cube.applyTexture(projectTexture, faces === true ? true : sides);
       }
-
-      return cube;
+      if (autouv) cube.mapAutoUV();
+      rectangles.forEach(({ face, uv }) => {
+        cube.faces[face].extend({ uv: uv as [number, number, number, number] });
+      });
     });
-
-    Undo.finishEdit("Agent placed cubes");
     Canvas.updateAll();
+  });
+  return JSON.stringify(cubes.map(cube => `Added cube ${cube.name} with ID ${cube.uuid}`));
+}
 
-    return await Promise.resolve(
-      JSON.stringify(
-        cubes.map((cube: Cube) => `Added cube ${cube.name} with ID ${cube.uuid}`)
-      )
-    );
-  },
+/** Registers the cube tools with their shared parameter schemas and runtime implementations. */
+export function registerCubesTools(): void {
+createTool(cubeToolDocs[0].name, {
+  ...cubeToolDocs[0],
+  parameters: placeCubeParameters,
+  execute: placeCubes,
 }, cubeToolDocs[0].status);
 
 createTool(cubeToolDocs[1].name, {

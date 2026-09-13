@@ -1,9 +1,8 @@
 /// <reference types="three" />
 /// <reference types="blockbench-types" />
 import { z } from "zod";
-import { createTool, type ToolSpec } from "@/lib/factories";
+import { createTool, type IToolSpec } from "@/lib/factories";
 import {
-  getProjectTexture,
   imageContent,
   findElementOrThrow,
   findTextureOrThrow,
@@ -12,6 +11,7 @@ import {
 } from "@/lib/util";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
 import {
+  colorByte,
   colorSchema,
   elementIdSchema,
   textureIdSchema,
@@ -19,17 +19,40 @@ import {
   pbrChannelEnum,
   renderModeEnum,
   renderSidesEnum,
+  rgbByteTuple,
+  rgbaByteTuple,
 } from "@/lib/zodObjects";
+import {
+  applyTextureToTargets,
+  describeTargetKind,
+  resolveTextureTargets,
+} from "@/server/tools/texture/apply-texture";
+import { addCreatedTexture, loadTextureData } from "@/server/tools/texture/create-texture";
+import {
+  commitMaterialEdit,
+  findMaterial,
+  materialConfig,
+  planChannels,
+  projectedChannels,
+  requireTextureProject,
+  uniqueByUuid,
+  validateMaterialChanges,
+  type MaterialChannels,
+} from "@/server/tools/texture/material-edit";
+import { importMaterial } from "@/server/tools/texture/texture-set-import";
 
 // ============================================================================
 // Texture Tool Parameter Schemas
 // ============================================================================
 
+/** Create a texture from pixels or a fill, with optional paired logical UV dimensions for per-texture formats; `pbr_channel` requires a material `group`. */
 export const createTextureParameters = z
   .object({
     name: z.string(),
     width: z.number().min(16).max(4096).default(16),
     height: z.number().min(16).max(4096).default(16),
+    uv_width: z.number().finite().positive().optional().describe("Logical UV width for formats with per_texture_uv_size. Supply uv_height too. Independent of bitmap width; omit both to preserve native defaults."),
+    uv_height: z.number().finite().positive().optional().describe("Logical UV height for formats with per_texture_uv_size. Supply uv_width too. Independent of bitmap height."),
     data: z
       .string()
       .optional()
@@ -60,6 +83,10 @@ export const createTextureParameters = z
       .default("auto")
       .describe("Render sides for the texture. Auto, front, or double."),
   })
+  .refine(params => (params.uv_width === undefined) === (params.uv_height === undefined), {
+    message: "Supply both uv_width and uv_height, or omit both.",
+    path: ["uv_width"],
+  })
   .refine((params) => !(params.data && params.fill_color), {
     message:
       "The 'data' and 'fill_color' properties cannot both be defined.",
@@ -79,6 +106,7 @@ export const createTextureParameters = z
     }
   );
 
+/** Apply a texture to one cube/mesh or every cube/mesh inside a group, choosing which faces receive it. */
 export const applyTextureParameters = z.object({
   id: elementIdSchema.describe("ID or name of the element to apply the texture to."),
   texture: textureIdSchema.describe("ID or name of the texture to apply."),
@@ -89,6 +117,7 @@ export const applyTextureParameters = z.object({
     .default("blank"),
 });
 
+/** Create a texture group (a PBR material by default) containing existing textures. */
 export const addTextureGroupParameters = z.object({
   name: z.string(),
   textures: z
@@ -102,18 +131,22 @@ export const addTextureGroupParameters = z.object({
     .describe("Whether the texture group is a PBR material or not."),
 });
 
+/** list_textures takes no arguments. */
 export const listTexturesParameters = z.object({});
 
+/** Read a texture's image by ID or name; omit `texture` for the project's default texture. */
 export const getTextureParameters = z.object({
   texture: textureIdOptionalSchema,
 });
 
+/** Select the texture that later paint tools target by default. */
 export const activateTextureParameters = z.object({
   texture: textureIdSchema.describe(
     "Texture ID, UUID, or name to activate in the texture panel."
   ),
 });
 
+/** Create a material with one texture per channel and reversible group membership. */
 export const createPbrMaterialParameters = z.object({
   name: z.string().describe("Name of the material."),
   color_texture: z
@@ -134,30 +167,27 @@ export const createPbrMaterialParameters = z.object({
     .describe(
       "Texture ID/name for the MER (Metalness/Emissive/Roughness) channel."
     ),
-  color_value: z
-    .array(z.number().min(0).max(255))
-    .length(4)
+  color_value: rgbaByteTuple()
     .optional()
     .describe(
       "Uniform RGBA color [R,G,B,A] when no color texture is provided."
     ),
-  mer_value: z
-    .array(z.number().min(0).max(255))
-    .length(3)
+  mer_value: rgbByteTuple()
     .optional()
     .describe(
       "Uniform MER values [Metalness, Emissive, Roughness] (0-255) when no MER texture is provided."
     ),
-  subsurface_value: z
-    .number()
-    .min(0)
-    .max(255)
+  subsurface_value: colorByte()
     .optional()
     .describe(
       "Subsurface scattering value (0-255) for Bedrock 1.21.30+ materials."
     ),
+}).refine(({ normal_texture, height_texture }) => !(normal_texture && height_texture), {
+  message: "Use either normal_texture or height_texture, not both.",
+  path: ["height_texture"],
 });
 
+/** Update channel assignments; use 'none' to detach a map before using a uniform value. */
 export const configureMaterialParameters = z.object({
   material: z.string().describe("Material name or UUID to configure."),
   color_texture: z
@@ -184,32 +214,31 @@ export const configureMaterialParameters = z.object({
     .describe(
       "Texture ID/name for MER channel, or 'none' to use uniform values."
     ),
-  color_value: z
-    .array(z.number().min(0).max(255))
-    .length(4)
+  color_value: rgbaByteTuple()
     .optional()
     .describe("Uniform RGBA color [R,G,B,A] when no color texture."),
-  mer_value: z
-    .array(z.number().min(0).max(255))
-    .length(3)
+  mer_value: rgbByteTuple()
     .optional()
     .describe(
       "Uniform MER values [Metalness, Emissive, Roughness] (0-255)."
     ),
-  subsurface_value: z
-    .number()
-    .min(0)
-    .max(255)
+  subsurface_value: colorByte()
     .optional()
     .describe("Subsurface scattering value (0-255)."),
+}).refine(({ normal_texture, height_texture }) => !(normal_texture && normal_texture !== "none" && height_texture && height_texture !== "none"), {
+  message: "Use either normal_texture or height_texture; set the other channel to 'none' when replacing it.",
+  path: ["height_texture"],
 });
 
+/** list_materials takes no arguments. */
 export const listMaterialsParameters = z.object({});
 
+/** Inspect one PBR material by name or UUID. */
 export const getMaterialInfoParameters = z.object({
   material: z.string().describe("Material name or UUID."),
 });
 
+/** Import a Bedrock `.texture_set.json` file from disk as a PBR material. */
 export const importTextureSetParameters = z.object({
   path: z
     .string()
@@ -218,12 +247,14 @@ export const importTextureSetParameters = z.object({
     ),
 });
 
+/** Move one texture into a material channel, detaching the previous map. */
 export const assignTextureChannelParameters = z.object({
   material: z.string().describe("Material name or UUID."),
   texture: textureIdSchema.describe("Texture name or UUID to assign."),
   channel: pbrChannelEnum.describe("PBR channel to assign the texture to."),
 });
 
+/** Write a material's texture_set.json next to its color texture. */
 export const saveMaterialConfigParameters = z.object({
   material: z.string().describe("Material name or UUID to save."),
 });
@@ -232,9 +263,16 @@ export const saveMaterialConfigParameters = z.object({
 // Texture Tool Docs
 // ============================================================================
 
-export const textureToolDocs: ToolSpec[] = [
+/**
+ * Public specs for every texture and PBR material tool (name, description,
+ * annotations, parameter schema, status). Shared by `registerTextureTools` and
+ * the docs generator, so it must stay free of Blockbench runtime globals.
+ * Registration indexes this array, so keep the order stable.
+ */
+export const textureToolDocs: IToolSpec[] = [
   {
     name: "create_texture",
+    condition: { project: true },
     description: "Creates a new texture with the given name and size.",
     annotations: {
       title: "Create Texture",
@@ -246,6 +284,7 @@ export const textureToolDocs: ToolSpec[] = [
   },
   {
     name: "apply_texture",
+    condition: { project: true, features: ["edit_mode"], method: () => Texture.all.length > 0 },
     description:
       "Applies the given texture to the element with the specified ID.",
     annotations: {
@@ -257,7 +296,8 @@ export const textureToolDocs: ToolSpec[] = [
   },
   {
     name: "add_texture_group",
-    description: "Adds a new texture group with the given name.",
+    condition: { project: true },
+    description: "Adds a reversible texture group. All texture references must exist. Material groups require one texture per channel, either normal or height, and a color map alongside a MER map; use is_material=false for ordinary grouping.",
     annotations: {
       title: "Add Texture Group",
       destructiveHint: true,
@@ -267,6 +307,7 @@ export const textureToolDocs: ToolSpec[] = [
   },
   {
     name: "list_textures",
+    condition: { project: true },
     description: "Returns a list of all textures in the Blockbench editor.",
     annotations: {
       title: "List Textures",
@@ -277,6 +318,7 @@ export const textureToolDocs: ToolSpec[] = [
   },
   {
     name: "get_texture",
+    condition: { project: true, method: () => Texture.all.length > 0 },
     description:
       "Returns the image data of the given texture or default texture.",
     annotations: {
@@ -288,8 +330,9 @@ export const textureToolDocs: ToolSpec[] = [
   },
   {
     name: "create_pbr_material",
+    condition: { project: true, features: ["pbr"] },
     description:
-      "Creates a new PBR material (texture group with is_material=true) and optionally assigns textures to PBR channels. Use this for Minecraft Bedrock resource packs or any format supporting PBR.",
+      "Creates a new PBR material (texture group with is_material=true) and optionally assigns textures to PBR channels. Requires a PBR-capable format, distinct textures per channel, either normal or height, and a color texture alongside a MER texture. Uniform values require the corresponding map to be absent. Creation and texture moves are one undoable edit.",
     annotations: {
       title: "Create PBR Material",
       destructiveHint: true,
@@ -299,8 +342,9 @@ export const textureToolDocs: ToolSpec[] = [
   },
   {
     name: "configure_material",
+    condition: { project: true, features: ["pbr"] },
     description:
-      "Configures an existing PBR material's properties including channel assignments, uniform values, and subsurface scattering.",
+      "Configures a PBR material in one undoable edit. Replaced maps are detached without deleting their textures. Use 'none' to clear a channel before using uniform values or switching between normal and height; a MER map requires a color map.",
     annotations: {
       title: "Configure Material",
       destructiveHint: true,
@@ -310,6 +354,7 @@ export const textureToolDocs: ToolSpec[] = [
   },
   {
     name: "list_materials",
+    condition: { project: true, features: ["pbr"] },
     description:
       "Lists all PBR materials (texture groups with is_material=true) and their assigned textures per channel.",
     annotations: {
@@ -321,6 +366,7 @@ export const textureToolDocs: ToolSpec[] = [
   },
   {
     name: "get_material_info",
+    condition: { project: true },
     description:
       "Gets detailed information about a PBR material including the compiled texture_set.json preview for Bedrock export.",
     annotations: {
@@ -332,8 +378,9 @@ export const textureToolDocs: ToolSpec[] = [
   },
   {
     name: "import_texture_set",
+    condition: { project: true, features: ["pbr"], method: () => !Blockbench.isWeb },
     description:
-      "Imports a Minecraft Bedrock texture_set.json file and creates a PBR material with the associated textures.",
+      "Imports a Minecraft Bedrock texture_set.json on desktop. Validates supported JSON and decodes referenced images before one undoable edit. Returns JSON with material name/UUID and path. Reuses already loaded image paths without deleting textures. Normal and height, or MER and MERS, cannot coexist; MER images require a color image.",
     annotations: {
       title: "Import Texture Set",
       destructiveHint: true,
@@ -344,8 +391,9 @@ export const textureToolDocs: ToolSpec[] = [
   },
   {
     name: "assign_texture_channel",
+    condition: { project: true, features: ["pbr"] },
     description:
-      "Assigns a texture to a specific PBR channel within a material.",
+      "Assigns a texture to one PBR channel in a single undoable edit. Detaches the previous map without deleting it or changing its channel. Normal and height cannot coexist; a MER map requires a color map, including in the source material after moving textures.",
     annotations: {
       title: "Assign Texture Channel",
       destructiveHint: true,
@@ -355,6 +403,7 @@ export const textureToolDocs: ToolSpec[] = [
   },
   {
     name: "save_material_config",
+    condition: { project: true, features: ["pbr"], method: () => !Blockbench.isWeb },
     description:
       "Saves the material's texture_set.json file to disk (Bedrock format). Requires the color texture to have a valid file path.",
     annotations: {
@@ -367,6 +416,7 @@ export const textureToolDocs: ToolSpec[] = [
   },
   {
     name: "activate_texture",
+    condition: { project: true, method: () => Texture.all.length > 0 },
     description:
       "Activates the given texture in the Blockbench texture panel so that subsequent paint operations (draw_shape_tool, paint_with_brush, gradient_tool, etc.) target it. Most paint tools already call this internally when a texture_id is provided, but you can invoke it explicitly to pin the active texture across multiple calls.",
     annotations: {
@@ -383,94 +433,43 @@ export const textureToolDocs: ToolSpec[] = [
 // Tool Registration
 // ============================================================================
 
-export function registerTextureTools() {
+/**
+ * Registers texture editing and material tools with validated, reversible PBR changes.
+ * Blockbench globals are only touched inside each tool's `execute`, so this
+ * module stays importable by the docs generator outside Blockbench.
+ */
+export function registerTextureTools(): void {
   createTool(textureToolDocs[0].name, {
     ...textureToolDocs[0],
-    async execute({
-      name,
-      width,
-      height,
-      data,
-      pbr_channel,
-      fill_color,
-      group,
-      layer_name,
-      render_mode,
-      render_sides,
-    }) {
-      Undo.initEdit({
-        textures: [],
-        collections: [],
-      });
-
-      let texture = new Texture({
-        name,
-        width,
-        height,
-        group,
-        pbr_channel,
-        render_mode,
-        render_sides,
-        internal: true,
-      });
-
-      if (data) {
-        if (data.startsWith("data:image/")) {
-          texture.source = data;
-          texture.width = width;
-          texture.height = height;
-        } else {
-          texture = texture.fromFile({
-            name: data.split(/[\/\\]/).pop() || data,
-            path: data.replace(/^file:\/\//, ""),
-          });
-        }
-
-        texture.load();
-        texture.fillParticle();
-        texture.layers_enabled = false;
-      } else {
-        const { ctx } = texture.getActiveCanvas();
-
-        if (fill_color) {
-          const color = Array.isArray(fill_color)
-            // @ts-ignore - tinycolor is available globally in Blockbench
-            ? tinycolor({
-              r: Number(fill_color[0]),
-              g: Number(fill_color[1]),
-              b: Number(fill_color[2]),
-              a: Number(fill_color[3] ?? 255),
-            })
-            // @ts-ignore - tinycolor ok
-            : tinycolor(fill_color);
-
-          ctx.fillStyle = color.toRgbString().toLowerCase();
-          ctx.fillRect(0, 0, texture.width, texture.height);
-        } else {
-          ctx.clearRect(0, 0, texture.width, texture.height);
-        }
-
-        texture.updateSource(ctx.canvas.toDataURL("image/png", 1));
-        texture.updateLayerChanges(true);
+    parameters: createTextureParameters,
+    async execute({ name, width, height, uv_width, uv_height, data, pbr_channel, fill_color, group, render_mode, render_sides }) {
+      requireTextureProject(false);
+      if (uv_width !== undefined && !Format.per_texture_uv_size) {
+        throw new Error("The current format uses project-wide UV dimensions. Per-texture uv_width/uv_height would have no effect; edit project UV size through the native project workflow.");
       }
-
-      texture.add();
-
-      // The file/data-URL import path reassigns `texture` (via fromFile) and
-      // neither path guarantees the constructor's render settings survived, so
-      // re-apply them on the final instance and rebuild the three.js material
-      // so emissive/additive/layered modes take effect in the viewport
-      // immediately (constructing alone does not rebuild the material).
-      if (render_mode) texture.render_mode = render_mode;
-      if (render_sides) texture.render_sides = render_sides;
+      const textureGroup = group ? findTextureGroupOrThrow(group) : undefined;
+      if (textureGroup?.is_material) requireTextureProject();
+      if (pbr_channel && !textureGroup?.is_material) {
+        throw new Error("pbr_channel requires a PBR material group. Use create_pbr_material first.");
+      }
+      const project = Project;
+      const blank = new Texture({ name, width, height, internal: true });
+      const texture = await loadTextureData(blank, data, fill_color, pbr_channel ?? "color");
+      if (Project !== project) {
+        throw new Error("The active project changed while loading the texture. Select the intended project and try again.");
+      }
+      texture.name = name;
+      texture.pbr_channel = pbr_channel ?? "color";
+      texture.render_mode = render_mode;
+      texture.render_sides = render_sides;
+      if (uv_width !== undefined && uv_height !== undefined) {
+        texture.uv_width = uv_width;
+        texture.uv_height = uv_height;
+      }
       texture.updateMaterial();
-
-      Undo.finishEdit("Agent created texture");
-      Canvas.updateAll();
-
-      return imageContent({
-        url: texture.getDataURL(),
-      });
+      const result = imageContent({ url: texture.getDataURL() });
+      addCreatedTexture(texture, textureGroup);
+      return result;
     },
   }, textureToolDocs[0].status);
 
@@ -491,135 +490,31 @@ export function registerTextureTools() {
       // Resolve `id` to the concrete set of cubes/meshes to texture.
       // - Group → all descendant cubes + meshes
       // - Cube / Mesh → that single element
-      const targets: Array<Cube | Mesh> = [];
-      if (element instanceof Group) {
-        const collectDescendants = (group: Group) => {
-          for (const child of group.children ?? []) {
-            if (child instanceof Cube || child instanceof Mesh) {
-              targets.push(child);
-              continue;
-            }
-            if (child instanceof Group) collectDescendants(child);
-          }
-        };
-        collectDescendants(element);
-      } else if (element instanceof Cube || element instanceof Mesh) {
-        targets.push(element);
-      } else {
-        throw new Error(
-          `Element "${id}" is not a cube, mesh, or group — cannot apply texture to it.`
-        );
-      }
-
+      const targets = resolveTextureTargets(element, id);
       if (targets.length === 0) {
         throw new Error(
           `Element "${id}" resolved to no paintable cubes or meshes.`
         );
       }
 
-      // Save prior selection so the call is non-destructive to UI state.
-      const prevCubeSelection = [...Cube.selected];
-      const prevMeshSelection = [...Mesh.selected];
-      const prevGroup = Group.selected ?? null;
+      applyTextureToTargets(projectTexture, targets, applyTo);
 
-      // Undo must capture the element face-texture state, not just outliner.
-      Undo.initEdit({
-        elements: targets,
-        outliner: false,
-        collections: [],
-      });
-
-      try {
-        // Replace selection with the resolved targets so Texture.apply()
-        // operates on exactly this scope.
-        Cube.all.forEach((c: Cube) => {
-          if (c.selected) c.unselect?.();
-        });
-        Mesh.all.forEach((m: Mesh) => {
-          if (m.selected) m.unselect?.();
-        });
-        for (const target of targets) {
-          // @ts-ignore - select method available on outliner elements
-          target.select?.({ shiftKey: true });
-        }
-        updateSelection();
-
-        projectTexture.select();
-
-        Texture.selected?.apply(
-          applyTo === "none" ? false : applyTo === "all" ? true : "blank"
-        );
-
-        projectTexture.updateChangesAfterEdit();
-      } finally {
-        // Restore the caller's original selection.
-        Cube.all.forEach((c: Cube) => {
-          if (c.selected) c.unselect?.();
-        });
-        Mesh.all.forEach((m: Mesh) => {
-          if (m.selected) m.unselect?.();
-        });
-        for (const c of prevCubeSelection) {
-          // @ts-ignore - select method
-          c.select?.({ shiftKey: true });
-        }
-        for (const m of prevMeshSelection) {
-          // @ts-ignore - select method
-          m.select?.({ shiftKey: true });
-        }
-        if (prevGroup) prevGroup.selected = true;
-        updateSelection();
-      }
-
-      Undo.finishEdit("Agent applied texture");
-
-      // Force face-level render refresh so the viewport matches the data.
-      // Canvas.updateAll() alone sometimes doesn't push new face materials
-      // into the THREE.js render targets.
-      Canvas.updateView({
-        elements: targets,
-        element_aspects: { faces: true, uv: true, geometry: false },
-      });
-      Canvas.updateAll();
-
-      return `Applied texture "${projectTexture.name}" to ${targets.length} element(s) scoped by "${id}" (${element instanceof Group ? "group" : element instanceof Cube ? "cube" : "mesh"}).`;
+      return `Applied texture "${projectTexture.name}" to ${targets.length} element(s) scoped by "${id}" (${describeTargetKind(element)}).`;
     },
   }, textureToolDocs[1].status);
 
   createTool(textureToolDocs[2].name, {
     ...textureToolDocs[2],
+    parameters: addTextureGroupParameters,
     async execute({ name, textures, is_material }) {
-      Undo.initEdit({
-        elements: [],
-        outliner: true,
-        collections: [],
-        textures: [],
-      });
-
+      requireTextureProject(is_material);
+      const textureList = uniqueByUuid((textures ?? []).map(findTextureOrThrow));
       const textureGroup = new TextureGroup({
         name,
         is_material,
-      }).add();
-
-      if (textures) {
-        const textureList = textures
-          .map((texture) => getProjectTexture(texture))
-          .filter(Boolean);
-
-        if (textureList.length === 0) {
-          throw new Error(`No textures found for "${textures}".`);
-        }
-
-        textureList.forEach((texture) => {
-          texture?.extend({
-            group: textureGroup.uuid,
-          });
-        });
-      }
-
-      Undo.finishEdit("Agent added texture group");
-      Canvas.updateAll();
-
+      });
+      const changes = textureList.map(texture => ({ texture, group: textureGroup.uuid, channel: pbrChannelEnum.parse(texture.pbr_channel) }));
+      commitMaterialEdit(textureGroup, changes, {}, "Agent added texture group");
       return `Added texture group ${textureGroup.name} with ID ${textureGroup.uuid}`;
     },
   }, textureToolDocs[2].status);
@@ -635,6 +530,9 @@ export function registerTextureTools() {
           uuid: texture.uuid,
           id: texture.id,
           group: texture.group,
+          uv_size: [texture.getUVWidth(), texture.getUVHeight()],
+          bitmap_size: [texture.width, texture.height],
+          frame_size: [texture.width, texture.display_height],
         }))
       );
     },
@@ -660,85 +558,13 @@ export function registerTextureTools() {
 
   createTool(textureToolDocs[5].name, {
     ...textureToolDocs[5],
-    async execute({
-      name,
-      color_texture,
-      normal_texture,
-      height_texture,
-      mer_texture,
-      color_value,
-      mer_value,
-      subsurface_value,
-    }) {
-      const texturesToAdd: Texture[] = [];
-
-      // Find textures to add
-      if (color_texture) {
-        const tex = findTextureOrThrow(color_texture);
-        texturesToAdd.push(tex);
-      }
-      if (normal_texture) {
-        const tex = findTextureOrThrow(normal_texture);
-        texturesToAdd.push(tex);
-      }
-      if (height_texture) {
-        const tex = findTextureOrThrow(height_texture);
-        texturesToAdd.push(tex);
-      }
-      if (mer_texture) {
-        const tex = findTextureOrThrow(mer_texture);
-        texturesToAdd.push(tex);
-      }
-
-      Undo.initEdit({
-        texture_groups: [],
-        textures: texturesToAdd,
-      });
-
-      // @ts-ignore - TextureGroup is globally available
-      const textureGroup = new TextureGroup({
-        name,
-        is_material: true,
-      });
-
-      // Set material config values
-      if (color_value) {
-        textureGroup.material_config.color_value = color_value;
-      }
-      if (mer_value) {
-        textureGroup.material_config.mer_value = mer_value;
-      }
-      if (subsurface_value !== undefined) {
-        textureGroup.material_config.subsurface_value = subsurface_value;
-      }
-      textureGroup.material_config.saved = false;
-
-      textureGroup.add();
-
-      // Assign textures to channels
-      if (color_texture) {
-        const tex = findTextureOrThrow(color_texture);
-        tex.extend({ group: textureGroup.uuid, pbr_channel: "color" });
-      }
-      if (normal_texture) {
-        const tex = findTextureOrThrow(normal_texture);
-        tex.extend({ group: textureGroup.uuid, pbr_channel: "normal" });
-      }
-      if (height_texture) {
-        const tex = findTextureOrThrow(height_texture);
-        tex.extend({ group: textureGroup.uuid, pbr_channel: "height" });
-      }
-      if (mer_texture) {
-        const tex = findTextureOrThrow(mer_texture);
-        tex.extend({ group: textureGroup.uuid, pbr_channel: "mer" });
-      }
-
-      // Update material preview
-      textureGroup.updateMaterial();
-
-      Undo.finishEdit("Agent created PBR material");
-      Canvas.updateAll();
-
+    parameters: createPbrMaterialParameters,
+    async execute(args) {
+      requireTextureProject();
+      const textureGroup = new TextureGroup({ name: args.name, is_material: true });
+      const changes = planChannels(textureGroup, args);
+      commitMaterialEdit(textureGroup, changes, args, "Agent created PBR material");
+      const channels = projectedChannels(textureGroup, []);
       return JSON.stringify({
         success: true,
         material: {
@@ -746,10 +572,10 @@ export function registerTextureTools() {
           uuid: textureGroup.uuid,
           is_material: true,
           channels: {
-            color: color_texture ? true : !!color_value,
-            normal: !!normal_texture,
-            height: !!height_texture,
-            mer: mer_texture ? true : !!mer_value,
+            color: true,
+            normal: channels.includes("normal"),
+            height: channels.includes("height"),
+            mer: true,
           },
         },
       });
@@ -758,84 +584,14 @@ export function registerTextureTools() {
 
   createTool(textureToolDocs[6].name, {
     ...textureToolDocs[6],
-    async execute({
-      material,
-      color_texture,
-      normal_texture,
-      height_texture,
-      mer_texture,
-      color_value,
-      mer_value,
-      subsurface_value,
-    }) {
-      const textureGroup = findTextureGroupOrThrow(material);
-      const textures = textureGroup.getTextures();
-
-      Undo.initEdit({
-        texture_groups: [textureGroup],
-        textures,
-      });
-
-      // Handle color channel
-      if (color_texture === "none") {
-        textures
-          .filter((t: Texture) => t.pbr_channel === "color")
-          .forEach((t: Texture) => (t.group = ""));
-      } else if (color_texture) {
-        textures
-          .filter((t: Texture) => t.pbr_channel === "color")
-          .forEach((t: Texture) => (t.pbr_channel = "color"));
-        const tex = findTextureOrThrow(color_texture);
-        tex.extend({ group: textureGroup.uuid, pbr_channel: "color" });
+    parameters: configureMaterialParameters,
+    async execute(args) {
+      const textureGroup = findMaterial(args.material);
+      if (Object.entries(args).every(([key, value]) => key === "material" || value === undefined)) {
+        throw new Error("Provide a channel assignment or a uniform material value to configure.");
       }
-
-      // Handle normal channel
-      if (normal_texture === "none") {
-        textures
-          .filter((t: Texture) => t.pbr_channel === "normal")
-          .forEach((t: Texture) => (t.group = ""));
-      } else if (normal_texture) {
-        const tex = findTextureOrThrow(normal_texture);
-        tex.extend({ group: textureGroup.uuid, pbr_channel: "normal" });
-      }
-
-      // Handle height channel
-      if (height_texture === "none") {
-        textures
-          .filter((t: Texture) => t.pbr_channel === "height")
-          .forEach((t: Texture) => (t.group = ""));
-      } else if (height_texture) {
-        const tex = findTextureOrThrow(height_texture);
-        tex.extend({ group: textureGroup.uuid, pbr_channel: "height" });
-      }
-
-      // Handle MER channel
-      if (mer_texture === "none") {
-        textures
-          .filter((t: Texture) => t.pbr_channel === "mer")
-          .forEach((t: Texture) => (t.group = ""));
-      } else if (mer_texture) {
-        const tex = findTextureOrThrow(mer_texture);
-        tex.extend({ group: textureGroup.uuid, pbr_channel: "mer" });
-      }
-
-      // Update uniform values
-      if (color_value) {
-        textureGroup.material_config.color_value = color_value;
-      }
-      if (mer_value) {
-        textureGroup.material_config.mer_value = mer_value;
-      }
-      if (subsurface_value !== undefined) {
-        textureGroup.material_config.subsurface_value = subsurface_value;
-      }
-
-      textureGroup.material_config.saved = false;
-      textureGroup.updateMaterial();
-
-      Undo.finishEdit("Agent configured material");
-      Canvas.updateAll();
-
+      const changes = planChannels(textureGroup, args);
+      commitMaterialEdit(textureGroup, changes, args, "Agent configured material");
       return `Configured material "${textureGroup.name}"`;
     },
   }, textureToolDocs[6].status);
@@ -862,7 +618,7 @@ export function registerTextureTools() {
           config: {
             color_value: group.material_config.color_value,
             mer_value: group.material_config.mer_value,
-            subsurface_value: group.material_config.subsurface_value,
+            subsurface_value: materialConfig(group).subsurface_value,
             saved: group.material_config.saved,
           },
         };
@@ -902,7 +658,7 @@ export function registerTextureTools() {
         config: {
           color_value: textureGroup.material_config.color_value,
           mer_value: textureGroup.material_config.mer_value,
-          subsurface_value: textureGroup.material_config.subsurface_value,
+          subsurface_value: materialConfig(textureGroup).subsurface_value,
           saved: textureGroup.material_config.saved,
           file_path: textureGroup.material_config.getFilePath(),
         },
@@ -915,77 +671,46 @@ export function registerTextureTools() {
 
   createTool(textureToolDocs[9].name, {
     ...textureToolDocs[9],
+    parameters: importTextureSetParameters,
     async execute({ path }) {
-      // Validate path ends with texture_set.json
-      if (!path.endsWith(".texture_set.json")) {
-        throw new Error(
-          "Path must end with '.texture_set.json'. Example: 'path/to/mytexture.texture_set.json'"
-        );
-      }
-
-      // @ts-ignore - fs module available via Blockbench
-      const fs = requireNativeModule("fs");
-      if (!fs.existsSync(path)) {
-        throw new Error(`File not found: ${path}`);
-      }
-
-      // Use Blockbench's importTextureSet function
-      // @ts-ignore - importTextureSet is globally available
-      importTextureSet({ path, name: path.split(/[\/\\]/).pop() });
-
-      return `Imported texture set from "${path}". Check the textures panel for the new material.`;
+      const material = await importMaterial(path);
+      return JSON.stringify({ success: true, material: { name: material.name, uuid: material.uuid }, path });
     },
   }, textureToolDocs[9].status);
 
   createTool(textureToolDocs[10].name, {
     ...textureToolDocs[10],
+    parameters: assignTextureChannelParameters,
     async execute({ material, texture, channel }) {
-      const textureGroup = findTextureGroupOrThrow(material);
-      const tex = findTextureOrThrow(texture);
-
-      Undo.initEdit({
-        texture_groups: [textureGroup],
-        textures: [tex],
-      });
-
-      // Remove any existing texture from this channel in the group
-      const existingTextures = textureGroup.getTextures();
-      existingTextures
-        .filter((t: Texture) => t.pbr_channel === channel && t.uuid !== tex.uuid)
-        .forEach((t: Texture) => {
-          t.pbr_channel = "color"; // Reset to color
-        });
-
-      // Assign the texture to the channel
-      tex.extend({
-        group: textureGroup.uuid,
-        pbr_channel: channel,
-      });
-
-      textureGroup.material_config.saved = false;
-      textureGroup.updateMaterial();
-
-      Undo.finishEdit("Agent assigned texture channel");
-      Canvas.updateAll();
-
-      return `Assigned texture "${tex.name}" to ${channel} channel of material "${textureGroup.name}"`;
+      const textureGroup = findMaterial(material);
+      const channels: MaterialChannels = { [`${channel}_texture`]: texture };
+      const changes = planChannels(textureGroup, channels);
+      commitMaterialEdit(textureGroup, changes, {}, "Agent assigned texture channel");
+      return `Assigned texture "${texture}" to ${channel} channel of material "${textureGroup.name}"`;
     },
   }, textureToolDocs[10].status);
 
   createTool(textureToolDocs[11].name, {
     ...textureToolDocs[11],
+    parameters: saveMaterialConfigParameters,
     async execute({ material }) {
-      const textureGroup = findTextureGroupOrThrow(material);
+      const textureGroup = findMaterial(material);
+      if (Blockbench.isWeb) throw new Error("save_material_config requires Blockbench desktop to save to the texture's file path.");
+      validateMaterialChanges(textureGroup, []);
+      const colorTexture = textureGroup.getTextures().find(texture => texture.pbr_channel === "color");
       const filePath = textureGroup.material_config.getFilePath();
 
-      if (!filePath) {
+      if (!colorTexture?.path || !filePath) {
         throw new Error(
           "Cannot save: Material needs a color texture with a valid file path. Save the color texture first, then try again."
         );
       }
-
+      const fs = requireNativeModule("fs");
+      if (!fs) throw new Error("Local file access is unavailable. Enable the plugin's file access before saving a material.");
+      const pathModule = requireNativeModule("path");
+      if (!fs.existsSync(pathModule.dirname(filePath))) throw new Error(`Cannot save material: output directory does not exist for "${filePath}".`);
       textureGroup.material_config.save();
-
+      if (!fs.existsSync(filePath)) throw new Error(`Material config was not saved to "${filePath}".`);
       return `Saved material config to "${filePath}"`;
     },
   }, textureToolDocs[11].status);

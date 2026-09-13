@@ -2,12 +2,13 @@
 /// <reference types="blockbench-types" />
 
 import { z } from "zod";
-import { createTool, type ToolSpec } from "@/lib/factories";
+import { createTool, type IToolSpec } from "@/lib/factories";
 import {
   isHytalePluginInstalled,
   isHytaleFormat,
   getHytaleFormatType,
   getHytaleBlockSize,
+  getHytaleTextureDimensionIssues,
   getAttachmentCollections,
   findAttachmentCollection,
   getAttachmentPieces,
@@ -17,11 +18,14 @@ import {
   getHytaleAnimationFPS,
   HYTALE_SHADING_MODES,
   HYTALE_QUAD_NORMALS,
-  type HytaleCube,
-  type HytaleGroup,
-  type HytaleAttachmentCollection,
+  type IHytaleCube,
+  type IHytaleGroup,
+  type IHytaleAttachmentCollection,
 } from "@/lib/hytale";
 import { findGroupOrThrow, findElementOrThrow } from "@/lib/util";
+import { runUndoableEdit } from "@/lib/undo";
+import { runUndoableAnimationEdit } from "@/lib/animation-undo";
+import { findAnimationOrSelected } from "./animation/shared";
 import {
   cubeIdOptionalSchema,
   vector3Schema,
@@ -72,12 +76,14 @@ export const hytaleGetCubePropertiesParametersSchema = z.object({
 /** Parameters for creating a Hytale quad */
 export const hytaleCreateQuadParametersSchema = z.object({
   name: z.string().describe("Name for the quad"),
-  position: vector3Schema.default([0, 0, 0]).describe("Position [x, y, z]"),
+  position: vector3Schema.refine(value => value.every(Number.isFinite), "Quad position must contain finite numbers.")
+    .default([0, 0, 0]).describe("Finite position [x, y, z] of the quad's starting corner."),
   normal: hytaleQuadNormalEnum
     .default("+Y")
     .describe("Normal direction: +X, -X, +Y, -Y, +Z, -Z"),
-  size: size2dSchema.default([16, 16]),
-  group: groupIdOptionalSchema.describe("Parent group/bone name"),
+  size: size2dSchema.refine(value => value.every(dimension => Number.isFinite(dimension) && dimension > 0), "Quad width and height must be finite and positive.")
+    .default([16, 16]).describe("Positive finite [width, height]. Width/height axes are Z/Y for X normals, X/Z for Y normals, and X/Y for Z normals."),
+  group: groupIdOptionalSchema.describe("Parent group UUID or unique name, or root (default). Missing or ambiguous names are rejected."),
   double_sided: z
     .boolean()
     .default(true)
@@ -93,7 +99,7 @@ export const hytaleSetAttachmentPieceParametersSchema = z.object({
 /** Parameters for creating visibility keyframe */
 export const hytaleCreateVisibilityKeyframeParametersSchema = z.object({
   bone_name: boneNameSchema,
-  time: z.number().describe("Time in seconds for the keyframe"),
+  time: z.number().finite().min(0).max(10000).describe("Finite time in seconds between 0 and 10000 for the visibility keyframe."),
   visible: z.boolean().describe("Whether the bone is visible at this keyframe"),
   animation_id: animationIdOptionalSchema,
 });
@@ -121,9 +127,10 @@ export const hytaleGetCubeStretchParametersSchema = z.object({
 // Hytale Tool Docs
 // ============================================================================
 
-export const hytaleToolDocs: ToolSpec[] = [
+export const hytaleToolDocs: IToolSpec[] = [
   {
     name: "hytale_get_format_info",
+    condition: { project: true, method: () => isHytalePluginInstalled() && isHytaleFormat() },
     description:
       "Returns information about the current Hytale format. Requires the Hytale plugin and a Hytale format project to be active.",
     annotations: {
@@ -135,8 +142,9 @@ export const hytaleToolDocs: ToolSpec[] = [
   },
   {
     name: "hytale_validate_model",
+    condition: { project: true, method: () => isHytalePluginInstalled() && isHytaleFormat() },
     description:
-      "Validates the current Hytale model against Hytale engine constraints (node count, UV sizes, etc.).",
+      "Checks exported main-model node count using the installed Hytale codec and verifies bitmap dimensions are multiples of 32. Does not validate attachment exports, shading, all UVs, animation integration or target-engine rendering.",
     annotations: {
       title: "Validate Hytale Model",
       readOnlyHint: true,
@@ -146,6 +154,7 @@ export const hytaleToolDocs: ToolSpec[] = [
   },
   {
     name: "hytale_set_cube_properties",
+    condition: { project: true, method: () => isHytalePluginInstalled() && isHytaleFormat() },
     description:
       "Sets Hytale-specific properties on a cube: shading_mode (flat, standard, fullbright, reflective) and double_sided.",
     annotations: {
@@ -157,6 +166,7 @@ export const hytaleToolDocs: ToolSpec[] = [
   },
   {
     name: "hytale_get_cube_properties",
+    condition: { project: true, method: () => isHytalePluginInstalled() && isHytaleFormat() },
     description: "Gets Hytale-specific properties from a cube (shading_mode, double_sided).",
     annotations: {
       title: "Get Hytale Cube Properties",
@@ -167,8 +177,9 @@ export const hytaleToolDocs: ToolSpec[] = [
   },
   {
     name: "hytale_create_quad",
+    condition: { project: true, method: () => isHytalePluginInstalled() && isHytaleFormat() },
     description:
-      "Creates a Hytale quad (2D plane) with a specified normal direction. Quads are single-face elements useful for flat surfaces.",
+      "Creates a Hytale quad with exactly one enabled face matching the signed normal direction, per-face UV and Auto UV 1. Positive width/height and parent references are validated before one reversible edit.",
     annotations: {
       title: "Create Hytale Quad",
       destructiveHint: false,
@@ -178,6 +189,7 @@ export const hytaleToolDocs: ToolSpec[] = [
   },
   {
     name: "hytale_list_attachments",
+    condition: { project: true, method: () => isHytalePluginInstalled() && isHytaleFormat() },
     description: "Lists all attachment collections in the current Hytale project.",
     annotations: {
       title: "List Hytale Attachments",
@@ -188,6 +200,7 @@ export const hytaleToolDocs: ToolSpec[] = [
   },
   {
     name: "hytale_set_attachment_piece",
+    condition: { project: true, method: () => isHytalePluginInstalled() && isHytaleFormat() },
     description:
       "Marks or unmarks a group as an attachment piece. Attachment pieces attach to like-named bones in the main model.",
     annotations: {
@@ -199,6 +212,7 @@ export const hytaleToolDocs: ToolSpec[] = [
   },
   {
     name: "hytale_list_attachment_pieces",
+    condition: { project: true, method: () => isHytalePluginInstalled() && isHytaleFormat() },
     description: "Lists all groups marked as attachment pieces.",
     annotations: {
       title: "List Attachment Pieces",
@@ -209,6 +223,7 @@ export const hytaleToolDocs: ToolSpec[] = [
   },
   {
     name: "hytale_create_visibility_keyframe",
+    condition: { project: true, method: () => isHytalePluginInstalled() && isHytaleFormat() },
     description:
       "Creates a visibility keyframe for a bone. Hytale supports toggling node visibility at keyframes.",
     annotations: {
@@ -220,6 +235,7 @@ export const hytaleToolDocs: ToolSpec[] = [
   },
   {
     name: "hytale_set_animation_loop",
+    condition: { project: true, method: () => isHytalePluginInstalled() && isHytaleFormat() },
     description:
       'Sets the loop mode for a Hytale animation. Hytale supports "loop" (continuous) or "hold" (freeze on last frame).',
     annotations: {
@@ -231,6 +247,7 @@ export const hytaleToolDocs: ToolSpec[] = [
   },
   {
     name: "hytale_set_cube_stretch",
+    condition: { project: true, method: () => isHytalePluginInstalled() && isHytaleFormat() },
     description:
       "Sets the stretch values for a cube. Hytale uses stretch instead of float sizes for better UV handling.",
     annotations: {
@@ -242,6 +259,7 @@ export const hytaleToolDocs: ToolSpec[] = [
   },
   {
     name: "hytale_get_cube_stretch",
+    condition: { project: true, method: () => isHytalePluginInstalled() && isHytaleFormat() },
     description: "Gets the stretch values for a cube.",
     annotations: {
       title: "Get Cube Stretch",
@@ -252,18 +270,66 @@ export const hytaleToolDocs: ToolSpec[] = [
   },
 ];
 
+/** Native Hytale quad face polarity and width/height axes for each requested normal. */
+const quadDirections: Record<z.infer<typeof hytaleQuadNormalEnum>, { face: CubeFaceDirection; axes: readonly [number, number] }> = {
+  "+X": { face: "east", axes: [2, 1] }, "-X": { face: "west", axes: [2, 1] },
+  "+Y": { face: "up", axes: [0, 2] }, "-Y": { face: "down", axes: [0, 2] },
+  "+Z": { face: "south", axes: [0, 1] }, "-Z": { face: "north", axes: [0, 1] },
+};
+
+/** Native disabled faces use null, which the published CubeFace.texture declaration omits. */
+type QuadFaceTexture = { texture: CubeFace["texture"] | null };
+
+/** Resolves a quad's parent by UUID first, rejecting names that could target multiple bones. */
+function quadParent(reference: string | undefined): Group | "root" {
+  if (reference === undefined || reference === "root") return "root";
+  const byUuid = Group.all.find(group => group.uuid === reference);
+  if (byUuid) return byUuid;
+  const matches = Group.all.filter(group => group.name === reference);
+  if (matches.length === 0) throw new Error(`Parent group "${reference}" not found. Use list_outline to inspect group UUIDs and names.`);
+  if (matches.length > 1) throw new Error(`Parent group name "${reference}" is ambiguous. Use its UUID.`);
+  return matches[0];
+}
+
+/** Creates a native single-face Hytale quad, recording its bitmap-independent geometry before initialization. */
+async function createHytaleQuad({ name, position, normal, size, group, double_sided }: z.infer<typeof hytaleCreateQuadParametersSchema>): Promise<string> {
+  if (typeof Project === "undefined" || !Project || !isHytaleFormat()) throw new Error("Open a Hytale format project before creating a quad.");
+  if (position.some(value => !Number.isFinite(value))) throw new Error("Quad position must contain finite numbers.");
+  if (size.some(value => !Number.isFinite(value) || value <= 0)) throw new Error("Quad width and height must be finite and positive.");
+  const parent = quadParent(group);
+  const direction = quadDirections[normal];
+  const from = [...position] as [number, number, number];
+  const to: [number, number, number] = [...from];
+  direction.axes.forEach((axis, dimension) => { to[axis] += size[dimension]; });
+  if (to.some(value => !Number.isFinite(value))) throw new Error("Quad bounds must remain finite after adding the size to the position.");
+  const texture = Format.single_texture ? Texture.getDefault() : undefined;
+  const created: Cube[] = [];
+  const cube = runUndoableEdit({ outliner: true, elements: created }, "Create Hytale quad", () => {
+    const quad = new Cube({ name, from, to, autouv: 1, box_uv: false });
+    created.push(quad);
+    quad.box_uv = false;
+    Object.entries(quad.faces).forEach(([face, data]) => {
+      (data as QuadFaceTexture).texture = face === direction.face ? texture?.uuid ?? false : null;
+    });
+    const hytaleQuad = quad as IHytaleCube;
+    hytaleQuad.double_sided = double_sided;
+    hytaleQuad.shading_mode = "standard";
+    quad.init().addTo(parent);
+    if (quad.parent !== parent) throw new Error("The current format does not allow the requested quad parent.");
+    quad.mapAutoUV();
+    Canvas.updateAll();
+    return quad;
+  });
+  return JSON.stringify({ uuid: cube.uuid, name: cube.name, normal, from, to, double_sided });
+}
+
 /**
  * Register Hytale-specific tools.
  * These tools are only functional when the Hytale plugin is installed.
  */
 export function registerHytaleTools() {
-  // Only register if Hytale plugin is available
-  if (!isHytalePluginInstalled()) {
-    console.log("[MCP] Hytale plugin not detected, skipping Hytale tools registration");
-    return;
-  }
-
-  console.log("[MCP] Hytale plugin detected, registering Hytale tools");
+  // Keep definitions registered so native conditions can enable them when the
+  // Hytale plugin is loaded after MCP, or disable them when it is unloaded.
 
   // ============================================================================
   // Format & Project Tools
@@ -322,21 +388,9 @@ export function registerHytaleTools() {
           issues.push(nodeValidation.message!);
         }
 
-        // Check UV size matches texture resolution
-        // @ts-ignore - Project is globally available
         const textures = Project?.textures ?? [];
         const blockSize = getHytaleBlockSize();
-
-        for (const texture of textures) {
-          if (texture.width !== blockSize || texture.height < blockSize) {
-            // Check for flipbook (vertically stacked frames)
-            if (texture.height % blockSize !== 0) {
-              issues.push(
-                `Texture "${texture.name}" has invalid dimensions (${texture.width}x${texture.height}). Expected width ${blockSize} and height multiple of ${blockSize}.`
-              );
-            }
-          }
-        }
+        issues.push(...getHytaleTextureDimensionIssues(textures));
 
         return JSON.stringify({
           valid: issues.length === 0,
@@ -345,6 +399,8 @@ export function registerHytaleTools() {
           issues,
           blockSize,
           textureCount: textures.length,
+          scope: "main_model_node_count_and_texture_dimensions",
+          notes: ["Node count comes from the installed blockymodel codec's main-model output. Validate attachment exports separately. Passing these checks does not prove full runtime compatibility."],
         });
       },
     },
@@ -383,7 +439,7 @@ export function registerHytaleTools() {
         // @ts-ignore - Undo is globally available
         Undo.initEdit({ elements: [cube] });
 
-        const hytaleCube = cube as HytaleCube;
+        const hytaleCube = cube as IHytaleCube;
         if (shading_mode !== undefined) {
           hytaleCube.shading_mode = shading_mode;
         }
@@ -449,81 +505,8 @@ export function registerHytaleTools() {
     hytaleToolDocs[4].name,
     {
       ...hytaleToolDocs[4],
-      async execute({ name, position, normal, size, group, double_sided }) {
-        if (!isHytaleFormat()) {
-          throw new Error("Current project is not using a Hytale format.");
-        }
-
-        // Find parent group if specified
-        let parentGroup: Group | undefined;
-        if (group) {
-          parentGroup = findGroupOrThrow(group);
-        }
-
-        // Calculate from/to based on normal direction and size
-        const [width, height] = size;
-        const [x, y, z] = position;
-        let from: [number, number, number];
-        let to: [number, number, number];
-
-        // Quads are essentially very thin cubes (0 depth in one dimension)
-        switch (normal) {
-          case "+X":
-          case "-X":
-            from = [x, y, z];
-            to = [x, y + height, z + width];
-            break;
-          case "+Y":
-          case "-Y":
-            from = [x, y, z];
-            to = [x + width, y, z + height];
-            break;
-          case "+Z":
-          case "-Z":
-            from = [x, y, z];
-            to = [x + width, y + height, z];
-            break;
-          default:
-            from = [x, y, z];
-            to = [x + width, y + height, z];
-        }
-
-        // @ts-ignore - Undo is globally available
-        Undo.initEdit({ outliner: true, elements: [] });
-
-        // @ts-ignore - Cube is globally available
-        const cube = new Cube({
-          name,
-          from,
-          to,
-          autouv: 1,
-        }).init();
-
-        // Set Hytale-specific properties
-        const hytaleCube = cube as HytaleCube;
-        hytaleCube.double_sided = double_sided;
-        hytaleCube.shading_mode = "standard";
-
-        // Add to parent group if specified
-        if (parentGroup) {
-          cube.addTo(parentGroup);
-        }
-
-        // @ts-ignore - Undo is globally available
-        Undo.finishEdit("Create Hytale quad");
-
-        // @ts-ignore - Canvas is globally available
-        Canvas.updateAll();
-
-        return JSON.stringify({
-          uuid: cube.uuid,
-          name: cube.name,
-          normal,
-          from,
-          to,
-          double_sided,
-        });
-      },
+      parameters: hytaleCreateQuadParametersSchema,
+      execute: createHytaleQuad,
     },
     hytaleToolDocs[4].status
   );
@@ -572,7 +555,7 @@ export function registerHytaleTools() {
         // @ts-ignore - Undo is globally available
         Undo.initEdit({ outliner: true });
 
-        (group as HytaleGroup).is_piece = is_piece;
+        (group as IHytaleGroup).is_piece = is_piece;
 
         // @ts-ignore - Undo is globally available
         Undo.finishEdit("Set attachment piece");
@@ -619,55 +602,24 @@ export function registerHytaleTools() {
     hytaleToolDocs[8].name,
     {
       ...hytaleToolDocs[8],
+      parameters: hytaleCreateVisibilityKeyframeParametersSchema,
       async execute({ bone_name, time, visible, animation_id }) {
         if (!isHytaleFormat()) {
           throw new Error("Current project is not using a Hytale format.");
         }
 
-        // Find animation
-        // @ts-ignore - Animation is globally available
-        let animation: Animation;
-        if (animation_id) {
-          // @ts-ignore - Animation is globally available
-          animation = Animation.all.find(
-            (a: Animation) => a.uuid === animation_id || a.name === animation_id
-          );
-          if (!animation) {
-            throw new Error(`Animation "${animation_id}" not found.`);
-          }
-        } else {
-          // @ts-ignore - Animation is globally available
-          animation = Animation.selected;
-          if (!animation) {
-            throw new Error("No animation selected and no animation_id provided.");
-          }
-        }
-
-        // Find bone animator
-        const animator = animation.getBoneAnimator(findGroupOrThrow(bone_name));
-        if (!animator) {
-          throw new Error(`Could not get animator for bone "${bone_name}".`);
-        }
-
-        // @ts-ignore - Undo is globally available
-        Undo.initEdit({ animations: [animation] });
-
-        // Create visibility keyframe
-        // Hytale uses a "visibility" channel for BoneAnimator
-        // @ts-ignore - addKeyframe may have visibility channel
-        const keyframe = animator.addKeyframe({
-          channel: "visibility",
-          time,
-          data_points: [{ visible }],
+        if (!Number.isFinite(time) || time < 0 || time > 10000) throw new Error("Visibility keyframe time must be finite and between 0 and 10000 seconds.");
+        const animation = findAnimationOrSelected(animation_id);
+        if (!animation) throw new Error(animation_id ? `Animation "${animation_id}" not found.` : "No animation selected and no animation_id provided.");
+        const bone = findGroupOrThrow(bone_name);
+        const keyframe = runUndoableAnimationEdit({ animations: [animation] }, "Create visibility keyframe", () => {
+          const animator = animation.getBoneAnimator(bone);
+          if (!animator) throw new Error(`Could not get animator for bone "${bone_name}".`);
+          const frame: _Keyframe | undefined = animator.addKeyframe({ channel: "visibility", time, data_points: [{ visible }] });
+          if (!frame) throw new Error("The Hytale animator could not create a visibility keyframe.");
+          if (typeof updateKeyframeSelection === "function") updateKeyframeSelection();
+          return frame;
         });
-
-        // @ts-ignore - Undo is globally available
-        Undo.finishEdit("Create visibility keyframe");
-
-        // @ts-ignore - updateKeyframeSelection may exist
-        if (typeof updateKeyframeSelection === "function") {
-          updateKeyframeSelection();
-        }
 
         return JSON.stringify({
           success: true,
@@ -675,7 +627,7 @@ export function registerHytaleTools() {
           bone: bone_name,
           time,
           visible,
-          keyframe_uuid: keyframe?.uuid,
+          keyframe_uuid: keyframe.uuid,
         });
       },
     },
@@ -686,37 +638,15 @@ export function registerHytaleTools() {
     hytaleToolDocs[9].name,
     {
       ...hytaleToolDocs[9],
+      parameters: hytaleSetAnimationLoopParametersSchema,
       async execute({ animation_id, loop_mode }) {
         if (!isHytaleFormat()) {
           throw new Error("Current project is not using a Hytale format.");
         }
 
-        // Find animation
-        // @ts-ignore - Animation is globally available
-        let animation: Animation;
-        if (animation_id) {
-          // @ts-ignore - Animation is globally available
-          animation = Animation.all.find(
-            (a: Animation) => a.uuid === animation_id || a.name === animation_id
-          );
-          if (!animation) {
-            throw new Error(`Animation "${animation_id}" not found.`);
-          }
-        } else {
-          // @ts-ignore - Animation is globally available
-          animation = Animation.selected;
-          if (!animation) {
-            throw new Error("No animation selected and no animation_id provided.");
-          }
-        }
-
-        // @ts-ignore - Undo is globally available
-        Undo.initEdit({ animations: [animation] });
-
-        animation.loop = loop_mode;
-
-        // @ts-ignore - Undo is globally available
-        Undo.finishEdit("Set animation loop mode");
+        const animation = findAnimationOrSelected(animation_id);
+        if (!animation) throw new Error(animation_id ? `Animation "${animation_id}" not found.` : "No animation selected and no animation_id provided.");
+        runUndoableAnimationEdit({ animations: [animation] }, "Set animation loop mode", () => { animation.loop = loop_mode; });
 
         return JSON.stringify({
           animation: animation.name,

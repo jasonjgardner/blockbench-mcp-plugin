@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getAllPromptDefinitions } from "@/lib/factories";
 import { openPromptOverrideDialog } from "@/ui/promptOverrideDialog";
 
-interface FormElementOptions {
+interface IFormElementOptions {
   label?: string;
   description?: string;
   type?: string;
@@ -12,7 +12,7 @@ interface FormElementOptions {
   options?: Record<string, string>;
 }
 
-type InputFormConfig = Record<string, "_" | FormElementOptions>;
+type InputFormConfig = Record<string, "_" | IFormElementOptions>;
 
 /**
  * Extracts metadata from a Zod schema type for form generation
@@ -91,7 +91,7 @@ function zodSchemaToFormConfig(
   for (const [fieldName, zodType] of Object.entries(argsSchema)) {
     const meta = getZodTypeMeta(zodType);
 
-    const fieldConfig: FormElementOptions = {
+    const fieldConfig: IFormElementOptions = {
       label: `${fieldName}${meta.isOptional ? "" : " *"}`,
       description: meta.description || `Argument: ${fieldName}`,
       type: meta.type,
