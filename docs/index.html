@@ -342,7 +342,7 @@
         </div>
       </div>
       <p class="card-title">Create Animation</p>
-      <p class="card-desc">Creates a new animation with keyframes for bones.</p>
+      <p class="card-desc">Creates and selects an undoable animation with linear keyframes for existing bones, using Blockbench editor coordinates. Returns its UUID and actual name.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -367,12 +367,12 @@
       <td class="col-name">animation_length</td>
       <td class="col-type">number</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Length of the animation in seconds</td>
+      <td class="col-desc">Length of the animation in seconds <span class="param-meta">[min: 0, max: 10000]</span></td>
     </tr><tr>
       <td class="col-name">bones</td>
       <td class="col-type">Record&lt;string, object[]&gt;</td>
       <td><span class="param-required">required</span></td>
-      <td class="col-desc">Keyframes for each bone</td>
+      <td class="col-desc">Keyframes keyed by existing bone/group name. Values use Blockbench editor coordinates; rotations are degrees.</td>
     </tr><tr>
       <td class="col-name">particle_effects</td>
       <td class="col-type">Record&lt;string, string&gt;</td>
@@ -545,6 +545,11 @@
         </tr>
       </thead>
       <tbody><tr>
+      <td class="col-name">animation_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Animation UUID or name. If not provided, uses current animation.</td>
+    </tr><tr>
       <td class="col-name">action</td>
       <td class="col-type">&quot;play&quot; | &quot;pause&quot; | &quot;stop&quot; | &quot;set_time&quot; | &quot;set_length&quot; | &quot;set_fps&quot; | &quot;loop&quot; | &quot;select_range&quot;</td>
       <td><span class="param-required">required</span></td>
@@ -553,17 +558,17 @@
       <td class="col-name">time</td>
       <td class="col-type">number</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Time in seconds (for set_time action).</td>
+      <td class="col-desc">Time in seconds (for set_time action). <span class="param-meta">[min: 0]</span></td>
     </tr><tr>
       <td class="col-name">length</td>
       <td class="col-type">number</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Animation length in seconds (for set_length action).</td>
+      <td class="col-desc">Animation length in seconds, including all keyframes (for set_length action). <span class="param-meta">[min: 0, max: 10000]</span></td>
     </tr><tr>
       <td class="col-name">fps</td>
-      <td class="col-type">number</td>
+      <td class="col-type">integer</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Frames per second (for set_fps action). <span class="param-meta">[min: 1, max: 120]</span></td>
+      <td class="col-desc">Integer frames per second, 10–120 (for set_fps action; Blockbench minimum is 10). <span class="param-meta">[min: 10, max: 120]</span></td>
     </tr><tr>
       <td class="col-name">loop_mode</td>
       <td class="col-type">&quot;once&quot; | &quot;loop&quot; | &quot;hold&quot;</td>
@@ -1514,7 +1519,7 @@
       <td class="col-name">parent</td>
       <td class="col-type">string</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc"> <span class="param-meta">(default: <code>&quot;root&quot;</code>)</span></td>
+      <td class="col-desc">Parent group UUID or name, or root for the project root. <span class="param-meta">(default: <code>&quot;root&quot;</code>)</span></td>
     </tr><tr>
       <td class="col-name">visibility</td>
       <td class="col-type">boolean</td>
@@ -4712,7 +4717,7 @@
       </section>
 
       <footer class="page-footer">
-        Generated 2026-09-12T20:29:02.473Z from Zod schemas
+        Generated 2026-09-12T21:09:30.338Z from Zod schemas
       </footer>
     </main>
   </div>

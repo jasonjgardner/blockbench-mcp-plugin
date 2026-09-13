@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createTool, type ToolSpec } from "@/lib/factories";
 import { findGroupOrThrow } from "@/lib/util";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
+import { createGroupWithUndo } from "@/lib/group-creation";
 import {
   vector3Schema,
   animationIdOptionalSchema,
@@ -17,6 +18,7 @@ import {
   keyframeDataSchema,
 } from "@/lib/zodObjects";
 
+/** Native Blockbench animation data; rotations are degrees in editor coordinates. */
 export const createAnimationParameters = z.object({
   name: z.string().describe("Name of the animation"),
   loop: z
@@ -25,20 +27,23 @@ export const createAnimationParameters = z.object({
     .describe("Whether the animation should loop"),
   animation_length: z
     .number()
+    .finite()
+    .nonnegative()
+    .max(10000)
     .optional()
     .describe("Length of the animation in seconds"),
   bones: z
     .record(
       z.array(
         z.object({
-          time: z.number(),
+          time: z.number().finite().nonnegative(),
           position: vector3Schema.optional(),
           rotation: vector3Schema.optional(),
           scale: z.union([vector3Schema, z.number()]).optional(),
         })
       )
     )
-    .describe("Keyframes for each bone"),
+    .describe("Keyframes keyed by existing bone/group name. Values use Blockbench editor coordinates; rotations are degrees."),
   particle_effects: z
     .record(z.string().describe("Effect name"))
     .optional()
@@ -111,13 +116,13 @@ export const boneRiggingParameters = z.object({
   bone_data: z
     .object({
       name: z.string().describe("Name of the bone."),
-      parent: z.string().optional().describe("Parent bone name."),
+      parent: z.string().optional().describe("Parent bone name; create also accepts a group UUID or root."),
       origin: vector3Schema.optional().describe("Pivot point of the bone."),
       rotation: vector3Schema.optional().describe("Initial rotation of the bone."),
       children: z
         .array(z.string())
         .optional()
-        .describe("Names of elements to add to this bone."),
+        .describe("Names or UUIDs of existing elements/groups to add when creating a bone. For rename, the first entry is the new name."),
       ik_enabled: z
         .boolean()
         .optional()
@@ -131,7 +136,9 @@ export const boneRiggingParameters = z.object({
     .describe("Bone configuration data."),
 });
 
+/** Playback targets an explicit animation or falls back to the selected animation. */
 export const animationTimelineParameters = z.object({
+  animation_id: animationIdOptionalSchema,
   action: z
     .enum([
       "play",
@@ -146,18 +153,24 @@ export const animationTimelineParameters = z.object({
     .describe("Timeline action to perform."),
   time: z
     .number()
+    .finite()
+    .nonnegative()
     .optional()
     .describe("Time in seconds (for set_time action)."),
   length: z
     .number()
+    .finite()
+    .nonnegative()
+    .max(10000)
     .optional()
-    .describe("Animation length in seconds (for set_length action)."),
+    .describe("Animation length in seconds, including all keyframes (for set_length action)."),
   fps: z
     .number()
-    .min(1)
+    .int()
+    .min(10)
     .max(120)
     .optional()
-    .describe("Frames per second (for set_fps action)."),
+    .describe("Integer frames per second, 10–120 (for set_fps action; Blockbench minimum is 10)."),
   loop_mode: loopModeEnum.optional().describe("Loop mode for the animation."),
   range: timeRangeSchema.optional().describe("Time range for selection."),
 });
@@ -249,7 +262,7 @@ export const animationCopyPasteParameters = z.object({
 export const animationToolDocs: ToolSpec[] = [
   {
     name: "create_animation",
-    description: "Creates a new animation with keyframes for bones.",
+    description: "Creates and selects an undoable animation with linear keyframes for existing bones, using Blockbench editor coordinates. Returns its UUID and actual name.",
     annotations: {
       title: "Create Animation",
       destructiveHint: true,
@@ -352,56 +365,80 @@ function applyKeyframeValues(
   keyframe.set("z", vals[2]);
 }
 
+/** Registers animation editing and playback tools after Blockbench is initialized. */
 export function registerAnimationTools() {
 createTool(
   animationToolDocs[0].name,
   {
     ...animationToolDocs[0],
+    parameters: createAnimationParameters,
     async execute({ name, loop, animation_length, bones, particle_effects }) {
-      const animationData = {
-        loop,
-        ...(animation_length && { animation_length }),
-        bones: Object.fromEntries(
-          Object.entries(bones).map(([boneName, keyframes]) => {
-            const boneData: Record<
-              string,
-              Record<string, number | number[]>
-            > = keyframes.reduce((acc, keyframe) => {
-              const timeKey = keyframe.time.toString();
-              if (keyframe.position) {
-                (acc.position ??= {})[timeKey] = keyframe.position;
-              }
-              if (keyframe.rotation) {
-                (acc.rotation ??= {})[timeKey] = keyframe.rotation;
-              }
-              if (keyframe.scale) {
-                (acc.scale ??= {})[timeKey] = keyframe.scale;
-              }
-              return acc;
-            }, {} as Record<string, Record<string, number | number[]>>);
-
-            return [boneName, boneData];
-          })
-        ),
-        ...(particle_effects && { particle_effects }),
-      };
-
-      Animator.loadFile({
-        content: JSON.stringify({
-          format_version: "1.8.0",
-          animations: {
-            [`animation.${name}`]: animationData,
-          },
-        }),
+      if (!Project || !Format.animation_mode) {
+        throw new Error("The current project format does not support animations. Use get_capabilities to inspect supported formats.");
+      }
+      const targets = Object.entries(bones).map(([boneName, keyframes]) => {
+        const group = findGroupOrThrow(boneName);
+        const times = new Set<string>();
+        keyframes.forEach((frame) => {
+          (["position", "rotation", "scale"] as const).forEach((channel) => {
+            if (frame[channel] === undefined) return;
+            const key = `${channel}:${frame.time}`;
+            if (times.has(key)) throw new Error(`Duplicate ${channel} keyframe at ${frame.time} seconds for "${boneName}".`);
+            times.add(key);
+          });
+        });
+        return { group, keyframes };
       });
+      const particles = Object.entries(particle_effects ?? {}).map(([timestamp, effect]) => {
+        const time = Number(timestamp);
+        if (!timestamp.trim() || !Number.isFinite(time) || time < 0) {
+          throw new Error(`Invalid particle timestamp "${timestamp}"; use nonnegative seconds.`);
+        }
+        return { time, effect };
+      });
+      const latestTime = Math.max(0, ...targets.flatMap(({ keyframes }) => keyframes.map(({ time }) => time)), ...particles.map(({ time }) => time));
+      if (animation_length !== undefined && animation_length < latestTime) {
+        throw new Error(`animation_length must include the last keyframe at ${latestTime} seconds.`);
+      }
 
-      return `Created animation "${name}" with keyframes for ${
-        Object.keys(bones).length
-      } bones${
-        particle_effects
-          ? ` and ${Object.keys(particle_effects).length} particle effects`
-          : ""
-      }`;
+      const animations: _Animation[] = [];
+      Undo.initEdit({ animations });
+      try {
+        const AnimationClass = Animation as unknown as typeof _Animation;
+        const animation = new AnimationClass({
+          name: `animation.${name}`, loop: loop ? "loop" : "once",
+          length: animation_length ?? latestTime,
+        });
+        animations.push(animation);
+        animation.add(false);
+        targets.forEach(({ group, keyframes }) => {
+          const animator = animation.getBoneAnimator(group);
+          keyframes.forEach((data) => {
+            (["position", "rotation", "scale"] as const).forEach((channel) => {
+              const values = data[channel];
+              if (values === undefined) return;
+              const keyframe = animator.addKeyframe({
+                time: data.time, channel, interpolation: "linear", data_points: [{}],
+              });
+              applyKeyframeValues(keyframe, values);
+            });
+          });
+        });
+        if (particles.length) {
+          const effects = new EffectAnimator(animation);
+          animation.animators.effects = effects;
+          particles.forEach(({ time, effect }) => effects.addKeyframe({
+            time, channel: "particle", data_points: [{ effect }],
+          }));
+        }
+        animation.select();
+        Animator.preview();
+        Undo.finishEdit("Create animation");
+        return JSON.stringify({ uuid: animation.uuid, name: animation.name, length: animation.length, loop: animation.loop, bones: targets.length });
+      } catch (error) {
+        (Undo.cancelEdit as (revert?: boolean) => void)(true);
+        throw error;
+      }
     },
   },
   animationToolDocs[0].status
@@ -411,128 +448,71 @@ createTool(
   animationToolDocs[1].name,
   {
     ...animationToolDocs[1],
+    parameters: manageKeyframesParameters,
     async execute({ animation_id, action, bone_name, channel, keyframes }) {
-      // Find or select animation
+      const AnimationClass = Animation as unknown as typeof _Animation;
       const animation = animation_id
-        ? Animation.all.find(
-            (a) => a.uuid === animation_id || a.name === animation_id
-          )
-        : Animation.selected;
-
-      if (!animation) {
-        throw new Error("No animation found or selected.");
-      }
-
-      // Find the bone
+        ? AnimationClass.all.find((item) => item.uuid === animation_id || item.name === animation_id)
+        : AnimationClass.selected;
+      if (!animation) throw new Error("No animation found or selected.");
       const group = findGroupOrThrow(bone_name);
-
-      // Get or create animator
-      let animator = animation.animators[group.uuid];
-      if (!animator) {
-        animator = new BoneAnimator(group.uuid, animation, bone_name);
-        animation.animators[group.uuid] = animator;
+      if (!keyframes.length || keyframes.some(({ time }) => !Number.isFinite(time) || time < 0)) {
+        throw new Error("Provide at least one keyframe with a finite, nonnegative time.");
+      }
+      if (new Set(keyframes.map(({ time }) => time)).size !== keyframes.length) {
+        throw new Error("Duplicate requested keyframe times are not supported; provide each timestamp once.");
+      }
+      const existingAnimator = animation.animators[group.uuid];
+      const existingFrames: _Keyframe[] = existingAnimator?.[channel] ?? [];
+      const matches = keyframes.map((data) => existingFrames.find((frame) => Math.abs(frame.time - data.time) < 0.001));
+      if (action !== "create" && matches.some((frame) => !frame)) {
+        throw new Error("No keyframe exists at one or more requested times; no keyframes changed.");
+      }
+      if (action === "select") {
+        Undo.initSelection({ timeline: true });
+        animation.select();
+        Timeline.selected.forEach((frame) => { frame.selected = false; });
+        Timeline.selected.splice(0);
+        matches.forEach((frame) => frame?.select({ ctrlOrCmd: true }));
+        updateKeyframeSelection();
+        Undo.finishSelection("Select keyframes");
+        return `Selected ${matches.length} keyframes for ${bone_name}.${channel}`;
       }
 
-      Undo.initEdit({
-        animations: [animation],
-        keyframes: [],
-      });
-
-      switch (action) {
-        case "create":
-          keyframes.forEach((kf) => {
-            // `values` is intentionally omitted here: Keyframe.extend() ignores
-            // it. Values are applied below through the real per-axis set() API.
-            const keyframe = animator.createKeyframe(
-              {
-                time: kf.time,
-                channel,
-                interpolation: kf.interpolation,
-              },
-              kf.time,
-              channel,
-              false
-            );
-
-            if (kf.values !== undefined) {
-              applyKeyframeValues(keyframe, kf.values);
-            }
-
-            if (kf.interpolation === "bezier" && kf.bezier_handles) {
-              // @ts-ignore
-              if (kf.bezier_handles.left_time !== undefined)
-                keyframe.bezier_left_time = kf.bezier_handles.left_time;
-              // @ts-ignore
-              if (kf.bezier_handles.left_value)
-                keyframe.bezier_left_value = kf.bezier_handles.left_value;
-              // @ts-ignore
-              if (kf.bezier_handles.right_time !== undefined)
-                keyframe.bezier_right_time = kf.bezier_handles.right_time;
-              // @ts-ignore
-              if (kf.bezier_handles.right_value)
-                keyframe.bezier_right_value = kf.bezier_handles.right_value;
-            }
-          });
-          break;
-
-        case "delete":
-          keyframes.forEach((kf) => {
-            const keyframe = animator[channel]?.find(
-              (k) => Math.abs(k.time - kf.time) < 0.001
-            );
-            if (keyframe) {
-              keyframe.remove();
-            }
-          });
-          break;
-
-        case "edit":
-          keyframes.forEach((kf) => {
-            const keyframe = animator[channel]?.find(
-              (k) => Math.abs(k.time - kf.time) < 0.001
-            );
-            if (keyframe) {
-              if (kf.values !== undefined) {
-                applyKeyframeValues(keyframe, kf.values);
-              }
-              if (kf.interpolation) {
-                keyframe.interpolation = kf.interpolation;
-              }
-              if (kf.interpolation === "bezier" && kf.bezier_handles) {
-                // @ts-ignore
-                if (kf.bezier_handles.left_time !== undefined)
-                  keyframe.bezier_left_time = kf.bezier_handles.left_time;
-                // @ts-ignore
-                if (kf.bezier_handles.left_value)
-                  keyframe.bezier_left_value = kf.bezier_handles.left_value;
-                // @ts-ignore
-                if (kf.bezier_handles.right_time !== undefined)
-                  keyframe.bezier_right_time = kf.bezier_handles.right_time;
-                // @ts-ignore
-                if (kf.bezier_handles.right_value)
-                  keyframe.bezier_right_value = kf.bezier_handles.right_value;
-              }
-            }
-          });
-          break;
-
-        case "select":
-          Timeline.selected.empty();
-          keyframes.forEach((kf) => {
-            const keyframe = animator[channel]?.find(
-              (k) => Math.abs(k.time - kf.time) < 0.001
-            );
-            if (keyframe) {
-              keyframe.select();
-            }
-          });
-          break;
+      Undo.initEdit({ animations: [animation] });
+      try {
+        const animator = animation.getBoneAnimator(group);
+        keyframes.forEach((data, index) => {
+          const existing = matches[index];
+          if (action === "delete") {
+            existing?.remove();
+            return;
+          }
+          if (action === "create") existing?.remove();
+          const frame = action === "create"
+            ? animator.addKeyframe({ time: data.time, channel, interpolation: data.interpolation, data_points: [{}] })
+            : existing;
+          if (!frame) throw new Error("Could not resolve the target keyframe.");
+          if (data.values !== undefined) applyKeyframeValues(frame, data.values);
+          if (data.interpolation) frame.interpolation = data.interpolation;
+          if (data.interpolation === "bezier" && data.bezier_handles) {
+            const vector = (value: number | number[]): [number, number, number] =>
+              Array.isArray(value) ? [value[0], value[1], value[2]] : [value, value, value];
+            const handles = data.bezier_handles;
+            if (handles.left_time !== undefined) frame.bezier_left_time = vector(handles.left_time);
+            if (handles.right_time !== undefined) frame.bezier_right_time = vector(handles.right_time);
+            if (handles.left_value !== undefined) frame.bezier_left_value = vector(handles.left_value);
+            if (handles.right_value !== undefined) frame.bezier_right_value = vector(handles.right_value);
+          }
+        });
+        animation.setLength();
+        Animator.preview();
+        Undo.finishEdit(`${action} keyframes`);
+        return `Successfully performed ${action} on ${keyframes.length} keyframes for ${bone_name}.${channel}`;
+      } catch (error) {
+        (Undo.cancelEdit as (revert?: boolean) => void)(true);
+        throw error;
       }
-
-      Undo.finishEdit(`${action} keyframes`);
-      Animator.preview();
-
-      return `Successfully performed ${action} on ${keyframes.length} keyframes for ${bone_name}.${channel}`;
     },
   },
   animationToolDocs[1].status
@@ -660,6 +640,19 @@ createTool(
   {
     ...animationToolDocs[3],
     async execute({ action, bone_data }) {
+      if (action === "create") {
+        const group = createGroupWithUndo({
+          name: bone_data.name,
+          origin: bone_data.origin ?? [0, 0, 0],
+          rotation: bone_data.rotation ?? [0, 0, 0],
+        }, bone_data.parent, bone_data.children, (created) => {
+          if (bone_data.ik_enabled && bone_data.ik_target) {
+            Object.assign(created, { ik_enabled: true, ik_target: bone_data.ik_target });
+          }
+        }, "Bone rigging: create");
+        return `Created bone "${group.name}" with UUID ${group.uuid}`;
+      }
+
       Undo.initEdit({
         outliner: true,
         elements: [],
@@ -669,45 +662,6 @@ createTool(
       let result = "";
 
       switch (action) {
-        case "create": {
-          const group = new Group({
-            name: bone_data.name,
-            origin: bone_data.origin || [0, 0, 0],
-            rotation: bone_data.rotation || [0, 0, 0],
-          }).init();
-
-          // Set parent
-          if (bone_data.parent) {
-            const parent = Group.all.find((g) => g.name === bone_data.parent);
-            if (parent) {
-              group.addTo(parent);
-            }
-          }
-
-          // Add children elements
-          if (bone_data.children) {
-            bone_data.children.forEach((childName) => {
-              const element = Outliner.elements.find(
-                (e) => e.name === childName
-              );
-              if (element) {
-                element.addTo(group);
-              }
-            });
-          }
-
-          // Set up IK if requested
-          if (bone_data.ik_enabled && bone_data.ik_target) {
-            // @ts-ignore
-            group.ik_enabled = true;
-            // @ts-ignore
-            group.ik_target = bone_data.ik_target;
-          }
-
-          result = `Created bone "${group.name}" with UUID ${group.uuid}`;
-          break;
-        }
-
         case "parent": {
           const child = findGroupOrThrow(bone_data.name);
           const parent = bone_data.parent
@@ -804,82 +758,59 @@ createTool(
   animationToolDocs[4].name,
   {
     ...animationToolDocs[4],
-    async execute({ action, time, length, fps, loop_mode, range }) {
-      if (!Animation.selected) {
-        throw new Error("No animation selected.");
+    parameters: animationTimelineParameters,
+    async execute({ animation_id, action, time, length, fps, loop_mode, range }) {
+      const AnimationClass = Animation as unknown as typeof _Animation;
+      const animation = animation_id
+        ? AnimationClass.all.find((item) => item.uuid === animation_id || item.name === animation_id)
+        : AnimationClass.selected;
+      if (!animation) throw new Error("No animation found or selected.");
+      if (action === "set_time" && time === undefined) throw new Error("Time parameter required for set_time action.");
+      if (action === "set_length" && length === undefined) throw new Error("Length parameter required for set_length action.");
+      if (action === "set_fps" && fps === undefined) throw new Error("FPS parameter required for set_fps action.");
+      if (action === "loop" && loop_mode === undefined) throw new Error("loop_mode parameter required for loop action.");
+      if (action === "select_range" && (!range || range.start > range.end)) throw new Error("An ordered range is required for select_range action.");
+      const allFrames = Object.values(animation.animators).flatMap((animator) => animator.keyframes as _Keyframe[]);
+      const lastTime = Math.max(0, ...allFrames.map((frame) => frame.time));
+      if (action === "set_length" && length !== undefined && length < lastTime) {
+        throw new Error(`Length must include the last keyframe at ${lastTime} seconds.`);
       }
-
-      let result = "";
-
-      switch (action) {
-        case "play":
-          Timeline.start();
-          result = "Started animation playback";
-          break;
-
-        case "pause":
-          Timeline.pause();
-          result = "Paused animation playback";
-          break;
-
-        case "stop":
-          Timeline.setTime(0);
-          Timeline.pause();
-          result = "Stopped animation playback";
-          break;
-
-        case "set_time":
-          if (time === undefined) {
-            throw new Error("Time parameter required for set_time action.");
-          }
-          Timeline.setTime(time);
-          result = `Set timeline to ${time} seconds`;
-          break;
-
-        case "set_length":
-          if (length === undefined) {
-            throw new Error("Length parameter required for set_length action.");
-          }
-          Animation.selected.length = length;
-          result = `Set animation length to ${length} seconds`;
-          break;
-
-        case "set_fps":
-          if (fps === undefined) {
-            throw new Error("FPS parameter required for set_fps action.");
-          }
-          Animation.selected.snapping = fps;
-          result = `Set animation FPS to ${fps}`;
-          break;
-
-        case "loop":
-          if (loop_mode) {
-            Animation.selected.loop = loop_mode;
-          }
-          result = `Set loop mode to ${loop_mode || Animation.selected.loop}`;
-          break;
-
-        case "select_range":
-          if (!range) {
-            throw new Error(
-              "Range parameter required for select_range action."
-            );
-          }
-          // Select keyframes in range
-          Timeline.keyframes.forEach((kf) => {
-            if (kf.time >= range.start && kf.time <= range.end) {
-              kf.select();
-            } else {
-              kf.selected = false;
-            }
-          });
-          result = `Selected keyframes between ${range.start} and ${range.end} seconds`;
-          break;
+      if (action === "set_length" || action === "set_fps" || action === "loop") {
+        Undo.initEdit({ animations: [animation] });
+        try {
+          if (action === "set_length") animation.setLength(length);
+          if (action === "set_fps" && fps !== undefined) animation.snapping = fps;
+          if (action === "loop" && loop_mode) animation.setLoop(loop_mode, false);
+          Animator.preview();
+          Undo.finishEdit(`Animation timeline: ${action}`);
+          return `Updated animation ${animation.name}: ${action}`;
+        } catch (error) {
+          (Undo.cancelEdit as (revert?: boolean) => void)(true);
+          throw error;
+        }
       }
-
+      if (action === "select_range" && range) {
+        Undo.initSelection({ timeline: true });
+        animation.select();
+        Timeline.selected.forEach((frame) => { frame.selected = false; });
+        Timeline.selected.splice(0);
+        const selected = allFrames.filter((frame) => frame.time >= range.start && frame.time <= range.end);
+        selected.forEach((frame) => frame.select({ ctrlOrCmd: true }));
+        updateKeyframeSelection();
+        Undo.finishSelection("Select animation range");
+        return `Selected ${selected.length} keyframes between ${range.start} and ${range.end} seconds`;
+      }
+      animation.select();
+      if (action === "play" || action === "set_time") {
+        Modes.options.animate.select();
+      }
+      if (action === "play") Timeline.start();
+      if (action === "pause" || action === "stop") Timeline.pause();
+      if (action === "stop") Timeline.setTime(0);
+      if (action === "set_time" && time !== undefined) Timeline.setTime(time);
       Animator.preview();
+      return `Animation timeline: ${action}`;
 
-      return result;
     },
   },
   animationToolDocs[4].status

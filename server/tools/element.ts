@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createTool, type ToolSpec } from "@/lib/factories";
 import { findElementOrThrow, findTextureOrThrow } from "@/lib/util";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
+import { createGroupWithUndo } from "@/lib/group-creation";
 import {
   elementIdSchema,
   vector3Schema,
@@ -99,7 +100,7 @@ export const addGroupParameters = z.object({
   rotation: vec3("Rotation of the group in degrees as [x, y, z].")
     .optional()
     .default([0, 0, 0]),
-  parent: z.string().optional().default("root"),
+  parent: z.string().optional().default("root").describe("Parent group UUID or name, or root for the project root."),
   visibility: z.boolean().optional().default(true),
   autouv: autoUvEnum
     .optional()
@@ -354,13 +355,7 @@ export function registerElementTools() {
       selected,
       shade,
     }) {
-      Undo.initEdit({
-        elements: [],
-        outliner: true,
-        collections: [],
-      });
-
-      const group = new Group({
+      const group = createGroupWithUndo({
         name,
         origin,
         rotation,
@@ -368,16 +363,7 @@ export function registerElementTools() {
         visibility: Boolean(visibility),
         selected: Boolean(selected),
         shade: Boolean(shade),
-      }).init();
-
-      const parentGroup = parent === "root"
-        ? "root"
-        : // `@ts-expect-error` getAllGroups is a Blockbench global
-          getAllGroups().find((g: Group) => g.name === parent || g.uuid === parent);
-      group.addTo(parentGroup);
-
-      Undo.finishEdit("Agent added group");
-      Canvas.updateAll();
+      }, parent);
 
       return `Added group ${group.name} with ID ${group.uuid}`;
     },

@@ -1,6 +1,6 @@
 {
   "version": "1.8.0",
-  "generatedAt": "2026-09-12T20:29:02.473Z",
+  "generatedAt": "2026-09-12T21:09:30.338Z",
   "tools": [
     {
       "name": "place_cube",
@@ -458,7 +458,7 @@
     {
       "name": "create_animation",
       "title": "Create Animation",
-      "description": "Creates a new animation with keyframes for bones.",
+      "description": "Creates and selects an undoable animation with linear keyframes for existing bones, using Blockbench editor coordinates. Returns its UUID and actual name.",
       "status": "stable",
       "category": "Animation",
       "annotations": {
@@ -483,6 +483,8 @@
               },
               "animation_length": {
                 "type": "number",
+                "minimum": 0,
+                "maximum": 10000,
                 "description": "Length of the animation in seconds",
                 "markdownDescription": "Length of the animation in seconds"
               },
@@ -494,7 +496,8 @@
                     "type": "object",
                     "properties": {
                       "time": {
-                        "type": "number"
+                        "type": "number",
+                        "minimum": 0
                       },
                       "position": {
                         "type": "array",
@@ -540,8 +543,8 @@
                     "additionalProperties": false
                   }
                 },
-                "description": "Keyframes for each bone",
-                "markdownDescription": "Keyframes for each bone"
+                "description": "Keyframes keyed by existing bone/group name. Values use Blockbench editor coordinates; rotations are degrees.",
+                "markdownDescription": "Keyframes keyed by existing bone/group name. Values use Blockbench editor coordinates; rotations are degrees."
               },
               "particle_effects": {
                 "type": "object",
@@ -895,8 +898,8 @@
                   },
                   "parent": {
                     "type": "string",
-                    "description": "Parent bone name.",
-                    "markdownDescription": "Parent bone name."
+                    "description": "Parent bone name; create also accepts a group UUID or root.",
+                    "markdownDescription": "Parent bone name; create also accepts a group UUID or root."
                   },
                   "origin": {
                     "type": "array",
@@ -923,8 +926,8 @@
                     "items": {
                       "type": "string"
                     },
-                    "description": "Names of elements to add to this bone.",
-                    "markdownDescription": "Names of elements to add to this bone."
+                    "description": "Names or UUIDs of existing elements/groups to add when creating a bone. For rename, the first entry is the new name.",
+                    "markdownDescription": "Names or UUIDs of existing elements/groups to add when creating a bone. For rename, the first entry is the new name."
                   },
                   "ik_enabled": {
                     "type": "boolean",
@@ -980,6 +983,11 @@
           "animation_timeline": {
             "type": "object",
             "properties": {
+              "animation_id": {
+                "type": "string",
+                "description": "Animation UUID or name. If not provided, uses current animation.",
+                "markdownDescription": "Animation UUID or name. If not provided, uses current animation."
+              },
               "action": {
                 "type": "string",
                 "enum": [
@@ -997,20 +1005,23 @@
               },
               "time": {
                 "type": "number",
+                "minimum": 0,
                 "description": "Time in seconds (for set_time action).",
                 "markdownDescription": "Time in seconds (for set_time action)."
               },
               "length": {
                 "type": "number",
-                "description": "Animation length in seconds (for set_length action).",
-                "markdownDescription": "Animation length in seconds (for set_length action)."
+                "minimum": 0,
+                "maximum": 10000,
+                "description": "Animation length in seconds, including all keyframes (for set_length action).",
+                "markdownDescription": "Animation length in seconds, including all keyframes (for set_length action)."
               },
               "fps": {
-                "type": "number",
-                "minimum": 1,
+                "type": "integer",
+                "minimum": 10,
                 "maximum": 120,
-                "description": "Frames per second (for set_fps action).",
-                "markdownDescription": "Frames per second (for set_fps action)."
+                "description": "Integer frames per second, 10–120 (for set_fps action; Blockbench minimum is 10).",
+                "markdownDescription": "Integer frames per second, 10–120 (for set_fps action; Blockbench minimum is 10)."
               },
               "loop_mode": {
                 "type": "string",
@@ -2294,7 +2305,9 @@
               },
               "parent": {
                 "type": "string",
-                "default": "root"
+                "default": "root",
+                "description": "Parent group UUID or name, or root for the project root.",
+                "markdownDescription": "Parent group UUID or name, or root for the project root."
               },
               "visibility": {
                 "type": "boolean",

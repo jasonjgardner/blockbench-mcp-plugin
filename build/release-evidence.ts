@@ -9,6 +9,7 @@ export const evidencePath = "releases/desktop-smoke.json";
 
 /** Ordered desktop checks; identity creation supplies the inspection suite's mesh. */
 export const desktopSuites = [
+  { name: "animation", script: "tests/live/animation-smoke.ts", result: "artifacts/animation/smoke-results.json" },
   { name: "actions", script: "tests/live/action-wrappers-smoke.ts", result: "artifacts/action-wrappers/smoke-results.json" },
   { name: "pbr", script: "tests/live/pbr-smoke.ts", result: "artifacts/pbr/smoke-results.json" },
   { name: "identity", script: "tests/live/mcp-identity-smoke.ts", result: "artifacts/mcp-identity/smoke-results.json" },
