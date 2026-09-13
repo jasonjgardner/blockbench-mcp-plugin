@@ -61,7 +61,7 @@ export function getHytaleBlockSize(): number {
 /**
  * Extended cube interface for Hytale cubes with shading_mode and double_sided.
  */
-export interface HytaleCube extends Cube {
+export interface IHytaleCube extends Cube {
   shading_mode?: HytaleShadingMode;
   double_sided?: boolean;
 }
@@ -69,28 +69,28 @@ export interface HytaleCube extends Cube {
 /**
  * Extended group interface for Hytale groups with is_piece flag.
  */
-export interface HytaleGroup extends Group {
+export interface IHytaleGroup extends Group {
   is_piece?: boolean;
 }
 
 /**
  * Hytale attachment collection interface.
  */
-export interface HytaleAttachmentCollection extends Collection {
+export interface IHytaleAttachmentCollection extends Collection {
   texture?: string; // UUID of collection's texture
 }
 
 /**
  * Get all attachment collections in the current project.
  */
-export function getAttachmentCollections(): HytaleAttachmentCollection[] {
+export function getAttachmentCollections(): IHytaleAttachmentCollection[] {
   if (!isHytalePluginInstalled()) return [];
   // @ts-ignore - Collection is globally available in Blockbench
   if (typeof Collection === "undefined") return [];
   // @ts-ignore - Collection.all contains all collections
   return (Collection.all ?? []).filter(
     (c: Collection) => c.export_codec === "blockymodel"
-  ) as HytaleAttachmentCollection[];
+  ) as IHytaleAttachmentCollection[];
 }
 
 /**
@@ -98,7 +98,7 @@ export function getAttachmentCollections(): HytaleAttachmentCollection[] {
  */
 export function findAttachmentCollection(
   id: string
-): HytaleAttachmentCollection | null {
+): IHytaleAttachmentCollection | null {
   const collections = getAttachmentCollections();
   return (
     collections.find((c) => c.uuid === id || c.name === id) ?? null
@@ -109,26 +109,26 @@ export function findAttachmentCollection(
  * Check if a group is marked as an attachment piece.
  */
 export function isAttachmentPiece(group: Group): boolean {
-  return (group as HytaleGroup).is_piece === true;
+  return (group as IHytaleGroup).is_piece === true;
 }
 
 /**
  * Get all groups marked as attachment pieces.
  */
-export function getAttachmentPieces(): HytaleGroup[] {
+export function getAttachmentPieces(): IHytaleGroup[] {
   // @ts-ignore - Group is globally available in Blockbench
   if (typeof Group === "undefined") return [];
   // @ts-ignore - Group.all contains all groups
   return (Group.all ?? []).filter(
-    (g: Group) => (g as HytaleGroup).is_piece === true
-  ) as HytaleGroup[];
+    (g: Group) => (g as IHytaleGroup).is_piece === true
+  ) as IHytaleGroup[];
 }
 
 /**
  * Get the shading mode of a cube (Hytale-specific).
  */
 export function getCubeShadingMode(cube: Cube): HytaleShadingMode {
-  const hytaleCube = cube as HytaleCube;
+  const hytaleCube = cube as IHytaleCube;
   return hytaleCube.shading_mode ?? "standard";
 }
 
@@ -136,7 +136,7 @@ export function getCubeShadingMode(cube: Cube): HytaleShadingMode {
  * Check if a cube is double-sided (Hytale-specific).
  */
 export function isCubeDoubleSided(cube: Cube): boolean {
-  const hytaleCube = cube as HytaleCube;
+  const hytaleCube = cube as IHytaleCube;
   return hytaleCube.double_sided ?? false;
 }
 

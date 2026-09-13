@@ -1,7 +1,7 @@
 /// <reference types="blockbench-types" />
 import { z } from "zod";
-import { BUILD_ID, BUILD_MODE, STATUS_STABLE, VERSION } from "@/lib/constants";
-import { createTool, tools, type ToolSpec } from "@/lib/factories";
+import { BUILD_ID, BUILD_MODE, STATUS_STABLE, VERSION, type BuildMode } from "@/lib/constants";
+import { createTool, tools, type IToolSpec } from "@/lib/factories";
 import type { StatusType } from "@/types";
 
 // Keep discovery focused on the format properties that affect modeling tools.
@@ -30,7 +30,61 @@ const featureNames = [
 
 type FormatFeatureName = (typeof featureNames)[number];
 type FormatFeatures = Record<FormatFeatureName, boolean | null>;
-type FormatSummary = { id: string; name: string; features: FormatFeatures };
+
+/** Detailed feature flags for one format; `null` marks a flag the host did not declare as a boolean. */
+interface IFormatSummary {
+  id: string;
+  name: string;
+  features: FormatFeatures;
+}
+
+/** Host application version and runtime environment. */
+interface IBlockbenchSummary {
+  version: string;
+  environment: "desktop" | "web";
+  platform: string;
+  is_mobile: boolean;
+}
+
+/** Identity of the running plugin bundle, used to match release evidence. */
+interface IPluginSummary {
+  version: string;
+  build_id: string;
+  build_mode: BuildMode;
+}
+
+/** Totals for the active project; `meshes` and `cubes` are subsets of `elements`. */
+interface IProjectCounts {
+  elements: number;
+  meshes: number;
+  cubes: number;
+  groups: number;
+  textures: number;
+  animations: number;
+}
+
+/** Identity, format, and totals of the active project. */
+interface IProjectSummary {
+  uuid: string;
+  name: string;
+  format_id: string;
+  counts: IProjectCounts;
+}
+
+/** Compact support listing for one registered format; `unknown_features` is omitted when empty. */
+interface IRegisteredFormatSummary {
+  id: string;
+  name: string;
+  supported_features: FormatFeatureName[];
+  unknown_features?: FormatFeatureName[];
+}
+
+/** Registration state of one MCP tool; not a per-project compatibility guarantee. */
+interface IToolRegistrationSummary {
+  name: string;
+  status: StatusType;
+  enabled: boolean;
+}
 
 /**
  * Detached discovery result for planning tool calls without changing projects.
@@ -39,37 +93,15 @@ type FormatSummary = { id: string; name: string; features: FormatFeatures };
  * `unknown_features`. Null feature values mean the host did not declare them.
  * Optional `tools` describes registration state, not per-project compatibility.
  */
-export type CapabilitiesSnapshot = {
-  blockbench: {
-    version: string;
-    environment: "desktop" | "web";
-    platform: string;
-    is_mobile: boolean;
-  };
-  plugin: { version: string; build_id: string; build_mode: "production" | "development" };
-  project: {
-    uuid: string;
-    name: string;
-    format_id: string;
-    counts: {
-      elements: number;
-      meshes: number;
-      cubes: number;
-      groups: number;
-      textures: number;
-      animations: number;
-    };
-  } | null;
-  format: FormatSummary | null;
-  formats: Array<{
-    id: string;
-    name: string;
-    supported_features: FormatFeatureName[];
-    unknown_features?: FormatFeatureName[];
-  }>;
-  tools?: Array<{ name: string; status: StatusType; enabled: boolean }>;
+export interface ICapabilitiesSnapshot {
+  blockbench: IBlockbenchSummary;
+  plugin: IPluginSummary;
+  project: IProjectSummary | null;
+  format: IFormatSummary | null;
+  formats: IRegisteredFormatSummary[];
+  tools?: IToolRegistrationSummary[];
   notes: string[];
-};
+}
 
 /**
  * Discovery options safe to import outside Blockbench. Format identifiers are
@@ -87,8 +119,13 @@ export const getCapabilitiesParameters = z.object({
     .describe("Include all registered MCP tool names, stability status, and enabled state. Enabled tools may still require a compatible format, project, mode, or selection."),
 });
 
-/** Documentation and read-only annotations shared by registration and API docs. */
-export const capabilityToolDocs: ToolSpec[] = [
+/**
+ * Spec for the single `get_capabilities` tool, shared by
+ * `registerCapabilityTools` and the docs manifest. Its read-only, idempotent,
+ * closed-world annotations tell MCP clients the call is safe to repeat before
+ * planning edits. Built without Blockbench globals so it imports outside the host.
+ */
+export const capabilityToolDocs: IToolSpec[] = [
   {
     name: "get_capabilities",
     description: "Discover Blockbench/plugin versions, desktop or web environment, active project summary, and registered model formats. Returns detailed boolean format features (null means unknown), compact supported-feature lists for all formats, and optional tool registration states. Works with no open project. Format features do not guarantee that every enabled MCP tool can run in the current mode or selection.",
@@ -104,7 +141,8 @@ export const capabilityToolDocs: ToolSpec[] = [
   },
 ];
 
-function summarizeFormat(format: ModelFormat): FormatSummary {
+/** Reads the tracked feature flags of one format, mapping non-boolean declarations to `null`. */
+function summarizeFormat(format: ModelFormat): IFormatSummary {
   const features = Object.fromEntries(featureNames.map((name) => {
     const value: unknown = format[name];
     return [name, typeof value === "boolean" ? value : null];
@@ -112,15 +150,9 @@ function summarizeFormat(format: ModelFormat): FormatSummary {
   return { id: format.id, name: format.name, features };
 }
 
-function inspectCapabilities({ format_id, include_tools }: z.infer<typeof getCapabilitiesParameters>): CapabilitiesSnapshot {
-  const formats = typeof Formats === "undefined" ? {} : Formats;
-  if (format_id && !Object.hasOwn(formats, format_id)) {
-    throw new Error(`Unknown format ID "${format_id}". Call get_capabilities without format_id and choose an ID from formats.`);
-  }
-
-  const project = typeof Project === "undefined" ? null : Project;
-  const format = format_id ? formats[format_id] : project?.format;
-  const projectSummary = project ? {
+/** Copies project identity and totals so callers cannot mutate host arrays. */
+function summarizeProject(project: ModelProject): IProjectSummary {
+  return {
     uuid: project.uuid,
     name: project.name,
     format_id: project.format.id,
@@ -132,7 +164,41 @@ function inspectCapabilities({ format_id, include_tools }: z.infer<typeof getCap
       textures: project.textures.length,
       animations: project.animations.length,
     },
-  } : null;
+  };
+}
+
+/** Lists every registered format by ID with its true and undeclared feature flags. */
+function summarizeRegisteredFormats(formats: Record<string, ModelFormat>): IRegisteredFormatSummary[] {
+  return Object.values(formats)
+    .toSorted((first, second) => first.id.localeCompare(second.id))
+    .map((registeredFormat) => {
+      const summary = summarizeFormat(registeredFormat);
+      const unknownFeatures = featureNames.filter((name) => summary.features[name] === null);
+      return {
+        id: summary.id,
+        name: summary.name,
+        supported_features: featureNames.filter((name) => summary.features[name] === true),
+        ...(unknownFeatures.length > 0 ? { unknown_features: unknownFeatures } : {}),
+      };
+    });
+}
+
+/** Lists every registered MCP tool by name with detached status and enabled state. */
+function summarizeTools(): IToolRegistrationSummary[] {
+  return Object.values(tools)
+    .toSorted((first, second) => first.name.localeCompare(second.name))
+    .map(({ name, status, enabled }) => ({ name, status, enabled }));
+}
+
+/** Builds a detached snapshot; rejects `format_id` values that are not own keys of the format registry. */
+function inspectCapabilities({ format_id, include_tools }: z.infer<typeof getCapabilitiesParameters>): ICapabilitiesSnapshot {
+  const formats = typeof Formats === "undefined" ? {} : Formats;
+  if (format_id && !Object.hasOwn(formats, format_id)) {
+    throw new Error(`Unknown format ID "${format_id}". Call get_capabilities without format_id and choose an ID from formats.`);
+  }
+
+  const project = typeof Project === "undefined" ? null : Project;
+  const format = format_id ? formats[format_id] : project?.format;
 
   return {
     blockbench: {
@@ -142,25 +208,10 @@ function inspectCapabilities({ format_id, include_tools }: z.infer<typeof getCap
       is_mobile: Blockbench.isMobile,
     },
     plugin: { version: VERSION, build_id: BUILD_ID, build_mode: BUILD_MODE },
-    project: projectSummary,
+    project: project ? summarizeProject(project) : null,
     format: format ? summarizeFormat(format) : null,
-    formats: Object.values(formats)
-      .toSorted((first, second) => first.id.localeCompare(second.id))
-      .map((registeredFormat) => {
-        const summary = summarizeFormat(registeredFormat);
-        const unknownFeatures = featureNames.filter((name) => summary.features[name] === null);
-        return {
-          id: summary.id,
-          name: summary.name,
-          supported_features: featureNames.filter((name) => summary.features[name] === true),
-          ...(unknownFeatures.length > 0 ? { unknown_features: unknownFeatures } : {}),
-        };
-      }),
-    ...(include_tools ? {
-      tools: Object.values(tools)
-        .toSorted((first, second) => first.name.localeCompare(second.name))
-        .map(({ name, status, enabled }) => ({ name, status, enabled })),
-    } : {}),
+    formats: summarizeRegisteredFormats(formats),
+    ...(include_tools ? { tools: summarizeTools() } : {}),
     notes: [
       "Format features are host declarations, not guarantees of MCP tool compatibility. Null or unknown_features means the host did not declare a boolean value; supported_features lists true flags.",
       "Tool enabled state reflects plugin registration. Calls may also require a compatible project format, editor mode, or selection.",
@@ -168,7 +219,13 @@ function inspectCapabilities({ format_id, include_tools }: z.infer<typeof getCap
   };
 }
 
-/** Register read-only runtime discovery; importing schemas never reads host globals. */
+/**
+ * Registers `get_capabilities`, which reads Blockbench, project, format, and
+ * tool registries only when called, so clients can discover support with or
+ * without an open project. Results are returned both as JSON text (for clients
+ * without structured output) and as `structuredContent` shaped as
+ * {@link ICapabilitiesSnapshot}. Importing this module never reads host globals.
+ */
 export function registerCapabilityTools(): void {
   const spec = capabilityToolDocs[0];
   createTool(spec.name, {

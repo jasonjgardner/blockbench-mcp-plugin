@@ -5,7 +5,7 @@ import { z } from "zod";
 // Types
 // ============================================================================
 
-export interface PromptManifest {
+export interface IPromptManifest {
   version: string;
   generatedAt: string;
   prompts: Record<string, string>;
@@ -28,7 +28,7 @@ const STORAGE_KEY_OVERRIDES = "bbmcp_prompt_overrides";
 // State
 // ============================================================================
 
-let manifest: PromptManifest | null = null;
+let manifest: IPromptManifest | null = null;
 let overrides: Record<string, string> = {};
 let initialized = false;
 
@@ -82,7 +82,7 @@ const promptManifestSchema = z.object({
   prompts: z.record(z.string(), z.string()),
 });
 
-async function fetchManifestFromCDN(): Promise<PromptManifest> {
+async function fetchManifestFromCDN(): Promise<IPromptManifest> {
   const url = getManifestUrl();
   console.log(`[MCP] Fetching prompt manifest from ${url}`);
 
@@ -121,12 +121,12 @@ async function fetchManifestFromCDN(): Promise<PromptManifest> {
 // Cache helpers
 // ============================================================================
 
-function loadCachedManifest(): PromptManifest | null {
+function loadCachedManifest(): IPromptManifest | null {
   const raw = storageGet(STORAGE_KEY_MANIFEST);
   if (!raw) return null;
 
   try {
-    const parsed = JSON.parse(raw) as PromptManifest;
+    const parsed = JSON.parse(raw) as IPromptManifest;
     if (parsed.prompts && typeof parsed.prompts === "object") {
       return parsed;
     }
@@ -139,7 +139,7 @@ function loadCachedManifest(): PromptManifest | null {
   return null;
 }
 
-function cacheManifest(m: PromptManifest): void {
+function cacheManifest(m: IPromptManifest): void {
   storageSet(STORAGE_KEY_MANIFEST, JSON.stringify(m));
   storageSet(STORAGE_KEY_VERSION, VERSION);
 }
@@ -302,7 +302,7 @@ export function getAvailablePromptNames(): string[] {
 /**
  * Get the loaded manifest (if any). For UI display.
  */
-export function getManifest(): PromptManifest | null {
+export function getManifest(): IPromptManifest | null {
   if (!manifest) return null;
   return { ...manifest, prompts: { ...manifest.prompts } };
 }

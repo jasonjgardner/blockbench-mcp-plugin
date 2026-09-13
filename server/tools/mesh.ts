@@ -1,7 +1,7 @@
 /// <reference types="three" />
 /// <reference types="blockbench-types" />
 import { z } from "zod";
-import { createTool, type ToolSpec } from "@/lib/factories";
+import { createTool, type IToolSpec } from "@/lib/factories";
 import {
   meshSchema,
   meshIdOptionalSchema,
@@ -12,9 +12,18 @@ import {
   meshSelectionModeEnum,
   selectionActionEnum,
 } from "@/lib/zodObjects";
-import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
+import { MAX_SUBDIVISION_CUTS, STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
 import { getProjectTexture, getMeshOrSelected, findMeshOrThrow } from "@/lib/util";
 import { deleteMeshSelection, extrudeMeshFaces, subdivideMeshFaces } from "@/lib/mesh-editing";
+import {
+  addCylinderGeometry,
+  addIndexedGeometry,
+  addNewMesh,
+  addSphereGeometry,
+  createMeshEdit,
+  type IIndexedGeometryKeys,
+  type IMeshCreationContext,
+} from "@/lib/mesh-primitives";
 
 // ============================================================================
 // Mesh Tool Parameter Schemas
@@ -47,7 +56,7 @@ export const subdivideMeshParameters = z.object({
     .number()
     .int()
     .min(1)
-    .max(10)
+    .max(MAX_SUBDIVISION_CUTS)
     .default(1)
     .describe("Number of cuts per edge; each selected face becomes (cuts + 1) squared faces."),
 });
@@ -113,6 +122,7 @@ export const selectMeshElementsParameters = z.object({
     ),
 });
 
+/** Offset explicit vertex keys, or the mesh's current vertex selection, in local units. */
 export const moveMeshVerticesParameters = z.object({
   mesh_id: meshIdOptionalSchema,
   offset: vector3Schema.describe("Offset to move vertices by [x, y, z]."),
@@ -137,6 +147,7 @@ export const deleteMeshElementsParameters = z.object({
     .describe("When deleting faces/edges, whether to keep the vertices."),
 });
 
+/** Distance-threshold vertex merge over selected or all vertices of a named mesh. */
 export const mergeMeshVerticesParameters = z.object({
   mesh_id: meshIdSchema,
   threshold: z
@@ -151,6 +162,7 @@ export const mergeMeshVerticesParameters = z.object({
     .describe("Whether to only merge selected vertices."),
 });
 
+/** Build one triangle/quad from existing vertex keys, optionally assigning a texture. */
 export const createMeshFaceParameters = z.object({
   mesh_id: meshIdOptionalSchema,
   vertices: z
@@ -180,6 +192,7 @@ export const createCylinderParameters = z.object({
   group: groupIdOptionalSchema,
 });
 
+/** Retained for contract stability; knife_tool validates the mesh, then reports that headless cuts are unsupported. */
 export const knifeToolParameters = z.object({
   mesh_id: meshIdSchema.describe("ID or name of the mesh to cut."),
   points: z
@@ -200,7 +213,15 @@ export const knifeToolParameters = z.object({
 // Mesh Tool Docs
 // ============================================================================
 
-export const meshToolDocs: ToolSpec[] = [
+/**
+ * Static specs for every mesh tool, shared by {@link registerMeshTools} and the docs generator.
+ *
+ * Registration addresses entries by index, so the order is part of the contract:
+ * place_mesh, extrude_mesh, subdivide_mesh, create_sphere, select_mesh_elements,
+ * move_mesh_vertices, delete_mesh_elements, merge_mesh_vertices, create_mesh_face,
+ * create_cylinder, knife_tool. Building this array touches no Blockbench globals.
+ */
+export const meshToolDocs: IToolSpec[] = [
   {
     name: "place_mesh",
     description:
@@ -318,11 +339,14 @@ export const meshToolDocs: ToolSpec[] = [
 // Registration
 // ============================================================================
 
+/** Per-mesh keys returned by place_mesh, in input order, for follow-up editing. */
+interface IPlacedMesh extends IIndexedGeometryKeys {
+  name: string;
+  uuid: string;
+}
+
 /** Resolve references before beginning an edit so invalid inputs leave no undo state. */
-function resolveMeshCreationContext(texture?: string, group?: string): {
-  projectTexture: Texture | null | undefined;
-  outlinerGroup: Group | "root";
-} {
+function resolveMeshCreationContext(texture?: string, group?: string): IMeshCreationContext {
   if (!Project) {
     throw new Error("No project is open. Use create_project before creating meshes.");
   }
@@ -346,32 +370,18 @@ function resolveMeshCreationContext(texture?: string, group?: string): {
 }
 
 /**
- * Track new elements in the same array used by Blockbench's undo snapshots.
- * The builder appends each mesh before initialization so a partial failure can
- * restore the previous scene and discard the pending edit.
+ * Registers every tool in {@link meshToolDocs} against the active Blockbench runtime.
+ *
+ * Creation tools validate references before opening a single undo edit per batch;
+ * editing tools snapshot only the target mesh. Blockbench globals are accessed only
+ * when a tool executes, never at registration.
  */
-function createMeshEdit(label: string, build: (meshes: Mesh[]) => void): Mesh[] {
-  const meshes: Mesh[] = [];
-  Undo.initEdit({ elements: meshes, outliner: true, collections: [] });
-  try {
-    build(meshes);
-  } catch (error) {
-    // Blockbench supports reverting a canceled edit; the published types omit the argument.
-    (Undo.cancelEdit as (revertChanges: boolean) => void)(true);
-    throw error;
-  }
-  Undo.finishEdit(label);
-  Canvas.updateAll();
-  return meshes;
-}
-
-/** Register mesh creation and editing tools against the active Blockbench runtime. */
 export function registerMeshTools(): void {
   createTool(meshToolDocs[0].name, {
     ...meshToolDocs[0],
     parameters: placeMeshParameters,
     async execute({ elements, texture, group }, context) {
-      const { projectTexture, outlinerGroup } = resolveMeshCreationContext(texture, group);
+      const creation = resolveMeshCreationContext(texture, group);
       const total = elements.length;
       elements.forEach((element) => {
         element.faces.forEach((face, faceIndex) => {
@@ -381,33 +391,11 @@ export function registerMeshTools(): void {
         });
       });
 
-      const placed: Array<{ name: string; uuid: string; vertex_keys: string[]; face_keys: string[] }> = [];
-      createMeshEdit("Agent placed meshes", (created) => {
-        elements.forEach((element, index) => {
-          const mesh = new Mesh({
-            name: element.name,
-            vertices: {},
-            origin: element.position as ArrayVector3,
-            rotation: element.rotation as ArrayVector3,
-          });
-          created.push(mesh);
-          const vertexKeys = element.vertices.map((vertex) => mesh.addVertices([
-            vertex[0] * element.scale[0],
-            vertex[1] * element.scale[1],
-            vertex[2] * element.scale[2],
-          ])[0]);
-          const faceKeys = element.faces.map((face) => {
-            return mesh.addFaces(new MeshFace(mesh, {
-              vertices: face.map((vertexIndex) => vertexKeys[vertexIndex]),
-              uv: {},
-            }))[0];
-          });
-          mesh.addTo(outlinerGroup).init();
-          if (projectTexture) mesh.applyTexture(projectTexture, true);
-          context?.reportProgress({ progress: index + 1, total });
-          placed.push({ name: mesh.name, uuid: mesh.uuid, vertex_keys: vertexKeys, face_keys: faceKeys });
-        });
-      });
+      const placed = createMeshEdit("Agent placed meshes", (created) => elements.map((element, index): IPlacedMesh => {
+        const [mesh, keys] = addNewMesh(created, element, creation, (target) => addIndexedGeometry(target, element));
+        context?.reportProgress({ progress: index + 1, total });
+        return { name: mesh.name, uuid: mesh.uuid, ...keys };
+      }));
       return JSON.stringify({ meshes: placed });
     },
   }, meshToolDocs[0].status);
@@ -435,114 +423,14 @@ export function registerMeshTools(): void {
     ...meshToolDocs[3],
     parameters: createSphereParameters,
     async execute({ elements, texture, group }, context) {
-      const { projectTexture, outlinerGroup } = resolveMeshCreationContext(texture, group);
+      const creation = resolveMeshCreationContext(texture, group);
       const total = elements.length;
-      const spheres = createMeshEdit("Agent created spheres", (created) => elements.forEach((element, progress) => {
-        const mesh = new Mesh({
-          name: element.name,
-          vertices: {},
-          origin: element.position as [number, number, number],
-          rotation: (element.rotation || [0, 0, 0]) as [
-            number,
-            number,
-            number
-          ],
-        });
-        created.push(mesh);
-
-        // Create sphere vertices using spherical coordinates
-        const radius = element.diameter / 2;
-        const sides = Math.round(element.sides / 2) * 2; // Ensure even number for symmetry
-
-        // Add top and bottom vertices
-        const [bottom] = mesh.addVertices([0, -radius, 0]);
-        const [top] = mesh.addVertices([0, radius, 0]);
-
-        const rings: string[][] = [];
-        const off_ang = element.align_edges ? 0.5 : 0;
-
-        // Create rings of vertices
-        for (let i = 0; i < element.sides; i++) {
-          const circle_x = Math.sin(
-            ((i + off_ang) / element.sides) * Math.PI * 2
-          );
-          const circle_z = Math.cos(
-            ((i + off_ang) / element.sides) * Math.PI * 2
-          );
-
-          const vertices: string[] = [];
-          for (let j = 1; j < sides / 2; j++) {
-            const slice_x = Math.sin((j / sides) * Math.PI * 2) * radius;
-            const x = circle_x * slice_x;
-            const y = Math.cos((j / sides) * Math.PI * 2) * radius;
-            const z = circle_z * slice_x;
-            vertices.push(...mesh.addVertices([x, y, z]));
-          }
-          rings.push(vertices);
-        }
-
-        // Create faces
-        for (let i = 0; i < element.sides; i++) {
-          const this_ring = rings[i];
-          const next_ring = rings[i + 1] || rings[0];
-
-          for (let j = 0; j < sides / 2; j++) {
-            if (j == 0) {
-              // Connect to top vertex
-              mesh.addFaces(
-                new MeshFace(mesh, {
-                  vertices: [this_ring[j], next_ring[j], top],
-                  uv: {},
-                })
-              );
-              continue;
-            }
-
-            if (!this_ring[j]) {
-              // Connect to bottom vertex
-              mesh.addFaces(
-                new MeshFace(mesh, {
-                  vertices: [next_ring[j - 1], this_ring[j - 1], bottom],
-                  uv: {},
-                })
-              );
-              continue;
-            }
-
-            // Connect ring segments
-            mesh.addFaces(
-              new MeshFace(mesh, {
-                vertices: [
-                  this_ring[j],
-                  next_ring[j],
-                  this_ring[j - 1],
-                  next_ring[j - 1],
-                ],
-                uv: {},
-              })
-            );
-          }
-        }
-
-        mesh.addTo(outlinerGroup).init();
-        if (projectTexture) {
-          mesh.applyTexture(projectTexture, true);
-        }
-
-        context?.reportProgress({
-          progress: progress + 1,
-          total,
-        });
-
+      const spheres = createMeshEdit("Agent created spheres", (created) => elements.map((element, index) => {
+        const [mesh] = addNewMesh(created, element, creation, (target) => addSphereGeometry(target, element));
+        context?.reportProgress({ progress: index + 1, total });
+        return mesh;
       }));
-
-      return await Promise.resolve(
-        JSON.stringify(
-          spheres.map(
-            (sphere) => `Added sphere ${sphere.name} with ID ${sphere.uuid}`
-          )
-        )
-      );
+      return JSON.stringify(spheres.map((sphere) => `Added sphere ${sphere.name} with ID ${sphere.uuid}`));
     },
   }, meshToolDocs[3].status);
 
@@ -859,73 +747,14 @@ export function registerMeshTools(): void {
     ...meshToolDocs[9],
     parameters: createCylinderParameters,
     async execute({ elements, texture, group }, context) {
-      const { projectTexture, outlinerGroup } = resolveMeshCreationContext(texture, group);
+      const creation = resolveMeshCreationContext(texture, group);
       const total = elements.length;
-      const cylinders = createMeshEdit("Agent created cylinders", (created) => elements.forEach((element, progress) => {
-        const mesh = new Mesh({
-          name: element.name,
-          vertices: {},
-          origin: element.position as [number, number, number],
-          rotation: (element.rotation || [0, 0, 0]) as [
-            number,
-            number,
-            number
-          ],
-        });
-        created.push(mesh);
-        const radius = element.diameter / 2;
-        const height = element.height;
-        const sides = Math.round(element.sides);
-        // centres for the caps
-        const capCenters = element.capped ? mesh.addVertices([0, height / 2, 0], [0, -height / 2, 0]) : [];
-        const [topCenter, bottomCenter] = capCenters;
-        const topRing: string[] = [];
-        const bottomRing: string[] = [];
-        for (let i = 0; i < sides; i++) {
-          const ang = (i / sides) * Math.PI * 2;
-          const x = Math.cos(ang) * radius;
-          const z = Math.sin(ang) * radius;
-          topRing.push(mesh.addVertices([x, height / 2, z])[0]);
-          bottomRing.push(mesh.addVertices([x, -height / 2, z])[0]);
-        }
-        for (let i = 0; i < sides; i++) {
-          const next = (i + 1) % sides;
-          // side face
-          mesh.addFaces(
-            new MeshFace(mesh, {
-              vertices: [
-                topRing[i],
-                topRing[next],
-                bottomRing[next],
-                bottomRing[i],
-              ],
-              uv: {},
-            })
-          );
-          if (element.capped) {
-            // top cap (triangle fan)
-            mesh.addFaces(
-              new MeshFace(mesh, {
-                vertices: [topRing[next], topRing[i], topCenter],
-                uv: {},
-              })
-            );
-            // bottom cap
-            mesh.addFaces(
-              new MeshFace(mesh, {
-                vertices: [bottomRing[i], bottomRing[next], bottomCenter],
-                uv: {},
-              })
-            );
-          }
-        }
-        mesh.addTo(outlinerGroup).init();
-        if (projectTexture) mesh.applyTexture(projectTexture, true);
-        context?.reportProgress({ progress: progress + 1, total });
+      const cylinders = createMeshEdit("Agent created cylinders", (created) => elements.map((element, index) => {
+        const [mesh] = addNewMesh(created, element, creation, (target) => addCylinderGeometry(target, element));
+        context?.reportProgress({ progress: index + 1, total });
+        return mesh;
       }));
-      return JSON.stringify(
-        cylinders.map((c) => `Added cylinder ${c.name} (ID ${c.uuid})`)
-      );
+      return JSON.stringify(cylinders.map((c) => `Added cylinder ${c.name} (ID ${c.uuid})`));
     },
   }, meshToolDocs[9].status);
 

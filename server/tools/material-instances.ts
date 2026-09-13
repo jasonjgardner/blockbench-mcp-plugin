@@ -1,7 +1,7 @@
 /// <reference types="three" />
 /// <reference types="blockbench-types" />
 import { z } from "zod";
-import { createTool, type ToolSpec } from "@/lib/factories";
+import { createTool, type IToolSpec } from "@/lib/factories";
 import { findElementOrThrow } from "@/lib/util";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
 import { faceEnum, cubeIdOptionalSchema, cubeIdSchema } from "@/lib/zodObjects";
@@ -94,7 +94,7 @@ function findCubeOrThrow(id: string): Cube {
 // Material Instance Tool Docs
 // ============================================================================
 
-export const materialInstanceToolDocs: ToolSpec[] = [
+export const materialInstanceToolDocs: IToolSpec[] = [
   {
     name: "get_face_material_instances",
     description:

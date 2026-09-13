@@ -2,7 +2,7 @@
 /// <reference types="blockbench-types" />
 
 import { z } from "zod";
-import { createTool, type ToolSpec } from "@/lib/factories";
+import { createTool, type IToolSpec } from "@/lib/factories";
 import {
   isHytalePluginInstalled,
   isHytaleFormat,
@@ -17,9 +17,9 @@ import {
   getHytaleAnimationFPS,
   HYTALE_SHADING_MODES,
   HYTALE_QUAD_NORMALS,
-  type HytaleCube,
-  type HytaleGroup,
-  type HytaleAttachmentCollection,
+  type IHytaleCube,
+  type IHytaleGroup,
+  type IHytaleAttachmentCollection,
 } from "@/lib/hytale";
 import { findGroupOrThrow, findElementOrThrow } from "@/lib/util";
 import {
@@ -121,7 +121,7 @@ export const hytaleGetCubeStretchParametersSchema = z.object({
 // Hytale Tool Docs
 // ============================================================================
 
-export const hytaleToolDocs: ToolSpec[] = [
+export const hytaleToolDocs: IToolSpec[] = [
   {
     name: "hytale_get_format_info",
     description:
@@ -383,7 +383,7 @@ export function registerHytaleTools() {
         // @ts-ignore - Undo is globally available
         Undo.initEdit({ elements: [cube] });
 
-        const hytaleCube = cube as HytaleCube;
+        const hytaleCube = cube as IHytaleCube;
         if (shading_mode !== undefined) {
           hytaleCube.shading_mode = shading_mode;
         }
@@ -500,7 +500,7 @@ export function registerHytaleTools() {
         }).init();
 
         // Set Hytale-specific properties
-        const hytaleCube = cube as HytaleCube;
+        const hytaleCube = cube as IHytaleCube;
         hytaleCube.double_sided = double_sided;
         hytaleCube.shading_mode = "standard";
 
@@ -572,7 +572,7 @@ export function registerHytaleTools() {
         // @ts-ignore - Undo is globally available
         Undo.initEdit({ outliner: true });
 
-        (group as HytaleGroup).is_piece = is_piece;
+        (group as IHytaleGroup).is_piece = is_piece;
 
         // @ts-ignore - Undo is globally available
         Undo.finishEdit("Set attachment piece");

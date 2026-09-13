@@ -1,7 +1,7 @@
 /// <reference types="three" />
 /// <reference types="blockbench-types" />
 import { z } from "zod";
-import { createTool, type ToolSpec } from "@/lib/factories";
+import { createTool, type IToolSpec } from "@/lib/factories";
 import { captureAppScreenshot } from "@/lib/util";
 import { STATUS_STABLE } from "@/lib/constants";
 
@@ -13,7 +13,7 @@ export const fromGeoJsonParameters = z.object({
     ),
 });
 
-export const importToolDocs: ToolSpec[] = [
+export const importToolDocs: IToolSpec[] = [
   {
     name: "from_geo_json",
     description: "Imports a model from a GeoJSON file.",

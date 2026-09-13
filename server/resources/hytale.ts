@@ -14,7 +14,7 @@ import {
   getHytaleAnimationFPS,
   getCubeShadingMode,
   isCubeDoubleSided,
-  type HytaleCube,
+  type IHytaleCube,
 } from "@/lib/hytale";
 
 /**
@@ -333,7 +333,7 @@ export function registerHytaleResources() {
           throw new Error(`Cube "${id}" not found.`);
         }
 
-        const hytaleCube = cube as HytaleCube;
+        const hytaleCube = cube as IHytaleCube;
         return {
           contents: [
             {
@@ -371,7 +371,7 @@ export function registerHytaleResources() {
                 shading_mode: getCubeShadingMode(c),
                 double_sided: isCubeDoubleSided(c),
                 // @ts-ignore - stretch property
-                stretch: (c as HytaleCube).stretch ?? [1, 1, 1],
+                stretch: (c as IHytaleCube).stretch ?? [1, 1, 1],
               })),
             }),
             mimeType: "application/json",

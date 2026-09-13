@@ -1,33 +1,33 @@
 import { z } from "zod";
-import type { ToolSpec, PromptSpec, ResourceSpec } from "../lib/factories";
+import type { IToolSpec, IPromptSpec, IResourceSpec } from "@/lib/factories";
 
 // Tool docs imports — each file exports schemas at module level with zero Blockbench deps
-import { cameraToolDocs } from "../server/tools/camera";
-import { capabilityToolDocs } from "../server/tools/capabilities";
-import { cubeToolDocs } from "../server/tools/cubes";
-import { displayToolDocs } from "../server/tools/display";
-import { elementToolDocs } from "../server/tools/element";
-import { importToolDocs } from "../server/tools/import";
-import { meshToolDocs } from "../server/tools/mesh";
-import { meshInspectionToolDocs } from "../server/tools/mesh-inspection";
-import { paintToolDocs } from "../server/tools/paint";
-import { projectToolDocs } from "../server/tools/project";
-import { textureToolDocs } from "../server/tools/texture";
-import { armatureToolDocs } from "../server/tools/armature";
-import { animationToolDocs } from "../server/tools/animation";
-import { uiToolDocs } from "../server/tools/ui";
-import { hytaleToolDocs } from "../server/tools/hytale";
-import { materialInstanceToolDocs } from "../server/tools/material-instances";
-import { uvToolDocs } from "../server/tools/uv";
-import { historyToolDocs } from "../server/tools/history";
-import { exportToolDocs } from "../server/tools/export";
+import { cameraToolDocs } from "@/server/tools/camera";
+import { capabilityToolDocs } from "@/server/tools/capabilities";
+import { cubeToolDocs } from "@/server/tools/cubes";
+import { displayToolDocs } from "@/server/tools/display";
+import { elementToolDocs } from "@/server/tools/element";
+import { importToolDocs } from "@/server/tools/import";
+import { meshToolDocs } from "@/server/tools/mesh";
+import { meshInspectionToolDocs } from "@/server/tools/mesh-inspection";
+import { paintToolDocs } from "@/server/tools/paint";
+import { projectToolDocs } from "@/server/tools/project";
+import { textureToolDocs } from "@/server/tools/texture";
+import { armatureToolDocs } from "@/server/tools/armature";
+import { animationToolDocs } from "@/server/tools/animation";
+import { uiToolDocs } from "@/server/tools/ui";
+import { hytaleToolDocs } from "@/server/tools/hytale";
+import { materialInstanceToolDocs } from "@/server/tools/material-instances";
+import { uvToolDocs } from "@/server/tools/uv";
+import { historyToolDocs } from "@/server/tools/history";
+import { exportToolDocs } from "@/server/tools/export";
 
-export interface CategoryGroup {
+export interface ICategoryGroup {
   category: string;
-  tools: ToolSpec[];
+  tools: IToolSpec[];
 }
 
-export const toolManifest: CategoryGroup[] = [
+export const toolManifest: ICategoryGroup[] = [
   { category: "Cubes", tools: cubeToolDocs },
   { category: "Camera & Screenshots", tools: cameraToolDocs },
   { category: "Capabilities", tools: capabilityToolDocs },
@@ -49,7 +49,7 @@ export const toolManifest: CategoryGroup[] = [
 ];
 
 // Prompt specs defined inline — server/prompts.ts uses macros that complicate direct import
-export const promptDocs: PromptSpec[] = [
+export const promptDocs: IPromptSpec[] = [
   {
     name: "blockbench_native_apis",
     description:
@@ -116,7 +116,7 @@ export const promptDocs: PromptSpec[] = [
 ];
 
 // Resource specs defined inline — server/resources.ts uses Blockbench globals at module level
-export const resourceDocs: ResourceSpec[] = [
+export const resourceDocs: IResourceSpec[] = [
   {
     name: "projects",
     uriTemplate: "projects://{id}",

@@ -13,6 +13,12 @@ import { createTextureParameters } from "@/server/tools/texture";
 
 type RegistrationMode = "initial" | "session";
 
+/** Fields the transform test's object schema hands to its object-level transform. */
+interface ITransformFields {
+  label: string;
+  count: number;
+}
+
 const originalServer = getServer();
 let clients: Client[] = [];
 let servers: ReturnType<typeof createServer>[] = [];
@@ -116,7 +122,7 @@ describe.each<RegistrationMode>(["initial", "session"])("%s registration", (mode
 
   test("passes defaults and once-transformed output to execute", async () => {
     const fieldTransform = mock((value: string) => `${value}!`);
-    const objectTransform = mock((value: { label: string; count: number }) => ({
+    const objectTransform = mock((value: ITransformFields) => ({
       ...value,
       parsed: true,
     }));

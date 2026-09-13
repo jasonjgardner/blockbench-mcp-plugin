@@ -1,7 +1,7 @@
 /// <reference types="three" />
 /// <reference types="blockbench-types" />
 import { z } from "zod";
-import { createTool, type ToolSpec } from "@/lib/factories";
+import { createTool, type IToolSpec } from "@/lib/factories";
 import { captureScreenshot } from "@/lib/util";
 import { STATUS_EXPERIMENTAL } from "@/lib/constants";
 import { displaySlotEnum, vec3 } from "@/lib/zodObjects";
@@ -58,7 +58,7 @@ export const enterDisplayModeParameters = z.object({
 // Display Settings Tool Docs
 // ============================================================================
 
-export const displayToolDocs: ToolSpec[] = [
+export const displayToolDocs: IToolSpec[] = [
   {
     name: "get_display_transform",
     description:

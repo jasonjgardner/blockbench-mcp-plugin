@@ -16,7 +16,7 @@ export const DEFAULT_PING_INTERVAL_MS = 30 * 1000;
 /** Max consecutive failed pings before considering session dead */
 export const DEFAULT_MAX_FAILED_PINGS = 3;
 
-export interface SessionConfig {
+export interface ISessionConfig {
   /** Inactivity timeout in milliseconds */
   inactivityTimeoutMs: number;
   /** Ping interval in milliseconds (0 to disable) */
@@ -25,7 +25,7 @@ export interface SessionConfig {
   maxFailedPings: number;
 }
 
-export interface Session {
+export interface ISession {
   id: string;
   connectedAt: Date;
   lastActivity: Date;
@@ -41,16 +41,16 @@ export interface Session {
   clientVersion?: string;
 }
 
-type SessionListener = (sessions: Session[]) => void;
+type SessionListener = (sessions: ISession[]) => void;
 type RemovalCallback = (sessionId: string) => void;
 type PingCallback = (sessionId: string) => Promise<boolean>;
 
 class SessionManager {
-  private sessions: Map<string, Session> = new Map();
+  private sessions: Map<string, ISession> = new Map();
   private listeners: Set<SessionListener> = new Set();
   private removalCallback: RemovalCallback | null = null;
   private pingCallback: PingCallback | null = null;
-  private config: SessionConfig = {
+  private config: ISessionConfig = {
     inactivityTimeoutMs: DEFAULT_INACTIVITY_TIMEOUT_MS,
     pingIntervalMs: DEFAULT_PING_INTERVAL_MS,
     maxFailedPings: DEFAULT_MAX_FAILED_PINGS,
@@ -59,7 +59,7 @@ class SessionManager {
   /**
    * Configure session manager settings
    */
-  configure(config: Partial<SessionConfig>): void {
+  configure(config: Partial<ISessionConfig>): void {
     this.config = { ...this.config, ...config };
     console.log(`[MCP] Session config updated: timeout=${this.config.inactivityTimeoutMs}ms, ping=${this.config.pingIntervalMs}ms`);
   }
@@ -67,7 +67,7 @@ class SessionManager {
   /**
    * Get current configuration
    */
-  getConfig(): Readonly<SessionConfig> {
+  getConfig(): Readonly<ISessionConfig> {
     return { ...this.config };
   }
 
@@ -78,7 +78,7 @@ class SessionManager {
       return;
     }
 
-    const session: Session = {
+    const session: ISession = {
       id: sessionId,
       connectedAt: new Date(),
       lastActivity: new Date(),
@@ -186,7 +186,7 @@ class SessionManager {
     }
   }
 
-  private clearSessionTimers(session: Session): void {
+  private clearSessionTimers(session: ISession): void {
     if (session.timeoutHandle) {
       clearTimeout(session.timeoutHandle);
       session.timeoutHandle = undefined;
@@ -197,7 +197,7 @@ class SessionManager {
     }
   }
 
-  private resetTimeout(session: Session): void {
+  private resetTimeout(session: ISession): void {
     if (session.timeoutHandle) {
       clearTimeout(session.timeoutHandle);
     }
@@ -207,7 +207,7 @@ class SessionManager {
     }, this.config.inactivityTimeoutMs);
   }
 
-  private startPingInterval(session: Session): void {
+  private startPingInterval(session: ISession): void {
     // Don't start ping if interval is 0 (disabled) or no callback
     if (this.config.pingIntervalMs <= 0) return;
 
@@ -229,7 +229,7 @@ class SessionManager {
     }, this.config.pingIntervalMs);
   }
 
-  getAll(): Session[] {
+  getAll(): ISession[] {
     return [...this.sessions.values()];
   }
 
@@ -241,7 +241,7 @@ class SessionManager {
     return this.sessions.has(sessionId);
   }
 
-  get(sessionId: string): Session | undefined {
+  get(sessionId: string): ISession | undefined {
     return this.sessions.get(sessionId);
   }
 

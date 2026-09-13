@@ -1,7 +1,7 @@
 /// <reference types="three" />
 /// <reference types="blockbench-types" />
 import { z } from "zod";
-import { createTool, type ToolSpec } from "@/lib/factories";
+import { createTool, type IToolSpec } from "@/lib/factories";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
 import {
   elementIdSchema,
@@ -272,7 +272,7 @@ export const clearVertexWeightsParameters = z.object({
 // Armature Tool Docs
 // ============================================================================
 
-export const armatureToolDocs: ToolSpec[] = [
+export const armatureToolDocs: IToolSpec[] = [
   {
     name: "list_armatures",
     description:

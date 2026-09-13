@@ -1,7 +1,7 @@
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { z } from "zod";
 import { toolManifest, promptDocs, resourceDocs } from "./docs-manifest";
-import type { ToolSpec, PromptSpec, ResourceSpec } from "../lib/factories";
+import type { IToolSpec, IPromptSpec, IResourceSpec } from "../lib/factories";
 import { version } from "../package.json";
 import { log } from "./utils";
 
@@ -9,7 +9,7 @@ import { log } from "./utils";
 // Types
 // ============================================================================
 
-interface ToolDocEntry {
+interface IToolDocEntry {
   name: string;
   title: string;
   description: string;
@@ -23,7 +23,7 @@ interface ToolDocEntry {
   parameters: object;
 }
 
-interface PromptDocEntry {
+interface IPromptDocEntry {
   name: string;
   title: string;
   description: string;
@@ -31,19 +31,19 @@ interface PromptDocEntry {
   arguments: object | null;
 }
 
-interface ResourceDocEntry {
+interface IResourceDocEntry {
   name: string;
   title: string;
   description: string;
   uriTemplate: string;
 }
 
-interface DocOutput {
+interface IDocOutput {
   version: string;
   generatedAt: string;
-  tools: ToolDocEntry[];
-  prompts: PromptDocEntry[];
-  resources: ResourceDocEntry[];
+  tools: IToolDocEntry[];
+  prompts: IPromptDocEntry[];
+  resources: IResourceDocEntry[];
 }
 
 // ============================================================================
@@ -65,7 +65,7 @@ function convertSchema(name: string, schema: z.ZodType): object {
   }
 }
 
-function convertToolSpec(spec: ToolSpec, category: string): ToolDocEntry {
+function convertToolSpec(spec: IToolSpec, category: string): IToolDocEntry {
   return {
     name: spec.name,
     title: spec.annotations?.title ?? spec.name,
@@ -81,7 +81,7 @@ function convertToolSpec(spec: ToolSpec, category: string): ToolDocEntry {
   };
 }
 
-function convertPromptSpec(spec: PromptSpec): PromptDocEntry {
+function convertPromptSpec(spec: IPromptSpec): IPromptDocEntry {
   return {
     name: spec.name,
     title: spec.title ?? spec.name,
@@ -91,7 +91,7 @@ function convertPromptSpec(spec: PromptSpec): PromptDocEntry {
   };
 }
 
-function convertResourceSpec(spec: ResourceSpec): ResourceDocEntry {
+function convertResourceSpec(spec: IResourceSpec): IResourceDocEntry {
   return {
     name: spec.name,
     title: spec.title ?? spec.name,
@@ -138,7 +138,7 @@ function statusBadge(status: string): string {
   return `<span class="badge ${cls}">${status}</span>`;
 }
 
-function annotationBadges(annotations: ToolDocEntry["annotations"]): string {
+function annotationBadges(annotations: IToolDocEntry["annotations"]): string {
   const badges: string[] = [];
   if (annotations.destructiveHint) {
     badges.push('<span class="badge badge-destructive">destructive</span>');
@@ -211,7 +211,7 @@ function renderParametersTable(params: Record<string, unknown>): string {
     </table>`;
 }
 
-function renderToolCard(tool: ToolDocEntry): string {
+function renderToolCard(tool: IToolDocEntry): string {
   const schema = tool.parameters as Record<string, unknown>;
   const innerSchema =
     ((schema.definitions as Record<string, unknown> | undefined)?.[tool.name] as Record<string, unknown>) ??
@@ -233,7 +233,7 @@ function renderToolCard(tool: ToolDocEntry): string {
     </div>`;
 }
 
-function renderPromptCard(prompt: PromptDocEntry): string {
+function renderPromptCard(prompt: IPromptDocEntry): string {
   const argsHtml = prompt.arguments
     ? renderParametersTable(
         ((prompt.arguments as Record<string, unknown>).definitions as Record<string, Record<string, unknown>> | undefined)?.[prompt.name] ??
@@ -252,7 +252,7 @@ function renderPromptCard(prompt: PromptDocEntry): string {
     </div>`;
 }
 
-function renderResourceCard(resource: ResourceDocEntry): string {
+function renderResourceCard(resource: IResourceDocEntry): string {
   return `<div class="card">
       <div class="card-header">
         <h3 class="card-name">${resource.name}</h3>
@@ -263,7 +263,7 @@ function renderResourceCard(resource: ResourceDocEntry): string {
     </div>`;
 }
 
-async function generateHtml(data: DocOutput): Promise<string> {
+async function generateHtml(data: IDocOutput): Promise<string> {
   const categoryNav = toolManifest
     .map(
       ({ category, tools }) =>
@@ -376,7 +376,7 @@ async function main() {
   log.header("Blockbench MCP Documentation Generator");
 
   log.step("Collecting tool specs...");
-  const tools: ToolDocEntry[] = [];
+  const tools: IToolDocEntry[] = [];
   for (const { category, tools: specs } of toolManifest) {
     for (const spec of specs) {
       tools.push(convertToolSpec(spec, category));
@@ -392,7 +392,7 @@ async function main() {
   const resources = resourceDocs.map(convertResourceSpec);
   log.info(`  ${resources.length} resources`);
 
-  const output: DocOutput = {
+  const output: IDocOutput = {
     version,
     generatedAt: new Date().toISOString(),
     tools,

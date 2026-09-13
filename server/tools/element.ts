@@ -1,7 +1,7 @@
 /// <reference types="three" />
 /// <reference types="blockbench-types" />
 import { z } from "zod";
-import { createTool, type ToolSpec } from "@/lib/factories";
+import { createTool, type IToolSpec } from "@/lib/factories";
 import { findElementOrThrow, findTextureOrThrow } from "@/lib/util";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
 import { createGroupWithUndo } from "@/lib/group-creation";
@@ -92,6 +92,14 @@ export const filterByMaterialParameters = z.object({
 
 export const getSelectionParameters = z.object({});
 
+/**
+ * Parameters for `add_group`, passed to `createGroupWithUndo` as one reversible edit.
+ * Expected shape: `name`; optional `origin` pivot and `rotation` (degrees) as
+ * `[x, y, z]` defaulting to zeros; `parent` as a group UUID or name, or
+ * `"root"` (default) for the project root; plus native group flags
+ * `visibility`, `autouv` (`"0"` | `"1"` | `"2"`), `selected`, and `shade`.
+ * Parent references are resolved at runtime, so the schema stays free of Blockbench globals.
+ */
 export const addGroupParameters = z.object({
   name: z.string(),
   origin: vec3("Pivot point of the group as [x, y, z].")
@@ -144,7 +152,7 @@ export const renameElementParameters = z.object({
   new_name: z.string().describe("New name to assign."),
 });
 
-export const elementToolDocs: ToolSpec[] = [
+export const elementToolDocs: IToolSpec[] = [
   {
     name: "remove_element",
     description: "Removes the element with the given ID.",

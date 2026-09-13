@@ -1,7 +1,7 @@
 /// <reference types="three" />
 /// <reference types="blockbench-types" />
 import { z } from "zod";
-import { createTool, type ToolSpec } from "@/lib/factories";
+import { createTool, type IToolSpec } from "@/lib/factories";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
 
 export const listExportFormatsParameters = z.object({
@@ -45,7 +45,7 @@ export const exportModelParameters = z.object({
     ),
 });
 
-export const exportToolDocs: ToolSpec[] = [
+export const exportToolDocs: IToolSpec[] = [
   {
     name: "list_export_formats",
     description:

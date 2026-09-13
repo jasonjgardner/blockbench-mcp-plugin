@@ -1,7 +1,7 @@
 /// <reference types="three" />
 /// <reference types="blockbench-types" />
 import { z } from "zod";
-import { createTool, type ToolSpec } from "@/lib/factories";
+import { createTool, type IToolSpec } from "@/lib/factories";
 import { STATUS_STABLE } from "@/lib/constants";
 
 export const createProjectParameters = z.object({
@@ -14,7 +14,7 @@ export const createProjectParameters = z.object({
 
 export const getProjectInfoParameters = z.object({});
 
-export const projectToolDocs: ToolSpec[] = [
+export const projectToolDocs: IToolSpec[] = [
   {
     name: "create_project",
     description: "Creates a new project with the given name and project type.",

@@ -4,19 +4,26 @@ import { getServer } from "@/server/server";
 import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 /**
+ * MCP tool annotations advertised to clients. Hints are advisory metadata that
+ * let agents decide whether a call is safe to retry (`idempotentHint`), needs
+ * confirmation (`destructiveHint`), or only reads state (`readOnlyHint`).
+ */
+export interface IToolAnnotations {
+  title?: string;
+  destructiveHint?: boolean;
+  idempotentHint?: boolean;
+  readOnlyHint?: boolean;
+  openWorldHint?: boolean;
+}
+
+/**
  * Declarative tool spec for documentation and registration.
  * Contains everything except the `execute` implementation.
  */
-export interface ToolSpec {
+export interface IToolSpec {
   name: string;
   description: string;
-  annotations?: {
-    title?: string;
-    destructiveHint?: boolean;
-    idempotentHint?: boolean;
-    readOnlyHint?: boolean;
-    openWorldHint?: boolean;
-  };
+  annotations?: IToolAnnotations;
   parameters: z.ZodType;
   status: StatusType;
 }
@@ -24,7 +31,7 @@ export interface ToolSpec {
 /**
  * Declarative prompt spec for documentation and registration.
  */
-export interface PromptSpec {
+export interface IPromptSpec {
   name: string;
   description: string;
   title?: string;
@@ -35,7 +42,7 @@ export interface PromptSpec {
 /**
  * Declarative resource spec for documentation and registration.
  */
-export interface ResourceSpec {
+export interface IResourceSpec {
   name: string;
   description: string;
   uriTemplate: string;
@@ -57,26 +64,30 @@ export const prompts: Record<string, IMCPPrompt> = {};
  */
 export const resources: Record<string, IMCPResource> = {};
 
-export interface ToolContext {
+/**
+ * Per-call context passed to tool `execute()` implementations. Long-running
+ * tools call `reportProgress` so MCP clients can render progress notifications.
+ */
+export interface IToolContext {
   reportProgress: (progress: { progress: number; total: number }) => void;
 }
 
-interface TextContent {
+interface ITextContent {
   type: "text";
   text: string;
 }
 
-interface ImageContent {
+interface IImageContent {
   type: "image";
   data: string;
   mimeType: string;
 }
 
-type ToolContentItem = TextContent | ImageContent;
+type ToolContentItem = ITextContent | IImageContent;
 
 type ToolResult = string | { content: ToolContentItem[]; structuredContent?: unknown };
 
-interface ToolDefinition {
+interface IToolDefinition {
   title: string;
   description: string;
   /** Raw fields used to build the plugin's tool test form. */
@@ -84,20 +95,14 @@ interface ToolDefinition {
   /** Complete schema used by the SDK to validate and parse incoming calls. */
   parameterSchema: z.ZodType;
   outputSchema?: Record<string, z.ZodType> | z.ZodType;
-  execute: (args: Record<string, unknown>, context?: ToolContext) => Promise<ToolResult>;
-  annotations?: {
-    title?: string;
-    destructiveHint?: boolean;
-    idempotentHint?: boolean;
-    openWorldHint?: boolean;
-    readOnlyHint?: boolean;
-  };
+  execute: (args: Record<string, unknown>, context?: IToolContext) => Promise<ToolResult>;
+  annotations?: IToolAnnotations;
 }
 
 /**
  * Store tool definitions for dynamic server reconstruction
  */
-const toolDefinitions: Record<string, ToolDefinition> = {};
+const toolDefinitions: Record<string, IToolDefinition> = {};
 
 /**
  * Extracts the shape from a Zod schema, unwrapping ZodEffects if necessary.
@@ -149,15 +154,9 @@ export function createTool<T extends z.ZodType>(
   name: string,
   tool: {
     description: string;
-    annotations?: {
-      title?: string;
-      destructiveHint?: boolean;
-      idempotentHint?: boolean;
-      openWorldHint?: boolean;
-      readOnlyHint?: boolean;
-    };
+    annotations?: IToolAnnotations;
     parameters: T;
-    execute: (args: z.infer<T>, context?: ToolContext) => Promise<ToolResult>;
+    execute: (args: z.infer<T>, context?: IToolContext) => Promise<ToolResult>;
   },
   status: IMCPTool["status"] = "stable",
   enabled: boolean = true
@@ -168,7 +167,7 @@ export function createTool<T extends z.ZodType>(
 
   const inputSchema = extractShape(tool.parameters);
 
-  const toolDef: ToolDefinition = {
+  const toolDef: IToolDefinition = {
     title: tool.annotations?.title ?? tool.description,
     description: tool.description,
     inputSchema,
@@ -192,7 +191,7 @@ export function createTool<T extends z.ZodType>(
         title: string;
         description: string;
         inputSchema: z.ZodType;
-        annotations?: ToolDefinition["annotations"];
+        annotations?: IToolDefinition["annotations"];
       },
       callback: (args: unknown, extra: unknown) => Promise<unknown>
     ) => void;
@@ -209,9 +208,9 @@ export function createTool<T extends z.ZodType>(
         // Provide a no-op reportProgress function
         // Note: Progress notifications require SSE streaming which is not enabled
         // in the current StreamableHTTPServerTransport configuration (enableJsonResponse: true)
-        const reportProgress: ToolContext["reportProgress"] = () => {};
+        const reportProgress: IToolContext["reportProgress"] = () => {};
 
-        const context: ToolContext = { reportProgress };
+        const context: IToolContext = { reportProgress };
         const result = await tool.execute(args as ToolArgs, context);
 
         // Normalize result to MCP CallToolResult format
@@ -275,7 +274,7 @@ export function registerToolsOnServer(server: unknown) {
         title: string;
         description: string;
         inputSchema: z.ZodType;
-        annotations?: ToolDefinition["annotations"];
+        annotations?: IToolDefinition["annotations"];
       },
       callback: (args: unknown, extra: unknown) => Promise<unknown>
     ) => void;
@@ -291,8 +290,8 @@ export function registerToolsOnServer(server: unknown) {
         annotations: toolDef.annotations,
       },
       async (args: unknown, _extra: unknown) => {
-        const reportProgress: ToolContext["reportProgress"] = () => {};
-        const context: ToolContext = { reportProgress };
+        const reportProgress: IToolContext["reportProgress"] = () => {};
+        const context: IToolContext = { reportProgress };
         const result = await toolDef.execute(args as Record<string, unknown>, context);
 
         if (typeof result === "string") {
@@ -316,7 +315,7 @@ export function registerToolsOnServer(server: unknown) {
 /**
  * Resource definition storage for dynamic server reconstruction
  */
-interface ResourceDefinition {
+interface IResourceDefinition {
   name: string;
   uriTemplate: string;
   metadata: {
@@ -334,7 +333,7 @@ interface ResourceDefinition {
   }>;
 }
 
-const resourceDefinitions: Record<string, ResourceDefinition> = {};
+const resourceDefinitions: Record<string, IResourceDefinition> = {};
 
 /**
  * Creates a new MCP resource and registers it with the server using the official SDK.
@@ -368,7 +367,7 @@ export function createResource(
     throw new Error(`Resource with name "${name}" already exists.`);
   }
 
-  const resourceDef: ResourceDefinition = {
+  const resourceDef: IResourceDefinition = {
     name,
     uriTemplate: config.uriTemplate,
     metadata: {
@@ -488,7 +487,7 @@ export function registerResourcesOnServer(server: unknown) {
 /**
  * Prompt definition storage for dynamic server reconstruction
  */
-interface PromptDefinition {
+interface IPromptDefinition {
   name: string;
   title: string;
   description: string;
@@ -501,7 +500,7 @@ interface PromptDefinition {
   }>;
 }
 
-const promptDefinitions: Record<string, PromptDefinition> = {};
+const promptDefinitions: Record<string, IPromptDefinition> = {};
 
 /**
  * Creates a new MCP prompt and registers it with the server using the official SDK.
@@ -546,7 +545,7 @@ export function createPrompt<T extends z.ZodRawShape = Record<string, never>>(
 
   // Store prompt definition for session reconstruction
   if (enabled && prompt.generate && prompt.argsSchema) {
-    const promptDef: PromptDefinition = {
+    const promptDef: IPromptDefinition = {
       name,
       title: prompt.title || prompt.description,
       description: prompt.description,

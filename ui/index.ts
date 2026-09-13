@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { IMCPTool, IMCPPrompt, IMCPResource } from "@/types";
 import { VERSION } from "@/lib/constants";
 import { statusBarSetup, statusBarTeardown } from "@/ui/statusBar";
-import { sessionManager, type Session } from "@/lib/sessions";
+import { sessionManager, type ISession } from "@/lib/sessions";
 import { openToolTestDialog } from "@/ui/toolTestDialog";
 import { openPromptPreviewDialog } from "@/ui/promptPreviewDialog";
 import { openPromptOverrideDialog, overrideDialogTeardown, PROMPT_OVERRIDE_CHANGED } from "@/ui/promptOverrideDialog";
@@ -42,8 +42,8 @@ export function uiSetup({
         // Subscribe to session changes
         // @ts-ignore
         const vm = this;
-        unsubscribe = sessionManager.subscribe((sessions: Session[]) => {
-          vm.sessions = sessions.map((s: Session) => ({
+        unsubscribe = sessionManager.subscribe((sessions: ISession[]) => {
+          vm.sessions = sessions.map((s: ISession) => ({
             id: s.id,
             connectedAt: s.connectedAt,
             lastActivity: s.lastActivity,

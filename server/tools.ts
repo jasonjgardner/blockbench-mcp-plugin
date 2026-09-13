@@ -4,32 +4,32 @@
 import { tools, prompts } from "@/lib/factories";
 
 // Import tool registration functions
-import { registerCameraTools } from "./tools/camera";
-import { registerCapabilityTools } from "./tools/capabilities";
-import { registerAnimationTools } from "./tools/animation";
-import { registerCubesTools } from "./tools/cubes";
-import { registerDisplayTools } from "./tools/display";
-import { registerElementTools } from "./tools/element";
-import { registerImportTools } from "./tools/import";
-import { registerMeshTools } from "./tools/mesh";
-import { registerMeshInspectionTools } from "./tools/mesh-inspection";
-import { registerPaintTools } from "./tools/paint";
-import { registerProjectTools } from "./tools/project";
-import { registerTextureTools } from "./tools/texture";
-import { registerUITools } from "./tools/ui";
-import { registerUVTools } from "./tools/uv";
-import { registerMaterialInstanceTools } from "./tools/material-instances";
-import { registerArmatureTools } from "./tools/armature";
-import { registerHistoryTools } from "./tools/history";
-import { registerExportTools } from "./tools/export";
+import { registerCameraTools } from "@/server/tools/camera";
+import { registerCapabilityTools } from "@/server/tools/capabilities";
+import { registerAnimationTools } from "@/server/tools/animation";
+import { registerCubesTools } from "@/server/tools/cubes";
+import { registerDisplayTools } from "@/server/tools/display";
+import { registerElementTools } from "@/server/tools/element";
+import { registerImportTools } from "@/server/tools/import";
+import { registerMeshTools } from "@/server/tools/mesh";
+import { registerMeshInspectionTools } from "@/server/tools/mesh-inspection";
+import { registerPaintTools } from "@/server/tools/paint";
+import { registerProjectTools } from "@/server/tools/project";
+import { registerTextureTools } from "@/server/tools/texture";
+import { registerUITools } from "@/server/tools/ui";
+import { registerUVTools } from "@/server/tools/uv";
+import { registerMaterialInstanceTools } from "@/server/tools/material-instances";
+import { registerArmatureTools } from "@/server/tools/armature";
+import { registerHistoryTools } from "@/server/tools/history";
+import { registerExportTools } from "@/server/tools/export";
 
 // Core resource registrations
-import { registerValidatorResources } from "./resources/validator";
+import { registerValidatorResources } from "@/server/resources/validator";
 
 // Optional plugin integrations (conditionally registered)
-import { registerHytaleTools } from "./tools/hytale";
-import { registerHytaleResources } from "./resources/hytale";
-import { registerHytalePrompts } from "./prompts/hytale";
+import { registerHytaleTools } from "@/server/tools/hytale";
+import { registerHytaleResources } from "@/server/resources/hytale";
+import { registerHytalePrompts } from "@/server/prompts/hytale";
 
 // All registration functions - MUST be used to prevent tree-shaking
 const registrationFunctions = [
@@ -63,17 +63,18 @@ const optionalRegistrationFunctions = [
 ];
 
 // Register all core tools immediately when this module loads
-for (const register of registrationFunctions) {
-  register();
-}
+registrationFunctions.forEach(register => register());
 
 // Register optional plugin integrations
 // Each function checks if its plugin is installed before registering
-for (const register of optionalRegistrationFunctions) {
-  register();
-}
+optionalRegistrationFunctions.forEach(register => register());
 
-// Function to get tool count - called at runtime after registration
+/**
+ * Counts registered MCP tools. Call at runtime, after this module's
+ * import-time registration has run, so optional integrations are included.
+ *
+ * @returns Number of tool entries in the shared registry, including disabled tools.
+ */
 export function getToolCount(): number {
   return Object.keys(tools).length;
 }

@@ -1,34 +1,34 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import type { z } from "zod";
+import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { required } from "@/tests/helpers/assertions";
+import { useGlobals } from "@/tests/helpers/globals";
+import { loadToolDefinitions, type IToolFixture } from "@/tests/helpers/tool-fixture";
+import { createUndoHost } from "@/tests/helpers/undo-host";
 
-type TextureSnapshot = {
+/** Texture state that must survive undo/redo: identity by name, bitmap, and render settings. */
+interface ITextureSnapshot {
   name: string;
   source: string;
   render_mode: string;
   render_sides: string;
-};
+}
 
-type TextureAspects = { textures: TestTexture[]; bitmap?: boolean };
-type TextureTool = {
-  parameters: z.ZodType<unknown>;
-  execute: (input: unknown) => Promise<unknown>;
-};
+/** Undo aspects `create_texture` passes to `Undo.initEdit` for an ungrouped texture. */
+interface ITextureAspects {
+  textures: TestTexture[];
+  bitmap?: boolean;
+}
 
-const originalGlobals = new Map<string, PropertyDescriptor | undefined>();
-let createTexture: TextureTool;
-let before: TextureSnapshot[];
-let after: TextureSnapshot[];
-let aspects: TextureAspects;
+let tools: IToolFixture;
 
 // The model stores only the textures supplied to Undo, matching Blockbench's
 // before/post snapshots. Omitted new textures therefore cannot be removed.
-function capture(value: TextureAspects): TextureSnapshot[] {
+function capture(value: ITextureAspects): ITextureSnapshot[] {
   return value.textures.map(({ name, source, render_mode, render_sides }) => ({
     name, source, render_mode, render_sides,
   }));
 }
 
-function restore(target: TextureSnapshot[], reference: TextureSnapshot[]): void {
+function restore(target: ITextureSnapshot[], reference: ITextureSnapshot[]): void {
   const affected = new Set(reference.map((texture) => texture.name));
   TestTexture.all = TestTexture.all.filter((texture) => !affected.has(texture.name));
   target.forEach((snapshot) => new TestTexture(snapshot).add());
@@ -49,7 +49,7 @@ class TestTexture {
   layers_enabled = false;
   img = { decode: async () => {} };
 
-  constructor(input: Partial<TextureSnapshot> = {}) {
+  constructor(input: Partial<ITextureSnapshot> = {}) {
     Object.assign(this, input);
   }
 
@@ -58,93 +58,52 @@ class TestTexture {
       canvas: { toDataURL: () => this.source },
       clearRect: () => {},
       fillStyle: "",
-      fillRect: () => { this.source = `data:image/png;base64,${btoa(ctx.fillStyle)}`; },
+      fillRect: () => {
+        this.source = `data:image/png;base64,${btoa(ctx.fillStyle)}`;
+      },
     };
     return { ctx };
   }
-  updateSource(source: string) { this.source = source; }
-  updateLayerChanges() {}
-  updateMaterial() {}
-  fromDataURL(source: string) { this.source = source; return this; }
-  load() {}
-  fillParticle() {}
-  getDataURL() { return this.source; }
-  add() { TestTexture.all.push(this); return this; }
+  updateSource(source: string): void {
+    this.source = source;
+  }
+  updateLayerChanges(): void {}
+  updateMaterial(): void {}
+  fromDataURL(source: string): this {
+    this.source = source;
+    return this;
+  }
+  load(): void {}
+  fillParticle(): void {}
+  getDataURL(): string {
+    return this.source;
+  }
+  add(): this {
+    TestTexture.all.push(this);
+    return this;
+  }
 }
 
-beforeAll(async () => {
-  // Bundle a private registration shim so this test does not replace factory
-  // imports or module caches used by other Bun test files.
-  const result = await Bun.build({
-    entrypoints: [`${import.meta.dir}/../server/tools/texture.ts`],
-    target: "bun",
-    format: "cjs",
-    plugins: [{
-      name: "capture-texture-tools",
-      setup(build) {
-        build.onLoad({ filter: /[/\\]lib[/\\]factories\.ts$/ }, () => ({
-          contents: "export const definitions = new Map(); export function createTool(name, tool) { definitions.set(name, tool); }",
-          loader: "js",
-        }));
-        build.onLoad({ filter: /[/\\]server[/\\]tools[/\\]texture\.ts$/ }, async ({ path }) => ({
-          contents: `${await Bun.file(path).text()}\nexport { definitions } from '@/lib/factories';`,
-          loader: "ts",
-        }));
-      },
-    }],
-  });
-  if (!result.success) throw new AggregateError(result.logs, "Texture test bundle failed");
-  const fixturePath = `${import.meta.dir}/.texture-undo-${crypto.randomUUID()}.cjs`;
-  await Bun.write(fixturePath, result.outputs[0]);
-  const fixture = await import(fixturePath).finally(() => Bun.file(fixturePath).delete()) as {
-    registerTextureTools: () => void;
-    definitions: Map<string, TextureTool>;
-  };
-  fixture.registerTextureTools();
-  const definition = fixture.definitions.get("create_texture");
-  if (!definition) throw new Error("create_texture was not registered");
-  createTexture = definition;
-});
+const undo = createUndoHost({ restore, snapshot: capture });
 
+beforeAll(async () => {
+  // A private bundle keeps this file's create_texture out of the shared factories
+  // registry that server/tools/texture.test.ts registers into.
+  tools = await loadToolDefinitions({ entries: ["server/tools/texture.ts"], register: ["registerTextureTools"] });
+});
 beforeEach(() => {
   TestTexture.all = [new TestTexture({ name: "existing" })];
-  before = [];
-  after = [];
-  const globals = {
-    Project: { get textures() { return TestTexture.all; } },
-    Format: { id: "free", pbr: true },
-    Blockbench: { isWeb: false },
-    Texture: TestTexture,
-    Canvas: { updateAll() {} },
-    tinycolor: (value: string) => ({ toRgbString: () => value }),
-    Undo: {
-      initEdit(value: TextureAspects) {
-        aspects = value;
-        before = capture(value);
-      },
-      finishEdit(_message: string, value = aspects) { after = capture(value); },
-      cancelEdit(revert: boolean) {
-        if (revert) restore(before, capture(aspects));
-        after = [];
-      },
-    },
-  };
-  Object.entries(globals).forEach(([key, value]) => {
-    originalGlobals.set(key, Object.getOwnPropertyDescriptor(globalThis, key));
-    Object.defineProperty(globalThis, key, { configurable: true, writable: true, value });
-  });
+  undo.reset();
 });
-
-afterEach(() => {
-  originalGlobals.forEach((descriptor, key) => {
-    if (descriptor) {
-      Object.defineProperty(globalThis, key, descriptor);
-      return;
-    }
-    Reflect.deleteProperty(globalThis, key);
-  });
-  originalGlobals.clear();
-});
+useGlobals(() => ({
+  Blockbench: { isWeb: false },
+  Canvas: { updateAll() {} },
+  Format: { id: "free", pbr: true },
+  Project: { get textures() { return TestTexture.all; } },
+  Texture: TestTexture,
+  Undo: undo,
+  tinycolor: (value: string) => ({ toRgbString: () => value }),
+}));
 
 describe("create_texture undo", () => {
   test.each([
@@ -152,20 +111,18 @@ describe("create_texture undo", () => {
     { name: "filled", fill_color: "#ff0000", layer_name: "Base" },
     { name: "imported", data: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j17sAAAAASUVORK5CYII=" },
   ])("undo removes $name and redo restores its bitmap and render settings", async (input) => {
-    const parameters = createTexture.parameters.parse({
-      ...input, render_mode: "emissive", render_sides: "double",
-    });
-    await createTexture.execute(parameters);
+    await tools.call("create_texture", { ...input, render_mode: "emissive", render_sides: "double" });
     const created = TestTexture.all.find((texture) => texture.name === input.name);
     expect(created).toBeDefined();
-    const expected = capture({ textures: created ? [created] : [] });
+    const expected = capture({ textures: [required(created, `created texture "${input.name}"`)] });
 
-    restore(before, after);
+    undo.undo();
     expect(TestTexture.all.map((texture) => texture.name)).toEqual(["existing"]);
 
-    restore(after, before);
+    undo.redo();
+    const restored = required(TestTexture.all.at(1), `restored texture "${input.name}"`);
     expect(capture({ textures: TestTexture.all.slice(1) })).toEqual(expected);
-    expect(TestTexture.all[1].render_mode).toBe("emissive");
-    expect(TestTexture.all[1].render_sides).toBe("double");
+    expect(restored.render_mode).toBe("emissive");
+    expect(restored.render_sides).toBe("double");
   });
 });

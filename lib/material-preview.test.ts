@@ -1,22 +1,35 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, spyOn, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { MeshStandardMaterial } from "three";
-import { setupMaterialUndoRefresh, teardownMaterialUndoRefresh, updateMaterialPreview } from "./material-preview";
+import { setupMaterialUndoRefresh, teardownMaterialUndoRefresh, updateMaterialPreview } from "@/lib/material-preview";
+import { useGlobals } from "@/tests/helpers/globals";
+import type { IMaterialUniforms, PbrChannel } from "@/tests/helpers/shapes";
+
+/** Largest byte in `material_config`; material uniforms are stored as byte / 255 fractions. */
+const MAX_BYTE = 255;
 
 type Handler = (event: unknown) => void;
+
 class TestImage extends EventTarget {
   complete = false;
   naturalWidth = 0;
 }
 
+interface IGroupTexture {
+  img: TestImage;
+  pbr_channel: PbrChannel;
+}
+
 class TestGroup {
   is_material = true;
   material = new MeshStandardMaterial();
-  material_config = { color_value: [10, 20, 30, 128], mer_value: [0, 0, 40] };
-  textures: Array<{ img: TestImage; pbr_channel: string }> = [];
+  material_config: IMaterialUniforms = { color_value: [10, 20, 30, 128], mer_value: [0, 0, 40] };
+  textures: IGroupTexture[] = [];
   updates = 0;
   broken = false;
   constructor(readonly uuid: string, readonly name = uuid) {}
-  getTextures() { return this.textures; }
+  getTextures(): IGroupTexture[] {
+    return this.textures;
+  }
   updateMaterial(): void {
     this.updates++;
     if (this.broken) throw new Error("Legacy material failed");
@@ -24,39 +37,42 @@ class TestGroup {
     // issue also leaves uniform color white and opacity non-finite.
     this.material.color.set(0xffffff);
     this.material.opacity = Number.NaN;
-    this.material.roughness = this.textures.some(texture => texture.pbr_channel === "mer" && texture.img.naturalWidth > 0) ? 1 : this.material_config.mer_value[2] / 255;
+    const hasLoadedMer = this.textures.some(texture => texture.pbr_channel === "mer" && texture.img.naturalWidth > 0);
+    this.material.roughness = hasLoadedMer ? 1 : this.material_config.mer_value[2] / MAX_BYTE;
   }
 }
 
-const names = ["Blockbench", "TextureGroup", "Project", "Canvas"];
-const original = new Map<string, PropertyDescriptor | undefined>();
 const handlers = new Map<string, Set<Handler>>();
 let groups: TestGroup[] = [];
 let canvasRefreshes = 0;
 
-beforeAll(() => names.forEach(name => original.set(name, Object.getOwnPropertyDescriptor(globalThis, name))));
 beforeEach(() => {
   handlers.clear();
   groups = [];
   canvasRefreshes = 0;
-  Object.assign(globalThis, {
-    Project: {},
-    TextureGroup: { get all() { return groups; } },
-    Canvas: { updateAllFaces() { canvasRefreshes++; } },
-    Blockbench: {
-      on(name: string, handler: Handler) {
-        const entries = handlers.get(name) ?? new Set<Handler>();
-        entries.add(handler);
-        handlers.set(name, entries);
-      },
-      removeListener(name: string, handler: Handler) { handlers.get(name)?.delete(handler); },
-    },
-  });
 });
+// teardown still calls Blockbench.removeListener, so it must run before useGlobals restores the host.
 afterEach(() => teardownMaterialUndoRefresh());
-afterAll(() => original.forEach((descriptor, name) => {
-  if (descriptor) { Object.defineProperty(globalThis, name, descriptor); return; }
-  Reflect.deleteProperty(globalThis, name);
+useGlobals(() => ({
+  Blockbench: {
+    on(name: string, handler: Handler): void {
+      handlers.set(name, new Set([...(handlers.get(name) ?? []), handler]));
+    },
+    removeListener(name: string, handler: Handler): void {
+      handlers.get(name)?.delete(handler);
+    },
+  },
+  Canvas: {
+    updateAllFaces(): void {
+      canvasRefreshes++;
+    },
+  },
+  Project: {},
+  TextureGroup: {
+    get all(): TestGroup[] {
+      return groups;
+    },
+  },
 }));
 
 function loaded(save: unknown, reference: unknown = {}): void {
@@ -67,9 +83,9 @@ describe("material preview restoration", () => {
   test("corrects uniform RGB and RGBA opacity after native material refresh", () => {
     const group = new TestGroup("uniform");
     updateMaterialPreview(group as unknown as TextureGroup);
-    expect(group.material.color.toArray()).toEqual([10 / 255, 20 / 255, 30 / 255]);
-    expect(group.material.opacity).toBe(128 / 255);
-    expect(group.material.roughness).toBe(40 / 255);
+    expect(group.material.color.toArray()).toEqual([10 / MAX_BYTE, 20 / MAX_BYTE, 30 / MAX_BYTE]);
+    expect(group.material.opacity).toBe(128 / MAX_BYTE);
+    expect(group.material.roughness).toBe(40 / MAX_BYTE);
   });
 
   test("native undo and redo refresh only restored or removed-reference groups", () => {
@@ -77,15 +93,15 @@ describe("material preview restoration", () => {
     const source = new TestGroup("source");
     const unrelated = new TestGroup("unrelated");
     groups = [restored, source, unrelated];
-    restored.material.roughness = 80 / 255;
+    restored.material.roughness = 80 / MAX_BYTE;
     setupMaterialUndoRefresh();
     loaded({ texture_groups: { restored: {} } }, { texture_groups: { restored: {}, source: {} } });
-    expect(restored.material.roughness).toBe(40 / 255);
+    expect(restored.material.roughness).toBe(40 / MAX_BYTE);
     expect(source.updates).toBe(1);
     expect(unrelated.updates).toBe(0);
     restored.material_config.mer_value = [0, 0, 80];
     loaded({ texture_groups: { restored: {} } });
-    expect(restored.material.roughness).toBe(80 / 255);
+    expect(restored.material.roughness).toBe(80 / MAX_BYTE);
     expect(canvasRefreshes).toBe(2);
   });
 
@@ -96,7 +112,7 @@ describe("material preview restoration", () => {
     groups = [group];
     setupMaterialUndoRefresh();
     loaded({ texture_groups: { images: {} } });
-    expect(group.material.roughness).toBe(40 / 255);
+    expect(group.material.roughness).toBe(40 / MAX_BYTE);
     image.naturalWidth = 16;
     image.complete = true;
     image.dispatchEvent(new Event("load"));

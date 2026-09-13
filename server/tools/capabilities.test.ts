@@ -1,15 +1,16 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 import { BUILD_ID, BUILD_MODE, VERSION } from "@/lib/constants";
-import { getAllToolDefinitions, tools } from "@/lib/factories";
+import { tools } from "@/lib/factories";
 import {
   capabilityToolDocs,
   getCapabilitiesParameters,
   registerCapabilityTools,
-  type CapabilitiesSnapshot,
-} from "./capabilities";
+  type ICapabilitiesSnapshot,
+} from "@/server/tools/capabilities";
+import { isRecord, required } from "@/tests/helpers/assertions";
+import { useGlobals } from "@/tests/helpers/globals";
+import { executeStructured } from "@/tests/helpers/tool-execution";
 
-const globals = ["Blockbench", "Project", "Format", "Formats"];
-const originalGlobals = new Map<string, PropertyDescriptor | undefined>();
 const baseFeatures = {
   meshes: false,
   bone_rig: false,
@@ -45,39 +46,26 @@ const activeProject = Object.freeze({
 });
 
 beforeAll(() => {
-  globals.forEach((name) => originalGlobals.set(name, Object.getOwnPropertyDescriptor(globalThis, name)));
   registerCapabilityTools();
 });
 
-beforeEach(() => {
-  Object.assign(globalThis, {
-    Blockbench: Object.freeze({ version: "5.0.6", isWeb: false, platform: "win32", isMobile: false }),
-    Project: activeProject,
-    Format: freeFormat,
-    Formats: registeredFormats,
-  });
-});
+useGlobals(() => ({
+  Blockbench: Object.freeze({ version: "5.0.6", isWeb: false, platform: "win32", isMobile: false }),
+  Project: activeProject,
+  Format: freeFormat,
+  Formats: registeredFormats,
+}));
 
-afterAll(() => {
-  originalGlobals.forEach((descriptor, name) => {
-    if (descriptor) {
-      Object.defineProperty(globalThis, name, descriptor);
-      return;
-    }
-    Reflect.deleteProperty(globalThis, name);
-  });
-});
+function isSnapshot(value: unknown): value is ICapabilitiesSnapshot {
+  return isRecord(value) && isRecord(value.plugin) && isRecord(value.blockbench) && Array.isArray(value.formats);
+}
 
-async function inspect(args: Record<string, unknown> = {}): Promise<CapabilitiesSnapshot> {
-  const parameters = getCapabilitiesParameters.parse(args);
-  const result = await getAllToolDefinitions().get_capabilities.execute(parameters);
-  if (typeof result === "string") throw new Error("Expected a structured discovery result");
-  const text = result.content.find((item) => item.type === "text");
-  if (!text || text.type !== "text") throw new Error("Expected JSON text alongside structured content");
-  const parsed: unknown = JSON.parse(text.text);
-  expect(parsed).toEqual(result.structuredContent);
-  // The equality check also ensures serializability of the full public result.
-  return result.structuredContent as CapabilitiesSnapshot;
+/**
+ * Calls get_capabilities with raw arguments. The helper requires a JSON text item
+ * deep-equal to structuredContent, which also proves the full public result is serializable.
+ */
+function inspect(args: Record<string, unknown> = {}): Promise<ICapabilitiesSnapshot> {
+  return executeStructured("get_capabilities", args, isSnapshot);
 }
 
 describe("capability discovery", () => {
@@ -145,8 +133,7 @@ describe("capability discovery", () => {
       const result = await inspect({ include_tools: true });
       expect(result.tools).toContainEqual({ name: key, enabled: false, status: "experimental" });
       expect(result.tools).toContainEqual({ name: "get_capabilities", enabled: true, status: "stable" });
-      const disabled = result.tools?.find(({ name }) => name === key);
-      if (!disabled) throw new Error("Expected disabled entry");
+      const disabled = required(result.tools?.find(({ name }) => name === key), "disabled tool entry");
       disabled.enabled = true;
       expect(tools[key]?.enabled).toBe(false);
     } finally {
@@ -164,9 +151,8 @@ describe("capability discovery", () => {
   test("returns independent snapshots without modifying host arrays or flags", async () => {
     const before = JSON.stringify({ project: activeProject, formats: registeredFormats });
     const first = await inspect();
-    if (!first.format || !first.project) throw new Error("Expected active project");
-    first.format.features.meshes = false;
-    first.project.counts.meshes = 900;
+    required(first.format, "active format").features.meshes = false;
+    required(first.project, "active project").counts.meshes = 900;
     first.formats[0]?.supported_features.pop();
     const second = await inspect();
     expect(second.format?.features.meshes).toBe(true);

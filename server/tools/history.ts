@@ -1,7 +1,7 @@
 /// <reference types="three" />
 /// <reference types="blockbench-types" />
 import { z } from "zod";
-import { createTool, type ToolSpec } from "@/lib/factories";
+import { createTool, type IToolSpec } from "@/lib/factories";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
 
 export const undoParameters = z.object({
@@ -47,7 +47,7 @@ export const saveCheckpointParameters = z.object({
     ),
 });
 
-export const historyToolDocs: ToolSpec[] = [
+export const historyToolDocs: IToolSpec[] = [
   {
     name: "undo",
     description:

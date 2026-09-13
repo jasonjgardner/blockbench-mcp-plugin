@@ -1,7 +1,7 @@
 /// <reference types="three" />
 /// <reference types="blockbench-types" />
 import { z } from "zod";
-import { createTool, type ToolSpec } from "@/lib/factories";
+import { createTool, type IToolSpec } from "@/lib/factories";
 import { cubeSchema } from "@/lib/zodObjects";
 import { STATUS_STABLE } from "@/lib/constants";
 import { getProjectTexture } from "@/lib/util";
@@ -97,7 +97,7 @@ export const modifyCubeParameters = z.object({
     .describe("Whether the cube is visible or not."),
 });
 
-export const cubeToolDocs: ToolSpec[] = [
+export const cubeToolDocs: IToolSpec[] = [
   {
     name: "place_cube",
     description:

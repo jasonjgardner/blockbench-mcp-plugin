@@ -153,6 +153,39 @@ export const displaySlotEnum = z.enum([
 // Color Schemas
 // ============================================================================
 
+/**
+ * Returns a *fresh* 8-bit color channel schema (inclusive 0-255) on every call.
+ * Fractional values are accepted to match existing tool contracts; chain
+ * `.int()` where the input format (such as Bedrock texture_set.json) requires
+ * whole numbers. A factory rather than a shared instance for the same reason as
+ * {@link vec3}: the MCP SDK emits repeated instances as bare `$ref`s (issue #44).
+ *
+ * @returns A new `z.number().min(0).max(255)` schema.
+ */
+export const colorByte = () => z.number().min(0).max(255);
+
+/**
+ * Returns a *fresh* RGB or MER triple of 8-bit channels, e.g.
+ * `[metalness, emissive, roughness]`, with independent channel instances.
+ *
+ * @returns A new 3-tuple schema of {@link colorByte} channels.
+ */
+export const rgbByteTuple = () => z.tuple([colorByte(), colorByte(), colorByte()]);
+
+/**
+ * Returns a *fresh* RGBA or MERS quadruple of 8-bit channels, e.g.
+ * `[r, g, b, a]`, with independent channel instances.
+ *
+ * @returns A new 4-tuple schema of {@link colorByte} channels.
+ */
+export const rgbaByteTuple = () => z.tuple([colorByte(), colorByte(), colorByte(), colorByte()]);
+
+/** Parsed `[r, g, b]` / `[metalness, emissive, roughness]` byte triple. */
+export type RgbByteTuple = z.infer<ReturnType<typeof rgbByteTuple>>;
+
+/** Parsed `[r, g, b, a]` byte quadruple. */
+export type RgbaByteTuple = z.infer<ReturnType<typeof rgbaByteTuple>>;
+
 /** Flexible color input: RGBA array, hex string, or named color */
 export const colorSchema = z.union([
   z
