@@ -3,3 +3,5 @@ dist/
 /artifacts/
 .claude
 nul
+output*/
+*.zip

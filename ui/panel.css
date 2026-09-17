@@ -1,237 +1,287 @@
-.mcp-panel {
+/* Scoped to Blockbench's generated panel container. Blockbench.addCSS wraps this in @layer plugin. */
+#panel_mcp_panel .mcp-panel {
     display: grid;
-    grid-template-rows: auto 1fr auto;
-    max-block-size: 66vh;
-    overflow: auto;
-    padding: 10px;
+    grid-template-rows: auto 1fr;
+    min-block-size: 0;
+    /* The host sets overflow: hidden on .panel.grow > .panel_vue_wrapper; the sections row scrolls instead. */
+    overflow: hidden;
 
-    details {
-        overflow: auto;
+    .toolbar_wrapper {
+        flex: none;
     }
 
-    summary {
-        cursor: pointer;
-    }
-
-    dl {
+    .mcp-sections {
         display: grid;
-        grid-template-columns: 1fr 1fr;
-        grid-auto-flow: row;
+        gap: 0.25rem;
+        min-block-size: 0;
+        overflow-y: auto;
+        padding-inline: 0.5rem;
+    }
+
+    .mcp-sections > details {
+        padding-block: 0.25rem;
+    }
+
+    .mcp-sections > details > summary {
+        color: var(--color-subtle_text);
+        cursor: pointer;
+        font-weight: 600;
+        list-style: none;
+        padding-block: 0.25rem;
+        transition: color 100ms ease;
+        user-select: none;
+
+        &::-webkit-details-marker {
+            display: none;
+        }
+
+        &::before {
+            content: "chevron_right";
+            font-family: "Material Icons";
+            font-size: 1.125em;
+            margin-inline-end: 0.25rem;
+            vertical-align: middle;
+        }
+
+        &:hover,
+        &:focus-visible {
+            color: var(--color-light);
+        }
+
+        &:focus-visible {
+            outline: 0.125rem solid var(--color-accent);
+            outline-offset: 0.125rem;
+        }
+    }
+
+    .mcp-sections > details[open] > summary {
+        color: var(--color-text);
+
+        &::before {
+            content: "expand_more";
+        }
+    }
+
+    /* The host floats .search_bar right; make the panel placement explicit. */
+    .mcp-search {
+        float: none;
+        margin-block: 0.25rem 0.5rem;
+    }
+
+    .mcp-server {
+        display: grid;
+        gap: 0.25rem 0.75rem;
+        grid-template-columns: max-content 1fr;
         margin: 0;
         padding: 0;
 
         dt {
+            color: var(--color-subtle_text);
             font-size: 0.825em;
-            font-weight: bold;
-            grid-column: 1;
+            font-weight: 600;
             margin: 0;
-            padding: 0;
         }
 
         dd {
-            grid-column: 2;
             margin: 0;
-            padding: 0;
+            min-inline-size: 0;
+            overflow-wrap: anywhere;
         }
     }
 
-    .tool-toggle-row {
-        display: flex;
+    .mcp-list,
+    .mcp-session-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+
+    .mcp-row {
         align-items: center;
-        justify-content: space-between;
-        padding: 8px 0;
-        border-bottom: 1px solid var(--color-border);
+        border-block-end: 1px solid var(--color-border);
+        display: flex;
+        gap: 0.25rem;
+
+        &:last-child {
+            border-block-end: none;
+        }
     }
 
-    .tool-toggle-row:last-child {
-        border-bottom: none;
+    .mcp-row--static {
+        gap: 0.5rem;
+        padding-block: 0.5rem;
     }
 
-    .tool-toggle-row.clickable {
+    /* Rows are real buttons; reset the UA styling and keep the panel typography. */
+    .mcp-row__button,
+    .mcp-row__action {
+        background: none;
+        border: none;
+        color: inherit;
         cursor: pointer;
-        padding: 8px;
-        margin: 0 -8px;
-        border-radius: 4px;
-        transition: background-color 0.15s ease;
+        font: inherit;
+        margin: 0;
+        text-align: start;
+        transition: background-color 150ms ease, color 100ms ease;
+
+        &:focus-visible {
+            background-color: var(--color-button);
+            outline: 0.125rem solid var(--color-accent);
+            outline-offset: -0.125rem;
+        }
     }
 
-    .tool-toggle-row.clickable:hover {
-        background-color: var(--color-button);
-    }
-
-    .tool-toggle-row.clickable:active {
-        background-color: var(--color-accent);
-    }
-
-    .tool-toggle-row.clickable .tool-name::after {
-        content: "chevron_right";
-        font-family: "Material Icons";
-        font-size: 16px;
-        margin-left: 4px;
-        opacity: 0.5;
-        vertical-align: middle;
-    }
-
-    .tool-info {
+    .mcp-row__button {
+        align-items: center;
+        border-radius: 0.25rem;
+        display: flex;
         flex: 1;
-        min-width: 0;
+        gap: 0.5rem;
+        margin-inline-start: -0.5rem;
+        min-inline-size: 0;
+        padding: 0.5rem;
+
+        &:hover {
+            background-color: var(--color-button);
+            color: var(--color-light);
+        }
+
+        &:active {
+            background-color: var(--color-selected);
+        }
     }
 
-    .tool-name {
-        font-weight: bold;
-        font-size: 0.9em;
-        margin-bottom: 2px;
-    }
-
-    .tool-description {
-        font-size: 0.8em;
+    .mcp-row__action {
+        border-radius: 0.25rem;
         color: var(--color-subtle_text);
-        white-space: nowrap;
+        display: inline-flex;
+        flex-shrink: 0;
+        padding: 0.25rem;
+
+        &:hover {
+            color: var(--color-light);
+        }
+    }
+
+    .mcp-row__body {
+        display: block;
+        flex: 1;
+        min-inline-size: 0;
+    }
+
+    .mcp-row__name {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        font-size: 0.9em;
+        font-weight: 600;
+        gap: 0.25rem;
+        margin-block-end: 0.125rem;
+    }
+
+    .mcp-row__description {
+        color: var(--color-subtle_text);
+        display: block;
+        font-size: 0.8em;
         overflow: hidden;
         text-overflow: ellipsis;
-    }
-
-    .tool-description + .tool-description {
-        margin-top: 4px;
-    }
-
-    .tool-toggle {
-        margin-left: 12px;
-        flex-shrink: 0;
-
-        label {
-        font-size: 0.9em;
-        }
-    }
-
-    .tool-status.experimental {
-        font-family: "Material Icons";
-        font-size: 14px;
-        margin-left: 6px;
-        vertical-align: middle;
-        line-height: 1;
-    }
-
-    .tool-status.experimental::before {
-        content: "science";
-    }
-
-    .session-item {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 6px 0;
-        border-bottom: 1px solid var(--color-border);
-        font-size: 0.85em;
-    }
-
-    .session-item:last-child {
-        border-bottom: none;
-    }
-
-    .session-id {
-        font-family: monospace;
-        color: var(--color-text);
-    }
-
-    .session-time {
-        color: var(--color-subtle_text);
-        font-size: 0.9em;
-    }
-
-    .no-sessions {
-        color: var(--color-subtle_text);
-        font-style: italic;
-        padding: 8px 0;
-    }
-
-    .no-results {
-        color: var(--color-subtle_text);
-        font-style: italic;
-        padding: 12px 0;
-        text-align: center;
-    }
-
-    .filter-bar {
-        display: flex;
-        flex-direction: row;
-        align-items: center;
-        gap: 10px;
-        padding: 8px 0;
-        margin-bottom: 4px;
-        border-bottom: 1px solid var(--color-border);
-    }
-
-    .filter-input {
-        flex: 1;
-        min-width: 0;
-        padding: 6px 8px;
-        border: 1px solid var(--color-border);
-        border-radius: 4px;
-        background: var(--color-back);
-        color: var(--color-text);
-        font-size: 0.85em;
-        box-sizing: border-box;
-    }
-
-    .filter-input:focus {
-        outline: none;
-        border-color: var(--color-accent);
-    }
-
-    .filter-input::placeholder {
-        color: var(--color-subtle_text);
-    }
-
-    .filter-switch {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 0.75em;
-        color: var(--color-subtle_text);
-        cursor: pointer;
-        user-select: none;
         white-space: nowrap;
     }
 
-    .filter-switch input[type="checkbox"] {
-        display: none;
+    .mcp-row__meta {
+        font-style: italic;
+        margin-block-start: 0.125rem;
     }
 
-    .switch-slider {
-        position: relative;
-        width: 28px;
-        height: 16px;
-        background: var(--color-button);
-        border-radius: 8px;
-        transition: background-color 0.2s ease;
-    }
-
-    .switch-slider::before {
-        content: "";
-        position: absolute;
-        top: 2px;
-        left: 2px;
-        width: 12px;
-        height: 12px;
-        background: var(--color-text);
-        border-radius: 50%;
-        transition: transform 0.2s ease;
-    }
-
-    .filter-switch input:checked + .switch-slider {
-        background: var(--color-accent);
-    }
-
-    .filter-switch input:checked + .switch-slider::before {
-        transform: translateX(12px);
-    }
-
-    .switch-label {
+    .mcp-row__status,
+    .mcp-row__chevron {
         color: var(--color-subtle_text);
+        flex-shrink: 0;
+        font-size: 1.125rem;
     }
 
-    .filter-switch input:checked ~ .switch-label {
-        color: var(--color-text);
+    .mcp-row__status {
+        font-size: 0.9rem;
+    }
+
+    .mcp-badge {
+        background: var(--color-accent);
+        border-radius: 0.75rem;
+        color: var(--color-accent_text);
+        font-size: 0.7em;
+        font-weight: 700;
+        line-height: 1.4;
+        padding-inline: 0.4rem;
+    }
+
+    .mcp-session {
+        align-items: center;
+        border-block-end: 1px solid var(--color-border);
+        display: flex;
+        font-size: 0.85em;
+        gap: 0.5rem;
+        justify-content: space-between;
+        padding-block: 0.375rem;
+
+        &:last-child {
+            border-block-end: none;
+        }
+    }
+
+    .mcp-session__name {
+        font-family: var(--font-code);
+        min-inline-size: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .mcp-session__time {
+        color: var(--color-subtle_text);
+        flex-shrink: 0;
+        font-size: 0.9em;
+    }
+
+    .mcp-empty {
+        color: var(--color-subtle_text);
+        font-style: italic;
+        margin: 0;
+        padding-block: 0.5rem;
+        text-align: center;
+    }
+}
+
+/* The AI-used bar text renders as an accent pill; the item id is the toolbar_item attribute. */
+#panel_mcp_panel .tool.widget.bar_text[toolbar_item="mcp_ai_used"] {
+    align-items: center;
+    background: var(--color-accent);
+    border-radius: 0.75rem;
+    color: var(--color-accent_text);
+    cursor: pointer;
+    display: inline-flex;
+    font-size: 0.75em;
+    font-weight: 700;
+    gap: 0.25rem;
+    inline-size: auto;
+    line-height: 1;
+    margin-inline-end: 0.5rem;
+    padding: 0.25rem 0.6rem;
+
+    &::before {
+        content: "verified_user";
+        font-family: "Material Icons";
+        font-size: 1rem;
+        font-weight: 400;
+    }
+
+    &:focus-visible {
+        outline: 0.125rem solid var(--color-light);
+        outline-offset: 0.125rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #panel_mcp_panel .mcp-panel * {
+        transition: none;
     }
 }

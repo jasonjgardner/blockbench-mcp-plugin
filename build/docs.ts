@@ -17,6 +17,7 @@ interface IToolDocEntry {
   category: string;
   annotations: {
     destructiveHint?: boolean;
+    idempotentHint?: boolean;
     readOnlyHint?: boolean;
     openWorldHint?: boolean;
   };
@@ -74,6 +75,7 @@ function convertToolSpec(spec: IToolSpec, category: string): IToolDocEntry {
     category,
     annotations: {
       destructiveHint: spec.annotations?.destructiveHint,
+      idempotentHint: spec.annotations?.idempotentHint,
       readOnlyHint: spec.annotations?.readOnlyHint,
       openWorldHint: spec.annotations?.openWorldHint,
     },

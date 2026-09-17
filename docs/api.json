@@ -1,6 +1,6 @@
 {
   "version": "1.8.0",
-  "generatedAt": "2026-09-13T20:44:59.501Z",
+  "generatedAt": "2026-09-17T22:26:39.056Z",
   "tools": [
     {
       "name": "place_cube",
@@ -306,9 +306,189 @@
       }
     },
     {
+      "name": "knife_cut_cube",
+      "title": "Knife Cut Cube",
+      "description": "Headless Blockbench Knife tool for cubes: splits each target cube with planes perpendicular to one axis at the given positions, keeping each piece's share of the face UVs. The original cube keeps the lowest piece; new pieces get unique names. One undo entry covers every cut and the selection is left unchanged.",
+      "status": "experimental",
+      "category": "Cubes",
+      "annotations": {
+        "destructiveHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/knife_cut_cube",
+        "definitions": {
+          "knife_cut_cube": {
+            "type": "object",
+            "properties": {
+              "cubes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "description": "Cube UUIDs or unique names to cut. Defaults to the selected cubes.",
+                "markdownDescription": "Cube UUIDs or unique names to cut. Defaults to the selected cubes."
+              },
+              "axis": {
+                "type": "string",
+                "enum": [
+                  "x",
+                  "y",
+                  "z"
+                ],
+                "description": "Axis the cut plane is perpendicular to.",
+                "markdownDescription": "Axis the cut plane is perpendicular to."
+              },
+              "positions": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 1,
+                "description": "Cut-plane coordinates along the axis, in the cube's from/to space (model space for unrotated cubes). Positions closer than the cube's inflate to its from/to edges, or outside it, are skipped for that cube and reported sorted and deduplicated.",
+                "markdownDescription": "Cut-plane coordinates along the axis, in the cube's from/to space (model space for unrotated cubes). Positions closer than the cube's inflate to its from/to edges, or outside it, are skipped for that cube and reported sorted and deduplicated."
+              }
+            },
+            "required": [
+              "axis",
+              "positions"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "slice_cubes_to_block_grid",
+      "title": "Slice Cubes To Block Grid",
+      "description": "Cuts cubes wherever they cross a Bedrock block boundary (16-unit grid, x/z centered) and, by default, regroups the pieces into one group per block cell pivoted at that block's origin. Use it to divide an oversized custom block model into per-block sections that each fit Bedrock's 30×30×30 limit. Rotated cubes are left uncut on the affected axes and reported.",
+      "status": "experimental",
+      "category": "Cubes",
+      "annotations": {
+        "destructiveHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/slice_cubes_to_block_grid",
+        "definitions": {
+          "slice_cubes_to_block_grid": {
+            "type": "object",
+            "properties": {
+              "cubes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "description": "Cube UUIDs or unique names to slice. Defaults to every cube in the project.",
+                "markdownDescription": "Cube UUIDs or unique names to slice. Defaults to every cube in the project."
+              },
+              "axes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "x",
+                    "y",
+                    "z"
+                  ]
+                },
+                "minItems": 1,
+                "default": [
+                  "x",
+                  "y",
+                  "z"
+                ],
+                "description": "Axes to slice along. Cubes rotated (or inside groups rotated) about the other two axes are skipped on that axis, as Blockbench's own slicer does.",
+                "markdownDescription": "Axes to slice along. Cubes rotated (or inside groups rotated) about the other two axes are skipped on that axis, as Blockbench's own slicer does."
+              },
+              "cell_size": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 16,
+                "description": "Block size in model units; 16 for Bedrock. Horizontal boundaries sit at ±half a cell, vertical ones at multiples.",
+                "markdownDescription": "Block size in model units; 16 for Bedrock. Horizontal boundaries sit at ±half a cell, vertical ones at multiples."
+              },
+              "regroup": {
+                "type": "boolean",
+                "default": true,
+                "description": "Move every resulting cube into a group named after its block cell (bottom, top, right_top_front, top2, …) pivoted at that block's origin, so each group is one exportable block section. Pieces leave their previous bone; the report lists each source cube's former group.",
+                "markdownDescription": "Move every resulting cube into a group named after its block cell (bottom, top, right_top_front, top2, …) pivoted at that block's origin, so each group is one exportable block section. Pieces leave their previous bone; the report lists each source cube's former group."
+              },
+              "parent": {
+                "type": "string",
+                "description": "Parent group UUID or name for the cell groups; must not be rotated. Defaults to the project root.",
+                "markdownDescription": "Parent group UUID or name for the cell groups; must not be rotated. Defaults to the project root."
+              },
+              "group_prefix": {
+                "type": "string",
+                "default": "",
+                "description": "Prefix for cell group names, e.g. `goal_` yields `goal_top`. Existing groups are reused only when their name and block-origin pivot match; otherwise a numbered name is chosen.",
+                "markdownDescription": "Prefix for cell group names, e.g. `goal_` yields `goal_top`. Existing groups are reused only when their name and block-origin pivot match; otherwise a numbered name is chosen."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "inspect_block_bounds",
+      "title": "Inspect Block Bounds",
+      "description": "Reports cube, group, and whole-model extents against Blockbench's Bedrock block limit (a 30×30×30 box whose center may sit up to 7 units from the block center), the block cell each cube occupies, and the grid cut positions slice_cubes_to_block_grid would use. Read-only. Extents ignore rotation; rotated cubes are flagged.",
+      "status": "experimental",
+      "category": "Cubes",
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/inspect_block_bounds",
+        "definitions": {
+          "inspect_block_bounds": {
+            "type": "object",
+            "properties": {
+              "cubes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "description": "Cube UUIDs or unique names to inspect. Defaults to every cube in the project.",
+                "markdownDescription": "Cube UUIDs or unique names to inspect. Defaults to every cube in the project."
+              },
+              "cell_size": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 16,
+                "description": "Block size in model units; 16 for Bedrock.",
+                "markdownDescription": "Block size in model units; 16 for Bedrock."
+              },
+              "max_size": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 30,
+                "description": "Maximum geometry size per axis for one block (Bedrock: 30).",
+                "markdownDescription": "Maximum geometry size per axis for one block (Bedrock: 30)."
+              },
+              "max_center_offset": {
+                "type": "number",
+                "minimum": 0,
+                "default": 7,
+                "description": "How far the limit box may shift from the block center per axis (Bedrock: 7, giving x/z within ±22 and y within -14…30).",
+                "markdownDescription": "How far the limit box may shift from the block center per axis (Bedrock: 7, giving x/z within ±22 and y within -14…30)."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
       "name": "capture_screenshot",
       "title": "Capture Screenshot",
-      "description": "Returns the image data of the current view.",
+      "description": "Returns the rendered image of a view. Defaults to the user's active viewport (\"active\"); pass the ID of an offscreen view from create_offscreen_view to render without disturbing the user, or a viewport ID from list_views.",
       "status": "stable",
       "category": "Camera & Screenshots",
       "annotations": {
@@ -324,6 +504,13 @@
                 "type": "string",
                 "description": "Project name or UUID.",
                 "markdownDescription": "Project name or UUID."
+              },
+              "view": {
+                "type": "string",
+                "minLength": 1,
+                "description": "View to target: \"active\" for the viewport the user last interacted with, the ID of an offscreen view from create_offscreen_view, or a viewport ID from list_views.",
+                "markdownDescription": "View to target: \"active\" for the viewport the user last interacted with, the ID of an offscreen view from create_offscreen_view, or a viewport ID from list_views.",
+                "default": "active"
               }
             },
             "additionalProperties": false
@@ -356,7 +543,7 @@
     {
       "name": "set_camera_angle",
       "title": "Set Camera Angle",
-      "description": "Sets the camera angle to the specified value.",
+      "description": "Moves a view's camera and returns the resulting frame plus the applied camera state. Defaults to the user's active viewport, which changes what they see and clears any side-view lock they had; target an offscreen view from create_offscreen_view to inspect the model from any angle without moving their camera.",
       "status": "experimental",
       "category": "Camera & Screenshots",
       "annotations": {
@@ -368,6 +555,13 @@
           "set_camera_angle": {
             "type": "object",
             "properties": {
+              "view": {
+                "type": "string",
+                "minLength": 1,
+                "description": "View to target: \"active\" for the viewport the user last interacted with, the ID of an offscreen view from create_offscreen_view, or a viewport ID from list_views.",
+                "markdownDescription": "View to target: \"active\" for the viewport the user last interacted with, the ID of an offscreen view from create_offscreen_view, or a viewport ID from list_views.",
+                "default": "active"
+              },
               "position": {
                 "type": "array",
                 "items": {
@@ -407,11 +601,212 @@
                 ],
                 "description": "Camera projection type.",
                 "markdownDescription": "Camera projection type."
+              },
+              "zoom": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Orthographic zoom factor (Blockbench default 0.5). Ignored for perspective views and while a side view is locked.",
+                "markdownDescription": "Orthographic zoom factor (Blockbench default 0.5). Ignored for perspective views and while a side view is locked."
+              },
+              "fov": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 179,
+                "description": "Perspective field of view in degrees. Uses the Blockbench setting when omitted.",
+                "markdownDescription": "Perspective field of view in degrees. Uses the Blockbench setting when omitted."
+              },
+              "locked_angle": {
+                "type": "string",
+                "enum": [
+                  "top",
+                  "bottom",
+                  "north",
+                  "south",
+                  "east",
+                  "west"
+                ],
+                "description": "Lock an orthographic side view (top, bottom, north, south, east, west). Omit to leave the view free.",
+                "markdownDescription": "Lock an orthographic side view (top, bottom, north, south, east, west). Omit to leave the view free."
               }
             },
             "required": [
               "position",
               "projection"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "create_offscreen_view",
+      "title": "Create Offscreen View",
+      "description": "Creates a private offscreen viewport that renders the current project without moving the user's camera. Use it with set_camera_angle and capture_screenshot (view: <id>) for multi-angle inspection. The camera starts where the user's is unless copy_view is \"none\". Up to 4 views may exist at once; delete them with delete_offscreen_view when done.",
+      "status": "experimental",
+      "category": "Camera & Screenshots",
+      "annotations": {
+        "idempotentHint": false
+      },
+      "parameters": {
+        "$ref": "#/definitions/create_offscreen_view",
+        "definitions": {
+          "create_offscreen_view": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{1,64}$",
+                "errorMessage": {
+                  "pattern": "Use 1–64 letters, digits, underscores, or hyphens."
+                },
+                "description": "ID for the new view. Generated as view_N when omitted.",
+                "markdownDescription": "ID for the new view. Generated as view_N when omitted."
+              },
+              "width": {
+                "type": "integer",
+                "minimum": 16,
+                "maximum": 2048,
+                "description": "Width in pixels (16–2048).",
+                "markdownDescription": "Width in pixels (16–2048).",
+                "default": 1024
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 16,
+                "maximum": 2048,
+                "description": "Height in pixels (16–2048).",
+                "markdownDescription": "Height in pixels (16–2048).",
+                "default": 768
+              },
+              "antialias": {
+                "type": "boolean",
+                "default": true,
+                "description": "Multisample antialiasing. Disable for crisp pixel-art inspection.",
+                "markdownDescription": "Multisample antialiasing. Disable for crisp pixel-art inspection."
+              },
+              "copy_view": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "View to target: \"active\" for the viewport the user last interacted with, the ID of an offscreen view from create_offscreen_view, or a viewport ID from list_views.",
+                    "markdownDescription": "View to target: \"active\" for the viewport the user last interacted with, the ID of an offscreen view from create_offscreen_view, or a viewport ID from list_views."
+                  },
+                  {
+                    "type": "string",
+                    "const": "none"
+                  }
+                ],
+                "default": "active",
+                "description": "View whose camera seeds the new one. Defaults to \"active\" (the user's viewport); pass \"none\" for Blockbench's default angle.",
+                "markdownDescription": "View whose camera seeds the new one. Defaults to \"active\" (the user's viewport); pass \"none\" for Blockbench's default angle."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "list_views",
+      "title": "List Views",
+      "description": "Lists render targets: the user's connected viewports (the active one flagged) and the plugin's offscreen views, each with size and camera position, target, projection, FOV, zoom, and side-view lock.",
+      "status": "experimental",
+      "category": "Camera & Screenshots",
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/list_views",
+        "definitions": {
+          "list_views": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "resize_offscreen_view",
+      "title": "Resize Offscreen View",
+      "description": "Changes the pixel size of an offscreen view. The user's viewports follow their layout and cannot be resized here.",
+      "status": "experimental",
+      "category": "Camera & Screenshots",
+      "annotations": {
+        "idempotentHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/resize_offscreen_view",
+        "definitions": {
+          "resize_offscreen_view": {
+            "type": "object",
+            "properties": {
+              "view": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{1,64}$",
+                "errorMessage": {
+                  "pattern": "Use 1–64 letters, digits, underscores, or hyphens."
+                },
+                "description": "ID of the offscreen view to resize.",
+                "markdownDescription": "ID of the offscreen view to resize."
+              },
+              "width": {
+                "type": "integer",
+                "minimum": 16,
+                "maximum": 2048,
+                "description": "Width in pixels (16–2048).",
+                "markdownDescription": "Width in pixels (16–2048)."
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 16,
+                "maximum": 2048,
+                "description": "Height in pixels (16–2048).",
+                "markdownDescription": "Height in pixels (16–2048)."
+              }
+            },
+            "required": [
+              "view",
+              "width",
+              "height"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "delete_offscreen_view",
+      "title": "Delete Offscreen View",
+      "description": "Disposes an offscreen view and releases its WebGL context. The user's viewports are not affected.",
+      "status": "experimental",
+      "category": "Camera & Screenshots",
+      "annotations": {
+        "destructiveHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/delete_offscreen_view",
+        "definitions": {
+          "delete_offscreen_view": {
+            "type": "object",
+            "properties": {
+              "view": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{1,64}$",
+                "errorMessage": {
+                  "pattern": "Use 1–64 letters, digits, underscores, or hyphens."
+                },
+                "description": "ID of the offscreen view to dispose.",
+                "markdownDescription": "ID of the offscreen view to dispose."
+              }
+            },
+            "required": [
+              "view"
             ],
             "additionalProperties": false
           }
@@ -427,6 +822,7 @@
       "category": "Capabilities",
       "annotations": {
         "destructiveHint": false,
+        "idempotentHint": true,
         "readOnlyHint": true,
         "openWorldHint": false
       },
@@ -727,7 +1123,7 @@
     {
       "name": "animation_graph_editor",
       "title": "Animation Graph Editor",
-      "description": "Controls animation curves in the graph editor for fine-tuning animations.",
+      "description": "Edits a bone channel's interpolation or numeric Bezier easing in one reversible edit. Uses native per-axis handle arrays and chronological segment durations. Custom points are normalized time/value fractions. Partial-axis edits require existing Bezier keys; key-wide mode changes require all axes. Rejects curve edits ignored by quaternion rotation. Inspect neighboring segments after range edits.",
       "status": "experimental",
       "category": "Animation",
       "annotations": {
@@ -775,8 +1171,8 @@
                   }
                 ],
                 "default": "all",
-                "description": "Axis to modify curves for.",
-                "markdownDescription": "Axis to modify curves for."
+                "description": "Axes to edit. Linear, stepped and smooth require all because interpolation is key-wide. Partial-axis easing/custom edits require selected keys already using Bezier interpolation, preserving other axes' handles.",
+                "markdownDescription": "Axes to edit. Linear, stepped and smooth require all because interpolation is key-wide. Partial-axis easing/custom edits require selected keys already using Bezier interpolation, preserving other axes' handles."
               },
               "action": {
                 "type": "string",
@@ -789,8 +1185,8 @@
                   "stepped",
                   "custom"
                 ],
-                "description": "Type of curve modification to apply.",
-                "markdownDescription": "Type of curve modification to apply."
+                "description": "Curve modification. Easing/custom require at least two distinct chronological numeric single-data-point keys. Smooth and Bezier rotation edits are unavailable when native quaternion interpolation would ignore them.",
+                "markdownDescription": "Curve modification. Easing/custom require at least two distinct chronological numeric single-data-point keys. Smooth and Bezier rotation edits are unavailable when native quaternion interpolation would ignore them."
               },
               "keyframe_range": {
                 "type": "object",
@@ -811,8 +1207,8 @@
                   "end"
                 ],
                 "additionalProperties": false,
-                "description": "Time range to apply the curve modification. If not provided, applies to all keyframes.",
-                "markdownDescription": "Time range to apply the curve modification. If not provided, applies to all keyframes."
+                "description": "Finite ordered time range selecting existing keys; omitted means the full channel. Key-wide interpolation can affect neighboring segments at range boundaries, so edit the full channel when boundary continuity matters.",
+                "markdownDescription": "Finite ordered time range selecting existing keys; omitted means the full channel. Key-wide interpolation can affect neighboring segments at range boundaries, so edit the full channel when boundary continuity matters."
               },
               "custom_curve": {
                 "type": "object",
@@ -824,8 +1220,8 @@
                     },
                     "minItems": 2,
                     "maxItems": 2,
-                    "description": "First control point [time, value].",
-                    "markdownDescription": "First control point [time, value]."
+                    "description": "Outgoing normalized control point [time fraction in 0..1, value fraction] for each selected adjacent-key segment. Finite value fractions outside 0..1 allow overshoot.",
+                    "markdownDescription": "Outgoing normalized control point [time fraction in 0..1, value fraction] for each selected adjacent-key segment. Finite value fractions outside 0..1 allow overshoot."
                   },
                   "control_point_2": {
                     "type": "array",
@@ -834,8 +1230,8 @@
                     },
                     "minItems": 2,
                     "maxItems": 2,
-                    "description": "Second control point [time, value].",
-                    "markdownDescription": "Second control point [time, value]."
+                    "description": "Incoming normalized control point [time fraction in 0..1, value fraction], measured from the segment start. Converted to native per-axis offsets relative to the ending key.",
+                    "markdownDescription": "Incoming normalized control point [time fraction in 0..1, value fraction], measured from the segment start. Converted to native per-axis offsets relative to the ending key."
                   }
                 },
                 "required": [
@@ -843,8 +1239,8 @@
                   "control_point_2"
                 ],
                 "additionalProperties": false,
-                "description": "Custom bezier curve control points (only for 'custom' action).",
-                "markdownDescription": "Custom bezier curve control points (only for 'custom' action)."
+                "description": "Normalized cubic Bezier control points, required for custom action. Conversion uses each segment's duration and edited-axis endpoint values; unrelated axis handles are preserved.",
+                "markdownDescription": "Normalized cubic Bezier control points, required for custom action. Conversion uses each segment's duration and edited-axis endpoint values; unrelated axis handles are preserved."
               }
             },
             "required": [
@@ -3791,7 +4187,7 @@
     {
       "name": "knife_tool",
       "title": "Knife Tool",
-      "description": "Currently unsupported: Blockbench's interactive Knife context requires pointer topology that this point-list API cannot safely provide. Use subdivide_mesh or create geometry with place_mesh, or use Knife manually.",
+      "description": "Currently unsupported for meshes: Blockbench's interactive Knife context requires pointer topology that this point-list API cannot safely provide. Use subdivide_mesh or place_mesh for meshes; use knife_cut_cube or slice_cubes_to_block_grid to cut cubes headlessly.",
       "status": "experimental",
       "category": "Mesh Editing",
       "annotations": {
@@ -3857,6 +4253,7 @@
       "category": "Mesh Editing",
       "annotations": {
         "destructiveHint": false,
+        "idempotentHint": true,
         "readOnlyHint": true,
         "openWorldHint": false
       },
@@ -5023,6 +5420,36 @@
       }
     },
     {
+      "name": "get_average_fps",
+      "title": "Get Average FPS",
+      "description": "Measures the average frames per second of Blockbench's render loop by counting rendered frames for duration_ms, then returns the average with the frame count, the fps_limit setting, Blockbench's own last-second counter, window focus at the start of the window plus whether it changed, and whether rendering was paused because the window was unfocused with background rendering disabled. The call waits for the whole window; keep other tools idle meanwhile for a representative reading.",
+      "status": "experimental",
+      "category": "Performance",
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/get_average_fps",
+        "definitions": {
+          "get_average_fps": {
+            "type": "object",
+            "properties": {
+              "duration_ms": {
+                "type": "integer",
+                "minimum": 250,
+                "maximum": 10000,
+                "default": 2000,
+                "description": "Sampling window in milliseconds (250–10000). The call waits this long while counting rendered frames.",
+                "markdownDescription": "Sampling window in milliseconds (250–10000). The call waits this long while counting rendered frames."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
       "name": "create_project",
       "title": "Create Project",
       "description": "Creates a project with the given name and format, and returns a resource link to its live .bbmodel file.",
@@ -5735,7 +6162,8 @@
       "status": "stable",
       "category": "Textures",
       "annotations": {
-        "destructiveHint": false
+        "destructiveHint": false,
+        "idempotentHint": true
       },
       "parameters": {
         "$ref": "#/definitions/activate_texture",
@@ -5747,6 +6175,36 @@
                 "type": "string",
                 "description": "Texture ID, UUID, or name to activate in the texture panel.",
                 "markdownDescription": "Texture ID, UUID, or name to activate in the texture panel."
+              }
+            },
+            "required": [
+              "texture"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "delete_texture",
+      "title": "Delete Texture",
+      "description": "Removes a texture from the project in one undoable edit, like deleting it from the Textures panel. Faces keep their UV mapping but lose the texture assignment, and a PBR material loses that channel, until the edit is undone. Use list_textures to find IDs.",
+      "status": "experimental",
+      "category": "Textures",
+      "annotations": {
+        "destructiveHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/delete_texture",
+        "definitions": {
+          "delete_texture": {
+            "type": "object",
+            "properties": {
+              "texture": {
+                "type": "string",
+                "description": "Texture ID, UUID, or name to remove.",
+                "markdownDescription": "Texture ID, UUID, or name to remove."
               }
             },
             "required": [
@@ -5982,11 +6440,12 @@
     {
       "name": "set_mode",
       "title": "Set Mode",
-      "description": "Switches Blockbench's editor tab through its native mode trigger, respecting the mode's condition. Use mode_id='animate' to enter Animate before animation work, 'paint' before native painting tools, or 'edit' to return. Returns the resulting mode and available modes; refresh tools/list for changed tool availability. Selecting the current mode does nothing. Does not change the project's format.",
+      "description": "Switches Blockbench's editor tab through its native mode trigger, respecting the mode's condition. Use mode_id='animate' to enter Animate before animation work, 'paint' before native painting tools, or 'edit' to return. Returns the resulting mode and available modes; refresh tools/list for changed tool availability. Selecting the current mode does nothing. Does not change the project's format. When the user enabled the AI Scratchpad setting, mode_id='ai_scratchpad' relaxes the format's cube size, rotation and integer-size guardrails until another mode is selected.",
       "status": "stable",
       "category": "UI Interaction",
       "annotations": {
         "destructiveHint": false,
+        "idempotentHint": true,
         "openWorldHint": false
       },
       "parameters": {
@@ -6164,6 +6623,7 @@
       "category": "UV Mapping",
       "annotations": {
         "destructiveHint": false,
+        "idempotentHint": true,
         "readOnlyHint": true,
         "openWorldHint": false
       },
@@ -6514,6 +6974,489 @@
       }
     },
     {
+      "name": "geckolib_get_format_info",
+      "title": "Get GeckoLib Format Info",
+      "description": "Returns the active GeckoLib project's model type, mod ID, object ID, bone and animation counts, cached export paths, and the installed plugin version. Requires the GeckoLib plugin and a GeckoLib Animated Model project.",
+      "status": "experimental",
+      "category": "GeckoLib Integration",
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/geckolib_get_format_info",
+        "definitions": {
+          "geckolib_get_format_info": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "geckolib_set_project_settings",
+      "title": "Set GeckoLib Project Settings",
+      "description": "Sets the GeckoLib mod ID, model type and object ID on the active project. Values are validated against the plugin's namespace rules before anything is written. Does not generate the armor template rig.",
+      "status": "experimental",
+      "category": "GeckoLib Integration",
+      "annotations": {
+        "destructiveHint": false
+      },
+      "parameters": {
+        "$ref": "#/definitions/geckolib_set_project_settings",
+        "definitions": {
+          "geckolib_set_project_settings": {
+            "type": "object",
+            "properties": {
+              "modid": {
+                "type": "string",
+                "pattern": "^[_\\-.a-z0-9]+$",
+                "errorMessage": {
+                  "pattern": "Mod IDs may only contain lowercase letters, digits, underscore, hyphen and period."
+                },
+                "description": "Mod namespace exports are written for, e.g. my_mod.",
+                "markdownDescription": "Mod namespace exports are written for, e.g. my_mod."
+              },
+              "model_type": {
+                "type": "string",
+                "enum": [
+                  "Entity",
+                  "Block",
+                  "Item",
+                  "Armor",
+                  "Object"
+                ],
+                "description": "GeckoLib model type. Armor only records the type; it does not generate the plugin's armor template rig, which requires creating a new Armor project in Blockbench.",
+                "markdownDescription": "GeckoLib model type. Armor only records the type; it does not generate the plugin's armor template rig, which requires creating a new Armor project in Blockbench."
+              },
+              "model_identifier": {
+                "type": "string",
+                "pattern": "^[_\\-/.a-z0-9]+$",
+                "errorMessage": {
+                  "pattern": "Object IDs may only contain lowercase letters, digits, underscore, hyphen, period and forward slash."
+                },
+                "description": "Registered object ID the geometry exports as (geometry.<identifier>); may include a folder path.",
+                "markdownDescription": "Registered object ID the geometry exports as (geometry.<identifier>); may include a folder path."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "geckolib_list_easings",
+      "title": "List GeckoLib Easings",
+      "description": "Lists every easing name GeckoLib accepts on keyframes, which of them read easingArgs, and each argument's default and meaning. Needs no project, so it can be called while planning an animation.",
+      "status": "experimental",
+      "category": "GeckoLib Integration",
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/geckolib_list_easings",
+        "definitions": {
+          "geckolib_list_easings": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "geckolib_get_keyframe_easing",
+      "title": "Get GeckoLib Keyframe Easing",
+      "description": "Reads the GeckoLib easing, easing arguments and interpolation of keyframes on one bone channel, or of the current timeline selection. An easing governs the segment arriving at its keyframe, so the first keyframe of a channel is reported as inert.",
+      "status": "experimental",
+      "category": "GeckoLib Integration",
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/geckolib_get_keyframe_easing",
+        "definitions": {
+          "geckolib_get_keyframe_easing": {
+            "type": "object",
+            "properties": {
+              "animation_id": {
+                "type": "string",
+                "description": "Animation UUID or name. If not provided, uses current animation.",
+                "markdownDescription": "Animation UUID or name. If not provided, uses current animation."
+              },
+              "bone_name": {
+                "type": "string",
+                "description": "Bone whose keyframes to target. Omit to act on the current timeline keyframe selection.",
+                "markdownDescription": "Bone whose keyframes to target. Omit to act on the current timeline keyframe selection."
+              },
+              "channel": {
+                "type": "string",
+                "enum": [
+                  "rotation",
+                  "position",
+                  "scale"
+                ],
+                "description": "Transform channel to target. Required with bone_name, and meaningless without it.",
+                "markdownDescription": "Transform channel to target. Required with bone_name, and meaningless without it."
+              },
+              "times": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "minItems": 1,
+                "description": "Keyframe times in seconds. Requires bone_name; omit to target every keyframe of that channel.",
+                "markdownDescription": "Keyframe times in seconds. Requires bone_name; omit to target every keyframe of that channel."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "geckolib_set_keyframe_easing",
+      "title": "Set GeckoLib Keyframe Easing",
+      "description": "Writes a GeckoLib easing (and its arguments) onto keyframes on one bone channel, or onto the current timeline selection, as one undoable edit. GeckoLib easings apply only to linear keyframes and shape the segment arriving at the keyframe they are set on, so the first keyframe of each channel is skipped and reported. Nothing in Blockbench's native keyframe API can author these.",
+      "status": "experimental",
+      "category": "GeckoLib Integration",
+      "annotations": {
+        "destructiveHint": false
+      },
+      "parameters": {
+        "$ref": "#/definitions/geckolib_set_keyframe_easing",
+        "definitions": {
+          "geckolib_set_keyframe_easing": {
+            "type": "object",
+            "properties": {
+              "animation_id": {
+                "type": "string",
+                "description": "Animation UUID or name. If not provided, uses current animation.",
+                "markdownDescription": "Animation UUID or name. If not provided, uses current animation."
+              },
+              "bone_name": {
+                "type": "string",
+                "description": "Bone whose keyframes to target. Omit to act on the current timeline keyframe selection.",
+                "markdownDescription": "Bone whose keyframes to target. Omit to act on the current timeline keyframe selection."
+              },
+              "channel": {
+                "type": "string",
+                "enum": [
+                  "rotation",
+                  "position",
+                  "scale"
+                ],
+                "description": "Transform channel to target. Required with bone_name, and meaningless without it.",
+                "markdownDescription": "Transform channel to target. Required with bone_name, and meaningless without it."
+              },
+              "times": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "minItems": 1,
+                "description": "Keyframe times in seconds. Requires bone_name; omit to target every keyframe of that channel.",
+                "markdownDescription": "Keyframe times in seconds. Requires bone_name; omit to target every keyframe of that channel."
+              },
+              "easing": {
+                "type": "string",
+                "enum": [
+                  "linear",
+                  "step",
+                  "easeInQuad",
+                  "easeOutQuad",
+                  "easeInOutQuad",
+                  "easeInCubic",
+                  "easeOutCubic",
+                  "easeInOutCubic",
+                  "easeInQuart",
+                  "easeOutQuart",
+                  "easeInOutQuart",
+                  "easeInQuint",
+                  "easeOutQuint",
+                  "easeInOutQuint",
+                  "easeInSine",
+                  "easeOutSine",
+                  "easeInOutSine",
+                  "easeInExpo",
+                  "easeOutExpo",
+                  "easeInOutExpo",
+                  "easeInCirc",
+                  "easeOutCirc",
+                  "easeInOutCirc",
+                  "easeInBack",
+                  "easeOutBack",
+                  "easeInOutBack",
+                  "easeInElastic",
+                  "easeOutElastic",
+                  "easeInOutElastic",
+                  "easeInBounce",
+                  "easeOutBounce",
+                  "easeInOutBounce",
+                  "none"
+                ],
+                "description": "GeckoLib easing name, or \"none\" to remove the easing and fall back to linear.",
+                "markdownDescription": "GeckoLib easing name, or \"none\" to remove the easing and fall back to linear."
+              },
+              "easing_args": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 1,
+                "description": "Arguments for the Back, Elastic, Bounce and step easings. Omit to use GeckoLib's default (1 overshoot, 0.5 bounciness, 5 steps). Ignored by every other easing.",
+                "markdownDescription": "Arguments for the Back, Elastic, Bounce and step easings. Omit to use GeckoLib's default (1 overshoot, 0.5 bounciness, 5 steps). Ignored by every other easing."
+              },
+              "convert_interpolation": {
+                "type": "boolean",
+                "default": false,
+                "description": "Set targeted keyframes to linear interpolation as part of the same edit. GeckoLib wipes easings from catmullrom, step and bezier keyframes on the next render frame, so without this the call is rejected instead of writing an easing that would not survive.",
+                "markdownDescription": "Set targeted keyframes to linear interpolation as part of the same edit. GeckoLib wipes easings from catmullrom, step and bezier keyframes on the next render frame, so without this the call is rejected instead of writing an easing that would not survive."
+              }
+            },
+            "required": [
+              "easing"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "geckolib_reverse_keyframe_easing",
+      "title": "Reverse GeckoLib Keyframe Easing",
+      "description": "Mirrors easing directions the way GeckoLib's own reverse-keyframes handler does: each easeIn becomes easeOut and back, the easings shift one keyframe later in time, and the first keyframe of each channel is cleared. Use after reversing keyframe values.",
+      "status": "experimental",
+      "category": "GeckoLib Integration",
+      "annotations": {
+        "destructiveHint": false
+      },
+      "parameters": {
+        "$ref": "#/definitions/geckolib_reverse_keyframe_easing",
+        "definitions": {
+          "geckolib_reverse_keyframe_easing": {
+            "type": "object",
+            "properties": {
+              "animation_id": {
+                "type": "string",
+                "description": "Animation UUID or name. If not provided, uses current animation.",
+                "markdownDescription": "Animation UUID or name. If not provided, uses current animation."
+              },
+              "bone_name": {
+                "type": "string",
+                "description": "Bone whose keyframes to target. Omit to act on the current timeline keyframe selection.",
+                "markdownDescription": "Bone whose keyframes to target. Omit to act on the current timeline keyframe selection."
+              },
+              "channel": {
+                "type": "string",
+                "enum": [
+                  "rotation",
+                  "position",
+                  "scale"
+                ],
+                "description": "Transform channel to target. Required with bone_name, and meaningless without it.",
+                "markdownDescription": "Transform channel to target. Required with bone_name, and meaningless without it."
+              },
+              "times": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "minItems": 1,
+                "description": "Keyframe times in seconds. Requires bone_name; omit to target every keyframe of that channel.",
+                "markdownDescription": "Keyframe times in seconds. Requires bone_name; omit to target every keyframe of that channel."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "geckolib_validate_model",
+      "title": "Validate GeckoLib Model",
+      "description": "Checks the GeckoLib project against rules derived from the plugin and the GeckoLib runtime: bone-name charset and duplicates, mod ID and object ID validity, armor template bones, texture size against the UV base, and (optionally) compiled animation loop values, easing names, easing arguments and lengths. Each finding carries a stable check ID. Passing does not prove in-game correctness.",
+      "status": "experimental",
+      "category": "GeckoLib Integration",
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/geckolib_validate_model",
+        "definitions": {
+          "geckolib_validate_model": {
+            "type": "object",
+            "properties": {
+              "include_animations": {
+                "type": "boolean",
+                "default": true,
+                "description": "Also compile the project's animations and validate their loop values, easings and lengths.",
+                "markdownDescription": "Also compile the project's animations and validate their loop values, easings and lengths."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "geckolib_export_model",
+      "title": "Export GeckoLib Model",
+      "description": "Compiles the GeckoLib geometry the plugin's model export produces, returning it as JSON and optionally writing it to a path. Set mode='dialog' to trigger the plugin's own export action and its save dialog instead.",
+      "status": "experimental",
+      "category": "GeckoLib Integration",
+      "annotations": {
+        "destructiveHint": false,
+        "openWorldHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/geckolib_export_model",
+        "definitions": {
+          "geckolib_export_model": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "compile",
+                  "dialog"
+                ],
+                "default": "compile",
+                "description": "compile returns the file content without touching the UI. dialog triggers the GeckoLib plugin's own export action, which opens a native save dialog for the user to complete and updates the project's cached export path.",
+                "markdownDescription": "compile returns the file content without touching the UI. dialog triggers the GeckoLib plugin's own export action, which opens a native save dialog for the user to complete and updates the project's cached export path."
+              },
+              "path": {
+                "type": "string",
+                "description": "Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode.",
+                "markdownDescription": "Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode."
+              },
+              "max_content_length": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2000000,
+                "default": 100000,
+                "description": "Maximum characters of content to return. Use 0 to omit the content and only report its size.",
+                "markdownDescription": "Maximum characters of content to return. Use 0 to omit the content and only report its size."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "geckolib_export_animations",
+      "title": "Export GeckoLib Animations",
+      "description": "Compiles the project's animations into GeckoLib animation-file JSON, including the easing and easingArgs the plugin writes, and optionally writes it to a path. Reports which host API compiled it, since only the plugin-patched route stamps geckolib_format_version. Set mode='dialog' to trigger the plugin's own animation export action instead.",
+      "status": "experimental",
+      "category": "GeckoLib Integration",
+      "annotations": {
+        "destructiveHint": false,
+        "openWorldHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/geckolib_export_animations",
+        "definitions": {
+          "geckolib_export_animations": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "compile",
+                  "dialog"
+                ],
+                "default": "compile",
+                "description": "compile returns the file content without touching the UI. dialog triggers the GeckoLib plugin's own export action, which opens a native save dialog for the user to complete and updates the project's cached export path.",
+                "markdownDescription": "compile returns the file content without touching the UI. dialog triggers the GeckoLib plugin's own export action, which opens a native save dialog for the user to complete and updates the project's cached export path."
+              },
+              "path": {
+                "type": "string",
+                "description": "Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode.",
+                "markdownDescription": "Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode."
+              },
+              "max_content_length": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2000000,
+                "default": 100000,
+                "description": "Maximum characters of content to return. Use 0 to omit the content and only report its size.",
+                "markdownDescription": "Maximum characters of content to return. Use 0 to omit the content and only report its size."
+              },
+              "animation_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "description": "Animation UUIDs or names to include. Omit to export every animation in the project.",
+                "markdownDescription": "Animation UUIDs or names to include. Omit to export every animation in the project."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "geckolib_export_display",
+      "title": "Export GeckoLib Display Settings",
+      "description": "Builds the Java item/block display-settings JSON for GeckoLib Item and Block models: parent model, texture size, GUI light, per-perspective display transforms and the namespaced particle texture. Reports when the active model type would not normally ship one. Set mode='dialog' to trigger the plugin's own display export action instead.",
+      "status": "experimental",
+      "category": "GeckoLib Integration",
+      "annotations": {
+        "destructiveHint": false,
+        "openWorldHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/geckolib_export_display",
+        "definitions": {
+          "geckolib_export_display": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "compile",
+                  "dialog"
+                ],
+                "default": "compile",
+                "description": "compile returns the file content without touching the UI. dialog triggers the GeckoLib plugin's own export action, which opens a native save dialog for the user to complete and updates the project's cached export path.",
+                "markdownDescription": "compile returns the file content without touching the UI. dialog triggers the GeckoLib plugin's own export action, which opens a native save dialog for the user to complete and updates the project's cached export path."
+              },
+              "path": {
+                "type": "string",
+                "description": "Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode.",
+                "markdownDescription": "Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode."
+              },
+              "max_content_length": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2000000,
+                "default": 100000,
+                "description": "Maximum characters of content to return. Use 0 to omit the content and only report its size.",
+                "markdownDescription": "Maximum characters of content to return. Use 0 to omit the content and only report its size."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
       "name": "hytale_get_format_info",
       "title": "Get Hytale Format Info",
       "description": "Returns information about the current Hytale format. Requires the Hytale plugin and a Hytale format project to be active.",
@@ -6628,7 +7571,7 @@
     {
       "name": "hytale_create_quad",
       "title": "Create Hytale Quad",
-      "description": "Creates a Hytale quad (2D plane) with a specified normal direction. Quads are single-face elements useful for flat surfaces.",
+      "description": "Creates a Hytale quad with exactly one enabled face matching the signed normal direction, per-face UV and Auto UV 1. Positive width/height and parent references are validated before one reversible edit.",
       "status": "experimental",
       "category": "Hytale Integration",
       "annotations": {
@@ -6652,8 +7595,8 @@
                 },
                 "minItems": 3,
                 "maxItems": 3,
-                "description": "Position [x, y, z]",
-                "markdownDescription": "Position [x, y, z]",
+                "description": "Finite position [x, y, z] of the quad's starting corner.",
+                "markdownDescription": "Finite position [x, y, z] of the quad's starting corner.",
                 "default": [
                   0,
                   0,
@@ -6681,8 +7624,8 @@
                 },
                 "minItems": 2,
                 "maxItems": 2,
-                "description": "Size [width, height].",
-                "markdownDescription": "Size [width, height].",
+                "description": "Positive finite [width, height]. Width/height axes are Z/Y for X normals, X/Z for Y normals, and X/Y for Z normals.",
+                "markdownDescription": "Positive finite [width, height]. Width/height axes are Z/Y for X normals, X/Z for Y normals, and X/Y for Z normals.",
                 "default": [
                   16,
                   16
@@ -6690,8 +7633,8 @@
               },
               "group": {
                 "type": "string",
-                "description": "Parent group/bone name",
-                "markdownDescription": "Parent group/bone name"
+                "description": "Parent group UUID or unique name, or root (default). Missing or ambiguous names are rejected.",
+                "markdownDescription": "Parent group UUID or unique name, or root (default). Missing or ambiguous names are rejected."
               },
               "double_sided": {
                 "type": "boolean",
@@ -6809,8 +7752,10 @@
               },
               "time": {
                 "type": "number",
-                "description": "Time in seconds for the keyframe",
-                "markdownDescription": "Time in seconds for the keyframe"
+                "minimum": 0,
+                "maximum": 10000,
+                "description": "Finite time in seconds between 0 and 10000 for the visibility keyframe.",
+                "markdownDescription": "Finite time in seconds between 0 and 10000 for the visibility keyframe."
               },
               "visible": {
                 "type": "boolean",

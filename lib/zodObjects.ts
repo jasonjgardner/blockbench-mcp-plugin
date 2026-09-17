@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ACTIVE_VIEW_ID } from "@/lib/constants";
 
 // ============================================================================
 // Vector Schemas
@@ -97,6 +98,23 @@ export const faceEnum = z.enum(["north", "south", "east", "west", "up", "down"])
 
 /** Camera projection types */
 export const projectionEnum = z.enum(["unset", "orthographic", "perspective"]);
+
+/** Reference to a render target accepted by view-aware camera tools. */
+export const viewRefSchema = z
+  .string()
+  .min(1)
+  .describe(
+    `View to target: "${ACTIVE_VIEW_ID}" for the viewport the user last interacted with, the ID of an offscreen view from create_offscreen_view, or a viewport ID from list_views.`
+  );
+
+/** Orthographic side views a camera can lock to. */
+export const lockedAngleEnum = z.enum(["top", "bottom", "north", "south", "east", "west"]);
+
+/** Agent-chosen identifier for a plugin-owned offscreen view. */
+export const offscreenViewIdSchema = z
+  .string()
+  .regex(/^[A-Za-z0-9_-]{1,64}$/, "Use 1–64 letters, digits, underscores, or hyphens.")
+  .describe("Offscreen view ID.");
 
 /** Mesh selection modes */
 export const meshSelectionModeEnum = z.enum(["vertex", "edge", "face"]);

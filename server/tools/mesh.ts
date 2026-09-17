@@ -336,7 +336,7 @@ export const meshToolDocs: IToolSpec[] = [
   {
     name: "knife_tool",
     condition: false,
-    description: "Currently unsupported: Blockbench's interactive Knife context requires pointer topology that this point-list API cannot safely provide. Use subdivide_mesh or create geometry with place_mesh, or use Knife manually.",
+    description: "Currently unsupported for meshes: Blockbench's interactive Knife context requires pointer topology that this point-list API cannot safely provide. Use subdivide_mesh or place_mesh for meshes; use knife_cut_cube or slice_cubes_to_block_grid to cut cubes headlessly.",
     annotations: {
       title: "Knife Tool",
       destructiveHint: true,
@@ -773,7 +773,7 @@ export function registerMeshTools(): void {
     ...meshToolDocs[10],
     async execute({ mesh_id }) {
       findMeshOrThrow(mesh_id);
-      throw new Error("Headless knife_tool is unsupported: Blockbench requires interactive pointer/edge topology. Use subdivide_mesh or place_mesh for explicit geometry, or use Knife manually in Blockbench.");
+      throw new Error("Headless knife_tool is unsupported for meshes: Blockbench requires interactive pointer/edge topology. Use subdivide_mesh or place_mesh for meshes, or knife_cut_cube / slice_cubes_to_block_grid for cubes.");
     },
   }, meshToolDocs[10].status);
 }

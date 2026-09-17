@@ -4,13 +4,14 @@ import statusBarCSS from "@/ui/statusBar.css";
 
 let statusBarElement: HTMLDivElement | undefined;
 let unsubscribe: (() => void) | undefined;
+let statusStyles: Deletable | undefined;
 
 export function statusBarSetup(server: McpServer): void {
   const port = Settings.get("mcp_port") || 3000;
   const endpoint = Settings.get("mcp_endpoint") || "/bb-mcp";
 
   // Add CSS for the status bar
-  Blockbench.addCSS(statusBarCSS);
+  statusStyles = Blockbench.addCSS(statusBarCSS);
 
   // Create the status bar element
   statusBarElement = document.createElement("div");
@@ -100,4 +101,6 @@ export function statusBarTeardown(): void {
     statusBarElement.remove();
     statusBarElement = undefined;
   }
+  statusStyles?.delete();
+  statusStyles = undefined;
 }

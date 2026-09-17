@@ -9,15 +9,18 @@ import { cubeUvToolDocs } from "@/server/tools/cube-uv";
 import { displayToolDocs } from "@/server/tools/display";
 import { elementToolDocs } from "@/server/tools/element";
 import { importToolDocs } from "@/server/tools/import";
+import { knifeToolDocs } from "@/server/tools/knife";
 import { meshToolDocs } from "@/server/tools/mesh";
 import { meshInspectionToolDocs } from "@/server/tools/mesh-inspection";
 import { paintToolDocs } from "@/server/tools/paint";
+import { performanceToolDocs } from "@/server/tools/performance";
 import { projectToolDocs } from "@/server/tools/project";
 import { textureToolDocs } from "@/server/tools/texture";
 import { armatureToolDocs } from "@/server/tools/armature";
 import { animationToolDocs } from "@/server/tools/animation";
 import { uiToolDocs } from "@/server/tools/ui";
 import { modeToolDocs } from "@/server/tools/modes";
+import { geckolibToolDocs } from "@/server/tools/geckolib";
 import { hytaleToolDocs } from "@/server/tools/hytale";
 import { materialInstanceToolDocs } from "@/server/tools/material-instances";
 import { uvToolDocs } from "@/server/tools/uv";
@@ -30,7 +33,7 @@ export interface ICategoryGroup {
 }
 
 export const toolManifest: ICategoryGroup[] = [
-  { category: "Cubes", tools: cubeToolDocs },
+  { category: "Cubes", tools: [...cubeToolDocs, ...knifeToolDocs] },
   { category: "Camera & Screenshots", tools: cameraToolDocs },
   { category: "Capabilities", tools: capabilityToolDocs },
   { category: "Animation", tools: animationToolDocs },
@@ -43,10 +46,12 @@ export const toolManifest: ICategoryGroup[] = [
   { category: "Material Instances", tools: materialInstanceToolDocs },
   { category: "Mesh Editing", tools: [...meshToolDocs, ...meshInspectionToolDocs] },
   { category: "Paint Tools", tools: paintToolDocs },
+  { category: "Performance", tools: performanceToolDocs },
   { category: "Project", tools: projectToolDocs },
   { category: "Textures", tools: textureToolDocs },
   { category: "UI Interaction", tools: [...uiToolDocs, ...modeToolDocs] },
   { category: "UV Mapping", tools: [...uvToolDocs, ...cubeUvToolDocs] },
+  { category: "GeckoLib Integration", tools: geckolibToolDocs },
   { category: "Hytale Integration", tools: hytaleToolDocs },
 ];
 

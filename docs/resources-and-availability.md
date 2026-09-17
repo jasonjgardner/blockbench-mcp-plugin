@@ -24,6 +24,56 @@ without animation support cannot enter Animate through this tool. After switchin
 refresh `tools/list` to discover newly available tools. Use `set_camera_angle` for
 camera views and `enter_display_mode` when you also need a display slot/reference.
 
+### AI Scratchpad mode
+
+With **Settings** > **General** > **Enable AI Scratchpad** on, `list_modes` also
+reports `ai_scratchpad` whenever a project with edit-mode support is open. Entering
+it through `set_mode` relaxes the active format's geometry guardrails (cube size
+limiter and coordinate limits, single-axis rotation limit and 22.5° snapping,
+integer sizes) until another mode is selected, which restores the values captured
+on entry. Leaving the mode does not clamp geometry that no longer fits; use
+`inspect_block_bounds` and `slice_cubes_to_block_grid` to conform it. Tools gated
+to `edit` (the knife tools and `set_cube_uv`) stay available in the scratchpad.
+
+### AI usage disclosure
+
+With **Disclose AI Usage** on (the default), the first tool call that finishes an
+undoable edit or creates a project stamps two native project properties, saved in
+the `.bbmodel` and shown in the Project settings dialog: `ai_used` (`true`) and
+`ai_agents`, the comma-separated client names from each session's `initialize`
+request (for example `Claude Code, Cline`). Read-only tools, camera moves, and
+mode switches never stamp a project; untouched files are written unchanged.
+
+## Views: sharing or not sharing the viewport
+
+`capture_screenshot` and `set_camera_angle` accept a `view`. The default,
+`"active"`, is the viewport the user last interacted with, so moving its camera
+changes what they see (and clears any side-view lock they had). To inspect the
+model without moving the user's camera, create a plugin-owned offscreen view and
+target it instead:
+
+```json
+{ "id": "inspect", "width": 1024, "height": 768 }
+```
+
+`create_offscreen_view` builds a Blockbench `Preview` that never joins the DOM.
+It shares the live scene but owns its camera, renderer, and canvas, and starts
+where the user's camera is unless `copy_view` is `"none"`. Then call
+`set_camera_angle` or `capture_screenshot` with `"view": "inspect"`.
+`set_camera_angle` also accepts `zoom`, `fov`, and `locked_angle` (`top`,
+`north`, ...) and returns the applied camera state next to the frame. The
+camera an agent gives an offscreen view is remembered and restored before each
+render, because Blockbench re-targets every preview when a project is selected.
+
+`list_views` reports every target with its rendered size and camera state.
+Connected viewports keep their Blockbench IDs (`main`, `split_screen_1`, ...)
+and can be addressed by those IDs too; `"active"` and `"none"` are reserved and
+cannot name an offscreen view. `resize_offscreen_view` changes an offscreen
+view's pixel size. Each offscreen view holds a WebGL context, so at most four
+exist at once; `create_offscreen_view` returns an explanatory error at the cap.
+Delete views with `delete_offscreen_view` when finished; the plugin disposes any
+that remain when it unloads.
+
 Resource discovery advertises `resources.listChanged: true` and emits
 `notifications/resources/list_changed` when the listed metadata changes. Clients
 can use `resources/list` to find the active project's live file:

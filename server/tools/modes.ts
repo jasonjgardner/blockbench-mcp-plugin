@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { createTool, type IToolSpec } from "@/lib/factories";
 import { STATUS_STABLE } from "@/lib/constants";
+import { createJsonResult } from "@/lib/tool-results";
 
 /** Mode discovery takes no arguments and evaluates the current host registry at call time. */
 export const listModesParameters = z.object({});
@@ -29,7 +30,7 @@ export const modeToolDocs: IToolSpec[] = [
   },
   {
     name: "set_mode",
-    description: "Switches Blockbench's editor tab through its native mode trigger, respecting the mode's condition. Use mode_id='animate' to enter Animate before animation work, 'paint' before native painting tools, or 'edit' to return. Returns the resulting mode and available modes; refresh tools/list for changed tool availability. Selecting the current mode does nothing. Does not change the project's format.",
+    description: "Switches Blockbench's editor tab through its native mode trigger, respecting the mode's condition. Use mode_id='animate' to enter Animate before animation work, 'paint' before native painting tools, or 'edit' to return. Returns the resulting mode and available modes; refresh tools/list for changed tool availability. Selecting the current mode does nothing. Does not change the project's format. When the user enabled the AI Scratchpad setting, mode_id='ai_scratchpad' relaxes the format's cube size, rotation and integer-size guardrails until another mode is selected.",
     annotations: { title: "Set Mode", destructiveHint: false, idempotentHint: true, openWorldHint: false },
     parameters: setModeParameters,
     status: STATUS_STABLE,
@@ -75,8 +76,7 @@ function inspectModes(): IModeSnapshot {
 }
 
 function modeResult(snapshot: IModeSnapshot, change?: { previous_mode: string | null; changed: boolean }): CallToolResult {
-  const result = { ...snapshot, ...change };
-  return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], structuredContent: result };
+  return createJsonResult({ ...snapshot, ...change });
 }
 
 /**

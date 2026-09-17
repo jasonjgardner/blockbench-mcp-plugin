@@ -1,4 +1,16 @@
-import type { EmbeddedResource } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult, EmbeddedResource } from "@modelcontextprotocol/sdk/types.js";
+
+/**
+ * Wraps a JSON-serialisable object as both pretty-printed text and
+ * `structuredContent`, so clients without structured output support still
+ * receive the same data.
+ *
+ * @param result - Plain object to return; must survive `JSON.stringify`.
+ * @returns A tool result carrying the object in both representations.
+ */
+export function createJsonResult(result: Record<string, unknown>): CallToolResult {
+  return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], structuredContent: result };
+}
 
 /**
  * A compiled export's identity and complete payload, independent of Blockbench

@@ -18,7 +18,7 @@ Open the desktop version of Blockbench, go to File > Plugins and click the "Load
 
 ## Model Context Protocol Server
 
-Configure the MCP server under Blockbench settings: **Settings** > **General** > **MCP Server Port** and **MCP Server Endpoint**
+Configure the MCP server under Blockbench settings: **Settings** > **General** > **MCP Server Port** and **MCP Server Endpoint**. The same section holds **Enable AI Scratchpad** (adds an `ai_scratchpad` mode that lifts the format's cube size, rotation, and integer-size guardrails while selected) and **Disclose AI Usage** (stamps `ai_used` and `ai_agents` onto projects that MCP tools modify or create).
 
 The following examples use the default values of `:3000/bb-mcp`
 

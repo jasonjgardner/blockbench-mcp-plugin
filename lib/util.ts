@@ -1,3 +1,6 @@
+import { ACTIVE_VIEW_ID } from "@/lib/constants";
+import { renderViewToDataUrl, resolveView } from "@/lib/views";
+
 /**
  * Helper function to create properly formatted image content for MCP responses.
  * Handles data URLs, base64 strings, and objects with url property.
@@ -280,10 +283,14 @@ export function getMeshOrSelected(meshId?: string): Mesh {
 }
 
 /**
- * Captures a screenshot of the 3D preview canvas.
- * Uses Blockbench's native rendering pipeline for accurate capture.
+ * Captures a screenshot of a 3D view using Blockbench's native rendering pipeline.
+ *
+ * @param project - Project name or UUID to select before rendering; defaults to the active project.
+ * @param view - `"active"` for the user's active viewport, an offscreen view ID, or a viewport ID.
+ * @returns MCP image content holding the PNG frame.
+ * @throws {Error} When no project is open, the view is unknown, or rendering fails.
  */
-export function captureScreenshot(project?: string) {
+export function captureScreenshot(project?: string, view: string = ACTIVE_VIEW_ID) {
   let selectedProject = Project;
 
   if (!selectedProject || project !== undefined) {
@@ -301,26 +308,7 @@ export function captureScreenshot(project?: string) {
     selectedProject.select();
   }
 
-  // @ts-ignore - Preview is globally available in Blockbench
-  const preview = Preview.selected;
-  if (!preview) {
-    throw new Error("No preview available for the selected project.");
-  }
-
-  // Capture the preview canvas using Blockbench's native approach
-  // Canvas.withoutGizmos temporarily hides gizmos, executes the callback, then restores them
-  let dataUrl: string | undefined;
-  // @ts-ignore - Canvas is globally available in Blockbench
-  Canvas.withoutGizmos(() => {
-    preview.render();
-    dataUrl = preview.canvas.toDataURL();
-  });
-
-  if (!dataUrl) {
-    throw new Error("Failed to capture preview screenshot.");
-  }
-
-  return imageContent(dataUrl, "image/png");
+  return imageContent(renderViewToDataUrl(resolveView(view)), "image/png");
 }
 
 /**

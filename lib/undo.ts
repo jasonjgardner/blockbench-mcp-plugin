@@ -1,4 +1,5 @@
 /// <reference types="blockbench-types" />
+import { recordToolWrite } from "@/lib/ai-disclosure";
 
 /**
  * Cancels the pending Blockbench edit.
@@ -17,24 +18,37 @@ export function cancelUndoEdit(revert: boolean): void {
 /**
  * Runs `edit` inside one Blockbench undo transaction.
  *
+ * A finished edit is also reported to AI usage disclosure, which stamps the
+ * project when the call belongs to an MCP client.
+ *
  * The entry is finished with `label` when `edit` returns, or canceled and
  * reverted when it throws, so a partial failure never leaves a half-applied
  * scene in history. Aspect arrays may be mutated by `edit` (for example,
  * pushing newly created elements) because Blockbench re-reads them when the
  * edit finishes or is canceled.
  *
+ * Blockbench's revert rebuilds its reference from the same aspect arrays, so it
+ * cannot recreate an object that `edit` removed. An edit that deletes something
+ * must therefore make the removal its last step and do any follow-up work
+ * (scene refreshes, toolbar updates) after this function returns.
+ *
  * @param aspects - Undo aspects snapshotted before the edit starts.
  * @param label - History entry label shown in Blockbench's Edit menu.
  * @param edit - Mutation to apply; its return value is passed through.
+ * @param finishAspects - Aspects snapshotted after the edit when they differ from
+ *   `aspects`. Blockbench serializes the objects listed in an aspect array, so an
+ *   edit that removes objects (for example a texture) must finish with an aspect
+ *   list that no longer names them, exactly as the native delete actions do.
  * @returns The value returned by `edit`.
  * @throws The original error from `edit` after reverting; an `AggregateError`
  *   carrying both errors when the revert itself also fails.
  */
-export function runUndoableEdit<T>(aspects: UndoAspects, label: string, edit: () => T): T {
+export function runUndoableEdit<T>(aspects: UndoAspects, label: string, edit: () => T, finishAspects?: UndoAspects): T {
   Undo.initEdit(aspects);
   try {
     const result = edit();
-    Undo.finishEdit(label);
+    Undo.finishEdit(label, finishAspects);
+    recordToolWrite();
     return result;
   } catch (error) {
     const [revertError] = attemptRevert();
