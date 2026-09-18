@@ -1,11 +1,11 @@
 {
-  "version": "1.7.0",
-  "generatedAt": "2026-09-12T19:10:53.987Z",
+  "version": "1.8.0",
+  "generatedAt": "2026-09-18T01:55:26.904Z",
   "tools": [
     {
       "name": "place_cube",
       "title": "Place Cube",
-      "description": "Places a cube of the given size at the specified position. Texture and group are optional.",
+      "description": "Creates cubes in one reversible edit. Texture and group are optional, allowing untextured blockouts. Explicit face targets never use the current UV selection; partial/custom faces require per-face UV support.",
       "status": "stable",
       "category": "Cubes",
       "annotations": {
@@ -97,13 +97,13 @@
               },
               "texture": {
                 "type": "string",
-                "description": "Texture ID or name to apply to the cube.",
-                "markdownDescription": "Texture ID or name to apply to the cube."
+                "description": "Texture UUID, ID or name. When omitted, uses the default texture if one exists; otherwise creates untextured cubes.",
+                "markdownDescription": "Texture UUID, ID or name. When omitted, uses the default texture if one exists; otherwise creates untextured cubes."
               },
               "group": {
                 "type": "string",
-                "description": "Group/bone to which the cube belongs.",
-                "markdownDescription": "Group/bone to which the cube belongs."
+                "description": "Parent group UUID or unique name, or root (default). Missing or ambiguous names are rejected.",
+                "markdownDescription": "Parent group UUID or unique name, or root (default). Missing or ambiguous names are rejected."
               },
               "faces": {
                 "anyOf": [
@@ -132,8 +132,8 @@
                         "type": "boolean"
                       }
                     ],
-                    "description": "Whether to apply the texture to all faces. Set to `true` to enable auto UV mapping.",
-                    "markdownDescription": "Whether to apply the texture to all faces. Set to `true` to enable auto UV mapping."
+                    "description": "true applies texture to all faces with Auto UV; false skips texture assignment and disables Auto UV except in Hytale, which requires Auto UV 1.",
+                    "markdownDescription": "true applies texture to all faces with Auto UV; false skips texture assignment and disables Auto UV except in Hytale, which requires Auto UV 1."
                   },
                   {
                     "type": "array",
@@ -160,8 +160,8 @@
                           },
                           "minItems": 4,
                           "maxItems": 4,
-                          "description": "Custom UV mapping for the face.",
-                          "markdownDescription": "Custom UV mapping for the face."
+                          "description": "Custom UV rectangle. Hytale requires absolute width/height to match the cube's face dimensions: north/south XY, east/west ZY, up/down XZ.",
+                          "markdownDescription": "Custom UV rectangle. Hytale requires absolute width/height to match the cube's face dimensions: north/south XY, east/west ZY, up/down XZ."
                         }
                       },
                       "required": [
@@ -175,8 +175,8 @@
                   }
                 ],
                 "default": true,
-                "description": "Faces to apply the texture to. Set to `true` to enable auto UV mapping.",
-                "markdownDescription": "Faces to apply the texture to. Set to `true` to enable auto UV mapping."
+                "description": "true applies texture to all faces with Auto UV; false skips texture assignment. Named faces use Auto UV; false/custom rectangles disable Auto UV outside Hytale. Hytale always retains Auto UV 1 and custom rectangles must match the geometry's face dimensions. Partial/custom faces require per-face UV support. Single-texture formats may still display the project texture.",
+                "markdownDescription": "true applies texture to all faces with Auto UV; false skips texture assignment. Named faces use Auto UV; false/custom rectangles disable Auto UV outside Hytale. Hytale always retains Auto UV 1 and custom rectangles must match the geometry's face dimensions. Partial/custom faces require per-face UV support. Single-texture formats may still display the project texture."
               }
             },
             "required": [
@@ -420,9 +420,45 @@
       }
     },
     {
+      "name": "get_capabilities",
+      "title": "Get Capabilities",
+      "description": "Discover Blockbench/plugin versions, desktop or web environment, active project summary, and registered model formats. Returns detailed boolean format features (null means unknown), compact supported-feature lists for all formats, and optional tool registration states. Works with no open project. Format features do not guarantee that every enabled MCP tool can run in the current mode or selection.",
+      "status": "stable",
+      "category": "Capabilities",
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
+      "parameters": {
+        "$ref": "#/definitions/get_capabilities",
+        "definitions": {
+          "get_capabilities": {
+            "type": "object",
+            "properties": {
+              "format_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional registered format ID to inspect, such as 'free'. Defaults to the active project's format. Does not switch or create a project.",
+                "markdownDescription": "Optional registered format ID to inspect, such as 'free'. Defaults to the active project's format. Does not switch or create a project."
+              },
+              "include_tools": {
+                "type": "boolean",
+                "default": false,
+                "description": "Include all registered MCP tool names, stability status, and current enabled state. Use list_modes and set_mode to navigate before calling mode-dependent tools.",
+                "markdownDescription": "Include all registered MCP tool names, stability status, and current enabled state. Use list_modes and set_mode to navigate before calling mode-dependent tools."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
       "name": "create_animation",
       "title": "Create Animation",
-      "description": "Creates a new animation with keyframes for bones.",
+      "description": "Creates and selects an undoable animation with linear keyframes for existing bones, using Blockbench editor coordinates. Returns its UUID and actual name.",
       "status": "stable",
       "category": "Animation",
       "annotations": {
@@ -447,6 +483,8 @@
               },
               "animation_length": {
                 "type": "number",
+                "minimum": 0,
+                "maximum": 10000,
                 "description": "Length of the animation in seconds",
                 "markdownDescription": "Length of the animation in seconds"
               },
@@ -458,7 +496,8 @@
                     "type": "object",
                     "properties": {
                       "time": {
-                        "type": "number"
+                        "type": "number",
+                        "minimum": 0
                       },
                       "position": {
                         "type": "array",
@@ -504,8 +543,8 @@
                     "additionalProperties": false
                   }
                 },
-                "description": "Keyframes for each bone",
-                "markdownDescription": "Keyframes for each bone"
+                "description": "Keyframes keyed by existing bone/group name. Values use Blockbench editor coordinates; rotations are degrees.",
+                "markdownDescription": "Keyframes keyed by existing bone/group name. Values use Blockbench editor coordinates; rotations are degrees."
               },
               "particle_effects": {
                 "type": "object",
@@ -688,7 +727,7 @@
     {
       "name": "animation_graph_editor",
       "title": "Animation Graph Editor",
-      "description": "Controls animation curves in the graph editor for fine-tuning animations.",
+      "description": "Edits a bone channel's interpolation or numeric Bezier easing in one reversible edit. Uses native per-axis handle arrays and chronological segment durations. Custom points are normalized time/value fractions. Partial-axis edits require existing Bezier keys; key-wide mode changes require all axes. Rejects curve edits ignored by quaternion rotation. Inspect neighboring segments after range edits.",
       "status": "experimental",
       "category": "Animation",
       "annotations": {
@@ -736,8 +775,8 @@
                   }
                 ],
                 "default": "all",
-                "description": "Axis to modify curves for.",
-                "markdownDescription": "Axis to modify curves for."
+                "description": "Axes to edit. Linear, stepped and smooth require all because interpolation is key-wide. Partial-axis easing/custom edits require selected keys already using Bezier interpolation, preserving other axes' handles.",
+                "markdownDescription": "Axes to edit. Linear, stepped and smooth require all because interpolation is key-wide. Partial-axis easing/custom edits require selected keys already using Bezier interpolation, preserving other axes' handles."
               },
               "action": {
                 "type": "string",
@@ -750,8 +789,8 @@
                   "stepped",
                   "custom"
                 ],
-                "description": "Type of curve modification to apply.",
-                "markdownDescription": "Type of curve modification to apply."
+                "description": "Curve modification. Easing/custom require at least two distinct chronological numeric single-data-point keys. Smooth and Bezier rotation edits are unavailable when native quaternion interpolation would ignore them.",
+                "markdownDescription": "Curve modification. Easing/custom require at least two distinct chronological numeric single-data-point keys. Smooth and Bezier rotation edits are unavailable when native quaternion interpolation would ignore them."
               },
               "keyframe_range": {
                 "type": "object",
@@ -772,8 +811,8 @@
                   "end"
                 ],
                 "additionalProperties": false,
-                "description": "Time range to apply the curve modification. If not provided, applies to all keyframes.",
-                "markdownDescription": "Time range to apply the curve modification. If not provided, applies to all keyframes."
+                "description": "Finite ordered time range selecting existing keys; omitted means the full channel. Key-wide interpolation can affect neighboring segments at range boundaries, so edit the full channel when boundary continuity matters.",
+                "markdownDescription": "Finite ordered time range selecting existing keys; omitted means the full channel. Key-wide interpolation can affect neighboring segments at range boundaries, so edit the full channel when boundary continuity matters."
               },
               "custom_curve": {
                 "type": "object",
@@ -785,8 +824,8 @@
                     },
                     "minItems": 2,
                     "maxItems": 2,
-                    "description": "First control point [time, value].",
-                    "markdownDescription": "First control point [time, value]."
+                    "description": "Outgoing normalized control point [time fraction in 0..1, value fraction] for each selected adjacent-key segment. Finite value fractions outside 0..1 allow overshoot.",
+                    "markdownDescription": "Outgoing normalized control point [time fraction in 0..1, value fraction] for each selected adjacent-key segment. Finite value fractions outside 0..1 allow overshoot."
                   },
                   "control_point_2": {
                     "type": "array",
@@ -795,8 +834,8 @@
                     },
                     "minItems": 2,
                     "maxItems": 2,
-                    "description": "Second control point [time, value].",
-                    "markdownDescription": "Second control point [time, value]."
+                    "description": "Incoming normalized control point [time fraction in 0..1, value fraction], measured from the segment start. Converted to native per-axis offsets relative to the ending key.",
+                    "markdownDescription": "Incoming normalized control point [time fraction in 0..1, value fraction], measured from the segment start. Converted to native per-axis offsets relative to the ending key."
                   }
                 },
                 "required": [
@@ -804,8 +843,8 @@
                   "control_point_2"
                 ],
                 "additionalProperties": false,
-                "description": "Custom bezier curve control points (only for 'custom' action).",
-                "markdownDescription": "Custom bezier curve control points (only for 'custom' action)."
+                "description": "Normalized cubic Bezier control points, required for custom action. Conversion uses each segment's duration and edited-axis endpoint values; unrelated axis handles are preserved.",
+                "markdownDescription": "Normalized cubic Bezier control points, required for custom action. Conversion uses each segment's duration and edited-axis endpoint values; unrelated axis handles are preserved."
               }
             },
             "required": [
@@ -859,8 +898,8 @@
                   },
                   "parent": {
                     "type": "string",
-                    "description": "Parent bone name.",
-                    "markdownDescription": "Parent bone name."
+                    "description": "Parent bone name; create also accepts a group UUID or root.",
+                    "markdownDescription": "Parent bone name; create also accepts a group UUID or root."
                   },
                   "origin": {
                     "type": "array",
@@ -887,8 +926,8 @@
                     "items": {
                       "type": "string"
                     },
-                    "description": "Names of elements to add to this bone.",
-                    "markdownDescription": "Names of elements to add to this bone."
+                    "description": "Names or UUIDs of existing elements/groups to add when creating a bone. For rename, the first entry is the new name.",
+                    "markdownDescription": "Names or UUIDs of existing elements/groups to add when creating a bone. For rename, the first entry is the new name."
                   },
                   "ik_enabled": {
                     "type": "boolean",
@@ -944,6 +983,11 @@
           "animation_timeline": {
             "type": "object",
             "properties": {
+              "animation_id": {
+                "type": "string",
+                "description": "Animation UUID or name. If not provided, uses current animation.",
+                "markdownDescription": "Animation UUID or name. If not provided, uses current animation."
+              },
               "action": {
                 "type": "string",
                 "enum": [
@@ -961,20 +1005,23 @@
               },
               "time": {
                 "type": "number",
+                "minimum": 0,
                 "description": "Time in seconds (for set_time action).",
                 "markdownDescription": "Time in seconds (for set_time action)."
               },
               "length": {
                 "type": "number",
-                "description": "Animation length in seconds (for set_length action).",
-                "markdownDescription": "Animation length in seconds (for set_length action)."
+                "minimum": 0,
+                "maximum": 10000,
+                "description": "Animation length in seconds, including all keyframes (for set_length action).",
+                "markdownDescription": "Animation length in seconds, including all keyframes (for set_length action)."
               },
               "fps": {
-                "type": "number",
-                "minimum": 1,
+                "type": "integer",
+                "minimum": 10,
                 "maximum": 120,
-                "description": "Frames per second (for set_fps action).",
-                "markdownDescription": "Frames per second (for set_fps action)."
+                "description": "Integer frames per second, 10–120 (for set_fps action; Blockbench minimum is 10).",
+                "markdownDescription": "Integer frames per second, 10–120 (for set_fps action; Blockbench minimum is 10)."
               },
               "loop_mode": {
                 "type": "string",
@@ -1021,7 +1068,7 @@
     {
       "name": "batch_keyframe_operations",
       "title": "Batch Keyframe Operations",
-      "description": "Performs batch operations on multiple keyframes at once.",
+      "description": "Edits keyframes in the active animation atomically; all includes hidden animators. Numeric value edits use native transform values. Bake samples continuous numeric curves within selected channel spans, caps output at 10000 samples, and restores the playhead. Expressions, step/pre-post curves and effect channels require native baking.",
       "status": "experimental",
       "category": "Animation",
       "annotations": {
@@ -1042,8 +1089,8 @@
                   "pattern"
                 ],
                 "default": "selected",
-                "description": "Which keyframes to operate on.",
-                "markdownDescription": "Which keyframes to operate on."
+                "description": "Which active-animation keyframes to operate on. all includes hidden or collapsed animators.",
+                "markdownDescription": "Which active-animation keyframes to operate on. all includes hidden or collapsed animators."
               },
               "range": {
                 "type": "object",
@@ -1072,8 +1119,9 @@
                 "properties": {
                   "interval": {
                     "type": "number",
-                    "description": "Time interval between keyframes.",
-                    "markdownDescription": "Time interval between keyframes."
+                    "exclusiveMinimum": 0,
+                    "description": "Positive time interval between keyframes.",
+                    "markdownDescription": "Positive time interval between keyframes."
                   },
                   "offset": {
                     "type": "number",
@@ -1107,8 +1155,8 @@
                 "properties": {
                   "offset_time": {
                     "type": "number",
-                    "description": "Time offset to apply.",
-                    "markdownDescription": "Time offset to apply."
+                    "description": "Time offset to apply; resulting keyframes must remain between 0 and 10000 seconds.",
+                    "markdownDescription": "Time offset to apply; resulting keyframes must remain between 0 and 10000 seconds."
                   },
                   "offset_values": {
                     "type": "array",
@@ -1117,13 +1165,13 @@
                     },
                     "minItems": 3,
                     "maxItems": 3,
-                    "description": "Value offset to apply.",
-                    "markdownDescription": "Value offset to apply."
+                    "description": "Numeric [x,y,z] value offset. Requires transform keyframes with a single numeric data point; expressions and pre/post values require native tools.",
+                    "markdownDescription": "Numeric [x,y,z] value offset. Requires transform keyframes with a single numeric data point; expressions and pre/post values require native tools."
                   },
                   "scale_factor": {
                     "type": "number",
-                    "description": "Scale factor for time or values.",
-                    "markdownDescription": "Scale factor for time or values."
+                    "description": "Scale factor for keyframe times around scale_pivot. Does not scale values; zero is accepted only when it creates no timestamp collisions.",
+                    "markdownDescription": "Scale factor for keyframe times around scale_pivot. Does not scale values; zero is accepted only when it creates no timestamp collisions."
                   },
                   "scale_pivot": {
                     "type": "number",
@@ -1137,13 +1185,14 @@
                       "y",
                       "z"
                     ],
-                    "description": "Axis to mirror values across.",
-                    "markdownDescription": "Axis to mirror values across."
+                    "description": "Numeric component to negate. Requires transform keyframes with a single numeric data point.",
+                    "markdownDescription": "Numeric component to negate. Requires transform keyframes with a single numeric data point."
                   },
                   "bake_interval": {
                     "type": "number",
-                    "description": "Interval for baking keyframes.",
-                    "markdownDescription": "Interval for baking keyframes."
+                    "minimum": 0.001,
+                    "description": "Sampling interval in seconds (minimum 0.001; at most 10000 samples). Bakes only selected transform channels between their selected times. Requires continuous numeric single-data-point keyframes; expressions, effects and stepped/pre-post curves require native baking.",
+                    "markdownDescription": "Sampling interval in seconds (minimum 0.001; at most 10000 samples). Bakes only selected transform channels between their selected times. Requires continuous numeric single-data-point keyframes; expressions, effects and stepped/pre-post curves require native baking."
                   }
                 },
                 "additionalProperties": false,
@@ -1163,7 +1212,7 @@
     {
       "name": "animation_copy_paste",
       "title": "Animation Copy/Paste",
-      "description": "Copies and pastes animation data between bones or animations.",
+      "description": "Copies native keyframe data points and curve metadata into a plugin-local clipboard. Paste preserves exact timestamps, replaces same-channel/time collisions and is undoable, including newly created animators. Mirror paste uses native position/rotation/curve mirroring; scale is unchanged.",
       "status": "experimental",
       "category": "Animation",
       "annotations": {
@@ -1262,8 +1311,8 @@
                   "time_offset": {
                     "type": "number",
                     "default": 0,
-                    "description": "Time offset for pasted keyframes.",
-                    "markdownDescription": "Time offset for pasted keyframes."
+                    "description": "Offset for exact, unsnapped pasted timestamps; results must remain between 0 and 10000 seconds. Existing keys at the same channel/time are replaced.",
+                    "markdownDescription": "Offset for exact, unsnapped pasted timestamps; results must remain between 0 and 10000 seconds. Existing keys at the same channel/time are replaced."
                   },
                   "mirror_axis": {
                     "type": "string",
@@ -1272,8 +1321,8 @@
                       "y",
                       "z"
                     ],
-                    "description": "Axis to mirror across for mirror_paste.",
-                    "markdownDescription": "Axis to mirror across for mirror_paste."
+                    "description": "Native mirror axis for mirror_paste (default x). Position negates this axis, rotation negates the other two axes, scale is unchanged; curve handles follow native mirroring.",
+                    "markdownDescription": "Native mirror axis for mirror_paste (default x). Position negates this axis, rotation negates the other two axes, scale is unchanged; curve handles follow native mirroring."
                   }
                 },
                 "required": [
@@ -2258,7 +2307,9 @@
               },
               "parent": {
                 "type": "string",
-                "default": "root"
+                "default": "root",
+                "description": "Parent group UUID or name, or root for the project root.",
+                "markdownDescription": "Parent group UUID or name, or root for the project root."
               },
               "visibility": {
                 "type": "boolean",
@@ -2608,7 +2659,7 @@
     {
       "name": "list_export_formats",
       "title": "List Export Formats",
-      "description": "Lists all registered export codecs with their id, display name, file extension, and whether they support compile/export. Use before `export_model` to pick a codec.",
+      "description": "Lists registered export codecs, file extensions, compile/export support, and availability under the native export action's condition. Use before `export_model` to pick a codec.",
       "status": "stable",
       "category": "Export",
       "annotations": {
@@ -2636,7 +2687,7 @@
     {
       "name": "export_model",
       "title": "Export Model",
-      "description": "Compiles the current project through the named codec and returns the result as text. Optionally writes the compiled content to a filesystem path (requires user permission in Blockbench v5.0+). Use `list_export_formats` first to discover codec IDs.",
+      "description": "Compiles the current project through a codec whose native export action is available. Returns JSON metadata and a live .bbmodel resource link; result_format='embedded' returns complete exports as text/blob resources with URI and MIME type. Optionally writes to a local path (requires Blockbench filesystem permission). Use `list_export_formats` to discover codecs.",
       "status": "experimental",
       "category": "Export",
       "annotations": {
@@ -2670,8 +2721,18 @@
                 "minimum": 0,
                 "maximum": 2000000,
                 "default": 100000,
-                "description": "Maximum number of characters to include in the returned `content` field. Use 0 to omit content entirely (useful when only writing to disk). Larger values risk exceeding MCP context limits.",
-                "markdownDescription": "Maximum number of characters to include in the returned `content` field. Use 0 to omit content entirely (useful when only writing to disk). Larger values risk exceeding MCP context limits."
+                "description": "Maximum characters of text or base64 to return. Use 0 to omit file content. In embedded mode, only complete files within this limit are embedded; larger files return a truncated preview in metadata.content.",
+                "markdownDescription": "Maximum characters of text or base64 to return. Use 0 to omit file content. In embedded mode, only complete files within this limit are embedded; larger files return a truncated preview in metadata.content."
+              },
+              "result_format": {
+                "type": "string",
+                "enum": [
+                  "text",
+                  "embedded"
+                ],
+                "default": "text",
+                "description": "text preserves the JSON metadata.content payload. embedded moves a complete file into an MCP resource block with URI and MIME type, sets metadata.content to null, and reports its resource_uri. Both modes include a link to the live .bbmodel project resource.",
+                "markdownDescription": "text preserves the JSON metadata.content payload. embedded moves a complete file into an MCP resource block with URI and MIME type, sets metadata.content to null, and reports its resource_uri. Both modes include a link to the live .bbmodel project resource."
               }
             },
             "additionalProperties": false
@@ -3075,7 +3136,7 @@
     {
       "name": "place_mesh",
       "title": "Place Mesh",
-      "description": "Places a mesh at the specified position. Texture and group are optional.",
+      "description": "Creates meshes from local vertices and optional indexed triangle/quad faces, with position, rotation, and scale. Texture and group are optional. Returns meshes with UUIDs and vertex_keys/face_keys arrays in input order for subsequent editing.",
       "status": "experimental",
       "category": "Mesh Editing",
       "annotations": {
@@ -3102,8 +3163,8 @@
                       },
                       "minItems": 3,
                       "maxItems": 3,
-                      "description": "Position of the mesh.",
-                      "markdownDescription": "Position of the mesh.",
+                      "description": "Position of the mesh origin/pivot. Vertices are local to this point.",
+                      "markdownDescription": "Position of the mesh origin/pivot. Vertices are local to this point.",
                       "default": [
                         0,
                         0,
@@ -3117,8 +3178,8 @@
                       },
                       "minItems": 3,
                       "maxItems": 3,
-                      "description": "Rotation of the mesh.",
-                      "markdownDescription": "Rotation of the mesh.",
+                      "description": "Rotation of the mesh in degrees around its origin.",
+                      "markdownDescription": "Rotation of the mesh in degrees around its origin.",
                       "default": [
                         0,
                         0,
@@ -3132,8 +3193,8 @@
                       },
                       "minItems": 3,
                       "maxItems": 3,
-                      "description": "Scale of the mesh.",
-                      "markdownDescription": "Scale of the mesh.",
+                      "description": "Scale factors baked into local vertex coordinates before rotation.",
+                      "markdownDescription": "Scale factors baked into local vertex coordinates before rotation.",
                       "default": [
                         1,
                         1,
@@ -3155,6 +3216,21 @@
                       "default": [],
                       "description": "Vertices of the mesh.",
                       "markdownDescription": "Vertices of the mesh."
+                    },
+                    "faces": {
+                      "type": "array",
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "minItems": 3,
+                        "maxItems": 4
+                      },
+                      "default": [],
+                      "description": "Triangle or quad faces as zero-based indices into vertices, in perimeter order. Counterclockwise winding faces outward. Omit for a vertex-only mesh.",
+                      "markdownDescription": "Triangle or quad faces as zero-based indices into vertices, in perimeter order. Counterclockwise winding faces outward. Omit for a vertex-only mesh."
                     }
                   },
                   "required": [
@@ -3189,7 +3265,7 @@
     {
       "name": "extrude_mesh",
       "title": "Extrude Mesh",
-      "description": "Extrudes selected faces or edges of a mesh.",
+      "description": "Extrudes the target mesh's selected face region along averaged normals, honoring distance. Returns new vertex keys and cap/wall face keys. Edge/vertex modes are unsupported.",
       "status": "experimental",
       "category": "Mesh Editing",
       "annotations": {
@@ -3209,8 +3285,8 @@
               "distance": {
                 "type": "number",
                 "default": 1,
-                "description": "Distance to extrude.",
-                "markdownDescription": "Distance to extrude."
+                "description": "Signed distance along averaged selected face normals, in local model units.",
+                "markdownDescription": "Signed distance along averaged selected face normals, in local model units."
               },
               "mode": {
                 "type": "string",
@@ -3220,8 +3296,8 @@
                   "vertices"
                 ],
                 "default": "faces",
-                "description": "What to extrude: faces, edges, or vertices.",
-                "markdownDescription": "What to extrude: faces, edges, or vertices."
+                "description": "Use faces. Edge and vertex extrusion are currently unsupported by this headless tool.",
+                "markdownDescription": "Use faces. Edge and vertex extrusion are currently unsupported by this headless tool."
               }
             },
             "additionalProperties": false
@@ -3233,7 +3309,7 @@
     {
       "name": "subdivide_mesh",
       "title": "Subdivide Mesh",
-      "description": "Subdivides selected faces of a mesh to create more geometry.",
+      "description": "Subdivides the target mesh's selected triangles/quads into a regular grid with interpolated UVs. Returns new geometry keys. Unselected neighboring faces remain unchanged and may need matching cuts.",
       "status": "experimental",
       "category": "Mesh Editing",
       "annotations": {
@@ -3251,12 +3327,12 @@
                 "markdownDescription": "ID or name of the mesh. If not provided, uses selected mesh."
               },
               "cuts": {
-                "type": "number",
+                "type": "integer",
                 "minimum": 1,
                 "maximum": 10,
                 "default": 1,
-                "description": "Number of subdivision cuts to make.",
-                "markdownDescription": "Number of subdivision cuts to make."
+                "description": "Number of cuts per edge; each selected face becomes (cuts + 1) squared faces.",
+                "markdownDescription": "Number of cuts per edge; each selected face becomes (cuts + 1) squared faces."
               }
             },
             "additionalProperties": false
@@ -3309,7 +3385,7 @@
                       "markdownDescription": "Diameter of the sphere."
                     },
                     "sides": {
-                      "type": "number",
+                      "type": "integer",
                       "minimum": 3,
                       "maximum": 48,
                       "default": 12,
@@ -3483,7 +3559,7 @@
     {
       "name": "delete_mesh_elements",
       "title": "Delete Mesh Elements",
-      "description": "Deletes selected vertices, edges, or faces from a mesh.",
+      "description": "Deletes selected components only from the target mesh. Vertex/edge deletion removes incident faces; keep_vertices retains vertices orphaned by face/edge removal.",
       "status": "experimental",
       "category": "Mesh Editing",
       "annotations": {
@@ -3659,7 +3735,7 @@
                       "default": 16
                     },
                     "sides": {
-                      "type": "number",
+                      "type": "integer",
                       "minimum": 3,
                       "maximum": 64,
                       "default": 12
@@ -3715,7 +3791,7 @@
     {
       "name": "knife_tool",
       "title": "Knife Tool",
-      "description": "Uses the knife tool to cut custom edges into mesh faces.",
+      "description": "Currently unsupported: Blockbench's interactive Knife context requires pointer topology that this point-list API cannot safely provide. Use subdivide_mesh or create geometry with place_mesh, or use Knife manually.",
       "status": "experimental",
       "category": "Mesh Editing",
       "annotations": {
@@ -3774,6 +3850,76 @@
       }
     },
     {
+      "name": "get_mesh_info",
+      "title": "Get Mesh Info",
+      "description": "Inspects a mesh by UUID/name or the first selected mesh without changing geometry, selection, or undo history. Returns transforms, parent, total counts, mesh-local bounds, selection counts, and optional paginated vertices/faces with actual runtime keys. Faces use perimeter vertex order and normalized mesh-local normals (zero for degenerate faces), stored texture references, and optional UVs. Texture status distinguishes resolved, missing, unassigned (false), disabled (null), and unset; default format materials are not resolved. Pages sort keys lexicographically and expose next_offset; geometry must remain unchanged between calls. Set include_vertices/include_faces false for a compact summary.",
+      "status": "stable",
+      "category": "Mesh Editing",
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
+      "parameters": {
+        "$ref": "#/definitions/get_mesh_info",
+        "definitions": {
+          "get_mesh_info": {
+            "type": "object",
+            "properties": {
+              "mesh_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Mesh UUID or name. Omit to inspect the first selected mesh.",
+                "markdownDescription": "Mesh UUID or name. Omit to inspect the first selected mesh."
+              },
+              "include_vertices": {
+                "type": "boolean",
+                "default": true,
+                "description": "Include a page of vertex keys, local positions, and selection flags.",
+                "markdownDescription": "Include a page of vertex keys, local positions, and selection flags."
+              },
+              "include_faces": {
+                "type": "boolean",
+                "default": true,
+                "description": "Include a page of face keys, perimeter vertices, local normals, texture references, and selection flags.",
+                "markdownDescription": "Include a page of face keys, perimeter vertices, local normals, texture references, and selection flags."
+              },
+              "include_uv": {
+                "type": "boolean",
+                "default": false,
+                "description": "Include per-vertex UV coordinates for returned faces, in Blockbench texture units.",
+                "markdownDescription": "Include per-vertex UV coordinates for returned faces, in Blockbench texture units."
+              },
+              "vertex_offset": {
+                "type": "integer",
+                "minimum": 0,
+                "default": 0,
+                "description": "Zero-based offset into lexicographically sorted vertex keys.",
+                "markdownDescription": "Zero-based offset into lexicographically sorted vertex keys."
+              },
+              "face_offset": {
+                "type": "integer",
+                "minimum": 0,
+                "default": 0,
+                "description": "Zero-based offset into lexicographically sorted face keys.",
+                "markdownDescription": "Zero-based offset into lexicographically sorted face keys."
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 500,
+                "default": 100,
+                "description": "Maximum items in each included page. Continue using that page's next_offset; avoid editing geometry between pages.",
+                "markdownDescription": "Maximum items in each included page. Continue using that page's next_offset; avoid editing geometry between pages."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
       "name": "paint_fill_tool",
       "title": "Paint Fill Tool",
       "description": "Uses the fill/bucket tool to fill areas with color.",
@@ -3819,8 +3965,8 @@
                 "type": "number",
                 "minimum": 0,
                 "maximum": 100,
-                "description": "Color tolerance for fill.",
-                "markdownDescription": "Color tolerance for fill."
+                "description": "Only zero (exact color matching) is supported by the native fill API. Nonzero tolerance is rejected.",
+                "markdownDescription": "Only zero (exact color matching) is supported by the native fill API. Nonzero tolerance is rejected."
               },
               "fill_mode": {
                 "type": "string",
@@ -4278,6 +4424,7 @@
                   ],
                   "additionalProperties": false
                 },
+                "minItems": 1,
                 "description": "Array of coordinates to erase at.",
                 "markdownDescription": "Array of coordinates to erase at."
               },
@@ -4314,8 +4461,8 @@
               "connect_strokes": {
                 "type": "boolean",
                 "default": true,
-                "description": "Whether to connect erase strokes with lines.",
-                "markdownDescription": "Whether to connect erase strokes with lines."
+                "description": "Whether to connect erase strokes with lines. Disconnected points are separate native strokes and separate undo entries.",
+                "markdownDescription": "Whether to connect erase strokes with lines. Disconnected points are separate native strokes and separate undo entries."
               }
             },
             "required": [
@@ -4502,6 +4649,7 @@
                   ],
                   "additionalProperties": false
                 },
+                "minItems": 1,
                 "description": "Array of coordinates to paint at.",
                 "markdownDescription": "Array of coordinates to paint at."
               },
@@ -4567,8 +4715,8 @@
               "connect_strokes": {
                 "type": "boolean",
                 "default": true,
-                "description": "Whether to connect paint strokes with lines.",
-                "markdownDescription": "Whether to connect paint strokes with lines."
+                "description": "Whether to interpolate brush samples between coordinates, at no more than one texture pixel per step.",
+                "markdownDescription": "Whether to interpolate brush samples between coordinates, at no more than one texture pixel per step."
               }
             },
             "required": [
@@ -4877,7 +5025,7 @@
     {
       "name": "create_project",
       "title": "Create Project",
-      "description": "Creates a new project with the given name and project type.",
+      "description": "Creates a project with the given name and format, and returns a resource link to its live .bbmodel file.",
       "status": "stable",
       "category": "Project",
       "annotations": {
@@ -4912,7 +5060,7 @@
     {
       "name": "get_project_info",
       "title": "Get Project Info",
-      "description": "Returns read-only project orientation: format id and display name, project name/UUID, texture resolution (texture_width/height), element counts, and a summary of top-level groups. Prefer this over `risky_eval` for first-look inspection — no JavaScript execution required.",
+      "description": "Returns read-only project orientation: format id and display name, project name/UUID, texture resolution (texture_width/height), element counts, and a summary of top-level groups. Includes structured JSON and a resource link to the live .bbmodel project file. Prefer this over `risky_eval` for first-look inspection.",
       "status": "stable",
       "category": "Project",
       "annotations": {
@@ -4960,6 +5108,18 @@
                 "minimum": 16,
                 "maximum": 4096,
                 "default": 16
+              },
+              "uv_width": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Logical UV width for formats with per_texture_uv_size. Supply uv_height too. Independent of bitmap width; omit both to preserve native defaults.",
+                "markdownDescription": "Logical UV width for formats with per_texture_uv_size. Supply uv_height too. Independent of bitmap width; omit both to preserve native defaults."
+              },
+              "uv_height": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Logical UV height for formats with per_texture_uv_size. Supply uv_width too. Independent of bitmap height.",
+                "markdownDescription": "Logical UV height for formats with per_texture_uv_size. Supply uv_width too. Independent of bitmap height."
               },
               "data": {
                 "type": "string",
@@ -5100,7 +5260,7 @@
     {
       "name": "add_texture_group",
       "title": "Add Texture Group",
-      "description": "Adds a new texture group with the given name.",
+      "description": "Adds a reversible texture group. All texture references must exist. Material groups require one texture per channel, either normal or height, and a color map alongside a MER map; use is_material=false for ordinary grouping.",
       "status": "experimental",
       "category": "Textures",
       "annotations": {
@@ -5190,7 +5350,7 @@
     {
       "name": "create_pbr_material",
       "title": "Create PBR Material",
-      "description": "Creates a new PBR material (texture group with is_material=true) and optionally assigns textures to PBR channels. Use this for Minecraft Bedrock resource packs or any format supporting PBR.",
+      "description": "Creates a new PBR material (texture group with is_material=true) and optionally assigns textures to PBR channels. Requires a PBR-capable format, distinct textures per channel, either normal or height, and a color texture alongside a MER texture. Uniform values require the corresponding map to be absent. Creation and texture moves are one undoable edit.",
       "status": "experimental",
       "category": "Textures",
       "annotations": {
@@ -5229,25 +5389,54 @@
               },
               "color_value": {
                 "type": "array",
-                "items": {
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 255
-                },
                 "minItems": 4,
                 "maxItems": 4,
+                "items": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 255
+                  }
+                ],
                 "description": "Uniform RGBA color [R,G,B,A] when no color texture is provided.",
                 "markdownDescription": "Uniform RGBA color [R,G,B,A] when no color texture is provided."
               },
               "mer_value": {
                 "type": "array",
-                "items": {
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 255
-                },
                 "minItems": 3,
                 "maxItems": 3,
+                "items": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 255
+                  }
+                ],
                 "description": "Uniform MER values [Metalness, Emissive, Roughness] (0-255) when no MER texture is provided.",
                 "markdownDescription": "Uniform MER values [Metalness, Emissive, Roughness] (0-255) when no MER texture is provided."
               },
@@ -5271,7 +5460,7 @@
     {
       "name": "configure_material",
       "title": "Configure Material",
-      "description": "Configures an existing PBR material's properties including channel assignments, uniform values, and subsurface scattering.",
+      "description": "Configures a PBR material in one undoable edit. Replaced maps are detached without deleting their textures. Use 'none' to clear a channel before using uniform values or switching between normal and height; a MER map requires a color map.",
       "status": "experimental",
       "category": "Textures",
       "annotations": {
@@ -5310,25 +5499,54 @@
               },
               "color_value": {
                 "type": "array",
-                "items": {
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 255
-                },
                 "minItems": 4,
                 "maxItems": 4,
+                "items": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 255
+                  }
+                ],
                 "description": "Uniform RGBA color [R,G,B,A] when no color texture.",
                 "markdownDescription": "Uniform RGBA color [R,G,B,A] when no color texture."
               },
               "mer_value": {
                 "type": "array",
-                "items": {
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 255
-                },
                 "minItems": 3,
                 "maxItems": 3,
+                "items": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 255
+                  }
+                ],
                 "description": "Uniform MER values [Metalness, Emissive, Roughness] (0-255).",
                 "markdownDescription": "Uniform MER values [Metalness, Emissive, Roughness] (0-255)."
               },
@@ -5403,7 +5621,7 @@
     {
       "name": "import_texture_set",
       "title": "Import Texture Set",
-      "description": "Imports a Minecraft Bedrock texture_set.json file and creates a PBR material with the associated textures.",
+      "description": "Imports a Minecraft Bedrock texture_set.json on desktop. Validates supported JSON and decodes referenced images before one undoable edit. Returns JSON with material name/UUID and path. Reuses already loaded image paths without deleting textures. Normal and height, or MER and MERS, cannot coexist; MER images require a color image.",
       "status": "experimental",
       "category": "Textures",
       "annotations": {
@@ -5434,7 +5652,7 @@
     {
       "name": "assign_texture_channel",
       "title": "Assign Texture Channel",
-      "description": "Assigns a texture to a specific PBR channel within a material.",
+      "description": "Assigns a texture to one PBR channel in a single undoable edit. Detaches the previous map without deleting it or changing its channel. Normal and height cannot coexist; a MER map requires a color map, including in the source material after moving textures.",
       "status": "experimental",
       "category": "Textures",
       "annotations": {
@@ -5543,7 +5761,7 @@
     {
       "name": "trigger_action",
       "title": "Trigger Action",
-      "description": "Triggers an action in the Blockbench editor.",
+      "description": "Triggers an available Blockbench Action and respects its condition. The native action owns Undo; only a newly opened dialog may be auto-confirmed.",
       "status": "experimental",
       "category": "UI Interaction",
       "annotations": {
@@ -5564,13 +5782,13 @@
               "confirmDialog": {
                 "type": "boolean",
                 "default": true,
-                "description": "Whether or not to automatically confirm any dialogs that appear as a result of the action.",
-                "markdownDescription": "Whether or not to automatically confirm any dialogs that appear as a result of the action."
+                "description": "Whether to confirm a newly opened dialog from this action. Existing unrelated dialogs are never confirmed.",
+                "markdownDescription": "Whether to confirm a newly opened dialog from this action. Existing unrelated dialogs are never confirmed."
               },
               "confirmEvent": {
                 "type": "string",
-                "description": "Stringified form of event arguments.",
-                "markdownDescription": "Stringified form of event arguments."
+                "description": "JSON object of MouseEvent options, with optional event type (default click).",
+                "markdownDescription": "JSON object of MouseEvent options, with optional event type (default click)."
               }
             },
             "required": [
@@ -5585,7 +5803,7 @@
     {
       "name": "risky_eval",
       "title": "Eval",
-      "description": "Evaluates the given expression and logs it to the console. Do not pass `console` commands as they will not work.",
+      "description": "Evaluates JavaScript and returns its JSON result. Does not create an Undo entry. Mutating code must manage its own correctly scoped Undo transaction; read-only evaluation leaves history unchanged.",
       "status": "stable",
       "category": "UI Interaction",
       "annotations": {
@@ -5740,6 +5958,60 @@
       }
     },
     {
+      "name": "list_modes",
+      "title": "List Modes",
+      "description": "Lists Blockbench editor tabs/modes with IDs, names, native availability, and the current mode. Includes plugin-added modes. Use before set_mode to discover whether Edit, Paint, Animate, or Display is available for the current project. Camera angles are controlled separately by set_camera_angle.",
+      "status": "stable",
+      "category": "UI Interaction",
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
+      "parameters": {
+        "$ref": "#/definitions/list_modes",
+        "definitions": {
+          "list_modes": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "set_mode",
+      "title": "Set Mode",
+      "description": "Switches Blockbench's editor tab through its native mode trigger, respecting the mode's condition. Use mode_id='animate' to enter Animate before animation work, 'paint' before native painting tools, or 'edit' to return. Returns the resulting mode and available modes; refresh tools/list for changed tool availability. Selecting the current mode does nothing. Does not change the project's format.",
+      "status": "stable",
+      "category": "UI Interaction",
+      "annotations": {
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "parameters": {
+        "$ref": "#/definitions/set_mode",
+        "definitions": {
+          "set_mode": {
+            "type": "object",
+            "properties": {
+              "mode_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Mode ID returned by list_modes, such as 'edit', 'paint', 'animate', or 'display'. The Animate tab uses 'animate'. The current project must satisfy the mode's native condition.",
+                "markdownDescription": "Mode ID returned by list_modes, such as 'edit', 'paint', 'animate', or 'display'. The Animate tab uses 'animate'. The current project must satisfy the mode's native condition."
+              }
+            },
+            "required": [
+              "mode_id"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
       "name": "set_mesh_uv",
       "title": "Set Mesh UV",
       "description": "Sets UV coordinates for mesh faces or vertices.",
@@ -5776,8 +6048,8 @@
                   "description": "2D vector [x, y].",
                   "markdownDescription": "2D vector [x, y]."
                 },
-                "description": "UV coordinates for each vertex of the face.",
-                "markdownDescription": "UV coordinates for each vertex of the face."
+                "description": "UV coordinates for each vertex of the face, in logical UV units (not necessarily bitmap pixels).",
+                "markdownDescription": "UV coordinates for each vertex of the face, in logical UV units (not necessarily bitmap pixels)."
               }
             },
             "required": [
@@ -5794,7 +6066,7 @@
     {
       "name": "auto_uv_mesh",
       "title": "Auto UV Mesh",
-      "description": "Automatically generates UV mapping for selected mesh faces.",
+      "description": "Maps only the specified/selected faces of the target mesh. project uses the active camera, unwrap projects each face to its own plane, and cylinder/sphere map around the local origin using each face's logical texture UV size (project UV size for untextured faces). Coordinates are logical UV units, not necessarily bitmap pixels. This does not pack UV islands.",
       "status": "experimental",
       "category": "UV Mapping",
       "annotations": {
@@ -5820,8 +6092,8 @@
                   "sphere"
                 ],
                 "default": "project",
-                "description": "UV mapping mode: project from view, unwrap, cylinder, or sphere mapping.",
-                "markdownDescription": "UV mapping mode: project from view, unwrap, cylinder, or sphere mapping."
+                "description": "project uses the active preview; unwrap is per-face planar projection; cylinder and sphere use the local origin and each face's logical texture UV dimensions.",
+                "markdownDescription": "project uses the active preview; unwrap is per-face planar projection; cylinder and sphere use the local origin and each face's logical texture UV dimensions."
               },
               "faces": {
                 "type": "array",
@@ -5841,7 +6113,7 @@
     {
       "name": "rotate_mesh_uv",
       "title": "Rotate Mesh UV",
-      "description": "Rotates UV coordinates of selected mesh faces.",
+      "description": "Rotates only the target mesh's specified/selected faces around their combined UV bounding-box center, without clamping or changing selection.",
       "status": "experimental",
       "category": "UV Mapping",
       "annotations": {
@@ -5885,6 +6157,363 @@
       }
     },
     {
+      "name": "get_cube_uv",
+      "title": "Get Cube UV",
+      "description": "Inspect a cube's UV mode, offset, mirroring, six face rectangles/rotations, stored and effective texture references, logical UV sizes and bitmap sizes. Read-only; no selection or preview changes.",
+      "status": "stable",
+      "category": "UV Mapping",
+      "annotations": {
+        "destructiveHint": false,
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
+      "parameters": {
+        "$ref": "#/definitions/get_cube_uv",
+        "definitions": {
+          "get_cube_uv": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Cube UUID or unique name. UUID takes precedence over names.",
+                "markdownDescription": "Cube UUID or unique name. UUID takes precedence over names."
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "set_cube_uv",
+      "title": "Set Cube UV",
+      "description": "Edit box UV offsets/mirroring or per-face rectangles, rotation and texture references in one reversible edit. Preserves untargeted faces and selection. Validates UV mode, texture references and rotation support. Hytale rectangles must retain geometry-linked extents and Auto UV; texture assignments use the project/attachment collection, and quads cannot use box UV. Does not pack islands or repaint textures.",
+      "status": "experimental",
+      "category": "UV Mapping",
+      "annotations": {
+        "destructiveHint": true,
+        "openWorldHint": false
+      },
+      "parameters": {
+        "$ref": "#/definitions/set_cube_uv",
+        "definitions": {
+          "set_cube_uv": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Cube UUID or unique name. Does not use or change selection.",
+                "markdownDescription": "Cube UUID or unique name. Does not use or change selection."
+              },
+              "box_uv": {
+                "type": "boolean",
+                "description": "Explicitly convert UV mode using the native cube operation. Requires optional_box_uv to change mode. Conversion can reset rotations and enable disabled faces.",
+                "markdownDescription": "Explicitly convert UV mode using the native cube operation. Requires optional_box_uv to change mode. Conversion can reset rotations and enable disabled faces."
+              },
+              "uv_offset": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2,
+                "description": "Box UV net offset [u, v]; requires box UV mode.",
+                "markdownDescription": "Box UV net offset [u, v]; requires box UV mode."
+              },
+              "mirror_uv": {
+                "type": "boolean",
+                "description": "Mirror the box UV net; requires box UV mode. For per-face mirroring, reverse rectangle endpoints.",
+                "markdownDescription": "Mirror the box UV net; requires box UV mode. For per-face mirroring, reverse rectangle endpoints."
+              },
+              "faces": {
+                "type": "object",
+                "properties": {
+                  "north": {
+                    "type": "object",
+                    "properties": {
+                      "uv": {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        },
+                        "minItems": 4,
+                        "maxItems": 4,
+                        "description": "[u1, v1, u2, v2] in logical UV units, not necessarily bitmap pixels. Reversed and out-of-bounds rectangles are preserved. Hytale requires extents matching cube face dimensions, swapped for 90/270-degree rotation; offsets and mirroring are supported.",
+                        "markdownDescription": "[u1, v1, u2, v2] in logical UV units, not necessarily bitmap pixels. Reversed and out-of-bounds rectangles are preserved. Hytale requires extents matching cube face dimensions, swapped for 90/270-degree rotation; offsets and mirroring are supported."
+                      },
+                      "rotation": {
+                        "type": "number",
+                        "enum": [
+                          0,
+                          90,
+                          180,
+                          270
+                        ],
+                        "description": "UV rotation in degrees; nonzero rotation requires format uv_rotation support.",
+                        "markdownDescription": "UV rotation in degrees; nonzero rotation requires format uv_rotation support."
+                      },
+                      "texture": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          {
+                            "type": "boolean",
+                            "const": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Texture UUID, ID or unique name; false unassigns, null disables the face. Omit to preserve.",
+                        "markdownDescription": "Texture UUID, ID or unique name; false unassigns, null disables the face. Omit to preserve."
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "east": {
+                    "type": "object",
+                    "properties": {
+                      "uv": {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        },
+                        "minItems": 4,
+                        "maxItems": 4,
+                        "description": "[u1, v1, u2, v2] in logical UV units, not necessarily bitmap pixels. Reversed and out-of-bounds rectangles are preserved. Hytale requires extents matching cube face dimensions, swapped for 90/270-degree rotation; offsets and mirroring are supported.",
+                        "markdownDescription": "[u1, v1, u2, v2] in logical UV units, not necessarily bitmap pixels. Reversed and out-of-bounds rectangles are preserved. Hytale requires extents matching cube face dimensions, swapped for 90/270-degree rotation; offsets and mirroring are supported."
+                      },
+                      "rotation": {
+                        "type": "number",
+                        "enum": [
+                          0,
+                          90,
+                          180,
+                          270
+                        ],
+                        "description": "UV rotation in degrees; nonzero rotation requires format uv_rotation support.",
+                        "markdownDescription": "UV rotation in degrees; nonzero rotation requires format uv_rotation support."
+                      },
+                      "texture": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          {
+                            "type": "boolean",
+                            "const": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Texture UUID, ID or unique name; false unassigns, null disables the face. Omit to preserve.",
+                        "markdownDescription": "Texture UUID, ID or unique name; false unassigns, null disables the face. Omit to preserve."
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "south": {
+                    "type": "object",
+                    "properties": {
+                      "uv": {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        },
+                        "minItems": 4,
+                        "maxItems": 4,
+                        "description": "[u1, v1, u2, v2] in logical UV units, not necessarily bitmap pixels. Reversed and out-of-bounds rectangles are preserved. Hytale requires extents matching cube face dimensions, swapped for 90/270-degree rotation; offsets and mirroring are supported.",
+                        "markdownDescription": "[u1, v1, u2, v2] in logical UV units, not necessarily bitmap pixels. Reversed and out-of-bounds rectangles are preserved. Hytale requires extents matching cube face dimensions, swapped for 90/270-degree rotation; offsets and mirroring are supported."
+                      },
+                      "rotation": {
+                        "type": "number",
+                        "enum": [
+                          0,
+                          90,
+                          180,
+                          270
+                        ],
+                        "description": "UV rotation in degrees; nonzero rotation requires format uv_rotation support.",
+                        "markdownDescription": "UV rotation in degrees; nonzero rotation requires format uv_rotation support."
+                      },
+                      "texture": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          {
+                            "type": "boolean",
+                            "const": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Texture UUID, ID or unique name; false unassigns, null disables the face. Omit to preserve.",
+                        "markdownDescription": "Texture UUID, ID or unique name; false unassigns, null disables the face. Omit to preserve."
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "west": {
+                    "type": "object",
+                    "properties": {
+                      "uv": {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        },
+                        "minItems": 4,
+                        "maxItems": 4,
+                        "description": "[u1, v1, u2, v2] in logical UV units, not necessarily bitmap pixels. Reversed and out-of-bounds rectangles are preserved. Hytale requires extents matching cube face dimensions, swapped for 90/270-degree rotation; offsets and mirroring are supported.",
+                        "markdownDescription": "[u1, v1, u2, v2] in logical UV units, not necessarily bitmap pixels. Reversed and out-of-bounds rectangles are preserved. Hytale requires extents matching cube face dimensions, swapped for 90/270-degree rotation; offsets and mirroring are supported."
+                      },
+                      "rotation": {
+                        "type": "number",
+                        "enum": [
+                          0,
+                          90,
+                          180,
+                          270
+                        ],
+                        "description": "UV rotation in degrees; nonzero rotation requires format uv_rotation support.",
+                        "markdownDescription": "UV rotation in degrees; nonzero rotation requires format uv_rotation support."
+                      },
+                      "texture": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          {
+                            "type": "boolean",
+                            "const": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Texture UUID, ID or unique name; false unassigns, null disables the face. Omit to preserve.",
+                        "markdownDescription": "Texture UUID, ID or unique name; false unassigns, null disables the face. Omit to preserve."
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "up": {
+                    "type": "object",
+                    "properties": {
+                      "uv": {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        },
+                        "minItems": 4,
+                        "maxItems": 4,
+                        "description": "[u1, v1, u2, v2] in logical UV units, not necessarily bitmap pixels. Reversed and out-of-bounds rectangles are preserved. Hytale requires extents matching cube face dimensions, swapped for 90/270-degree rotation; offsets and mirroring are supported.",
+                        "markdownDescription": "[u1, v1, u2, v2] in logical UV units, not necessarily bitmap pixels. Reversed and out-of-bounds rectangles are preserved. Hytale requires extents matching cube face dimensions, swapped for 90/270-degree rotation; offsets and mirroring are supported."
+                      },
+                      "rotation": {
+                        "type": "number",
+                        "enum": [
+                          0,
+                          90,
+                          180,
+                          270
+                        ],
+                        "description": "UV rotation in degrees; nonzero rotation requires format uv_rotation support.",
+                        "markdownDescription": "UV rotation in degrees; nonzero rotation requires format uv_rotation support."
+                      },
+                      "texture": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          {
+                            "type": "boolean",
+                            "const": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Texture UUID, ID or unique name; false unassigns, null disables the face. Omit to preserve.",
+                        "markdownDescription": "Texture UUID, ID or unique name; false unassigns, null disables the face. Omit to preserve."
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "down": {
+                    "type": "object",
+                    "properties": {
+                      "uv": {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        },
+                        "minItems": 4,
+                        "maxItems": 4,
+                        "description": "[u1, v1, u2, v2] in logical UV units, not necessarily bitmap pixels. Reversed and out-of-bounds rectangles are preserved. Hytale requires extents matching cube face dimensions, swapped for 90/270-degree rotation; offsets and mirroring are supported.",
+                        "markdownDescription": "[u1, v1, u2, v2] in logical UV units, not necessarily bitmap pixels. Reversed and out-of-bounds rectangles are preserved. Hytale requires extents matching cube face dimensions, swapped for 90/270-degree rotation; offsets and mirroring are supported."
+                      },
+                      "rotation": {
+                        "type": "number",
+                        "enum": [
+                          0,
+                          90,
+                          180,
+                          270
+                        ],
+                        "description": "UV rotation in degrees; nonzero rotation requires format uv_rotation support.",
+                        "markdownDescription": "UV rotation in degrees; nonzero rotation requires format uv_rotation support."
+                      },
+                      "texture": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          {
+                            "type": "boolean",
+                            "const": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Texture UUID, ID or unique name; false unassigns, null disables the face. Omit to preserve.",
+                        "markdownDescription": "Texture UUID, ID or unique name; false unassigns, null disables the face. Omit to preserve."
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Patch only these faces in per-face UV mode. Other faces are preserved. Explicit rectangles disable automatic UV remapping except in Hytale, where dimension-linked UVs retain native Auto UV. Hytale textures resolve through the project/attachment collection, so only null is accepted as an explicit face texture.",
+                "markdownDescription": "Patch only these faces in per-face UV mode. Other faces are preserved. Explicit rectangles disable automatic UV remapping except in Hytale, where dimension-linked UVs retain native Auto UV. Hytale textures resolve through the project/attachment collection, so only null is accepted as an explicit face texture."
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
       "name": "hytale_get_format_info",
       "title": "Get Hytale Format Info",
       "description": "Returns information about the current Hytale format. Requires the Hytale plugin and a Hytale format project to be active.",
@@ -5908,7 +6537,7 @@
     {
       "name": "hytale_validate_model",
       "title": "Validate Hytale Model",
-      "description": "Validates the current Hytale model against Hytale engine constraints (node count, UV sizes, etc.).",
+      "description": "Checks exported main-model node count using the installed Hytale codec and verifies bitmap dimensions are multiples of 32. Does not validate attachment exports, shading, all UVs, animation integration or target-engine rendering.",
       "status": "experimental",
       "category": "Hytale Integration",
       "annotations": {
@@ -5999,7 +6628,7 @@
     {
       "name": "hytale_create_quad",
       "title": "Create Hytale Quad",
-      "description": "Creates a Hytale quad (2D plane) with a specified normal direction. Quads are single-face elements useful for flat surfaces.",
+      "description": "Creates a Hytale quad with exactly one enabled face matching the signed normal direction, per-face UV and Auto UV 1. Positive width/height and parent references are validated before one reversible edit.",
       "status": "experimental",
       "category": "Hytale Integration",
       "annotations": {
@@ -6023,8 +6652,8 @@
                 },
                 "minItems": 3,
                 "maxItems": 3,
-                "description": "Position [x, y, z]",
-                "markdownDescription": "Position [x, y, z]",
+                "description": "Finite position [x, y, z] of the quad's starting corner.",
+                "markdownDescription": "Finite position [x, y, z] of the quad's starting corner.",
                 "default": [
                   0,
                   0,
@@ -6052,8 +6681,8 @@
                 },
                 "minItems": 2,
                 "maxItems": 2,
-                "description": "Size [width, height].",
-                "markdownDescription": "Size [width, height].",
+                "description": "Positive finite [width, height]. Width/height axes are Z/Y for X normals, X/Z for Y normals, and X/Y for Z normals.",
+                "markdownDescription": "Positive finite [width, height]. Width/height axes are Z/Y for X normals, X/Z for Y normals, and X/Y for Z normals.",
                 "default": [
                   16,
                   16
@@ -6061,8 +6690,8 @@
               },
               "group": {
                 "type": "string",
-                "description": "Parent group/bone name",
-                "markdownDescription": "Parent group/bone name"
+                "description": "Parent group UUID or unique name, or root (default). Missing or ambiguous names are rejected.",
+                "markdownDescription": "Parent group UUID or unique name, or root (default). Missing or ambiguous names are rejected."
               },
               "double_sided": {
                 "type": "boolean",
@@ -6180,8 +6809,10 @@
               },
               "time": {
                 "type": "number",
-                "description": "Time in seconds for the keyframe",
-                "markdownDescription": "Time in seconds for the keyframe"
+                "minimum": 0,
+                "maximum": 10000,
+                "description": "Finite time in seconds between 0 and 10000 for the visibility keyframe.",
+                "markdownDescription": "Finite time in seconds between 0 and 10000 for the visibility keyframe."
               },
               "visible": {
                 "type": "boolean",
@@ -6434,6 +7065,12 @@
   ],
   "resources": [
     {
+      "name": "project-files",
+      "title": "Blockbench Project Files",
+      "description": "Returns the active project's live .bbmodel file with unsaved edits and embedded textures. UUID-based URIs remain stable across renames. Select a project before reading its file; reading never switches tabs or saves to disk.",
+      "uriTemplate": "blockbench://project/{id}.bbmodel"
+    },
+    {
       "name": "projects",
       "title": "Blockbench Projects",
       "description": "Returns information about available projects. List URIs use the slugified project name (e.g. `projects://my-character`) when unique, or `projects://<slug>~<uuid-prefix>` on collision. Reads accept UUID, exact name, or slug.",
@@ -6454,8 +7091,8 @@
     {
       "name": "reference_models",
       "title": "Reference Models",
-      "description": "Returns reference models in the current project. Requires the Reference Models plugin. List URIs use slugified names (e.g. `reference_models://turntable`) with `~<uuid-prefix>` on collision. Reads accept UUID, exact name, or slug.",
-      "uriTemplate": "reference_models://{id}"
+      "description": "Returns reference models in the current project. Requires the Reference Models plugin. List URIs use slugified names (e.g. `reference-models://turntable`) with `~<uuid-prefix>` on collision. Reads accept UUID, exact name, or slug.",
+      "uriTemplate": "reference-models://{id}"
     },
     {
       "name": "validator-status",
