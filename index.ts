@@ -14,6 +14,9 @@ import { settingsSetup, settingsTeardown } from "@/ui/settings";
 import { setupI18n } from "@/ui/i18n";
 import { sessionManager } from "@/lib/sessions";
 import { initPromptLoader } from "@/lib/promptLoader";
+import { setupMaterialUndoRefresh, teardownMaterialUndoRefresh } from "@/lib/material-preview";
+import { setupAnimationUndoRestore, teardownAnimationUndoRestore } from "@/lib/animation-undo";
+import { setupEditorStateSync, teardownEditorStateSync } from "@/lib/editor-state";
 import type { NetServer, SessionTransports } from "@/server/net";
 import createNetServer from "@/server/net";
 import { getIcon } from "@/macros/getIcon" with { type: "macro" };
@@ -25,7 +28,7 @@ BBPlugin.register("mcp", {
   version: VERSION,
   title: "MCP Server",
   author: "Jason J. Gardner",
-  contributors: ["jasonjgardner", "brokestar233"],
+  contributors: ["jasonjgardner", "brokestar233", "nhjydywd"],
   description: "Create an MCP server inside Blockbench.",
   tags: ["MCP", "AI"],
   website: "https://jasonjgardner.github.io/blockbench-mcp-plugin/",
@@ -52,6 +55,9 @@ BBPlugin.register("mcp", {
     setupI18n();
 
     settingsSetup();
+    setupMaterialUndoRefresh();
+    setupAnimationUndoRestore();
+    setupEditorStateSync();
 
     // Load prompt manifest from CDN/cache before server starts.
     // Must never abort onload — missing prompts should degrade gracefully,
@@ -98,6 +104,9 @@ BBPlugin.register("mcp", {
   },
 
   onunload() {
+    teardownEditorStateSync();
+    teardownMaterialUndoRefresh();
+    teardownAnimationUndoRestore();
     // Close HTTP server
     if (httpServer) {
       httpServer.close();

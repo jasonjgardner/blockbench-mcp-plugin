@@ -4,6 +4,7 @@ import { resolve, join, normalize, sep } from "node:path";
 import { log, c, isCleanMode, isProduction, isWatchMode } from "./utils";
 import { blockbenchCompatPlugin, textFileLoaderPlugin } from "./plugins";
 import { version } from "../package.json";
+import { sourceBuildId } from "./release-evidence";
 
 const OUTPUT_DIR = "./dist";
 // Normalized output dir name for path comparison (strips "./" prefix)
@@ -72,6 +73,8 @@ async function buildPlugin(): Promise<boolean> {
     define: {
       "process.env.NODE_ENV": isProduction ? '"production"' : '"development"',
       __DEV__: isProduction ? "false" : "true",
+      __MCP_BUILD_ID__: JSON.stringify(await sourceBuildId()),
+      __MCP_BUILD_MODE__: JSON.stringify(isProduction ? "production" : "development"),
     },
     // Remove debugger statements in production
     drop: isProduction ? ["debugger"] : [],

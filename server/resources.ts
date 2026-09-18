@@ -2,6 +2,21 @@
 /// <reference types="blockbench-types" />
 import { createResource } from "@/lib/factories";
 import { findByResourceId, makeResourceUri } from "@/lib/resourceUri";
+import { resourceNotFound } from "@/lib/resourceErrors";
+import { listProjectFiles, readProjectFile } from "@/lib/projectResources";
+
+createResource("project-files", {
+  uriTemplate: "blockbench://project/{id}.bbmodel",
+  title: "Blockbench Project Files",
+  description:
+    "Returns the active project's live .bbmodel file, including unsaved edits and embedded textures. Select another project before reading its file; reading never switches tabs or saves to disk.",
+  async listCallback() {
+    return listProjectFiles();
+  },
+  async readCallback(uri) {
+    return readProjectFile(uri);
+  },
+});
 
 // Register projects resource using the factory pattern
 createResource("projects", {
@@ -24,9 +39,9 @@ createResource("projects", {
     };
   },
   async readCallback(uri, { id }) {
-    const projects = ModelProject.all;
+    const projects = ModelProject.all ?? [];
 
-    if (!projects || projects.length === 0) {
+    if (!id && projects.length === 0) {
       return {
         contents: [
           {
@@ -64,7 +79,7 @@ createResource("projects", {
       const project = findByResourceId(projects, id);
 
       if (!project) {
-        throw new Error(`Project with ID "${id}" not found.`);
+        throw resourceNotFound(uri, `Project with ID "${id}" not found.`);
       }
 
       return {
@@ -116,7 +131,7 @@ createResource("nodes", {
   },
   async readCallback(uri, { id }) {
     if (!Project?.nodes_3d) {
-      throw new Error("No nodes found in the Blockbench editor.");
+      throw resourceNotFound(uri, "No nodes found in the Blockbench editor.");
     }
 
     const nodes = Object.values(Project.nodes_3d);
@@ -124,7 +139,7 @@ createResource("nodes", {
       (id ? Project.nodes_3d[id] : undefined) ?? findByResourceId(nodes, id);
 
     if (!node) {
-      throw new Error(`Node with ID "${id}" not found.`);
+      throw resourceNotFound(uri, `Node with ID "${id}" not found.`);
     }
 
     const { position, rotation, scale, ...rest } = node;
@@ -167,7 +182,7 @@ createResource("textures", {
   async readCallback(uri, { id }) {
     const textures = Project?.textures ?? [];
 
-    if (textures.length === 0) {
+    if (!id && textures.length === 0) {
       return {
         contents: [
           {
@@ -207,7 +222,7 @@ createResource("textures", {
         textures.find((t) => t.id === id) ?? findByResourceId(textures, id);
 
       if (!texture) {
-        throw new Error(`Texture with ID "${id}" not found.`);
+        throw resourceNotFound(uri, `Texture with ID "${id}" not found.`);
       }
 
       return {
@@ -239,10 +254,10 @@ createResource("textures", {
 
 if (Plugins.installed.some((p: { id: string }) => p.id === "reference_models")) {
   createResource("reference_models", {
-    uriTemplate: "reference_models://{id}",
+    uriTemplate: "reference-models://{id}",
     title: "Reference Models",
     description:
-      "Returns information about reference models in the current Blockbench project. Requires the Reference Models plugin. List URIs use the slugified name (e.g. `reference_models://turntable`) when unique, with a `~<uuid-prefix>` suffix on collision. Reads also accept the raw UUID or exact name.",
+      "Returns information about reference models in the current Blockbench project. Requires the Reference Models plugin. List URIs use the slugified name (e.g. `reference-models://turntable`) when unique, with a `~<uuid-prefix>` suffix on collision. Reads also accept the raw UUID or exact name.",
     async listCallback() {
       const elements = Outliner?.elements ?? [];
       const referenceModels = elements.filter(
@@ -253,7 +268,7 @@ if (Plugins.installed.some((p: { id: string }) => p.id === "reference_models")) 
       }
       return {
         resources: referenceModels.map((model) => ({
-          uri: makeResourceUri("reference_models", model, referenceModels),
+          uri: makeResourceUri("reference-models", model, referenceModels),
           name: model.name || model.uuid,
           description: (model as { path?: string }).path
             ? `Reference model from ${(model as { path?: string }).path}`
@@ -268,7 +283,7 @@ if (Plugins.installed.some((p: { id: string }) => p.id === "reference_models")) 
         (e) => e.type === "reference_model"
       );
 
-      if (referenceModels.length === 0) {
+      if (!id && referenceModels.length === 0) {
         return {
           contents: [
             {
@@ -328,7 +343,7 @@ if (Plugins.installed.some((p: { id: string }) => p.id === "reference_models")) 
         const model = findByResourceId(referenceModels, id);
 
         if (!model) {
-          throw new Error(`Reference model with ID "${id}" not found.`);
+          throw resourceNotFound(uri, `Reference model with ID "${id}" not found.`);
         }
 
         return {

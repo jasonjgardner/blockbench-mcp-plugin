@@ -1,7 +1,7 @@
 /// <reference types="three" />
 /// <reference types="blockbench-types" />
 import { z } from "zod";
-import { createTool, type ToolSpec } from "@/lib/factories";
+import { createTool, type IToolSpec } from "@/lib/factories";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
 
 export const undoParameters = z.object({
@@ -47,9 +47,10 @@ export const saveCheckpointParameters = z.object({
     ),
 });
 
-export const historyToolDocs: ToolSpec[] = [
+export const historyToolDocs: IToolSpec[] = [
   {
     name: "undo",
+    condition: { project: true, method: () => Undo.index > 0 },
     description:
       "Undoes the most recent edit in the current project. Use `steps` to undo multiple edits in a single call. Returns the action(s) that were undone.",
     annotations: {
@@ -61,6 +62,7 @@ export const historyToolDocs: ToolSpec[] = [
   },
   {
     name: "redo",
+    condition: { project: true, method: () => Undo.index < Undo.history.length },
     description:
       "Redoes the most recently undone edit. Use `steps` to redo multiple edits in a single call. Returns the action(s) that were redone.",
     annotations: {
@@ -72,6 +74,7 @@ export const historyToolDocs: ToolSpec[] = [
   },
   {
     name: "get_undo_stack",
+    condition: { project: true },
     description:
       "Returns the current undo/redo history: the list of edit entries, the current index, and which entries are undone vs. applied. Use this to inspect available undo/redo operations and find named checkpoints.",
     annotations: {
@@ -83,6 +86,7 @@ export const historyToolDocs: ToolSpec[] = [
   },
   {
     name: "save_checkpoint",
+    condition: { project: true },
     description:
       "Inserts a named marker into the undo history. The marker can later be located with `get_undo_stack` so the agent knows how many times to call `undo` to return to this state. Does not modify the project.",
     annotations: {

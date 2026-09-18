@@ -35,7 +35,7 @@ server/
   prompts/            # Prompt implementations by domain
   net.ts              # HTTP server and transport handling
 lib/
-  factories.ts        # createTool(), createPrompt(), createResource(), ToolSpec/PromptSpec/ResourceSpec
+  factories.ts        # createTool(), createPrompt(), createResource(), IToolSpec/IPromptSpec/IResourceSpec
   zodObjects.ts       # Reusable Zod schemas
   util.ts             # Shared utilities
   constants.ts        # VERSION and other constants
@@ -62,16 +62,16 @@ docs/
 
 **Tool Registration**: Each tool file in `server/tools/` follows a two-part pattern:
 
-1. Export the Zod parameter schema and a `toolDocs: ToolSpec[]` array at module level (no Blockbench globals allowed here):
+1. Export the Zod parameter schema and a `toolDocs: IToolSpec[]` array at module level (no Blockbench globals allowed here):
 ```ts
 import { z } from "zod";
-import { createTool, type ToolSpec } from "@/lib/factories";
+import { createTool, type IToolSpec } from "@/lib/factories";
 
 export const exampleParameters = z.object({
   name: z.string().describe("Name to greet."),
 });
 
-export const exampleToolDocs: ToolSpec[] = [
+export const exampleToolDocs: IToolSpec[] = [
   {
     name: "example",
     description: "Does something",
@@ -112,7 +112,9 @@ After adding a tool: import the `toolDocs` in `build/docs-manifest.ts`, add to `
 - TypeScript strict mode, ESNext modules
 - Use `const`/`let`, never `var`; use `async/await` with `try/catch`
 - Prefer early returns over nested `if/else`
-- Never use `any`; prefer interfaces over types
+- Never use `any`; use `unknown` with explicit narrowing
+- Use `interface` for object shapes, always prefixed with `I` (e.g. `IToolSpec`); use `type` for unions, tuples, and `z.infer` aliases
+- Wrap Blockbench undo transactions with `runUndoableEdit()` / `cancelUndoEdit()` from `lib/undo.ts`
 - 2-space indentation
 - Zod for validation; store reusable schemas in `lib/zodObjects.ts`
 - Blockbench types are incomplete; use `// @ts-ignore` when necessary

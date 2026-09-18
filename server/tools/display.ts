@@ -1,7 +1,7 @@
 /// <reference types="three" />
 /// <reference types="blockbench-types" />
 import { z } from "zod";
-import { createTool, type ToolSpec } from "@/lib/factories";
+import { createTool, type IToolSpec } from "@/lib/factories";
 import { captureScreenshot } from "@/lib/util";
 import { STATUS_EXPERIMENTAL } from "@/lib/constants";
 import { displaySlotEnum, vec3 } from "@/lib/zodObjects";
@@ -58,9 +58,10 @@ export const enterDisplayModeParameters = z.object({
 // Display Settings Tool Docs
 // ============================================================================
 
-export const displayToolDocs: ToolSpec[] = [
+export const displayToolDocs: IToolSpec[] = [
   {
     name: "get_display_transform",
+    condition: { project: true, features: ["display_mode"] },
     description:
       "Reads Java Edition display settings (Project.display_settings). Returns translation, rotation, scale, mirror and pivots for a single slot, or a summary of every populated slot when no slot is given. Never modifies state.",
     annotations: {
@@ -72,6 +73,7 @@ export const displayToolDocs: ToolSpec[] = [
   },
   {
     name: "set_display_transform",
+    condition: { project: true, features: ["display_mode"] },
     description:
       "Writes a Java Edition display slot's transform (translation, rotation, scale, mirror, pivots). Creates the slot if it does not exist yet and wraps the change in an undo step. This edits data that ships in the exported model JSON — it changes the deliverable, not just the preview. Requires a format that supports display mode (e.g. Java Block/Item).",
     annotations: {
@@ -83,6 +85,7 @@ export const displayToolDocs: ToolSpec[] = [
   },
   {
     name: "enter_display_mode",
+    condition: { project: true, features: ["display_mode"] },
     description:
       "Switches Blockbench into Display mode, activates the given slot and optionally loads a reference model (player, zombie, armor stand, …), then returns a screenshot. Pair with set_camera_angle / capture_screenshot for multi-angle fit checks of cosmetics and handheld items. Requires a format that supports display mode.",
     annotations: {

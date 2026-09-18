@@ -1,9 +1,10 @@
 /// <reference types="three" />
 /// <reference types="blockbench-types" />
 import { z } from "zod";
-import { createTool, type ToolSpec } from "@/lib/factories";
+import { createTool, type IToolSpec } from "@/lib/factories";
 import { findElementOrThrow, findTextureOrThrow } from "@/lib/util";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
+import { createGroupWithUndo } from "@/lib/group-creation";
 import {
   elementIdSchema,
   vector3Schema,
@@ -91,6 +92,14 @@ export const filterByMaterialParameters = z.object({
 
 export const getSelectionParameters = z.object({});
 
+/**
+ * Parameters for `add_group`, passed to `createGroupWithUndo` as one reversible edit.
+ * Expected shape: `name`; optional `origin` pivot and `rotation` (degrees) as
+ * `[x, y, z]` defaulting to zeros; `parent` as a group UUID or name, or
+ * `"root"` (default) for the project root; plus native group flags
+ * `visibility`, `autouv` (`"0"` | `"1"` | `"2"`), `selected`, and `shade`.
+ * Parent references are resolved at runtime, so the schema stays free of Blockbench globals.
+ */
 export const addGroupParameters = z.object({
   name: z.string(),
   origin: vec3("Pivot point of the group as [x, y, z].")
@@ -99,7 +108,7 @@ export const addGroupParameters = z.object({
   rotation: vec3("Rotation of the group in degrees as [x, y, z].")
     .optional()
     .default([0, 0, 0]),
-  parent: z.string().optional().default("root"),
+  parent: z.string().optional().default("root").describe("Parent group UUID or name, or root for the project root."),
   visibility: z.boolean().optional().default(true),
   autouv: autoUvEnum
     .optional()
@@ -143,9 +152,10 @@ export const renameElementParameters = z.object({
   new_name: z.string().describe("New name to assign."),
 });
 
-export const elementToolDocs: ToolSpec[] = [
+export const elementToolDocs: IToolSpec[] = [
   {
     name: "remove_element",
+    condition: { project: true, features: ["edit_mode"] },
     description: "Removes the element with the given ID.",
     annotations: {
       title: "Remove Element",
@@ -156,6 +166,7 @@ export const elementToolDocs: ToolSpec[] = [
   },
   {
     name: "add_group",
+    condition: { project: true, features: ["edit_mode"] },
     description: "Adds a new group with the given name and options.",
     annotations: {
       title: "Add Group",
@@ -166,6 +177,7 @@ export const elementToolDocs: ToolSpec[] = [
   },
   {
     name: "list_outline",
+    condition: { project: true },
     description:
       "Returns the project outline as a hierarchical tree. Each node reports { name, uuid, type (cube|mesh|group), children? }. Groups contain child cubes, meshes, and sub-groups. Use `include_cubes=false` to get a group-only skeleton when you just need structure, or `max_depth` to bound very deep trees.",
     annotations: {
@@ -177,6 +189,7 @@ export const elementToolDocs: ToolSpec[] = [
   },
   {
     name: "duplicate_element",
+    condition: { project: true, features: ["edit_mode"] },
     description:
       "Duplicates a cube, mesh or group by ID or name.  You may offset the duplicate or assign a new name.",
     annotations: { title: "Duplicate Element", destructiveHint: true },
@@ -185,6 +198,7 @@ export const elementToolDocs: ToolSpec[] = [
   },
   {
     name: "rename_element",
+    condition: { project: true, features: ["edit_mode"] },
     description: "Renames a cube, mesh or group by ID or name.",
     annotations: { title: "Rename Element", destructiveHint: true },
     parameters: renameElementParameters,
@@ -192,6 +206,7 @@ export const elementToolDocs: ToolSpec[] = [
   },
   {
     name: "find_elements_by_criteria",
+    condition: { project: true },
     description:
       "Searches the current project for elements matching the given criteria. Supports name pattern matching (regex or substring), type filtering, scoping to a parent group, cube size ranges, and selection scope. Returns element metadata, never modifies state.",
     annotations: {
@@ -203,6 +218,7 @@ export const elementToolDocs: ToolSpec[] = [
   },
   {
     name: "select_all_of_type",
+    condition: { project: true },
     description:
       "Selects all elements of the given type (cube, mesh, or group) in the current project. Optionally restrict to descendants of a parent group, or add to (rather than replace) the current selection.",
     annotations: {
@@ -214,6 +230,7 @@ export const elementToolDocs: ToolSpec[] = [
   },
   {
     name: "filter_by_material",
+    condition: { project: true },
     description:
       "Returns all elements that reference the given texture. For cubes, includes the list of face keys (e.g., 'north', 'up') that use the texture. For meshes, returns the mesh if any face uses the texture.",
     annotations: {
@@ -225,6 +242,7 @@ export const elementToolDocs: ToolSpec[] = [
   },
   {
     name: "get_selection",
+    condition: { project: true },
     description:
       "Returns the current selection state: selected cube/mesh/group UUIDs and names, plus the active texture. Use this to verify what `apply_texture` or a paint tool with `fill_mode=\"selected_elements\"` will target.",
     annotations: {
@@ -354,13 +372,7 @@ export function registerElementTools() {
       selected,
       shade,
     }) {
-      Undo.initEdit({
-        elements: [],
-        outliner: true,
-        collections: [],
-      });
-
-      const group = new Group({
+      const group = createGroupWithUndo({
         name,
         origin,
         rotation,
@@ -368,16 +380,7 @@ export function registerElementTools() {
         visibility: Boolean(visibility),
         selected: Boolean(selected),
         shade: Boolean(shade),
-      }).init();
-
-      const parentGroup = parent === "root"
-        ? "root"
-        : // `@ts-expect-error` getAllGroups is a Blockbench global
-          getAllGroups().find((g: Group) => g.name === parent || g.uuid === parent);
-      group.addTo(parentGroup);
-
-      Undo.finishEdit("Agent added group");
-      Canvas.updateAll();
+      }, parent);
 
       return `Added group ${group.name} with ID ${group.uuid}`;
     },

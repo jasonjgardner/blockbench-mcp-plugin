@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { IMCPTool, IMCPPrompt, IMCPResource } from "@/types";
 import { VERSION } from "@/lib/constants";
 import { statusBarSetup, statusBarTeardown } from "@/ui/statusBar";
-import { sessionManager, type Session } from "@/lib/sessions";
+import { sessionManager, type ISession } from "@/lib/sessions";
 import { openToolTestDialog } from "@/ui/toolTestDialog";
 import { openPromptPreviewDialog } from "@/ui/promptPreviewDialog";
 import { openPromptOverrideDialog, overrideDialogTeardown, PROMPT_OVERRIDE_CHANGED } from "@/ui/promptOverrideDialog";
@@ -42,8 +42,8 @@ export function uiSetup({
         // Subscribe to session changes
         // @ts-ignore
         const vm = this;
-        unsubscribe = sessionManager.subscribe((sessions: Session[]) => {
-          vm.sessions = sessions.map((s: Session) => ({
+        unsubscribe = sessionManager.subscribe((sessions: ISession[]) => {
+          vm.sessions = sessions.map((s: ISession) => ({
             id: s.id,
             connectedAt: s.connectedAt,
             lastActivity: s.lastActivity,
@@ -75,12 +75,8 @@ export function uiSetup({
           name: "Blockbench MCP",
           version: VERSION,
         },
-        tools: Object.values(tools).map((tool) => ({
-          name: tool.name,
-          description: tool.description,
-          enabled: tool.enabled,
-          status: tool.status,
-        })),
+        // Observe shared metadata so native condition changes refresh the panel.
+        tools: Object.values(tools),
         resources: Object.values(resources).map((resource) => ({
           name: resource.name,
           description: resource.description,
@@ -111,7 +107,8 @@ export function uiSetup({
           // @ts-ignore - Vue component context
           const { tools, toolsFilter } = this;
           const searchLower = toolsFilter.search.toLowerCase();
-          return tools.filter((tool: { name: string; status: string }) => {
+          return tools.filter((tool: { name: string; status: string; enabled: boolean }) => {
+            if (!tool.enabled) return false;
             // Check status filter (stable always visible, experimental based on toggle)
             if (tool.status === "experimental" && !toolsFilter.showExperimental) return false;
             // Check search filter (name only)

@@ -1,9 +1,14 @@
 /// <reference types="three" />
 /// <reference types="blockbench-types" />
 import { z } from "zod";
-import { createTool, type ToolSpec } from "@/lib/factories";
+import { createTool, type IToolSpec } from "@/lib/factories";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
+import { getProjectFileResource } from "@/lib/projectResources";
+import { createEmbeddedExport } from "@/lib/tool-results";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { ToolCondition } from "@/server/tool-conditions";
 
+/** Options for listing registered codecs without requiring an open project. */
 export const listExportFormatsParameters = z.object({
   only_current_format: z
     .boolean()
@@ -14,6 +19,7 @@ export const listExportFormatsParameters = z.object({
     ),
 });
 
+/** Export selection, optional local destination, and bounded MCP result format. */
 export const exportModelParameters = z.object({
   codec_id: z
     .string()
@@ -41,15 +47,19 @@ export const exportModelParameters = z.object({
     .optional()
     .default(100_000)
     .describe(
-      "Maximum number of characters to include in the returned `content` field. Use 0 to omit content entirely (useful when only writing to disk). Larger values risk exceeding MCP context limits."
+      "Maximum characters of text or base64 to return. Use 0 to omit file content. In embedded mode, only complete files within this limit are embedded; larger files return a truncated preview in metadata.content."
     ),
+  result_format: z.enum(["text", "embedded"]).default("text").describe(
+    "text preserves the JSON metadata.content payload. embedded moves a complete file into an MCP resource block with URI and MIME type, sets metadata.content to null, and reports its resource_uri. Both modes include a link to the live .bbmodel project resource."
+  ),
 });
 
-export const exportToolDocs: ToolSpec[] = [
+/** Discoverable export tools; runtime codec conditions are evaluated on every call. */
+export const exportToolDocs: IToolSpec[] = [
   {
     name: "list_export_formats",
     description:
-      "Lists all registered export codecs with their id, display name, file extension, and whether they support compile/export. Use before `export_model` to pick a codec.",
+      "Lists registered export codecs, file extensions, compile/export support, and availability under the native export action's condition. Use before `export_model` to pick a codec.",
     annotations: {
       title: "List Export Formats",
       readOnlyHint: true,
@@ -60,7 +70,8 @@ export const exportToolDocs: ToolSpec[] = [
   {
     name: "export_model",
     description:
-      "Compiles the current project through the named codec and returns the result as text. Optionally writes the compiled content to a filesystem path (requires user permission in Blockbench v5.0+). Use `list_export_formats` first to discover codec IDs.",
+      "Compiles the current project through a codec whose native export action is available. Returns JSON metadata and a live .bbmodel resource link; result_format='embedded' returns complete exports as text/blob resources with URI and MIME type. Optionally writes to a local path (requires Blockbench filesystem permission). Use `list_export_formats` to discover codecs.",
+    condition: { project: true },
     annotations: {
       title: "Export Model",
       destructiveHint: false,
@@ -79,6 +90,17 @@ interface ICodecSummary {
   has_export: boolean;
   supports_partial_export: boolean;
   belongs_to_current_format: boolean;
+  available: boolean;
+}
+
+function isExportAvailable(codec: { export_action?: { condition?: ToolCondition } }): boolean {
+  if (!Project) return false;
+  try {
+    return !codec.export_action || Condition(codec.export_action.condition);
+  } catch {
+    // A third-party codec's condition must not make every other codec undiscoverable.
+    return false;
+  }
 }
 
 function isStringifiable(value: unknown): value is string {
@@ -101,7 +123,8 @@ function toTextContent(raw: unknown): string {
   return String(raw);
 }
 
-export function registerExportTools() {
+/** Registers codec discovery and export tools without evaluating host globals at import time. */
+export function registerExportTools(): void {
   createTool(exportToolDocs[0].name, {
     ...exportToolDocs[0],
     async execute({ only_current_format }) {
@@ -120,6 +143,7 @@ export function registerExportTools() {
             compile?: unknown;
             export?: unknown;
             support_partial_export?: boolean;
+            export_action?: { condition?: ToolCondition };
           };
           return {
             id,
@@ -129,6 +153,7 @@ export function registerExportTools() {
             has_export: typeof c.export === "function",
             supports_partial_export: Boolean(c.support_partial_export),
             belongs_to_current_format: c.id === currentFormatCodecId,
+            available: isExportAvailable(c),
           };
         }
       );
@@ -151,12 +176,13 @@ export function registerExportTools() {
 
   createTool(exportToolDocs[1].name, {
     ...exportToolDocs[1],
-    async execute({ codec_id, options, path, max_content_length }) {
+    async execute({ codec_id, options, path, max_content_length, result_format }): Promise<CallToolResult> {
       if (!Project) {
         throw new Error(
           "No project is open. Use `create_project` or open a project first."
         );
       }
+      const project = Project;
 
       // @ts-ignore - Codecs is a Blockbench global
       const registry = Codecs as Record<
@@ -169,6 +195,7 @@ export function registerExportTools() {
           compile?: (opts?: unknown) => unknown | Promise<unknown>;
           getExportOptions?: () => Record<string, unknown>;
           fileName?: () => string;
+          export_action?: { condition?: ToolCondition };
         }
       >;
 
@@ -196,19 +223,25 @@ export function registerExportTools() {
         );
       }
 
+      if (!isExportAvailable(codec)) {
+        throw new Error(
+          `Codec "${resolvedId}" is unavailable in the current project or mode. Use \`list_export_formats\` to find an available codec.`
+        );
+      }
+
       const effectiveOptions =
         options ??
         (typeof codec.getExportOptions === "function"
           ? codec.getExportOptions()
           : undefined);
+      const fileName = typeof codec.fileName === "function" ? codec.fileName() : project.name;
 
       // Await so async codecs (glTF/etc.) resolve before we stringify/write.
       // Sync codecs (obj, bedrock, project) pass through via Promise.resolve.
       const rawResult = await Promise.resolve(codec.compile(effectiveOptions));
 
       const isArrayBuffer = rawResult instanceof ArrayBuffer;
-      const isBinaryView =
-        ArrayBuffer.isView(rawResult) && !(rawResult instanceof DataView);
+      const isBinaryView = ArrayBuffer.isView(rawResult);
       const binaryBuffer = isArrayBuffer
         ? Buffer.from(rawResult as ArrayBuffer)
         : isBinaryView
@@ -250,25 +283,41 @@ export function registerExportTools() {
           ? fullContent.slice(0, max_content_length)
           : fullContent;
 
-      return JSON.stringify(
-        {
-          codec: {
-            id: resolvedId,
-            name: codec.name ?? resolvedId,
-            extension: codec.extension ?? null,
-          },
-          file_name: typeof codec.fileName === "function"
-            ? codec.fileName()
-            : Project.name,
-          byte_length: byteLength,
+      const embedded = result_format === "embedded" && max_content_length > 0 && !truncated
+        ? createEmbeddedExport({
+          projectId: project.uuid,
+          codecId: resolvedId,
+          fileName,
+          extension: codec.extension,
+          content: fullContent,
           encoding,
-          wrote_to_path,
-          truncated,
-          content: returnedContent,
+        })
+        : undefined;
+      const metadata = {
+        codec: {
+          id: resolvedId,
+          name: codec.name ?? resolvedId,
+          extension: codec.extension ?? null,
         },
-        null,
-        2
-      );
+        file_name: fileName,
+        byte_length: byteLength,
+        encoding,
+        wrote_to_path,
+        truncated,
+        content: embedded ? null : returnedContent,
+        resource_uri: embedded?.resource.uri ?? null,
+      };
+      const projectLink = Project === project
+        ? [{ type: "resource_link" as const, ...getProjectFileResource(project) }]
+        : [];
+      return {
+        content: [
+          { type: "text", text: JSON.stringify(metadata, null, 2) },
+          ...(embedded ? [embedded] : []),
+          ...projectLink,
+        ],
+        structuredContent: metadata,
+      };
     },
   }, exportToolDocs[1].status);
 }

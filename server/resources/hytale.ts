@@ -2,6 +2,7 @@
 /// <reference types="blockbench-types" />
 
 import { createResource } from "@/lib/factories";
+import { resourceNotFound } from "@/lib/resourceErrors";
 import { findByResourceId, makeResourceId } from "@/lib/resourceUri";
 import {
   isHytalePluginInstalled,
@@ -14,7 +15,7 @@ import {
   getHytaleAnimationFPS,
   getCubeShadingMode,
   isCubeDoubleSided,
-  type HytaleCube,
+  type IHytaleCube,
 } from "@/lib/hytale";
 
 /**
@@ -57,18 +58,7 @@ export function registerHytaleResources() {
     },
     async readCallback(uri) {
       if (!isHytaleFormat()) {
-        return {
-          contents: [
-            {
-              uri: uri.href,
-              text: JSON.stringify({
-                active: false,
-                message: "No Hytale format project is currently active.",
-              }),
-              mimeType: "application/json",
-            },
-          ],
-        };
+        throw resourceNotFound(uri, "No Hytale format project is currently active.");
       }
 
       const formatType = getHytaleFormatType();
@@ -134,17 +124,7 @@ export function registerHytaleResources() {
     },
     async readCallback(uri, { id }) {
       if (!isHytaleFormat()) {
-        return {
-          contents: [
-            {
-              uri: uri.href,
-              text: JSON.stringify({
-                error: "No Hytale format project is currently active.",
-              }),
-              mimeType: "application/json",
-            },
-          ],
-        };
+        throw resourceNotFound(uri, "No Hytale format project is currently active.");
       }
 
       const attachments = getAttachmentCollections();
@@ -153,7 +133,7 @@ export function registerHytaleResources() {
       if (id) {
         const attachment = findByResourceId(attachments, id);
         if (!attachment) {
-          throw new Error(`Attachment "${id}" not found.`);
+          throw resourceNotFound(uri, `Attachment "${id}" not found.`);
         }
 
         return {
@@ -222,17 +202,7 @@ export function registerHytaleResources() {
     },
     async readCallback(uri, { id }) {
       if (!isHytaleFormat()) {
-        return {
-          contents: [
-            {
-              uri: uri.href,
-              text: JSON.stringify({
-                error: "No Hytale format project is currently active.",
-              }),
-              mimeType: "application/json",
-            },
-          ],
-        };
+        throw resourceNotFound(uri, "No Hytale format project is currently active.");
       }
 
       const pieces = getAttachmentPieces();
@@ -241,7 +211,7 @@ export function registerHytaleResources() {
       if (id) {
         const piece = findByResourceId(pieces, id);
         if (!piece) {
-          throw new Error(`Attachment piece "${id}" not found.`);
+          throw resourceNotFound(uri, `Attachment piece "${id}" not found.`);
         }
 
         return {
@@ -310,17 +280,7 @@ export function registerHytaleResources() {
     },
     async readCallback(uri, { id }) {
       if (!isHytaleFormat()) {
-        return {
-          contents: [
-            {
-              uri: uri.href,
-              text: JSON.stringify({
-                error: "No Hytale format project is currently active.",
-              }),
-              mimeType: "application/json",
-            },
-          ],
-        };
+        throw resourceNotFound(uri, "No Hytale format project is currently active.");
       }
 
       // @ts-ignore - Cube is globally available
@@ -330,10 +290,10 @@ export function registerHytaleResources() {
       if (id) {
         const cube = findByResourceId(cubes, id);
         if (!cube) {
-          throw new Error(`Cube "${id}" not found.`);
+          throw resourceNotFound(uri, `Cube "${id}" not found.`);
         }
 
-        const hytaleCube = cube as HytaleCube;
+        const hytaleCube = cube as IHytaleCube;
         return {
           contents: [
             {
@@ -371,7 +331,7 @@ export function registerHytaleResources() {
                 shading_mode: getCubeShadingMode(c),
                 double_sided: isCubeDoubleSided(c),
                 // @ts-ignore - stretch property
-                stretch: (c as HytaleCube).stretch ?? [1, 1, 1],
+                stretch: (c as IHytaleCube).stretch ?? [1, 1, 1],
               })),
             }),
             mimeType: "application/json",

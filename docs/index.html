@@ -11,22 +11,23 @@
     <nav class="sidebar">
       <div class="sidebar-brand">
         <h1>Blockbench MCP</h1>
-        <p>v1.7.0 — API Reference</p>
+        <p>v1.8.0 — API Reference</p>
       </div>
 
       <input id="search" type="text" placeholder="Search tools..." class="search-input" />
 
       <div class="nav-group">
         <p class="nav-heading">Overview</p>
-        <a href="#tools" class="nav-link">Tools <span class="count">(109)</span></a>
+        <a href="#tools" class="nav-link">Tools <span class="count">(115)</span></a>
         <a href="#prompts" class="nav-link">Prompts <span class="count">(6)</span></a>
-        <a href="#resources" class="nav-link">Resources <span class="count">(12)</span></a>
+        <a href="#resources" class="nav-link">Resources <span class="count">(13)</span></a>
       </div>
 
       <div class="nav-group">
         <p class="nav-heading">Categories</p>
         <a href="#cat-cubes" class="nav-link">Cubes <span class="count">(2)</span></a>
         <a href="#cat-camera-screenshots" class="nav-link">Camera &amp; Screenshots <span class="count">(3)</span></a>
+        <a href="#cat-capabilities" class="nav-link">Capabilities <span class="count">(1)</span></a>
         <a href="#cat-animation" class="nav-link">Animation <span class="count">(7)</span></a>
         <a href="#cat-armature" class="nav-link">Armature <span class="count">(16)</span></a>
         <a href="#cat-display-settings" class="nav-link">Display Settings <span class="count">(3)</span></a>
@@ -35,12 +36,12 @@
         <a href="#cat-history" class="nav-link">History <span class="count">(4)</span></a>
         <a href="#cat-import-export" class="nav-link">Import/Export <span class="count">(1)</span></a>
         <a href="#cat-material-instances" class="nav-link">Material Instances <span class="count">(5)</span></a>
-        <a href="#cat-mesh-editing" class="nav-link">Mesh Editing <span class="count">(11)</span></a>
+        <a href="#cat-mesh-editing" class="nav-link">Mesh Editing <span class="count">(12)</span></a>
         <a href="#cat-paint-tools" class="nav-link">Paint Tools <span class="count">(12)</span></a>
         <a href="#cat-project" class="nav-link">Project <span class="count">(2)</span></a>
         <a href="#cat-textures" class="nav-link">Textures <span class="count">(13)</span></a>
-        <a href="#cat-ui-interaction" class="nav-link">UI Interaction <span class="count">(4)</span></a>
-        <a href="#cat-uv-mapping" class="nav-link">UV Mapping <span class="count">(3)</span></a>
+        <a href="#cat-ui-interaction" class="nav-link">UI Interaction <span class="count">(6)</span></a>
+        <a href="#cat-uv-mapping" class="nav-link">UV Mapping <span class="count">(5)</span></a>
         <a href="#cat-hytale-integration" class="nav-link">Hytale Integration <span class="count">(12)</span></a>
       </div>
     </nav>
@@ -48,11 +49,11 @@
     <main class="main">
       <header class="page-header">
         <h1>Blockbench MCP Plugin</h1>
-        <p class="subtitle">API Reference — v1.7.0</p>
+        <p class="subtitle">API Reference — v1.8.0</p>
         <nav class="stats">
-          <a href="#tools"><strong>109</strong> tools (39 stable, 70 experimental)</a>
+          <a href="#tools"><strong>115</strong> tools (44 stable, 71 experimental)</a>
           <a href="#prompts"><strong>6</strong> prompts</a>
-          <a href="#resources"><strong>12</strong> resources</a>
+          <a href="#resources"><strong>13</strong> resources</a>
         </nav>
       </header>
 
@@ -78,7 +79,7 @@
         </div>
       </div>
       <p class="card-title">Place Cube</p>
-      <p class="card-desc">Places a cube of the given size at the specified position. Texture and group are optional.</p>
+      <p class="card-desc">Creates cubes in one reversible edit. Texture and group are optional, allowing untextured blockouts. Explicit face targets never use the current UV selection; partial/custom faces require per-face UV support.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -98,17 +99,17 @@
       <td class="col-name">texture</td>
       <td class="col-type">string</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Texture ID or name to apply to the cube.</td>
+      <td class="col-desc">Texture UUID, ID or name. When omitted, uses the default texture if one exists; otherwise creates untextured cubes.</td>
     </tr><tr>
       <td class="col-name">group</td>
       <td class="col-type">string</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Group/bone to which the cube belongs.</td>
+      <td class="col-desc">Parent group UUID or unique name, or root (default). Missing or ambiguous names are rejected.</td>
     </tr><tr>
       <td class="col-name">faces</td>
       <td class="col-type">&quot;north&quot; | &quot;south&quot; | &quot;east&quot; | &quot;west&quot; | &quot;up&quot; | &quot;down&quot;[] | unknown | boolean | object[]</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Faces to apply the texture to. Set to `true` to enable auto UV mapping. <span class="param-meta">(default: <code>true</code>)</span></td>
+      <td class="col-desc">true applies texture to all faces with Auto UV; false skips texture assignment. Named faces use Auto UV; false/custom rectangles disable Auto UV outside Hytale. Hytale always retains Auto UV 1 and custom rectangles must match the geometry's face dimensions. Partial/custom faces require per-face UV support. Single-texture formats may still display the project texture. <span class="param-meta">(default: <code>true</code>)</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -293,6 +294,43 @@
       </div>
     </div>
         </section>
+<section id="cat-capabilities" class="category-section">
+          <h3 class="category-title">Capabilities</h3>
+          <div id="tool-get_capabilities" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">get_capabilities</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">Get Capabilities</p>
+      <p class="card-desc">Discover Blockbench/plugin versions, desktop or web environment, active project summary, and registered model formats. Returns detailed boolean format features (null means unknown), compact supported-feature lists for all formats, and optional tool registration states. Works with no open project. Format features do not guarantee that every enabled MCP tool can run in the current mode or selection.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">format_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Optional registered format ID to inspect, such as 'free'. Defaults to the active project's format. Does not switch or create a project. <span class="param-meta">[minLength: 1]</span></td>
+    </tr><tr>
+      <td class="col-name">include_tools</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Include all registered MCP tool names, stability status, and current enabled state. Use list_modes and set_mode to navigate before calling mode-dependent tools. <span class="param-meta">(default: <code>false</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+        </section>
 <section id="cat-animation" class="category-section">
           <h3 class="category-title">Animation</h3>
           <div id="tool-create_animation" class="card tool-card">
@@ -304,7 +342,7 @@
         </div>
       </div>
       <p class="card-title">Create Animation</p>
-      <p class="card-desc">Creates a new animation with keyframes for bones.</p>
+      <p class="card-desc">Creates and selects an undoable animation with linear keyframes for existing bones, using Blockbench editor coordinates. Returns its UUID and actual name.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -329,12 +367,12 @@
       <td class="col-name">animation_length</td>
       <td class="col-type">number</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Length of the animation in seconds</td>
+      <td class="col-desc">Length of the animation in seconds <span class="param-meta">[min: 0, max: 10000]</span></td>
     </tr><tr>
       <td class="col-name">bones</td>
       <td class="col-type">Record&lt;string, object[]&gt;</td>
       <td><span class="param-required">required</span></td>
-      <td class="col-desc">Keyframes for each bone</td>
+      <td class="col-desc">Keyframes keyed by existing bone/group name. Values use Blockbench editor coordinates; rotations are degrees.</td>
     </tr><tr>
       <td class="col-name">particle_effects</td>
       <td class="col-type">Record&lt;string, string&gt;</td>
@@ -507,6 +545,11 @@
         </tr>
       </thead>
       <tbody><tr>
+      <td class="col-name">animation_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Animation UUID or name. If not provided, uses current animation.</td>
+    </tr><tr>
       <td class="col-name">action</td>
       <td class="col-type">&quot;play&quot; | &quot;pause&quot; | &quot;stop&quot; | &quot;set_time&quot; | &quot;set_length&quot; | &quot;set_fps&quot; | &quot;loop&quot; | &quot;select_range&quot;</td>
       <td><span class="param-required">required</span></td>
@@ -515,17 +558,17 @@
       <td class="col-name">time</td>
       <td class="col-type">number</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Time in seconds (for set_time action).</td>
+      <td class="col-desc">Time in seconds (for set_time action). <span class="param-meta">[min: 0]</span></td>
     </tr><tr>
       <td class="col-name">length</td>
       <td class="col-type">number</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Animation length in seconds (for set_length action).</td>
+      <td class="col-desc">Animation length in seconds, including all keyframes (for set_length action). <span class="param-meta">[min: 0, max: 10000]</span></td>
     </tr><tr>
       <td class="col-name">fps</td>
-      <td class="col-type">number</td>
+      <td class="col-type">integer</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Frames per second (for set_fps action). <span class="param-meta">[min: 1, max: 120]</span></td>
+      <td class="col-desc">Integer frames per second, 10–120 (for set_fps action; Blockbench minimum is 10). <span class="param-meta">[min: 10, max: 120]</span></td>
     </tr><tr>
       <td class="col-name">loop_mode</td>
       <td class="col-type">&quot;once&quot; | &quot;loop&quot; | &quot;hold&quot;</td>
@@ -549,7 +592,7 @@
         </div>
       </div>
       <p class="card-title">Batch Keyframe Operations</p>
-      <p class="card-desc">Performs batch operations on multiple keyframes at once.</p>
+      <p class="card-desc">Edits keyframes in the active animation atomically; all includes hidden animators. Numeric value edits use native transform values. Bake samples continuous numeric curves within selected channel spans, caps output at 10000 samples, and restores the playhead. Expressions, step/pre-post curves and effect channels require native baking.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -564,7 +607,7 @@
       <td class="col-name">selection</td>
       <td class="col-type">&quot;all&quot; | &quot;selected&quot; | &quot;range&quot; | &quot;pattern&quot;</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Which keyframes to operate on. <span class="param-meta">(default: <code>&quot;selected&quot;</code>)</span></td>
+      <td class="col-desc">Which active-animation keyframes to operate on. all includes hidden or collapsed animators. <span class="param-meta">(default: <code>&quot;selected&quot;</code>)</span></td>
     </tr><tr>
       <td class="col-name">range</td>
       <td class="col-type">object</td>
@@ -598,7 +641,7 @@
         </div>
       </div>
       <p class="card-title">Animation Copy/Paste</p>
-      <p class="card-desc">Copies and pastes animation data between bones or animations.</p>
+      <p class="card-desc">Copies native keyframe data points and curve metadata into a plugin-local clipboard. Paste preserves exact timestamps, replaces same-channel/time collisions and is undoable, including newly created animators. Mirror paste uses native position/rotation/curve mirroring; scale is unchanged.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -1476,7 +1519,7 @@
       <td class="col-name">parent</td>
       <td class="col-type">string</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc"> <span class="param-meta">(default: <code>&quot;root&quot;</code>)</span></td>
+      <td class="col-desc">Parent group UUID or name, or root for the project root. <span class="param-meta">(default: <code>&quot;root&quot;</code>)</span></td>
     </tr><tr>
       <td class="col-name">visibility</td>
       <td class="col-type">boolean</td>
@@ -1776,7 +1819,7 @@
         </div>
       </div>
       <p class="card-title">List Export Formats</p>
-      <p class="card-desc">Lists all registered export codecs with their id, display name, file extension, and whether they support compile/export. Use before `export_model` to pick a codec.</p>
+      <p class="card-desc">Lists registered export codecs, file extensions, compile/export support, and availability under the native export action's condition. Use before `export_model` to pick a codec.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -1805,7 +1848,7 @@
         </div>
       </div>
       <p class="card-title">Export Model</p>
-      <p class="card-desc">Compiles the current project through the named codec and returns the result as text. Optionally writes the compiled content to a filesystem path (requires user permission in Blockbench v5.0+). Use `list_export_formats` first to discover codec IDs.</p>
+      <p class="card-desc">Compiles the current project through a codec whose native export action is available. Returns JSON metadata and a live .bbmodel resource link; result_format='embedded' returns complete exports as text/blob resources with URI and MIME type. Optionally writes to a local path (requires Blockbench filesystem permission). Use `list_export_formats` to discover codecs.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -1835,7 +1878,12 @@
       <td class="col-name">max_content_length</td>
       <td class="col-type">integer</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Maximum number of characters to include in the returned `content` field. Use 0 to omit content entirely (useful when only writing to disk). Larger values risk exceeding MCP context limits. <span class="param-meta">(default: <code>100000</code>) [min: 0, max: 2000000]</span></td>
+      <td class="col-desc">Maximum characters of text or base64 to return. Use 0 to omit file content. In embedded mode, only complete files within this limit are embedded; larger files return a truncated preview in metadata.content. <span class="param-meta">(default: <code>100000</code>) [min: 0, max: 2000000]</span></td>
+    </tr><tr>
+      <td class="col-name">result_format</td>
+      <td class="col-type">&quot;text&quot; | &quot;embedded&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">text preserves the JSON metadata.content payload. embedded moves a complete file into an MCP resource block with URI and MIME type, sets metadata.content to null, and reports its resource_uri. Both modes include a link to the live .bbmodel project resource. <span class="param-meta">(default: <code>&quot;text&quot;</code>)</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -2161,7 +2209,7 @@
         </div>
       </div>
       <p class="card-title">Place Mesh</p>
-      <p class="card-desc">Places a mesh at the specified position. Texture and group are optional.</p>
+      <p class="card-desc">Creates meshes from local vertices and optional indexed triangle/quad faces, with position, rotation, and scale. Texture and group are optional. Returns meshes with UUIDs and vertex_keys/face_keys arrays in input order for subsequent editing.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -2200,7 +2248,7 @@
         </div>
       </div>
       <p class="card-title">Extrude Mesh</p>
-      <p class="card-desc">Extrudes selected faces or edges of a mesh.</p>
+      <p class="card-desc">Extrudes the target mesh's selected face region along averaged normals, honoring distance. Returns new vertex keys and cap/wall face keys. Edge/vertex modes are unsupported.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -2220,12 +2268,12 @@
       <td class="col-name">distance</td>
       <td class="col-type">number</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Distance to extrude. <span class="param-meta">(default: <code>1</code>)</span></td>
+      <td class="col-desc">Signed distance along averaged selected face normals, in local model units. <span class="param-meta">(default: <code>1</code>)</span></td>
     </tr><tr>
       <td class="col-name">mode</td>
       <td class="col-type">&quot;faces&quot; | &quot;edges&quot; | &quot;vertices&quot;</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">What to extrude: faces, edges, or vertices. <span class="param-meta">(default: <code>&quot;faces&quot;</code>)</span></td>
+      <td class="col-desc">Use faces. Edge and vertex extrusion are currently unsupported by this headless tool. <span class="param-meta">(default: <code>&quot;faces&quot;</code>)</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -2239,7 +2287,7 @@
         </div>
       </div>
       <p class="card-title">Subdivide Mesh</p>
-      <p class="card-desc">Subdivides selected faces of a mesh to create more geometry.</p>
+      <p class="card-desc">Subdivides the target mesh's selected triangles/quads into a regular grid with interpolated UVs. Returns new geometry keys. Unselected neighboring faces remain unchanged and may need matching cuts.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -2257,9 +2305,9 @@
       <td class="col-desc">ID or name of the mesh. If not provided, uses selected mesh.</td>
     </tr><tr>
       <td class="col-name">cuts</td>
-      <td class="col-type">number</td>
+      <td class="col-type">integer</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Number of subdivision cuts to make. <span class="param-meta">(default: <code>1</code>) [min: 1, max: 10]</span></td>
+      <td class="col-desc">Number of cuts per edge; each selected face becomes (cuts + 1) squared faces. <span class="param-meta">(default: <code>1</code>) [min: 1, max: 10]</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -2395,7 +2443,7 @@
         </div>
       </div>
       <p class="card-title">Delete Mesh Elements</p>
-      <p class="card-desc">Deletes selected vertices, edges, or faces from a mesh.</p>
+      <p class="card-desc">Deletes selected components only from the target mesh. Vertex/edge deletion removes incident faces; keep_vertices retains vertices orphaned by face/edge removal.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -2551,7 +2599,7 @@
         </div>
       </div>
       <p class="card-title">Knife Tool</p>
-      <p class="card-desc">Uses the knife tool to cut custom edges into mesh faces.</p>
+      <p class="card-desc">Currently unsupported: Blockbench's interactive Knife context requires pointer topology that this point-list API cannot safely provide. Use subdivide_mesh or create geometry with place_mesh, or use Knife manually.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -2572,6 +2620,65 @@
       <td class="col-type">object[]</td>
       <td><span class="param-required">required</span></td>
       <td class="col-desc">Points defining the cut path. <span class="param-meta">[minItems: 2]</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-get_mesh_info" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">get_mesh_info</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">Get Mesh Info</p>
+      <p class="card-desc">Inspects a mesh by UUID/name or the first selected mesh without changing geometry, selection, or undo history. Returns transforms, parent, total counts, mesh-local bounds, selection counts, and optional paginated vertices/faces with actual runtime keys. Faces use perimeter vertex order and normalized mesh-local normals (zero for degenerate faces), stored texture references, and optional UVs. Texture status distinguishes resolved, missing, unassigned (false), disabled (null), and unset; default format materials are not resolved. Pages sort keys lexicographically and expose next_offset; geometry must remain unchanged between calls. Set include_vertices/include_faces false for a compact summary.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">mesh_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Mesh UUID or name. Omit to inspect the first selected mesh. <span class="param-meta">[minLength: 1]</span></td>
+    </tr><tr>
+      <td class="col-name">include_vertices</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Include a page of vertex keys, local positions, and selection flags. <span class="param-meta">(default: <code>true</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">include_faces</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Include a page of face keys, perimeter vertices, local normals, texture references, and selection flags. <span class="param-meta">(default: <code>true</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">include_uv</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Include per-vertex UV coordinates for returned faces, in Blockbench texture units. <span class="param-meta">(default: <code>false</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">vertex_offset</td>
+      <td class="col-type">integer</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Zero-based offset into lexicographically sorted vertex keys. <span class="param-meta">(default: <code>0</code>) [min: 0]</span></td>
+    </tr><tr>
+      <td class="col-name">face_offset</td>
+      <td class="col-type">integer</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Zero-based offset into lexicographically sorted face keys. <span class="param-meta">(default: <code>0</code>) [min: 0]</span></td>
+    </tr><tr>
+      <td class="col-name">limit</td>
+      <td class="col-type">integer</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Maximum items in each included page. Continue using that page's next_offset; avoid editing geometry between pages. <span class="param-meta">(default: <code>100</code>) [min: 1, max: 500]</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -2628,7 +2735,7 @@
       <td class="col-name">tolerance</td>
       <td class="col-type">number</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Color tolerance for fill. <span class="param-meta">[min: 0, max: 100]</span></td>
+      <td class="col-desc">Only zero (exact color matching) is supported by the native fill API. Nonzero tolerance is rejected. <span class="param-meta">[min: 0, max: 100]</span></td>
     </tr><tr>
       <td class="col-name">fill_mode</td>
       <td class="col-type">&quot;color&quot; | &quot;color_connected&quot; | &quot;face&quot; | &quot;element&quot; | &quot;selected_elements&quot; | &quot;selection&quot;</td>
@@ -2898,7 +3005,7 @@
       <td class="col-name">coordinates</td>
       <td class="col-type">object[]</td>
       <td><span class="param-required">required</span></td>
-      <td class="col-desc">Array of coordinates to erase at.</td>
+      <td class="col-desc">Array of coordinates to erase at. <span class="param-meta">[minItems: 1]</span></td>
     </tr><tr>
       <td class="col-name">brush_size</td>
       <td class="col-type">number</td>
@@ -2923,7 +3030,7 @@
       <td class="col-name">connect_strokes</td>
       <td class="col-type">boolean</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Whether to connect erase strokes with lines. <span class="param-meta">(default: <code>true</code>)</span></td>
+      <td class="col-desc">Whether to connect erase strokes with lines. Disconnected points are separate native strokes and separate undo entries. <span class="param-meta">(default: <code>true</code>)</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -3031,7 +3138,7 @@
       <td class="col-name">coordinates</td>
       <td class="col-type">object[]</td>
       <td><span class="param-required">required</span></td>
-      <td class="col-desc">Array of coordinates to paint at.</td>
+      <td class="col-desc">Array of coordinates to paint at. <span class="param-meta">[minItems: 1]</span></td>
     </tr><tr>
       <td class="col-name">brush_settings</td>
       <td class="col-type">object</td>
@@ -3041,7 +3148,7 @@
       <td class="col-name">connect_strokes</td>
       <td class="col-type">boolean</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Whether to connect paint strokes with lines. <span class="param-meta">(default: <code>true</code>)</span></td>
+      <td class="col-desc">Whether to interpolate brush samples between coordinates, at no more than one texture pixel per step. <span class="param-meta">(default: <code>true</code>)</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -3254,7 +3361,7 @@
         </div>
       </div>
       <p class="card-title">Create Project</p>
-      <p class="card-desc">Creates a new project with the given name and project type.</p>
+      <p class="card-desc">Creates a project with the given name and format, and returns a resource link to its live .bbmodel file.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -3288,7 +3395,7 @@
         </div>
       </div>
       <p class="card-title">Get Project Info</p>
-      <p class="card-desc">Returns read-only project orientation: format id and display name, project name/UUID, texture resolution (texture_width/height), element counts, and a summary of top-level groups. Prefer this over `risky_eval` for first-look inspection — no JavaScript execution required.</p>
+      <p class="card-desc">Returns read-only project orientation: format id and display name, project name/UUID, texture resolution (texture_width/height), element counts, and a summary of top-level groups. Includes structured JSON and a resource link to the live .bbmodel project file. Prefer this over `risky_eval` for first-look inspection.</p>
       <div class="overflow-x">
         <p class="empty-params">No parameters</p>
       </div>
@@ -3331,6 +3438,16 @@
       <td class="col-type">number</td>
       <td><span class="param-optional">optional</span></td>
       <td class="col-desc"> <span class="param-meta">(default: <code>16</code>) [min: 16, max: 4096]</span></td>
+    </tr><tr>
+      <td class="col-name">uv_width</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Logical UV width for formats with per_texture_uv_size. Supply uv_height too. Independent of bitmap width; omit both to preserve native defaults.</td>
+    </tr><tr>
+      <td class="col-name">uv_height</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Logical UV height for formats with per_texture_uv_size. Supply uv_width too. Independent of bitmap height.</td>
     </tr><tr>
       <td class="col-name">data</td>
       <td class="col-type">string</td>
@@ -3418,7 +3535,7 @@
         </div>
       </div>
       <p class="card-title">Add Texture Group</p>
-      <p class="card-desc">Adds a new texture group with the given name.</p>
+      <p class="card-desc">Adds a reversible texture group. All texture references must exist. Material groups require one texture per channel, either normal or height, and a color map alongside a MER map; use is_material=false for ordinary grouping.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -3500,7 +3617,7 @@
         </div>
       </div>
       <p class="card-title">Create PBR Material</p>
-      <p class="card-desc">Creates a new PBR material (texture group with is_material=true) and optionally assigns textures to PBR channels. Use this for Minecraft Bedrock resource packs or any format supporting PBR.</p>
+      <p class="card-desc">Creates a new PBR material (texture group with is_material=true) and optionally assigns textures to PBR channels. Requires a PBR-capable format, distinct textures per channel, either normal or height, and a color texture alongside a MER texture. Uniform values require the corresponding map to be absent. Creation and texture moves are one undoable edit.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -3538,12 +3655,12 @@
       <td class="col-desc">Texture ID/name for the MER (Metalness/Emissive/Roughness) channel.</td>
     </tr><tr>
       <td class="col-name">color_value</td>
-      <td class="col-type">number[]</td>
+      <td class="col-type">unknown[]</td>
       <td><span class="param-optional">optional</span></td>
       <td class="col-desc">Uniform RGBA color [R,G,B,A] when no color texture is provided. <span class="param-meta">[minItems: 4, maxItems: 4]</span></td>
     </tr><tr>
       <td class="col-name">mer_value</td>
-      <td class="col-type">number[]</td>
+      <td class="col-type">unknown[]</td>
       <td><span class="param-optional">optional</span></td>
       <td class="col-desc">Uniform MER values [Metalness, Emissive, Roughness] (0-255) when no MER texture is provided. <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
     </tr><tr>
@@ -3564,7 +3681,7 @@
         </div>
       </div>
       <p class="card-title">Configure Material</p>
-      <p class="card-desc">Configures an existing PBR material's properties including channel assignments, uniform values, and subsurface scattering.</p>
+      <p class="card-desc">Configures a PBR material in one undoable edit. Replaced maps are detached without deleting their textures. Use 'none' to clear a channel before using uniform values or switching between normal and height; a MER map requires a color map.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -3602,12 +3719,12 @@
       <td class="col-desc">Texture ID/name for MER channel, or 'none' to use uniform values.</td>
     </tr><tr>
       <td class="col-name">color_value</td>
-      <td class="col-type">number[]</td>
+      <td class="col-type">unknown[]</td>
       <td><span class="param-optional">optional</span></td>
       <td class="col-desc">Uniform RGBA color [R,G,B,A] when no color texture. <span class="param-meta">[minItems: 4, maxItems: 4]</span></td>
     </tr><tr>
       <td class="col-name">mer_value</td>
-      <td class="col-type">number[]</td>
+      <td class="col-type">unknown[]</td>
       <td><span class="param-optional">optional</span></td>
       <td class="col-desc">Uniform MER values [Metalness, Emissive, Roughness] (0-255). <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
     </tr><tr>
@@ -3671,7 +3788,7 @@
         </div>
       </div>
       <p class="card-title">Import Texture Set</p>
-      <p class="card-desc">Imports a Minecraft Bedrock texture_set.json file and creates a PBR material with the associated textures.</p>
+      <p class="card-desc">Imports a Minecraft Bedrock texture_set.json on desktop. Validates supported JSON and decodes referenced images before one undoable edit. Returns JSON with material name/UUID and path. Reuses already loaded image paths without deleting textures. Normal and height, or MER and MERS, cannot coexist; MER images require a color image.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -3700,7 +3817,7 @@
         </div>
       </div>
       <p class="card-title">Assign Texture Channel</p>
-      <p class="card-desc">Assigns a texture to a specific PBR channel within a material.</p>
+      <p class="card-desc">Assigns a texture to one PBR channel in a single undoable edit. Detaches the previous map without deleting it or changing its channel. Normal and height cannot coexist; a MER map requires a color map, including in the source material after moving textures.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -3800,7 +3917,7 @@
         </div>
       </div>
       <p class="card-title">Trigger Action</p>
-      <p class="card-desc">Triggers an action in the Blockbench editor.</p>
+      <p class="card-desc">Triggers an available Blockbench Action and respects its condition. The native action owns Undo; only a newly opened dialog may be auto-confirmed.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -3820,12 +3937,12 @@
       <td class="col-name">confirmDialog</td>
       <td class="col-type">boolean</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Whether or not to automatically confirm any dialogs that appear as a result of the action. <span class="param-meta">(default: <code>true</code>)</span></td>
+      <td class="col-desc">Whether to confirm a newly opened dialog from this action. Existing unrelated dialogs are never confirmed. <span class="param-meta">(default: <code>true</code>)</span></td>
     </tr><tr>
       <td class="col-name">confirmEvent</td>
       <td class="col-type">string</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Stringified form of event arguments.</td>
+      <td class="col-desc">JSON object of MouseEvent options, with optional event type (default click).</td>
     </tr></tbody>
     </table>
       </div>
@@ -3839,7 +3956,7 @@
         </div>
       </div>
       <p class="card-title">Eval</p>
-      <p class="card-desc">Evaluates the given expression and logs it to the console. Do not pass `console` commands as they will not work.</p>
+      <p class="card-desc">Evaluates JavaScript and returns its JSON result. Does not create an Undo entry. Mutating code must manage its own correctly scoped Undo transaction; read-only evaluation leaves history unchanged.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -3927,6 +4044,49 @@
     </table>
       </div>
     </div>
+<div id="tool-list_modes" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">list_modes</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">List Modes</p>
+      <p class="card-desc">Lists Blockbench editor tabs/modes with IDs, names, native availability, and the current mode. Includes plugin-added modes. Use before set_mode to discover whether Edit, Paint, Animate, or Display is available for the current project. Camera angles are controlled separately by set_camera_angle.</p>
+      <div class="overflow-x">
+        <p class="empty-params">No parameters</p>
+      </div>
+    </div>
+<div id="tool-set_mode" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">set_mode</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          
+        </div>
+      </div>
+      <p class="card-title">Set Mode</p>
+      <p class="card-desc">Switches Blockbench's editor tab through its native mode trigger, respecting the mode's condition. Use mode_id='animate' to enter Animate before animation work, 'paint' before native painting tools, or 'edit' to return. Returns the resulting mode and available modes; refresh tools/list for changed tool availability. Selecting the current mode does nothing. Does not change the project's format.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">mode_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Mode ID returned by list_modes, such as 'edit', 'paint', 'animate', or 'display'. The Animate tab uses 'animate'. The current project must satisfy the mode's native condition. <span class="param-meta">[minLength: 1]</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
         </section>
 <section id="cat-uv-mapping" class="category-section">
           <h3 class="category-title">UV Mapping</h3>
@@ -3964,7 +4124,7 @@
       <td class="col-name">uv_mapping</td>
       <td class="col-type">Record&lt;string, number[]&gt;</td>
       <td><span class="param-required">required</span></td>
-      <td class="col-desc">UV coordinates for each vertex of the face.</td>
+      <td class="col-desc">UV coordinates for each vertex of the face, in logical UV units (not necessarily bitmap pixels).</td>
     </tr></tbody>
     </table>
       </div>
@@ -3978,7 +4138,7 @@
         </div>
       </div>
       <p class="card-title">Auto UV Mesh</p>
-      <p class="card-desc">Automatically generates UV mapping for selected mesh faces.</p>
+      <p class="card-desc">Maps only the specified/selected faces of the target mesh. project uses the active camera, unwrap projects each face to its own plane, and cylinder/sphere map around the local origin using each face's logical texture UV size (project UV size for untextured faces). Coordinates are logical UV units, not necessarily bitmap pixels. This does not pack UV islands.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -3998,7 +4158,7 @@
       <td class="col-name">mode</td>
       <td class="col-type">&quot;project&quot; | &quot;unwrap&quot; | &quot;cylinder&quot; | &quot;sphere&quot;</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">UV mapping mode: project from view, unwrap, cylinder, or sphere mapping. <span class="param-meta">(default: <code>&quot;project&quot;</code>)</span></td>
+      <td class="col-desc">project uses the active preview; unwrap is per-face planar projection; cylinder and sphere use the local origin and each face's logical texture UV dimensions. <span class="param-meta">(default: <code>&quot;project&quot;</code>)</span></td>
     </tr><tr>
       <td class="col-name">faces</td>
       <td class="col-type">string[]</td>
@@ -4017,7 +4177,7 @@
         </div>
       </div>
       <p class="card-title">Rotate Mesh UV</p>
-      <p class="card-desc">Rotates UV coordinates of selected mesh faces.</p>
+      <p class="card-desc">Rotates only the target mesh's specified/selected faces around their combined UV bounding-box center, without clamping or changing selection.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -4043,6 +4203,84 @@
       <td class="col-type">string[]</td>
       <td><span class="param-optional">optional</span></td>
       <td class="col-desc">Specific face keys to rotate UV for. If not provided, rotates all selected faces.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-get_cube_uv" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">get_cube_uv</h3>
+        <div class="card-badges">
+          <span class="badge badge-stable">stable</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">Get Cube UV</p>
+      <p class="card-desc">Inspect a cube's UV mode, offset, mirroring, six face rectangles/rotations, stored and effective texture references, logical UV sizes and bitmap sizes. Read-only; no selection or preview changes.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Cube UUID or unique name. UUID takes precedence over names. <span class="param-meta">[minLength: 1]</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-set_cube_uv" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">set_cube_uv</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Set Cube UV</p>
+      <p class="card-desc">Edit box UV offsets/mirroring or per-face rectangles, rotation and texture references in one reversible edit. Preserves untargeted faces and selection. Validates UV mode, texture references and rotation support. Hytale rectangles must retain geometry-linked extents and Auto UV; texture assignments use the project/attachment collection, and quads cannot use box UV. Does not pack islands or repaint textures.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Cube UUID or unique name. Does not use or change selection. <span class="param-meta">[minLength: 1]</span></td>
+    </tr><tr>
+      <td class="col-name">box_uv</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Explicitly convert UV mode using the native cube operation. Requires optional_box_uv to change mode. Conversion can reset rotations and enable disabled faces.</td>
+    </tr><tr>
+      <td class="col-name">uv_offset</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Box UV net offset [u, v]; requires box UV mode. <span class="param-meta">[minItems: 2, maxItems: 2]</span></td>
+    </tr><tr>
+      <td class="col-name">mirror_uv</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Mirror the box UV net; requires box UV mode. For per-face mirroring, reverse rectangle endpoints.</td>
+    </tr><tr>
+      <td class="col-name">faces</td>
+      <td class="col-type">object</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Patch only these faces in per-face UV mode. Other faces are preserved. Explicit rectangles disable automatic UV remapping except in Hytale, where dimension-linked UVs retain native Auto UV. Hytale textures resolve through the project/attachment collection, so only null is accepted as an explicit face texture.</td>
     </tr></tbody>
     </table>
       </div>
@@ -4073,7 +4311,7 @@
         </div>
       </div>
       <p class="card-title">Validate Hytale Model</p>
-      <p class="card-desc">Validates the current Hytale model against Hytale engine constraints (node count, UV sizes, etc.).</p>
+      <p class="card-desc">Checks exported main-model node count using the installed Hytale codec and verifies bitmap dimensions are multiples of 32. Does not validate attachment exports, shading, all UVs, animation integration or target-engine rendering.</p>
       <div class="overflow-x">
         <p class="empty-params">No parameters</p>
       </div>
@@ -4518,6 +4756,14 @@
         <h2 class="section-title">Resources</h2>
         <div class="card">
       <div class="card-header">
+        <h3 class="card-name">project-files</h3>
+      </div>
+      <p class="card-title">Blockbench Project Files</p>
+      <p class="uri-template">blockbench://project/{id}.bbmodel</p>
+      <p class="card-desc">Returns the active project's live .bbmodel file with unsaved edits and embedded textures. UUID-based URIs remain stable across renames. Select a project before reading its file; reading never switches tabs or saves to disk.</p>
+    </div>
+<div class="card">
+      <div class="card-header">
         <h3 class="card-name">projects</h3>
       </div>
       <p class="card-title">Blockbench Projects</p>
@@ -4545,8 +4791,8 @@
         <h3 class="card-name">reference_models</h3>
       </div>
       <p class="card-title">Reference Models</p>
-      <p class="uri-template">reference_models://{id}</p>
-      <p class="card-desc">Returns reference models in the current project. Requires the Reference Models plugin. List URIs use slugified names (e.g. `reference_models://turntable`) with `~&lt;uuid-prefix&gt;` on collision. Reads accept UUID, exact name, or slug.</p>
+      <p class="uri-template">reference-models://{id}</p>
+      <p class="card-desc">Returns reference models in the current project. Requires the Reference Models plugin. List URIs use slugified names (e.g. `reference-models://turntable`) with `~&lt;uuid-prefix&gt;` on collision. Reads accept UUID, exact name, or slug.</p>
     </div>
 <div class="card">
       <div class="card-header">
@@ -4615,7 +4861,7 @@
       </section>
 
       <footer class="page-footer">
-        Generated 2026-07-03T17:35:32.369Z from Zod schemas
+        Generated 2026-09-13T20:44:59.501Z from Zod schemas
       </footer>
     </main>
   </div>
