@@ -90,9 +90,32 @@ function shiftUvCorner(face: CubeFace | undefined, index: number, amount: number
   face.uv[corner] = inverted ? lerp(own, other, amount) : lerp(other, own, amount);
 }
 
+/** The slice of Blockbench's `Clipbench` global that `duplicate()` writes to since 5.2. */
+interface IClipbenchDuplicateMapHost {
+  duplicate_map?: Map<unknown, unknown>;
+}
+
+/**
+ * Clears `Clipbench.duplicate_map` after plugin-driven `duplicate()` calls.
+ *
+ * Since Blockbench 5.2, `OutlinerElement.duplicate()` and `Group.duplicate()`
+ * record every original-to-copy pair in `Clipbench.duplicate_map`, but only the
+ * native Duplicate action resets it. Without a reset, the stale pairs (and the
+ * nodes they retain) leak into the next native duplicate, which would remap IK
+ * references and vertex weights against unrelated copies. No-op on older hosts
+ * and outside Blockbench.
+ */
+export function resetClipbenchDuplicateMap(): void {
+  const clipbench = (globalThis as { Clipbench?: IClipbenchDuplicateMapHost }).Clipbench;
+  if (!clipbench || !(clipbench.duplicate_map instanceof Map)) return;
+  clipbench.duplicate_map = new Map();
+}
+
 /** Blockbench declares `duplicate()` only on Group, but every OutlinerElement implements it. */
 function duplicateCube(cube: Cube): Cube {
-  return (cube as unknown as { duplicate(): Cube }).duplicate();
+  const created = (cube as unknown as { duplicate(): Cube }).duplicate();
+  resetClipbenchDuplicateMap();
+  return created;
 }
 
 /**

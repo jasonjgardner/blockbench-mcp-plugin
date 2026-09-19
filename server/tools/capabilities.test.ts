@@ -38,9 +38,14 @@ const baseFeatures = {
   rotation_limit: false,
   texture_meshes: false,
   locators: false,
+  molang: false,
+  java_cube_shade_direction_override: false,
 };
 
-const freeFormat = Object.freeze({ ...baseFeatures, id: "free", name: "Generic Model", meshes: true, bone_rig: true, animation_mode: true, pbr: true });
+const freeFormat = Object.freeze({
+  ...baseFeatures, id: "free", name: "Generic Model", meshes: true, bone_rig: true, animation_mode: true, pbr: true, molang: true,
+  remember_files: Object.freeze(["textures", "animation_files"]), animation_grouping: "custom",
+});
 const javaFormat = Object.freeze({ ...baseFeatures, id: "java_block", name: "Java Block/Item", rotation_limit: true, display_mode: true });
 const registeredFormats = Object.freeze({ java_block: javaFormat, free: freeFormat });
 const activeProject = Object.freeze({
@@ -92,6 +97,20 @@ describe("capability discovery", () => {
     expect(result.tools).toBeUndefined();
   });
 
+  test("a format getter that needs a project reports unknown instead of failing", async () => {
+    // Hytale's single_texture getter reads project data and throws with Project = 0.
+    const projectBound = { ...baseFeatures, id: "hytale_prop", name: "Hytale Prop" };
+    Object.defineProperty(projectBound, "single_texture", {
+      enumerable: true,
+      get: () => { throw new TypeError("Cannot read properties of undefined (reading 'length')"); },
+    });
+    Object.assign(globalThis, { Project: 0, Formats: { ...registeredFormats, hytale_prop: projectBound } });
+    const result = await inspect({ format_id: "hytale_prop" });
+    expect(result.format?.features.single_texture).toBeNull();
+    expect(result.format?.features.edit_mode).toBe(true);
+    expect(result.formats.find(({ id }) => id === "hytale_prop")?.unknown_features).toEqual(["single_texture"]);
+  });
+
   test("works when the no-project host leaves Project undefined", async () => {
     Reflect.deleteProperty(globalThis, "Project");
     const result = await inspect({ format_id: "free" });
@@ -116,6 +135,25 @@ describe("capability discovery", () => {
     expect(result.format).toMatchObject({ id: "java_block", features: { meshes: false, rotation_limit: true, display_mode: true } });
     expect(Reflect.get(globalThis, "Project")).toBe(activeProject);
     expect(Reflect.get(globalThis, "Format")).toBe(freeFormat);
+  });
+
+  test("reports Blockbench 5.2 molang/shade flags and non-boolean format settings", async () => {
+    const active = await inspect();
+    expect(active.format?.features.molang).toBe(true);
+    expect(active.format?.features.java_cube_shade_direction_override).toBe(false);
+    expect(active.format?.remember_files).toEqual(["textures", "animation_files"]);
+    expect(active.format?.animation_grouping).toBe("custom");
+    expect(active.formats.find(({ id }) => id === "free")?.supported_features).toContain("molang");
+
+    const older = await inspect({ format_id: "java_block" });
+    expect(older.format?.remember_files).toBeNull();
+    expect(older.format?.animation_grouping).toBeNull();
+
+    Object.assign(globalThis, { Formats: { custom: { id: "custom", name: "Custom", remember_files: ["textures", 7, "bogus"], animation_grouping: "sideways" } } });
+    const custom = await inspect({ format_id: "custom" });
+    expect(custom.format?.remember_files).toEqual(["textures"]);
+    expect(custom.format?.animation_grouping).toBeNull();
+    expect(custom.format?.features.molang).toBeNull();
   });
 
   test("reports web/mobile environment using Blockbench host flags", async () => {

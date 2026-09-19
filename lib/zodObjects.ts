@@ -304,13 +304,19 @@ export const faceKeysOptionalSchema = z
 // Common Parameter Schemas
 // ============================================================================
 
-/** Opacity value 0-255 */
+/**
+ * Brush/tool opacity, always on the 0-255 scale.
+ *
+ * Blockbench 5.2 added the `opacity_range` setting (`"255"` or `"100"`), which
+ * changes the scale of the brush opacity slider. The public MCP API stays 0-255
+ * regardless; paint tools convert to the active range before touching the slider.
+ */
 export const opacitySchema = z
   .number()
   .min(0)
   .max(255)
   .optional()
-  .describe("Opacity (0-255).");
+  .describe("Opacity (0-255), independent of Blockbench's opacity range setting.");
 
 /** Brush size 1-100 */
 export const brushSizeSchema = z

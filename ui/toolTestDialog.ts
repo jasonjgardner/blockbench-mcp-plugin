@@ -1,27 +1,18 @@
 /// <reference types="blockbench-types" />
+import type { FormElementOptions, InputFormConfig } from "blockbench-types/generated/interface/form";
 import { z } from "zod";
 import { getAllToolDefinitions } from "@/lib/factories";
 
-interface IFormElementOptions {
-  label?: string;
-  description?: string;
-  type?: string;
-  value?: unknown;
-  placeholder?: string;
-  min?: number;
-  max?: number;
-  step?: number;
-  options?: Record<string, string>;
-  height?: number;
-}
+type IFormElementOptions = FormElementOptions;
 
-type InputFormConfig = Record<string, "_" | IFormElementOptions>;
+/** Blockbench form input types this dialog maps Zod schemas onto. */
+type FormFieldType = "text" | "number" | "checkbox" | "select" | "textarea";
 
 /**
  * Extracts metadata from a Zod schema type
  */
 function getZodTypeMeta(zodType: z.ZodType): {
-  type: string;
+  type: FormFieldType;
   isOptional: boolean;
   isArray: boolean;
   description?: string;
@@ -79,7 +70,7 @@ function getZodTypeMeta(zodType: z.ZodType): {
   }
 
   // Map Zod types to form types
-  let type = "text";
+  let type: FormFieldType = "text";
   switch (typeName) {
     case "ZodString":
       type = "text";
@@ -301,7 +292,7 @@ export function openToolTestDialog(toolName: string) {
       if (buttonIndex === 1) {
         // @ts-ignore - 'this' refers to the Dialog instance
         const dialog = this as Dialog;
-        const formResult = dialog.form?.result ?? {};
+        const formResult = dialog.getFormResult() ?? {};
         const args = hasFields ? parseFormResult(formResult, toolDef.inputSchema) : {};
 
         const jsonData = JSON.stringify({
@@ -320,35 +311,38 @@ export function openToolTestDialog(toolName: string) {
         return false;
       }
     },
-    async onConfirm(formResult: Record<string, unknown>) {
-      const args = hasFields ? parseFormResult(formResult, toolDef.inputSchema) : {};
+    onConfirm(formResult: Record<string, unknown>) {
+      // Dialog callbacks must return synchronously; the async work runs detached.
+      void (async () => {
+        const args = hasFields ? parseFormResult(formResult, toolDef.inputSchema) : {};
 
-      // Show loading message
-      Blockbench.showQuickMessage(tl("mcp.dialog.running_tool"), 1000);
+        // Show loading message
+        Blockbench.showQuickMessage(tl("mcp.dialog.running_tool"), 1000);
 
-      try {
-        const result = await toolDef.execute(args);
+        try {
+          const result = await toolDef.execute(args);
 
-        // Format result for display
-        let displayResult: unknown;
-        if (typeof result === "string") {
-          displayResult = result;
-        } else if (result && typeof result === "object" && "content" in result) {
-          const content = (result as { content: Array<{ type: string; text?: string; data?: string }> }).content;
-          displayResult = content.map((c) => {
-            if (c.type === "text") return c.text;
-            if (c.type === "image") return `[Image: ${c.data?.slice(0, 50)}...]`;
-            return JSON.stringify(c);
-          }).join("\n");
-        } else {
-          displayResult = result;
+          // Format result for display
+          let displayResult: unknown;
+          if (typeof result === "string") {
+            displayResult = result;
+          } else if (result && typeof result === "object" && "content" in result) {
+            const content = (result as { content: Array<{ type: string; text?: string; data?: string }> }).content;
+            displayResult = content.map((c) => {
+              if (c.type === "text") return c.text;
+              if (c.type === "image") return `[Image: ${c.data?.slice(0, 50)}...]`;
+              return JSON.stringify(c);
+            }).join("\n");
+          } else {
+            displayResult = result;
+          }
+
+          showResultDialog(toolName, displayResult, false);
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          showResultDialog(toolName, `Error: ${errorMessage}`, true);
         }
-
-        showResultDialog(toolName, displayResult, false);
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        showResultDialog(toolName, `Error: ${errorMessage}`, true);
-      }
+      })();
     },
   });
 

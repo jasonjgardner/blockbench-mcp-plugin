@@ -39,6 +39,8 @@ BBPlugin.register("mcp", {
   bug_tracker: "https://github.com/jasonjgardner/blockbench-mcp-plugin/issues",
   icon: getIcon(),
   variant: "desktop",
+  // requireNativeModule() permission handling first shipped in Blockbench 5.0.
+  min_version: "5.0.0",
   async onload() {
     // Get network module with Blockbench permission handling
     // @ts-ignore - requireNativeModule is a Blockbench global

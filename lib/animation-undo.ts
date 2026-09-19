@@ -21,7 +21,7 @@ function markAnimationSave(event: unknown): void {
 }
 
 /** Native method omitted from published types; it also removes the animator from the timeline. */
-interface IAnimationWithRemoval extends _Animation {
+interface IAnimationWithRemoval extends BBAnimation {
   removeAnimator(id: string): void;
 }
 
@@ -72,7 +72,7 @@ function restoreAnimationSave(event: unknown): void {
  * @param edit - Synchronous mutation; errors cancel and restore the complete edit.
  * @returns The mutation callback's result.
  */
-export function runUndoableAnimationEdit<T>(aspects: UndoAspects & { animations: _Animation[] }, label: string, edit: () => T): T {
+export function runUndoableAnimationEdit<T>(aspects: UndoAspects & { animations: BBAnimation[] }, label: string, edit: () => T): T {
   const trackedAspects = { ...aspects, [RESTORE_MARKER]: true };
   return runUndoableEdit(trackedAspects, label, edit);
 }

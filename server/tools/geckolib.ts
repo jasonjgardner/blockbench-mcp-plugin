@@ -80,7 +80,7 @@ export {
 
 /** One targeted keyframe with the labels a result reports it under. */
 interface IEasingTarget {
-  animation: _Animation;
+  animation: BBAnimation;
   /** Animator UUID, which groups keyframes even when two bones share a name. */
   animatorId: string;
   bone: string;
@@ -130,7 +130,7 @@ function resolveSelectedTargets(): IEasingTarget[] {
 /** Describes a keyframe through its animator, which owns the bone name and animation. */
 function describeKeyframe(keyframe: IGeckolibKeyframe): IEasingTarget {
   // @ts-ignore - blockbench-types omits GeneralAnimator.animation and uuid, which exist at runtime
-  const animator = keyframe.animator as { animation: _Animation; name?: string; uuid?: string } | undefined;
+  const animator = keyframe.animator as { animation: BBAnimation; name?: string; uuid?: string } | undefined;
   if (!animator?.animation) {
     throw new Error("A targeted keyframe is not attached to an animation; reselect the keyframes and retry.");
   }
@@ -214,7 +214,7 @@ function reportTarget(target: IEasingTarget): Record<string, unknown> {
  * dropped entirely outside Animate mode. The `animations` aspect round-trips
  * easings correctly through the plugin's patched `Keyframe.getUndoCopy`.
  */
-function targetAnimations(targets: readonly IEasingTarget[]): _Animation[] {
+function targetAnimations(targets: readonly IEasingTarget[]): BBAnimation[] {
   return [...new Set(targets.map((target) => target.animation))];
 }
 
@@ -330,7 +330,7 @@ function deliverExport(
 }
 
 /** Resolves requested animations by UUID or name, or every animation. */
-function resolveAnimations(animationIds?: readonly string[]): _Animation[] {
+function resolveAnimations(animationIds?: readonly string[]): BBAnimation[] {
   const all = getAnimationClass().all ?? [];
   if (!animationIds) return [...all];
   return animationIds.map((id) => {

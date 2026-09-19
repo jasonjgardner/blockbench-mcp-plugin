@@ -99,12 +99,12 @@ export function getProjectTexture(id: string): Texture | null {
  * `… .set is not a function` on current Blockbench builds.
  */
 export function setBarItemValue(id: string, value: unknown): void {
-  // @ts-ignore - BarItems is a Blockbench global
-  const item = BarItems?.[id];
-  if (!item) return;
-  if (typeof item.set === "function") {
+  const item: unknown = Reflect.get(BarItems, id);
+  if (typeof item !== "object" || item === null) return;
+  const set: unknown = Reflect.get(item, "set");
+  if (typeof set === "function") {
     try {
-      item.set(value);
+      set.call(item, value);
       return;
     } catch {
       // Fall through to direct assignment for widgets whose runtime method
@@ -112,17 +112,18 @@ export function setBarItemValue(id: string, value: unknown): void {
     }
   }
   if ("value" in item) {
-    item.value = value;
-    if (typeof item.update === "function") item.update();
+    Reflect.set(item, "value", value);
+    const update: unknown = Reflect.get(item, "update");
+    if (typeof update === "function") update.call(item);
     return;
   }
-  if (typeof item.change === "function") {
-    try {
-      item.change(value);
-    } catch {
-      // Best-effort UI setting; callers should not fail because Blockbench
-      // changed an optional widget mutator signature.
-    }
+  const change: unknown = Reflect.get(item, "change");
+  if (typeof change !== "function") return;
+  try {
+    change.call(item, value);
+  } catch {
+    // Best-effort UI setting; callers should not fail because Blockbench
+    // changed an optional widget mutator signature.
   }
 }
 
@@ -204,10 +205,10 @@ export function findMeshOrThrow(id: string): Mesh {
 /**
  * Finds an element (cube, mesh, group) by ID or name and throws an actionable error if not found.
  * @param id - The UUID or name of the element to find
- * @returns The found OutlinerElement
+ * @returns The found element or group
  * @throws Error with suggestion to use list_outline
  */
-export function findElementOrThrow(id: string): OutlinerElement {
+export function findElementOrThrow(id: string): OutlinerElement | Group {
   const element = Outliner.elements.find(
     (el: OutlinerElement) => el.uuid === id || el.name === id
   ) || Group.all.find((g: Group) => g.uuid === id || g.name === id);
@@ -291,7 +292,7 @@ export function getMeshOrSelected(meshId?: string): Mesh {
  * @throws {Error} When no project is open, the view is unknown, or rendering fails.
  */
 export function captureScreenshot(project?: string, view: string = ACTIVE_VIEW_ID) {
-  let selectedProject = Project;
+  let selectedProject: ModelProject | undefined = Project;
 
   if (!selectedProject || project !== undefined) {
     selectedProject = ModelProject.all.find(

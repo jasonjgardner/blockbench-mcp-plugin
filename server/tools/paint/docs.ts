@@ -28,7 +28,8 @@ export const paintToolDocs: IToolSpec[] = [
   {
     name: "paint_fill_tool",
     condition: { project: true, features: ["paint_mode"], method: () => Texture.all.length > 0 && Boolean(BarItems.fill_tool) && Condition(BarItems.fill_tool.condition) },
-    description: "Uses the fill/bucket tool to fill areas with color.",
+    description:
+      "Uses the fill/bucket tool to fill areas with color. In 'face' and 'element' fill modes only the face or element whose UV area contains the given texture pixel is filled. Opacity is 0-255 regardless of Blockbench's opacity range setting.",
     annotations: {
       title: "Paint Fill Tool",
       destructiveHint: true,
@@ -95,7 +96,8 @@ export const paintToolDocs: IToolSpec[] = [
   {
     name: "paint_settings",
     condition: { project: true, features: ["paint_mode"] },
-    description: "Configures paint mode settings and preferences.",
+    description:
+      "Configures paint mode settings and preferences, including Blockbench 5.2 screen-space brush projection, brush lock mode and brush aspect ratio. The result also reports the active opacity range (0-255 or 0-100); tool opacity parameters stay 0-255 and are converted automatically.",
     annotations: {
       title: "Paint Settings",
       destructiveHint: true,
@@ -107,7 +109,7 @@ export const paintToolDocs: IToolSpec[] = [
     name: "paint_with_brush",
     condition: { project: true, features: ["paint_mode"], method: () => Texture.all.length > 0 },
     description:
-      "Paints on textures using the brush tool with customizable settings.",
+      "Paints on textures using the brush tool with customizable settings (opacity 0-255, softness 0-100%, optional aspect ratio). Paints on the selected pixel layer; if a layer group is selected, a pixel layer inside it is used.",
     annotations: {
       title: "Paint with Brush",
       destructiveHint: true,
@@ -117,7 +119,7 @@ export const paintToolDocs: IToolSpec[] = [
   },
   {
     name: "create_brush_preset",
-    description: "Creates a custom brush preset with specified settings.",
+    description: "Creates a custom brush preset with specified settings. Omitted settings are stored as unset so loading the preset keeps the current value.",
     annotations: {
       title: "Create Brush Preset",
       destructiveHint: true,
@@ -128,7 +130,7 @@ export const paintToolDocs: IToolSpec[] = [
   {
     name: "load_brush_preset",
     condition: { project: true, features: ["paint_mode"] },
-    description: "Loads and applies a brush preset by name.",
+    description: "Loads and applies a custom or built-in brush preset (e.g. 'screen_space') by name.",
     annotations: {
       title: "Load Brush Preset",
       destructiveHint: true,
@@ -151,7 +153,8 @@ export const paintToolDocs: IToolSpec[] = [
   {
     name: "texture_layer_management",
     condition: { project: true, features: ["paint_mode"], method: () => Texture.all.length > 0 },
-    description: "Creates, manages, and manipulates texture layers.",
+    description:
+      "Lists, creates, manages, and reorders texture layers and layer groups (Blockbench 5.2 hierarchy). Target a layer or group by UUID or name with layer_id; list_layers reports type, parent and depth.",
     annotations: {
       title: "Texture Layer Management",
       destructiveHint: true,

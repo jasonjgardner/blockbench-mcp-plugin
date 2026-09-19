@@ -31,7 +31,7 @@ export const exportModelParameters = z.object({
     .record(z.unknown())
     .optional()
     .describe(
-      "Codec-specific export options. Defaults to the codec's configured export options."
+      "Codec-specific export options, merged over the codec's configured export options (keys match the native export dialog). glTF ('gltf'): encoding ('ascii' | 'binary'), scale, embed_textures, armature (export groups as skinned bones), animations, and merge_armature (Blockbench 5.2+; default false exports one SkinnedMesh per armature child mesh, true merges each armature's meshes into a single SkinnedMesh)."
     ),
   path: z
     .string()
@@ -70,7 +70,7 @@ export const exportToolDocs: IToolSpec[] = [
   {
     name: "export_model",
     description:
-      "Compiles the current project through a codec whose native export action is available. Returns JSON metadata and a live .bbmodel resource link; result_format='embedded' returns complete exports as text/blob resources with URI and MIME type. Optionally writes to a local path (requires Blockbench filesystem permission). Use `list_export_formats` to discover codecs.",
+      "Compiles the current project through a codec whose native export action is available. Returns JSON metadata and a live .bbmodel resource link; result_format='embedded' returns complete exports as text/blob resources with URI and MIME type. Optionally writes to a local path (requires Blockbench filesystem permission). Partial codec options merge over the configured defaults; for glTF armatures, options.merge_armature=true merges each armature's meshes into one SkinnedMesh. Use `list_export_formats` to discover codecs.",
     condition: { project: true },
     annotations: {
       title: "Export Model",
@@ -229,11 +229,13 @@ export function registerExportTools(): void {
         );
       }
 
-      const effectiveOptions =
-        options ??
-        (typeof codec.getExportOptions === "function"
-          ? codec.getExportOptions()
-          : undefined);
+      // Merge partial options over the configured defaults, as the native
+      // glTF codec does, so passing only e.g. { merge_armature: true } keeps
+      // every other export setting.
+      const defaultOptions = typeof codec.getExportOptions === "function"
+        ? codec.getExportOptions()
+        : undefined;
+      const effectiveOptions = options ? { ...defaultOptions, ...options } : defaultOptions;
       const fileName = typeof codec.fileName === "function" ? codec.fileName() : project.name;
 
       // Await so async codecs (glTF/etc.) resolve before we stringify/write.

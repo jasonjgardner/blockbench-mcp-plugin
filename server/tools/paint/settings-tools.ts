@@ -3,7 +3,14 @@
 import { createTool } from "@/lib/factories";
 import { getAndActivateTexture, setBarItemValue } from "@/lib/util";
 import { paintToolDocs } from "./docs";
+import { alphaToOpacity, toOpacityRange } from "./paint-math";
 import { colorPickerToolParameters, paintSettingsParameters } from "./schemas";
+import {
+  activeOpacityRange,
+  blockbenchSetting,
+  painterRuntime,
+  setToolSettingOnAllTools,
+} from "./runtime";
 
 /**
  * Registers `color_picker_tool` (`paintToolDocs[3]`): samples a texture pixel
@@ -18,31 +25,23 @@ export function registerColorPickerTool(): void {
       async execute({ texture_id, x, y, set_as_secondary, pick_opacity }) {
         const texture = getAndActivateTexture(texture_id);
 
-        // Pick color
-        Painter.colorPicker(texture, x, y, { button: set_as_secondary ? 2 : 0 });
-
-        // Get the picked color
+        painterRuntime().colorPicker(texture, x, y, { button: set_as_secondary ? 2 : 0 });
         const color = ColorPanel.get();
 
-        if (pick_opacity) {
-          // Get pixel color with alpha
-          const pixelColor = Painter.getPixelColor(texture.ctx, x, y);
-          const opacity = Math.floor(pixelColor.getAlpha() * 255);
-
-          // Apply opacity to brush tools
-          for (let id in BarItems) {
-            const tool = BarItems[id];
-            // @ts-ignore
-            if (tool.tool_settings && tool.tool_settings.brush_opacity >= 0) {
-              // @ts-ignore
-              tool.tool_settings.brush_opacity = opacity;
-            }
-          }
-
-          return `Picked color ${color} with opacity ${opacity} from (${x}, ${y}) on texture "${texture.name}"`;
+        if (!pick_opacity) {
+          return `Picked color ${color} from (${x}, ${y}) on texture "${texture.name}"`;
         }
 
-        return `Picked color ${color} from (${x}, ${y}) on texture "${texture.name}"`;
+        // Public API stays 0-255; brush_opacity tool settings use the active range.
+        const opacity = alphaToOpacity(Painter.getPixelColor(texture.ctx, x, y).getAlpha());
+        setToolSettingOnAllTools(
+          "brush_opacity",
+          toOpacityRange(opacity, activeOpacityRange()),
+          tool => typeof tool.tool_settings.brush_opacity === "number" && tool.tool_settings.brush_opacity >= 0,
+          "slider_brush_opacity"
+        );
+
+        return `Picked color ${color} with opacity ${opacity} (0-255) from (${x}, ${y}) on texture "${texture.name}"`;
       },
     },
     paintToolDocs[3].status
@@ -50,8 +49,34 @@ export function registerColorPickerTool(): void {
 }
 
 /**
+ * Sets a Blockbench setting through `Setting.set` (fires `onChange` and saves),
+ * returning a change note, or a note that the setting is unavailable.
+ */
+function applySetting(id: string, value: boolean | string, label: string): string {
+  const setting = blockbenchSetting(id);
+  if (!setting) return `${label}: unavailable in this Blockbench version`;
+  setting.set(value);
+  return `${label}: ${value}`;
+}
+
+/** Whether a bar item exists, so version-specific toolbar settings can be reported as unavailable. */
+function hasBarItem(id: string): boolean {
+  return Boolean((BarItems as unknown as Record<string, unknown>)[id]);
+}
+
+/**
+ * Sets a toolbar toggle/select, returning a change note, or a note that the
+ * item is unavailable (for example on Blockbench versions before 5.2).
+ */
+function applyBarItem(id: string, value: boolean | string, label: string): string {
+  if (!hasBarItem(id)) return `${label}: unavailable in this Blockbench version`;
+  setBarItemValue(id, value);
+  return `${label}: ${value}`;
+}
+
+/**
  * Registers `paint_settings` (`paintToolDocs[6]`): toggles paint-mode
- * preferences, reporting each changed setting in the result text.
+ * preferences, reporting each changed setting and the active opacity range.
  */
 export function registerPaintSettingsTool(): void {
   createTool(
@@ -70,98 +95,85 @@ export function registerPaintSettingsTool(): void {
         paint_with_stylus_only,
         pick_color_opacity,
         pick_combined_color,
+        screen_space_brush_projection,
+        brush_lock_mode,
+        brush_aspect_ratio,
       }) {
-        const settings: string[] = [];
+        const painter = painterRuntime();
+        const changes: string[] = [];
 
-        // Mirror painting
         if (mirror_painting !== undefined) {
           setBarItemValue("mirror_painting", mirror_painting.enabled);
-          Painter.mirror_painting = mirror_painting.enabled;
-          settings.push(`Mirror painting: ${mirror_painting.enabled}`);
+          painter.mirror_painting = mirror_painting.enabled;
+          changes.push(`Mirror painting: ${mirror_painting.enabled}`);
 
-          if (
-            mirror_painting.enabled &&
-            (mirror_painting.axis ||
-              mirror_painting.texture ||
-              mirror_painting.texture_center)
-          ) {
-            // @ts-ignore
-            const options = Painter.mirror_painting_options;
-            if (mirror_painting.axis) {
-              mirror_painting.axis.forEach((axis) => {
-                options[axis] = true;
-              });
-            }
-            if (mirror_painting.texture !== undefined) {
-              options.texture = mirror_painting.texture;
-            }
+          const options = painter.mirror_painting_options;
+          const hasOptions = Boolean(mirror_painting.axis || mirror_painting.texture !== undefined || mirror_painting.texture_center);
+          if (mirror_painting.enabled && hasOptions && options) {
+            mirror_painting.axis?.forEach(axis => {
+              options[axis] = true;
+            });
+            if (mirror_painting.texture !== undefined) options.texture = mirror_painting.texture;
             if (mirror_painting.texture_center) {
-              options.texture_center = [
-                mirror_painting.texture_center.x,
-                mirror_painting.texture_center.y,
-              ];
+              options.texture_center = [mirror_painting.texture_center.x, mirror_painting.texture_center.y];
             }
-            settings.push(`Mirror options updated`);
+            changes.push("Mirror options updated");
           }
         }
 
-        // Lock alpha
         if (lock_alpha !== undefined) {
-          Painter.lock_alpha = lock_alpha;
-          settings.push(`Lock alpha: ${lock_alpha}`);
+          setBarItemValue("lock_alpha", lock_alpha);
+          painter.lock_alpha = lock_alpha;
+          changes.push(`Lock alpha: ${lock_alpha}`);
         }
 
-        // Pixel perfect
         if (pixel_perfect !== undefined) {
-          setBarItemValue("pixel_perfect_drawing", pixel_perfect);
-          settings.push(`Pixel perfect: ${pixel_perfect}`);
+          changes.push(applyBarItem("pixel_perfect_drawing", pixel_perfect, "Pixel perfect"));
         }
 
-        // Color erase mode
         if (color_erase_mode !== undefined) {
           setBarItemValue("color_erase_mode", color_erase_mode);
-          Painter.erase_mode = color_erase_mode;
-          settings.push(`Color erase mode: ${color_erase_mode}`);
+          painter.erase_mode = color_erase_mode;
+          changes.push(`Color erase mode: ${color_erase_mode}`);
         }
 
-        // Settings that require accessing the settings object
-        if (paint_side_restrict !== undefined) {
-          // @ts-ignore
-          settings.paint_side_restrict.value = paint_side_restrict;
-          settings.push(`Paint side restrict: ${paint_side_restrict}`);
+        const settingChanges: ReadonlyArray<[string, boolean | string | undefined, string]> = [
+          ["paint_side_restrict", paint_side_restrict, "Paint side restrict"],
+          ["brush_opacity_modifier", brush_opacity_modifier, "Brush opacity modifier"],
+          ["brush_size_modifier", brush_size_modifier, "Brush size modifier"],
+          ["paint_with_stylus_only", paint_with_stylus_only, "Paint with stylus only"],
+          ["pick_color_opacity", pick_color_opacity, "Pick color opacity"],
+          ["pick_combined_color", pick_combined_color, "Pick combined color"],
+        ];
+        settingChanges
+          .filter((entry): entry is [string, boolean | string, string] => entry[1] !== undefined)
+          .forEach(([id, value, label]) => changes.push(applySetting(id, value, label)));
+
+        if (screen_space_brush_projection !== undefined) {
+          changes.push(applyBarItem("screen_space_brush_projection", screen_space_brush_projection, "Screen-space brush projection"));
         }
 
-        if (brush_opacity_modifier !== undefined) {
-          // @ts-ignore
-          settings.brush_opacity_modifier.value = brush_opacity_modifier;
-          settings.push(`Brush opacity modifier: ${brush_opacity_modifier}`);
+        if (brush_lock_mode !== undefined) {
+          changes.push(applyBarItem("brush_lock_mode", brush_lock_mode, "Brush lock mode"));
         }
 
-        if (brush_size_modifier !== undefined) {
-          // @ts-ignore
-          settings.brush_size_modifier.value = brush_size_modifier;
-          settings.push(`Brush size modifier: ${brush_size_modifier}`);
+        if (brush_aspect_ratio !== undefined) {
+          const updated = setToolSettingOnAllTools(
+            "brush_aspect_ratio",
+            brush_aspect_ratio,
+            tool => tool.brush?.aspect_ratio === true,
+            "slider_brush_aspect_ratio"
+          );
+          changes.push(
+            updated > 0
+              ? `Brush aspect ratio: ${brush_aspect_ratio} (${updated} tools)`
+              : "Brush aspect ratio: unavailable in this Blockbench version"
+          );
         }
 
-        if (paint_with_stylus_only !== undefined) {
-          // @ts-ignore
-          settings.paint_with_stylus_only.value = paint_with_stylus_only;
-          settings.push(`Paint with stylus only: ${paint_with_stylus_only}`);
-        }
-
-        if (pick_color_opacity !== undefined) {
-          // @ts-ignore
-          settings.pick_color_opacity.value = pick_color_opacity;
-          settings.push(`Pick color opacity: ${pick_color_opacity}`);
-        }
-
-        if (pick_combined_color !== undefined) {
-          // @ts-ignore
-          settings.pick_combined_color.value = pick_combined_color;
-          settings.push(`Pick combined color: ${pick_combined_color}`);
-        }
-
-        return `Updated paint settings: ${settings.join(", ")}`;
+        const range = activeOpacityRange();
+        const summary = changes.length > 0 ? changes.join(", ") : "no changes";
+        return `Updated paint settings: ${summary}. Opacity range: 0-${range} (tool opacity parameters are always 0-255 and converted automatically).`;
       },
     },
     paintToolDocs[6].status

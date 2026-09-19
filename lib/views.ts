@@ -13,6 +13,7 @@
  *
  * @module
  */
+import type { AnglePreset } from "blockbench-types/generated/preview/preview";
 import { ACTIVE_VIEW_ID, MAX_OFFSCREEN_VIEWS, NO_COPY_VIEW_ID, RESERVED_VIEW_IDS } from "@/lib/constants";
 
 /**
@@ -84,17 +85,11 @@ export interface ICreateOffscreenViewOptions {
   copyFrom?: string;
 }
 
-/** Constructor options Blockbench accepts at runtime; `offscreen` is omitted by blockbench-types. */
-interface IOffscreenPreviewOptions extends PreviewOptions {
-  offscreen: boolean;
-}
+/** Constructor options of `Preview`; blockbench-types keeps the options interface module-private. */
+type IOffscreenPreviewOptions = ConstructorParameters<typeof Preview>[0];
 
-/** Runtime `Preview` members omitted by blockbench-types, verified by {@link isOffscreenPreview}. */
-interface IOffscreenPreview extends Preview {
-  offscreen: boolean;
-  resize(width?: number, height?: number): unknown;
-  copyView(preview: Preview): void;
-}
+/** A `Preview` whose `offscreen` flag and render methods were verified by {@link isOffscreenPreview}. */
+type IOffscreenPreview = Preview & { offscreen: true };
 
 interface IOffscreenViewRecord {
   readonly id: string;

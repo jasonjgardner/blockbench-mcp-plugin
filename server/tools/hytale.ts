@@ -615,7 +615,7 @@ export function registerHytaleTools() {
         const keyframe = runUndoableAnimationEdit({ animations: [animation] }, "Create visibility keyframe", () => {
           const animator = animation.getBoneAnimator(bone);
           if (!animator) throw new Error(`Could not get animator for bone "${bone_name}".`);
-          const frame: _Keyframe | undefined = animator.addKeyframe({ channel: "visibility", time, data_points: [{ visible }] });
+          const frame: BBKeyframe | undefined = animator.addKeyframe({ channel: "visibility", time, data_points: [{ visible }] });
           if (!frame) throw new Error("The Hytale animator could not create a visibility keyframe.");
           if (typeof updateKeyframeSelection === "function") updateKeyframeSelection();
           return frame;

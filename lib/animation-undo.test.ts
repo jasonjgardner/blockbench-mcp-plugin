@@ -84,7 +84,7 @@ const undo = createUndoHost({
   restore: load,
 });
 function edit(mutate: () => void): void {
-  runUndoableAnimationEdit({ animations: [selectedAnimation as unknown as _Animation] }, "MCP animation edit", mutate);
+  runUndoableAnimationEdit({ animations: [selectedAnimation as unknown as BBAnimation] }, "MCP animation edit", mutate);
 }
 
 beforeEach(() => {
@@ -184,7 +184,7 @@ test("cancellation restores native-merge failures including new animator and len
 test("unmarked native edits retain native restoration behavior", () => {
   setupAnimationUndoRestore();
   selectedAnimation.animator("bone").add(1);
-  runUndoableEdit({ animations: [selectedAnimation as unknown as _Animation] }, "Native edit", () => {
+  runUndoableEdit({ animations: [selectedAnimation as unknown as BBAnimation] }, "Native edit", () => {
     selectedAnimation.animators.bone.add(1.123);
     selectedAnimation.setLength();
   });
@@ -215,12 +215,12 @@ test("serialized history remains marked after teardown/reload and listeners are 
 
 test("empty creation snapshots leave native animation removal/recreation intact", () => {
   setupAnimationUndoRestore();
-  const targets: _Animation[] = [];
+  const targets: BBAnimation[] = [];
   runUndoableAnimationEdit({ animations: targets }, "Create animation", () => {
     const created = new TestAnimation("created");
     created.animator("bone").add(2);
     created.setLength();
-    targets.push(created as unknown as _Animation);
+    targets.push(created as unknown as BBAnimation);
     animations.push(created);
   });
   undo.undo();

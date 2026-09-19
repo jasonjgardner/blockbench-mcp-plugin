@@ -40,12 +40,12 @@ export function registerAnimationGraphEditorTool(): void {
           keyframes: animator[channel],
         });
 
-        const keyframes = animator[channel].filter((kf) => {
+        const keyframes = animator[channel].filter((kf: BBKeyframe) => {
           if (!keyframe_range) return true;
           return kf.time >= keyframe_range.start && kf.time <= keyframe_range.end;
         });
 
-        keyframes.forEach((kf, index) => {
+        keyframes.forEach((kf: BBKeyframe, index: number) => {
           switch (action) {
             case "linear":
               kf.interpolation = "linear";

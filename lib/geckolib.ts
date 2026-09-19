@@ -67,7 +67,7 @@ export const GECKOLIB_ARMOR_TEMPLATE_BONES: readonly string[] = Object.freeze([
 ]);
 
 /** A Blockbench keyframe carrying GeckoLib's easing fields. */
-export interface IGeckolibKeyframe extends _Keyframe {
+export interface IGeckolibKeyframe extends BBKeyframe {
   easing?: string | null;
   easingArgs?: number[];
 }
@@ -229,9 +229,9 @@ export interface IGeckolibAnimationCompile {
  * @returns The compiled document and the API that produced it.
  * @throws When no animation compiler exists in this Blockbench build.
  */
-export function compileGeckolibAnimationFile(animations?: readonly _Animation[]): IGeckolibAnimationCompile {
+export function compileGeckolibAnimationFile(animations?: readonly BBAnimation[]): IGeckolibAnimationCompile {
   // @ts-ignore - libdom's Animation shadows the Blockbench class declaration
-  const all: _Animation[] = animations ? [...animations] : ((Animation as unknown as typeof _Animation).all ?? []);
+  const all: BBAnimation[] = animations ? [...animations] : ((Animation as unknown as typeof BBAnimation).all ?? []);
   // @ts-ignore - Animator is a Blockbench global
   if (typeof Animator !== "undefined" && typeof Animator.buildFile === "function") {
     // @ts-ignore - buildFile(path_filter, name_filter) filters by animation name

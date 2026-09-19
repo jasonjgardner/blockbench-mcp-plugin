@@ -10,6 +10,7 @@ import {
   applyKeyframeValues,
   findAnimationOrSelected,
   replaceTimelineSelection,
+  requireBoneAnimator,
   toVector3,
 } from "./shared";
 
@@ -23,7 +24,7 @@ interface IKeyframeEdit {
   animator: BoneAnimator;
   channel: ManageKeyframesInput["channel"];
   data: KeyframeInput;
-  existing: _Keyframe | undefined;
+  existing: BBKeyframe | undefined;
 }
 
 /**
@@ -62,17 +63,17 @@ function assertRequestedKeyframeTimes(keyframes: KeyframeInput[]): void {
  * @returns One entry per requested keyframe; `undefined` where none exists.
  */
 function matchExistingKeyframes(
-  animation: _Animation,
+  animation: BBAnimation,
   group: Group,
   channel: ManageKeyframesInput["channel"],
   keyframes: KeyframeInput[]
-): (_Keyframe | undefined)[] {
-  const existingFrames: _Keyframe[] = animation.animators[group.uuid]?.[channel] ?? [];
+): (BBKeyframe | undefined)[] {
+  const existingFrames: BBKeyframe[] = animation.animators[group.uuid]?.[channel] ?? [];
   return keyframes.map((data) => existingFrames.find((frame) => Math.abs(frame.time - data.time) < KEYFRAME_TIME_EPSILON));
 }
 
 /** Copies requested bezier handles onto a keyframe, expanding uniform numbers per axis. */
-function applyBezierHandles(frame: _Keyframe, handles: BezierHandlesInput): void {
+function applyBezierHandles(frame: BBKeyframe, handles: BezierHandlesInput): void {
   if (handles.left_time !== undefined) frame.bezier_left_time = toVector3(handles.left_time);
   if (handles.right_time !== undefined) frame.bezier_right_time = toVector3(handles.right_time);
   if (handles.left_value !== undefined) frame.bezier_left_value = toVector3(handles.left_value);
@@ -83,7 +84,7 @@ function applyBezierHandles(frame: _Keyframe, handles: BezierHandlesInput): void
  * Writes requested values, interpolation, and bezier handles to a keyframe.
  * @throws When the target keyframe could not be resolved.
  */
-function writeKeyframeData(frame: _Keyframe | undefined, data: KeyframeInput): void {
+function writeKeyframeData(frame: BBKeyframe | undefined, data: KeyframeInput): void {
   if (!frame) throw new Error("Could not resolve the target keyframe.");
   if (data.values !== undefined) applyKeyframeValues(frame, data.values);
   if (data.interpolation) frame.interpolation = data.interpolation;
@@ -115,7 +116,7 @@ export function registerManageKeyframesTool(): void {
         }
 
         runUndoableAnimationEdit({ animations: [animation] }, `${action} keyframes`, () => {
-          const animator = animation.getBoneAnimator(group);
+          const animator = requireBoneAnimator(animation, group);
           keyframes.forEach((data, index) => KEYFRAME_EDITORS[action]({ animator, channel, data, existing: matches[index] }));
           animation.setLength();
           Animator.preview();

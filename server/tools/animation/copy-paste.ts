@@ -5,7 +5,7 @@ import { findGroupOrThrow } from "@/lib/util";
 import { runUndoableAnimationEdit } from "@/lib/animation-undo";
 import { animationToolDocs } from "./docs";
 import { animationCopyPasteParameters } from "./schemas";
-import { KEYFRAME_TIME_EPSILON, findAnimationOrSelected } from "./shared";
+import { KEYFRAME_TIME_EPSILON, findAnimationOrSelected, requireBoneAnimator } from "./shared";
 
 type Input = z.infer<typeof animationCopyPasteParameters>;
 type MirrorAxis = "x" | "y" | "z";
@@ -15,14 +15,14 @@ interface IClipboard {
 }
 interface IPasteEntry {
   data: KeyframeOptions;
-  existing: _Keyframe[];
+  existing: BBKeyframe[];
 }
 
 /** Plugin-local detached data; never stores live frame, animator, or mutable handle references. */
 let clipboard: IClipboard | undefined;
 
 /** Snapshot native datapoints and interpolation metadata so expressions and pre/post values survive copying. */
-function copyFrame(frame: _Keyframe): KeyframeOptions {
+function copyFrame(frame: BBKeyframe): KeyframeOptions {
   return {
     time: frame.time,
     channel: frame.channel,
@@ -59,7 +59,7 @@ function copySource(source: Input["source"]): string {
 }
 
 /** Prepare exact timestamps and replacement frames before creating a target animator or opening Undo. */
-function preparePaste(animation: _Animation, bone: Group, offset: number): IPasteEntry[] {
+function preparePaste(animation: BBAnimation, bone: Group, offset: number): IPasteEntry[] {
   if (!clipboard) throw new Error("No animation data in clipboard. Copy first.");
   const data = clipboard.frames.map(frame => ({ ...structuredClone(frame), time: frame.time + offset }));
   if (data.some(frame => !Number.isFinite(frame.time) || frame.time < 0 || frame.time > 10000)) {
@@ -76,10 +76,10 @@ function preparePaste(animation: _Animation, bone: Group, offset: number): IPast
 }
 
 /** Native flip uses a numeric axis, including complementary rotation axes and matching bezier values. */
-function mirrorFrame(frame: _Keyframe, axis: MirrorAxis): void {
+function mirrorFrame(frame: BBKeyframe, axis: MirrorAxis): void {
   const index = { x: 0, y: 1, z: 2 }[axis];
   // Published types say an axis letter, but Blockbench Keyframe.flip consumes 0/1/2.
-  (frame.flip as unknown as (axisIndex: number) => _Keyframe).call(frame, index);
+  (frame.flip as unknown as (axisIndex: number) => BBKeyframe).call(frame, index);
 }
 
 /** Paste native datapoints as exact unsnapped keys, replacing collisions in one reversible edit. */
@@ -92,7 +92,7 @@ function pasteTarget(target: Input["target"], mirrored: boolean): string {
   const entries = preparePaste(animation, bone, target.time_offset);
   const axis = target.mirror_axis ?? "x";
   runUndoableAnimationEdit({ animations: [animation] }, `${mirrored ? "Mirror paste" : "Paste"} animation data`, () => {
-    const animator = animation.getBoneAnimator(bone);
+    const animator = requireBoneAnimator(animation, bone);
     entries.forEach(({ data, existing }) => {
       existing.forEach(frame => frame.remove());
       const frame = animator.addKeyframe(data);

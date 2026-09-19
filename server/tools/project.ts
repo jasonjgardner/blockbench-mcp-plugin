@@ -12,7 +12,7 @@ export const createProjectParameters = z.object({
   format: z
     .string()
     .default("bedrock_block")
-    .describe("Project format ID from Blockbench's Formats registry."),
+    .describe("Project format ID from Blockbench's Formats registry (e.g. bedrock_block, java_block, free). Unknown IDs are rejected with the list of valid IDs."),
 });
 
 /** Project inspection needs no arguments because it targets the active project. */
@@ -50,18 +50,25 @@ export function registerProjectTools(): void {
   createTool(projectToolDocs[0].name, {
     ...projectToolDocs[0],
     async execute({ name, format }): Promise<CallToolResult> {
+      // newProject() is called directly: Blockbench 5.2's "New Project Dialog"
+      // setting only applies to ModelFormat.new(), which would open a modal.
+      // Own keys only, so inherited names like "toString" are rejected too.
+      if (!Object.hasOwn(Formats, format)) {
+        const validIds = Object.keys(Formats).toSorted().join(", ");
+        throw new Error(`Unknown format "${format}". Valid format IDs: ${validIds}. Use get_capabilities for feature details.`);
+      }
       const created = newProject(Formats[format]);
-
-      if (!created) {
+      const project = Project;
+      if (!created || !project) {
         throw new Error("Failed to create project.");
       }
 
-      Project!.name = name;
+      project.name = name;
 
       return {
         content: [
-          { type: "text", text: `Created project with name "${name}" (UUID: ${Project?.uuid}) and format "${format}".` },
-          { type: "resource_link", ...getProjectFileResource(Project!) },
+          { type: "text", text: `Created project with name "${name}" (UUID: ${project.uuid}) and format "${format}".` },
+          { type: "resource_link", ...getProjectFileResource(project) },
         ],
       };
     },

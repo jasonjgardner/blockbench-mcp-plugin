@@ -86,14 +86,15 @@ export function panelToolbarSetup(onExperimentalChange: (value: boolean) => void
     onChange: (value: boolean) => onExperimentalChange(value),
   } as ConstructorParameters<typeof Toggle>[1]);
 
-  // blockbench-types omits BarText's `click` option; the host wires it to the node.
-  const badge = new BarText(AI_USED_BADGE_ID, {
+  // blockbench-types marks `onUpdate` as required, but the host only calls it when it is a function.
+  const badgeOptions: Omit<ConstructorParameters<typeof BarText>[1], "onUpdate"> = {
     name: tl("mcp.toolbar.ai_used"),
     description: tl("mcp.toolbar.ai_used_desc"),
     text: tl("mcp.toolbar.ai_used"),
     condition: activeProjectUsedAi,
     click: openProjectSettings,
-  } as ConstructorParameters<typeof BarText>[1]);
+  };
+  const badge = new BarText(AI_USED_BADGE_ID, badgeOptions as ConstructorParameters<typeof BarText>[1]);
   makeBadgeAccessible(badge);
 
   const toolbar = new Toolbar(PANEL_TOOLBAR_ID, {

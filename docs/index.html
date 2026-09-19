@@ -18,7 +18,7 @@
 
       <div class="nav-group">
         <p class="nav-heading">Overview</p>
-        <a href="#tools" class="nav-link">Tools <span class="count">(134)</span></a>
+        <a href="#tools" class="nav-link">Tools <span class="count">(140)</span></a>
         <a href="#prompts" class="nav-link">Prompts <span class="count">(6)</span></a>
         <a href="#resources" class="nav-link">Resources <span class="count">(13)</span></a>
       </div>
@@ -28,15 +28,15 @@
         <a href="#cat-cubes" class="nav-link">Cubes <span class="count">(5)</span></a>
         <a href="#cat-camera-screenshots" class="nav-link">Camera &amp; Screenshots <span class="count">(7)</span></a>
         <a href="#cat-capabilities" class="nav-link">Capabilities <span class="count">(1)</span></a>
-        <a href="#cat-animation" class="nav-link">Animation <span class="count">(7)</span></a>
-        <a href="#cat-armature" class="nav-link">Armature <span class="count">(16)</span></a>
+        <a href="#cat-animation" class="nav-link">Animation <span class="count">(9)</span></a>
+        <a href="#cat-armature" class="nav-link">Armature <span class="count">(17)</span></a>
         <a href="#cat-display-settings" class="nav-link">Display Settings <span class="count">(3)</span></a>
         <a href="#cat-elements" class="nav-link">Elements <span class="count">(9)</span></a>
         <a href="#cat-export" class="nav-link">Export <span class="count">(2)</span></a>
         <a href="#cat-history" class="nav-link">History <span class="count">(4)</span></a>
         <a href="#cat-import-export" class="nav-link">Import/Export <span class="count">(1)</span></a>
         <a href="#cat-material-instances" class="nav-link">Material Instances <span class="count">(5)</span></a>
-        <a href="#cat-mesh-editing" class="nav-link">Mesh Editing <span class="count">(12)</span></a>
+        <a href="#cat-mesh-editing" class="nav-link">Mesh Editing <span class="count">(15)</span></a>
         <a href="#cat-paint-tools" class="nav-link">Paint Tools <span class="count">(12)</span></a>
         <a href="#cat-performance" class="nav-link">Performance <span class="count">(1)</span></a>
         <a href="#cat-project" class="nav-link">Project <span class="count">(2)</span></a>
@@ -53,7 +53,7 @@
         <h1>Blockbench MCP Plugin</h1>
         <p class="subtitle">API Reference — v1.8.0</p>
         <nav class="stats">
-          <a href="#tools"><strong>134</strong> tools (44 stable, 90 experimental)</a>
+          <a href="#tools"><strong>140</strong> tools (44 stable, 96 experimental)</a>
           <a href="#prompts"><strong>6</strong> prompts</a>
           <a href="#resources"><strong>13</strong> resources</a>
         </nav>
@@ -96,7 +96,7 @@
       <td class="col-name">elements</td>
       <td class="col-type">object[]</td>
       <td><span class="param-required">required</span></td>
-      <td class="col-desc">Array of cubes to place. <span class="param-meta">[minItems: 1]</span></td>
+      <td class="col-desc">Array of cubes to place, with optional Java shading fields. <span class="param-meta">[minItems: 1]</span></td>
     </tr><tr>
       <td class="col-name">texture</td>
       <td class="col-type">string</td>
@@ -185,7 +185,17 @@
       <td class="col-name">shade</td>
       <td class="col-type">boolean</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Whether to apply shading to the cube.</td>
+      <td class="col-desc">Whether to apply shading to the cube. Java 26.3+ projects ignore this flag; shade=false is mapped to shade_direction_override 'up' there, matching Blockbench's own import.</td>
+    </tr><tr>
+      <td class="col-name">shade_direction_override</td>
+      <td class="col-type">&quot;&quot; | &quot;north&quot; | &quot;south&quot; | &quot;west&quot; | &quot;east&quot; | &quot;up&quot; | &quot;down&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Java Edition 26.3+ shade direction override: the face direction whose lighting shade is applied to every face. '' removes the override. Replaces the boolean shade flag in formats with java_cube_shade_direction_override (new Java Block projects default to 26.3).</td>
+    </tr><tr>
+      <td class="col-name">light_emission</td>
+      <td class="col-type">integer</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Block light emitted by the cube (0-15). Exported by Java Block formats. <span class="param-meta">[min: 0, max: 15]</span></td>
     </tr><tr>
       <td class="col-name">inflate</td>
       <td class="col-type">number</td>
@@ -600,7 +610,7 @@
         </div>
       </div>
       <p class="card-title">Get Capabilities</p>
-      <p class="card-desc">Discover Blockbench/plugin versions, desktop or web environment, active project summary, and registered model formats. Returns detailed boolean format features (null means unknown), compact supported-feature lists for all formats, and optional tool registration states. Works with no open project. Format features do not guarantee that every enabled MCP tool can run in the current mode or selection.</p>
+      <p class="card-desc">Discover Blockbench/plugin versions, desktop or web environment, active project summary, and registered model formats. Returns detailed boolean format features (null means unknown; includes molang and java_cube_shade_direction_override) plus the format's remember_files and animation_grouping settings, compact supported-feature lists for all formats, and optional tool registration states. Works with no open project. Format features do not guarantee that every enabled MCP tool can run in the current mode or selection.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -794,7 +804,7 @@
         </div>
       </div>
       <p class="card-title">Bone Rigging</p>
-      <p class="card-desc">Creates and manipulates the bone structure (rig) of a model for animation.</p>
+      <p class="card-desc">Creates and manipulates the bone structure (rig) of a model for animation. The set_ik action is deprecated; use set_ik_controller for Blockbench's null-object IK (source, target, pole).</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -828,7 +838,7 @@
         </div>
       </div>
       <p class="card-title">Animation Timeline</p>
-      <p class="card-desc">Controls the animation timeline, including playback, time scrubbing, and timeline settings.</p>
+      <p class="card-desc">Controls the animation timeline: playback, time scrubbing, length, FPS, loop mode, and keyframe selection by time range or relative to the playhead (select_before_playhead/select_after_playhead return the selected keyframe UUIDs).</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -846,14 +856,14 @@
       <td class="col-desc">Animation UUID or name. If not provided, uses current animation.</td>
     </tr><tr>
       <td class="col-name">action</td>
-      <td class="col-type">&quot;play&quot; | &quot;pause&quot; | &quot;stop&quot; | &quot;set_time&quot; | &quot;set_length&quot; | &quot;set_fps&quot; | &quot;loop&quot; | &quot;select_range&quot;</td>
+      <td class="col-type">&quot;play&quot; | &quot;pause&quot; | &quot;stop&quot; | &quot;set_time&quot; | &quot;set_length&quot; | &quot;set_fps&quot; | &quot;loop&quot; | &quot;select_range&quot; | &quot;select_before_playhead&quot; | &quot;select_after_playhead&quot;</td>
       <td><span class="param-required">required</span></td>
-      <td class="col-desc">Timeline action to perform.</td>
+      <td class="col-desc">Timeline action to perform. select_before_playhead/select_after_playhead replace the keyframe selection with bone keyframes at or before/after the playhead (1e-5 s tolerance, like Blockbench 5.2's native actions) and return their UUIDs.</td>
     </tr><tr>
       <td class="col-name">time</td>
       <td class="col-type">number</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Time in seconds (for set_time action). <span class="param-meta">[min: 0]</span></td>
+      <td class="col-desc">Time in seconds. Required for set_time; for select_before_playhead/select_after_playhead it is the reference time and defaults to the current playhead. <span class="param-meta">[min: 0]</span></td>
     </tr><tr>
       <td class="col-name">length</td>
       <td class="col-type">number</td>
@@ -874,6 +884,11 @@
       <td class="col-type">object</td>
       <td><span class="param-optional">optional</span></td>
       <td class="col-desc">Time range for selection.</td>
+    </tr><tr>
+      <td class="col-name">scope</td>
+      <td class="col-type">&quot;animation&quot; | &quot;timeline&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Keyframes considered by select_before_playhead/select_after_playhead. animation: every bone animator of the target animation, including ones hidden from the timeline. timeline: only animators shown in the timeline with visible channels, matching the native action; requires the target animation to be selected. <span class="param-meta">(default: <code>&quot;animation&quot;</code>)</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -962,6 +977,84 @@
       <td class="col-type">object</td>
       <td><span class="param-optional">optional</span></td>
       <td class="col-desc">Target data for paste operation.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-variable_placeholders" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">variable_placeholders</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Variable Placeholders</p>
+      <p class="card-desc">Reads or edits the project's animation Variable Placeholders text (one `variable = expression` per line), used to preview Molang animations. add writes a value, slider('name', step, min, max), toggle('name') or impulse('name', duration) line like the native Create Variable Placeholder dialog; set replaces all text; remove deletes a variable's lines. Changes sync through the native panel, refresh the animation preview and return the parsed lines and live controls. Placeholder edits are not recorded in Undo. Requires a format with Molang enabled.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">action</td>
+      <td class="col-type">&quot;get&quot; | &quot;set&quot; | &quot;add&quot; | &quot;remove&quot;</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">get: read text, parsed lines and live controls. set: replace the whole text. add: write one structured line. remove: delete every line assigning variable.</td>
+    </tr><tr>
+      <td class="col-name">text</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Complete placeholder text for set; one `variable = expression` per line. Empty clears all placeholders. <span class="param-meta">[maxLength: 100000]</span></td>
+    </tr><tr>
+      <td class="col-name">entry</td>
+      <td class="col-type">object | object | object | object</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Structured line for add.</td>
+    </tr><tr>
+      <td class="col-name">replace_existing</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">For add: replace an existing line for the same variable (aliases such as v. match) instead of appending a duplicate. <span class="param-meta">(default: <code>true</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">variable</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Variable to delete for remove. <span class="param-meta">[minLength: 1]</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-list_molang_variables" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">list_molang_variables</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">List Molang Variables</p>
+      <p class="card-desc">Lists Blockbench's built-in Molang variables and query functions available in animation previews (like the native View Built-in Variables dialog), with current values for constants and live queries, plus the project's placeholder assignments. Read-only.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">filter</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Case-insensitive substring filter on variable names, e.g. 'camera'.</td>
     </tr></tbody>
     </table>
       </div>
@@ -1197,7 +1290,7 @@
       <td class="col-name">include_weights</td>
       <td class="col-type">boolean</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Whether to include all vertex weights in response. <span class="param-meta">(default: <code>false</code>)</span></td>
+      <td class="col-desc">Whether to include the bone's raw vertex_weights map in the response. Keys are `&lt;first 6 chars of mesh UUID&gt;:&lt;vertex key&gt;` (legacy projects may still hold bare `&lt;vertex key&gt;` entries until reweighted); use get_vertex_weights for per-mesh vertex-key maps. <span class="param-meta">(default: <code>false</code>)</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -1588,7 +1681,7 @@
         </div>
       </div>
       <p class="card-title">Clear Vertex Weights</p>
-      <p class="card-desc">Clears all vertex weights from a bone for a specific mesh.</p>
+      <p class="card-desc">Clears all vertex weights from a bone for a specific mesh, including legacy bare vertex-key entries that still apply to that mesh.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -1609,6 +1702,70 @@
       <td class="col-type">string</td>
       <td><span class="param-optional">optional</span></td>
       <td class="col-desc">ID or name of the mesh. If not provided, uses selected mesh.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-set_ik_controller" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">set_ik_controller</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Set IK Controller</p>
+      <p class="card-desc">Creates or updates an inverse-kinematics controller. Blockbench drives IK from a null object: ik_target is the end effector (group/bone, armature bone, or locator) that reaches for the null object, ik_source is the chain root (defaults to the null object's parent), ik_pole (Blockbench 5.2+) sets the bend direction, and lock_ik_target_rotation keeps the effector's rotation. Works with bone rigs and armatures (5.2 allows null objects under armatures and armature bones). Validates every reference and that the target lies below the chain root; returns the solved chain. Replaces the deprecated bone_rigging set_ik flags, which Blockbench never read.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">null_object</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">UUID or name of an existing null object to update. Omit to create a new IK controller null object.</td>
+    </tr><tr>
+      <td class="col-name">name</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Name for the null object. Defaults to '&lt;ik_target name&gt;_ik' when creating.</td>
+    </tr><tr>
+      <td class="col-name">position</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Null object position [x, y, z] as Blockbench stores it (model space for root and group parents). Defaults to the end effector's world pivot when creating. <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
+    </tr><tr>
+      <td class="col-name">parent</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Parent group, armature, or armature bone (UUID or name), or 'root'. Defaults to root when creating. When ik_source is empty the parent is the implicit chain root, so keep IK controllers outside the chain they drive.</td>
+    </tr><tr>
+      <td class="col-name">ik_target</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">End effector that reaches for the null object: a group/bone, armature bone, or locator (UUID or name). Required when creating; must be a descendant of the chain root. Empty string clears.</td>
+    </tr><tr>
+      <td class="col-name">ik_source</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Chain root: a group/bone or armature bone (UUID or name). The chain spans from here down to ik_target. Empty string clears, making the null object's parent the chain root.</td>
+    </tr><tr>
+      <td class="col-name">ik_pole</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Pole target controlling the bend direction (Blockbench 5.2+): a group, locator, or other null object (UUID or name). Empty string clears.</td>
+    </tr><tr>
+      <td class="col-name">lock_ik_target_rotation</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Keep the end effector's world rotation while the chain solves.</td>
     </tr></tbody>
     </table>
       </div>
@@ -1654,7 +1811,7 @@
         </div>
       </div>
       <p class="card-title">Set Display Transform</p>
-      <p class="card-desc">Writes a Java Edition display slot's transform (translation, rotation, scale, mirror, pivots). Creates the slot if it does not exist yet and wraps the change in an undo step. This edits data that ships in the exported model JSON — it changes the deliverable, not just the preview. Requires a format that supports display mode (e.g. Java Block/Item).</p>
+      <p class="card-desc">Writes a Java Edition display slot's transform (translation, rotation, scale, mirror, pivots). Creates the slot if it does not exist yet (seeded from Blockbench's Bedrock item display defaults on bedrock_block projects, identity otherwise) and wraps the change in an undo step. This edits data that ships in the exported model JSON — it changes the deliverable, not just the preview. Requires a format that supports display mode (e.g. Java Block/Item).</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -1704,7 +1861,7 @@
       <td class="col-name">reset</td>
       <td class="col-type">boolean</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Reset the slot to its default (identity) transform before applying any of the other values. <span class="param-meta">(default: <code>false</code>)</span></td>
+      <td class="col-desc">Reset the slot to its default transform before applying any of the other values: identity, or Blockbench's Bedrock defaults on bedrock_block projects. <span class="param-meta">(default: <code>false</code>)</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -1834,7 +1991,7 @@
       <td class="col-name">shade</td>
       <td class="col-type">boolean</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc"> <span class="param-meta">(default: <code>false</code>)</span></td>
+      <td class="col-desc">Outliner shading toggle, matching Blockbench's default (true). Ignored by Java 26.3+ projects, which use per-cube shade_direction_override instead. <span class="param-meta">(default: <code>true</code>)</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -1887,7 +2044,7 @@
         </div>
       </div>
       <p class="card-title">Duplicate Element</p>
-      <p class="card-desc">Duplicates a cube, mesh or group by ID or name.  You may offset the duplicate or assign a new name.</p>
+      <p class="card-desc">Duplicates any outliner element or group (with its children) by ID or name using Blockbench's native duplicate, so every property, face UV, texture and mesh vertex key is preserved. Mesh copies inherit their armature bone vertex weights. Optionally offsets the copy and assigns a new name. Selection is left unchanged.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -1907,12 +2064,12 @@
       <td class="col-name">offset</td>
       <td class="col-type">number[]</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">3D vector [x, y, z]. <span class="param-meta">(default: <code>[0,0,0]</code>) [minItems: 3, maxItems: 3]</span></td>
+      <td class="col-desc">Model-space offset [x, y, z] applied to the copy and every descendant. <span class="param-meta">(default: <code>[0,0,0]</code>) [minItems: 3, maxItems: 3]</span></td>
     </tr><tr>
       <td class="col-name">newName</td>
       <td class="col-type">string</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc"></td>
+      <td class="col-desc">Name for the top-level copy. Defaults to Blockbench's duplicate naming (trailing number incremented, unique where required).</td>
     </tr></tbody>
     </table>
       </div>
@@ -2143,7 +2300,7 @@
         </div>
       </div>
       <p class="card-title">Export Model</p>
-      <p class="card-desc">Compiles the current project through a codec whose native export action is available. Returns JSON metadata and a live .bbmodel resource link; result_format='embedded' returns complete exports as text/blob resources with URI and MIME type. Optionally writes to a local path (requires Blockbench filesystem permission). Use `list_export_formats` to discover codecs.</p>
+      <p class="card-desc">Compiles the current project through a codec whose native export action is available. Returns JSON metadata and a live .bbmodel resource link; result_format='embedded' returns complete exports as text/blob resources with URI and MIME type. Optionally writes to a local path (requires Blockbench filesystem permission). Partial codec options merge over the configured defaults; for glTF armatures, options.merge_armature=true merges each armature's meshes into one SkinnedMesh. Use `list_export_formats` to discover codecs.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -2163,7 +2320,7 @@
       <td class="col-name">options</td>
       <td class="col-type">Record&lt;string, unknown&gt;</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Codec-specific export options. Defaults to the codec's configured export options.</td>
+      <td class="col-desc">Codec-specific export options, merged over the codec's configured export options (keys match the native export dialog). glTF ('gltf'): encoding ('ascii' | 'binary'), scale, embed_textures, armature (export groups as skinned bones), animations, and merge_armature (Blockbench 5.2+; default false exports one SkinnedMesh per armature child mesh, true merges each armature's meshes into a single SkinnedMesh).</td>
     </tr><tr>
       <td class="col-name">path</td>
       <td class="col-type">string</td>
@@ -2563,7 +2720,7 @@
       <td class="col-name">distance</td>
       <td class="col-type">number</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Signed distance along averaged selected face normals, in local model units. <span class="param-meta">(default: <code>1</code>)</span></td>
+      <td class="col-desc">Signed distance along averaged selected face normals, in local model units. Defaults to Blockbench's current grid snap interval (getSpatialInterval), or 1 when unavailable.</td>
     </tr><tr>
       <td class="col-name">mode</td>
       <td class="col-type">&quot;faces&quot; | &quot;edges&quot; | &quot;vertices&quot;</td>
@@ -2919,6 +3076,138 @@
     </table>
       </div>
     </div>
+<div id="tool-create_polyhedron" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">create_polyhedron</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Create Polyhedron</p>
+      <p class="card-desc">Creates icosphere, octahedron, or dodecahedron meshes (Blockbench 5.2 primitives) with a detail level of 0-6, as triangles with coincident vertices merged and planar per-face UVs. Returns vertex_keys/face_keys per mesh.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">elements</td>
+      <td class="col-type">object[]</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Polyhedra to create. <span class="param-meta">[minItems: 1]</span></td>
+    </tr><tr>
+      <td class="col-name">texture</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Texture ID or name to apply to every face.</td>
+    </tr><tr>
+      <td class="col-name">group</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Group/bone to which the meshes belong.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-loop_cut_mesh" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">loop_cut_mesh</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Loop Cut Mesh</p>
+      <p class="card-desc">Runs Blockbench's native Loop Cut on a mesh: splits the quad ring crossing the start edge with one or more parallel cuts, with offset, direction and 5.2 spacing modes (proportional, even_start, even_end). One undo entry. The new loop vertices become the selection and are returned.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">mesh_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">ID or name of the mesh. If not provided, uses selected mesh.</td>
+    </tr><tr>
+      <td class="col-name">edge</td>
+      <td class="col-type">string[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Two vertex keys of the edge to start the loop from; the cut runs across the face ring perpendicular to it. Defaults to the mesh's current vertex/face selection (at least two selected vertices). <span class="param-meta">[minItems: 2, maxItems: 2]</span></td>
+    </tr><tr>
+      <td class="col-name">cuts</td>
+      <td class="col-type">integer</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Number of parallel loop cuts. <span class="param-meta">(default: <code>1</code>) [min: 1, max: 16]</span></td>
+    </tr><tr>
+      <td class="col-name">offset</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Distance of the (first) cut from the start of the edge, in the given unit. Defaults to the edge midpoint (or even spacing for multiple cuts). <span class="param-meta">[min: 0]</span></td>
+    </tr><tr>
+      <td class="col-name">unit</td>
+      <td class="col-type">&quot;size&quot; | &quot;percent&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Unit of offset: model units ('size') or percent of the start edge length. <span class="param-meta">(default: <code>&quot;size&quot;</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">direction</td>
+      <td class="col-type">integer</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Rotates which edge of the start face the loop starts from, as the native Direction slider. <span class="param-meta">(default: <code>0</code>) [min: 0]</span></td>
+    </tr><tr>
+      <td class="col-name">spacing</td>
+      <td class="col-type">&quot;proportional&quot; | &quot;even_start&quot; | &quot;even_end&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Blockbench 5.2 spacing: proportional keeps the same ratio on every edge of the loop; even_start/even_end keep the same absolute distance from the loop's start/end side. <span class="param-meta">(default: <code>&quot;proportional&quot;</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-flip_in_place" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">flip_in_place</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Flip In Place</p>
+      <p class="card-desc">Mirrors elements in place along an axis using Blockbench's native Flip In Place (flip_in_place_x/y/z): cubes flip around their own center, meshes around their origin, groups also invert rotations in bone-rig formats. For meshes in vertex/edge/face selection mode only the selected components flip. Edit mode only.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">ids</td>
+      <td class="col-type">string[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Element or group UUIDs/names to flip. Replaces the selection with these. Defaults to the current selection. <span class="param-meta">[minItems: 1]</span></td>
+    </tr><tr>
+      <td class="col-name">axis</td>
+      <td class="col-type">&quot;x&quot; | &quot;y&quot; | &quot;z&quot;</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Axis to mirror across each element's own center (cubes) or pivot (meshes, groups, other elements).</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
 <div id="tool-get_mesh_info" class="card tool-card">
       <div class="card-header">
         <h3 class="card-name">get_mesh_info</h3>
@@ -2990,7 +3279,7 @@
         </div>
       </div>
       <p class="card-title">Paint Fill Tool</p>
-      <p class="card-desc">Uses the fill/bucket tool to fill areas with color.</p>
+      <p class="card-desc">Uses the fill/bucket tool to fill areas with color. In 'face' and 'element' fill modes only the face or element whose UV area contains the given texture pixel is filled. Opacity is 0-255 regardless of Blockbench's opacity range setting.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -3035,7 +3324,7 @@
       <td class="col-name">fill_mode</td>
       <td class="col-type">&quot;color&quot; | &quot;color_connected&quot; | &quot;face&quot; | &quot;element&quot; | &quot;selected_elements&quot; | &quot;selection&quot;</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Fill mode. <span class="param-meta">(default: <code>&quot;color_connected&quot;</code>)</span></td>
+      <td class="col-desc">Fill mode. 'face' and 'element' fill only the face/element whose UV area contains (x, y) in texture space (Blockbench 5.2 looks it up with UVEditor.findFaceAtUV); 'color'/'color_connected' match exact colors; 'selected_elements' fills every selected element; 'selection' fills the texture selection (image editor). <span class="param-meta">(default: <code>&quot;color_connected&quot;</code>)</span></td>
     </tr><tr>
       <td class="col-name">blend_mode</td>
       <td class="col-type">&quot;default&quot; | &quot;set_opacity&quot; | &quot;color&quot; | &quot;behind&quot; | &quot;multiply&quot; | &quot;add&quot; | &quot;screen&quot; | &quot;overlay&quot; | &quot;difference&quot;</td>
@@ -3267,6 +3556,11 @@
       <td class="col-type">&quot;copy&quot; | &quot;sample&quot; | &quot;pattern&quot;</td>
       <td><span class="param-optional">optional</span></td>
       <td class="col-desc">Copy brush mode. <span class="param-meta">(default: <code>&quot;copy&quot;</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">aspect_ratio</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Brush aspect ratio (-16 to 16). Negative narrows the width, positive narrows the height, 0 keeps the brush square/round. <span class="param-meta">[min: -16, max: 16]</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -3339,7 +3633,7 @@
         </div>
       </div>
       <p class="card-title">Paint Settings</p>
-      <p class="card-desc">Configures paint mode settings and preferences.</p>
+      <p class="card-desc">Configures paint mode settings and preferences, including Blockbench 5.2 screen-space brush projection, brush lock mode and brush aspect ratio. The result also reports the active opacity range (0-255 or 0-100); tool opacity parameters stay 0-255 and are converted automatically.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -3400,6 +3694,21 @@
       <td class="col-type">boolean</td>
       <td><span class="param-optional">optional</span></td>
       <td class="col-desc">Pick combined layer colors.</td>
+    </tr><tr>
+      <td class="col-name">screen_space_brush_projection</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Project brushes in screen space when painting in the 3D viewport (Blockbench 5.2+, brush tools only).</td>
+    </tr><tr>
+      <td class="col-name">brush_lock_mode</td>
+      <td class="col-type">&quot;none&quot; | &quot;element&quot; | &quot;selected_faces&quot; | &quot;face&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Restrict viewport strokes: 'none', the 'element' the stroke started on, 'selected_faces', or the single 'face' it started on (Blockbench 5.2+).</td>
+    </tr><tr>
+      <td class="col-name">brush_aspect_ratio</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Brush aspect ratio (-16 to 16) applied to every tool that supports it (brush and copy brush; Blockbench 5.2+). <span class="param-meta">[min: -16, max: 16]</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -3413,7 +3722,7 @@
         </div>
       </div>
       <p class="card-title">Paint with Brush</p>
-      <p class="card-desc">Paints on textures using the brush tool with customizable settings.</p>
+      <p class="card-desc">Paints on textures using the brush tool with customizable settings (opacity 0-255, softness 0-100%, optional aspect ratio). Paints on the selected pixel layer; if a layer group is selected, a pixel layer inside it is used.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -3438,7 +3747,7 @@
       <td class="col-name">brush_settings</td>
       <td class="col-type">object</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Brush settings to apply.</td>
+      <td class="col-desc">Brush settings to apply. Opacity is 0-255; softness is a 0-100 percentage.</td>
     </tr><tr>
       <td class="col-name">connect_strokes</td>
       <td class="col-type">boolean</td>
@@ -3457,7 +3766,7 @@
         </div>
       </div>
       <p class="card-title">Create Brush Preset</p>
-      <p class="card-desc">Creates a custom brush preset with specified settings.</p>
+      <p class="card-desc">Creates a custom brush preset with specified settings. Omitted settings are stored as unset so loading the preset keeps the current value.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -3482,7 +3791,7 @@
       <td class="col-name">opacity</td>
       <td class="col-type">number</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Opacity (0-255). <span class="param-meta">[min: 0, max: 255]</span></td>
+      <td class="col-desc">Opacity (0-255), independent of Blockbench's opacity range setting. <span class="param-meta">[min: 0, max: 255]</span></td>
     </tr><tr>
       <td class="col-name">softness</td>
       <td class="col-type">number</td>
@@ -3492,7 +3801,7 @@
       <td class="col-name">shape</td>
       <td class="col-type">&quot;square&quot; | &quot;circle&quot;</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Brush shape.</td>
+      <td class="col-desc">Brush shape. Omit to keep the current shape when loading.</td>
     </tr><tr>
       <td class="col-name">color</td>
       <td class="col-type">string</td>
@@ -3502,12 +3811,17 @@
       <td class="col-name">blend_mode</td>
       <td class="col-type">&quot;default&quot; | &quot;set_opacity&quot; | &quot;color&quot; | &quot;behind&quot; | &quot;multiply&quot; | &quot;add&quot; | &quot;screen&quot; | &quot;overlay&quot; | &quot;difference&quot;</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Brush blend mode.</td>
+      <td class="col-desc">Brush blend mode. Omit to keep the current blend mode when loading.</td>
     </tr><tr>
       <td class="col-name">pixel_perfect</td>
       <td class="col-type">boolean</td>
       <td><span class="param-optional">optional</span></td>
       <td class="col-desc">Enable pixel perfect drawing.</td>
+    </tr><tr>
+      <td class="col-name">screen_space</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Enable screen-space brush projection when the preset is loaded (Blockbench 5.2+). Omit to keep the current setting.</td>
     </tr></tbody>
     </table>
       </div>
@@ -3521,7 +3835,7 @@
         </div>
       </div>
       <p class="card-title">Load Brush Preset</p>
-      <p class="card-desc">Loads and applies a brush preset by name.</p>
+      <p class="card-desc">Loads and applies a custom or built-in brush preset (e.g. 'screen_space') by name.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -3536,7 +3850,7 @@
       <td class="col-name">preset_name</td>
       <td class="col-type">string</td>
       <td><span class="param-required">required</span></td>
-      <td class="col-desc">Name of the brush preset to load.</td>
+      <td class="col-desc">Name of the brush preset to load: a custom preset name, or a built-in one such as 'pixel_brush', 'pixel_perfect', 'smooth_brush' or 'screen_space' (also accepts the full 'menu.brush_presets.*' key or its translated label).</td>
     </tr></tbody>
     </table>
       </div>
@@ -3599,7 +3913,7 @@
         </div>
       </div>
       <p class="card-title">Texture Layer Management</p>
-      <p class="card-desc">Creates, manages, and manipulates texture layers.</p>
+      <p class="card-desc">Lists, creates, manages, and reorders texture layers and layer groups (Blockbench 5.2 hierarchy). Target a layer or group by UUID or name with layer_id; list_layers reports type, parent and depth.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -3612,34 +3926,59 @@
       </thead>
       <tbody><tr>
       <td class="col-name">action</td>
-      <td class="col-type">&quot;create_layer&quot; | &quot;delete_layer&quot; | &quot;duplicate_layer&quot; | &quot;merge_down&quot; | &quot;set_opacity&quot; | &quot;set_blend_mode&quot; | &quot;move_layer&quot; | &quot;rename_layer&quot; | &quot;flatten_layers&quot;</td>
+      <td class="col-type">&quot;list_layers&quot; | &quot;select_layer&quot; | &quot;create_layer&quot; | &quot;delete_layer&quot; | &quot;duplicate_layer&quot; | &quot;merge_down&quot; | &quot;set_opacity&quot; | &quot;set_blend_mode&quot; | &quot;move_layer&quot; | &quot;rename_layer&quot; | &quot;flatten_layers&quot; | &quot;toggle_visibility&quot; | &quot;create_group&quot; | &quot;ungroup&quot; | &quot;move_to_group&quot; | &quot;set_group_folded&quot;</td>
       <td><span class="param-required">required</span></td>
-      <td class="col-desc">Layer management action.</td>
+      <td class="col-desc">Layer action. list_layers reports the hierarchy (read-only); select_layer makes a layer the paint target; create_group, ungroup, move_to_group and set_group_folded manage layer groups (Blockbench 5.2+); toggle_visibility works on layers and groups; flatten_layers composites visible layers into the texture and disables layers.</td>
     </tr><tr>
       <td class="col-name">texture_id</td>
       <td class="col-type">string</td>
       <td><span class="param-optional">optional</span></td>
       <td class="col-desc">Texture ID or name. If not provided, uses selected texture.</td>
     </tr><tr>
+      <td class="col-name">layer_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">UUID or exact name of the layer or group to act on. Defaults to the texture's selected layer.</td>
+    </tr><tr>
       <td class="col-name">layer_name</td>
       <td class="col-type">string</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Name of the layer.</td>
+      <td class="col-desc">Name for create_layer/create_group/duplicate_layer, or the new name for rename_layer.</td>
+    </tr><tr>
+      <td class="col-name">layer_ids</td>
+      <td class="col-type">string[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">create_group: UUIDs or names of layers/groups to move into the new group. They must share the same parent.</td>
+    </tr><tr>
+      <td class="col-name">group_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">UUID or name of the destination group for move_to_group and create_layer. Use an empty string for the root.</td>
     </tr><tr>
       <td class="col-name">opacity</td>
       <td class="col-type">number</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Layer opacity percentage. <span class="param-meta">[min: 0, max: 100]</span></td>
+      <td class="col-desc">Layer opacity percentage (0-100) for set_opacity. <span class="param-meta">[min: 0, max: 100]</span></td>
     </tr><tr>
       <td class="col-name">blend_mode</td>
-      <td class="col-type">&quot;normal&quot; | &quot;multiply&quot; | &quot;screen&quot; | &quot;overlay&quot; | &quot;soft_light&quot; | &quot;hard_light&quot; | &quot;color_dodge&quot; | &quot;color_burn&quot; | &quot;darken&quot; | &quot;lighten&quot; | &quot;difference&quot; | &quot;exclusion&quot;</td>
+      <td class="col-type">&quot;default&quot; | &quot;normal&quot; | &quot;set_opacity&quot; | &quot;color&quot; | &quot;multiply&quot; | &quot;add&quot; | &quot;darken&quot; | &quot;lighten&quot; | &quot;screen&quot; | &quot;overlay&quot; | &quot;difference&quot; | &quot;alpha_mask&quot;</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Layer blend mode.</td>
+      <td class="col-desc">Layer blend mode for set_blend_mode ('normal' is an alias of 'default').</td>
     </tr><tr>
       <td class="col-name">target_index</td>
-      <td class="col-type">number</td>
+      <td class="col-type">integer</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Target position for moving layers.</td>
+      <td class="col-desc">move_layer/move_to_group: position among siblings in the same parent, 0 = bottom-most; clamped to the valid range.</td>
+    </tr><tr>
+      <td class="col-name">folded</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">set_group_folded / create_group: whether the group is collapsed in the layers panel.</td>
+    </tr><tr>
+      <td class="col-name">visible</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">toggle_visibility: explicit visibility to set. Omit to toggle.</td>
     </tr></tbody>
     </table>
       </div>
@@ -3708,7 +4047,7 @@
       <td class="col-name">format</td>
       <td class="col-type">string</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Project format ID from Blockbench's Formats registry. <span class="param-meta">(default: <code>&quot;bedrock_block&quot;</code>)</span></td>
+      <td class="col-desc">Project format ID from Blockbench's Formats registry (e.g. bedrock_block, java_block, free). Unknown IDs are rejected with the list of valid IDs. <span class="param-meta">(default: <code>&quot;bedrock_block&quot;</code>)</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -5585,7 +5924,7 @@
       </section>
 
       <footer class="page-footer">
-        Generated 2026-09-17T22:26:39.056Z from Zod schemas
+        Generated 2026-09-18T17:36:30.446Z from Zod schemas
       </footer>
     </main>
   </div>

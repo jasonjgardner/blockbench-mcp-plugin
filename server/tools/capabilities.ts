@@ -34,16 +34,44 @@ const featureNames = [
   "rotation_limit",
   "texture_meshes",
   "locators",
+  "molang",
+  "java_cube_shade_direction_override",
 ] as const satisfies readonly (keyof ModelFormat)[];
 
 type FormatFeatureName = (typeof featureNames)[number];
 type FormatFeatures = Record<FormatFeatureName, boolean | null>;
 
-/** Detailed feature flags for one format; `null` marks a flag the host did not declare as a boolean. */
+/** File kinds a Blockbench 5.2+ format remembers with the project (`ModelFormat.remember_files`). */
+type RememberedFileKind = "textures" | "texture_sets" | "animation_files";
+
+/** How the Animations panel groups animations (`ModelFormat.animation_grouping`, Blockbench 5.2+). */
+type AnimationGrouping = "by_file" | "custom" | "disabled";
+
+/**
+ * Detailed feature flags for one format; `null` marks a flag the host did not
+ * declare as a boolean. Non-boolean 5.2 format settings are reported beside the
+ * flags and are `null` when the host does not declare them (older hosts).
+ */
 interface IFormatSummary {
   id: string;
   name: string;
   features: FormatFeatures;
+  remember_files: RememberedFileKind[] | null;
+  animation_grouping: AnimationGrouping | null;
+}
+
+const rememberedFileKinds: readonly RememberedFileKind[] = ["textures", "texture_sets", "animation_files"];
+const animationGroupings: readonly AnimationGrouping[] = ["by_file", "custom", "disabled"];
+
+/** Copies a declared `remember_files` array, keeping only known kinds; `null` when undeclared. */
+function readRememberFiles(value: unknown): RememberedFileKind[] | null {
+  if (!Array.isArray(value)) return null;
+  return value.filter((kind): kind is RememberedFileKind => rememberedFileKinds.some((known) => known === kind));
+}
+
+/** Reads a declared `animation_grouping` mode; `null` when undeclared or unrecognized. */
+function readAnimationGrouping(value: unknown): AnimationGrouping | null {
+  return animationGroupings.find((mode) => mode === value) ?? null;
 }
 
 /** Host application version and runtime environment. */
@@ -136,7 +164,7 @@ export const getCapabilitiesParameters = z.object({
 export const capabilityToolDocs: IToolSpec[] = [
   {
     name: "get_capabilities",
-    description: "Discover Blockbench/plugin versions, desktop or web environment, active project summary, and registered model formats. Returns detailed boolean format features (null means unknown), compact supported-feature lists for all formats, and optional tool registration states. Works with no open project. Format features do not guarantee that every enabled MCP tool can run in the current mode or selection.",
+    description: "Discover Blockbench/plugin versions, desktop or web environment, active project summary, and registered model formats. Returns detailed boolean format features (null means unknown; includes molang and java_cube_shade_direction_override) plus the format's remember_files and animation_grouping settings, compact supported-feature lists for all formats, and optional tool registration states. Works with no open project. Format features do not guarantee that every enabled MCP tool can run in the current mode or selection.",
     annotations: {
       title: "Get Capabilities",
       readOnlyHint: true,
@@ -149,13 +177,33 @@ export const capabilityToolDocs: IToolSpec[] = [
   },
 ];
 
-/** Reads the tracked feature flags of one format, mapping non-boolean declarations to `null`. */
+/**
+ * Reads one format property, treating a throwing getter as undeclared. Some
+ * formats compute flags from the open project (Hytale's `single_texture`, the
+ * native `modded_entity` `integer_size`), so those getters throw when no
+ * project is open. One such getter must not break discovery of every format.
+ */
+function readFormatProperty(format: ModelFormat, name: string): unknown {
+  try {
+    return Reflect.get(format, name);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Reads the tracked feature flags of one format, mapping non-boolean or unreadable declarations to `null`. */
 function summarizeFormat(format: ModelFormat): IFormatSummary {
   const features = Object.fromEntries(featureNames.map((name) => {
-    const value: unknown = format[name];
+    const value = readFormatProperty(format, name);
     return [name, typeof value === "boolean" ? value : null];
   })) as FormatFeatures;
-  return { id: format.id, name: format.name, features };
+  return {
+    id: format.id,
+    name: format.name,
+    features,
+    remember_files: readRememberFiles(readFormatProperty(format, "remember_files")),
+    animation_grouping: readAnimationGrouping(readFormatProperty(format, "animation_grouping")),
+  };
 }
 
 /** Copies project identity and totals so callers cannot mutate host arrays. */

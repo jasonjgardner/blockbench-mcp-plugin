@@ -1,24 +1,19 @@
 /// <reference types="blockbench-types" />
+import type { FormElementOptions, InputFormConfig } from "blockbench-types/generated/interface/form";
 import { z } from "zod";
 import { getAllPromptDefinitions } from "@/lib/factories";
 import { openPromptOverrideDialog } from "@/ui/promptOverrideDialog";
 
-interface IFormElementOptions {
-  label?: string;
-  description?: string;
-  type?: string;
-  value?: unknown;
-  placeholder?: string;
-  options?: Record<string, string>;
-}
+type IFormElementOptions = FormElementOptions;
 
-type InputFormConfig = Record<string, "_" | IFormElementOptions>;
+/** Blockbench form input types this dialog maps Zod schemas onto. */
+type FormFieldType = "text" | "number" | "checkbox" | "select" | "textarea";
 
 /**
  * Extracts metadata from a Zod schema type for form generation
  */
 function getZodTypeMeta(zodType: z.ZodType): {
-  type: string;
+  type: FormFieldType;
   isOptional: boolean;
   description?: string;
   defaultValue?: unknown;
@@ -53,7 +48,7 @@ function getZodTypeMeta(zodType: z.ZodType): {
   }
 
   // Map Zod types to form types
-  let type = "text";
+  let type: FormFieldType = "text";
   switch (typeName) {
     case "ZodString":
       type = "text";
@@ -216,36 +211,39 @@ export function openPromptPreviewDialog(promptName: string) {
     buttons: [tl("mcp.dialog.generate_prompt"), tl("mcp.dialog.cancel")],
     confirmIndex: 0,
     cancelIndex: 1,
-    async onConfirm(formResult: Record<string, unknown>) {
-      // Filter out empty values for optional args
-      const args: Record<string, unknown> = {};
-      for (const [key, value] of Object.entries(formResult)) {
-        if (value !== "" && value !== undefined && value !== null) {
-          args[key] = value;
+    onConfirm(formResult: Record<string, unknown>) {
+      // Dialog callbacks must return synchronously; the async work runs detached.
+      void (async () => {
+        // Filter out empty values for optional args
+        const args: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(formResult)) {
+          if (value !== "" && value !== undefined && value !== null) {
+            args[key] = value;
+          }
         }
-      }
 
-      Blockbench.showQuickMessage(tl("mcp.dialog.generating_prompt"), 1000);
+        Blockbench.showQuickMessage(tl("mcp.dialog.generating_prompt"), 1000);
 
-      try {
-        const result = await promptDef.generate(args);
+        try {
+          const result = await promptDef.generate(args);
 
-        // Extract text content from messages
-        const content = result.messages
-          .map((msg) => {
-            const roleLabel = msg.role === "user" ? tl("mcp.dialog.role_user") : tl("mcp.dialog.role_assistant");
-            const text = typeof msg.content === "string"
-              ? msg.content
-              : msg.content.text;
-            return `[${roleLabel}]\n${text}`;
-          })
-          .join("\n\n---\n\n");
+          // Extract text content from messages
+          const content = result.messages
+            .map((msg) => {
+              const roleLabel = msg.role === "user" ? tl("mcp.dialog.role_user") : tl("mcp.dialog.role_assistant");
+              const text = typeof msg.content === "string"
+                ? msg.content
+                : msg.content.text;
+              return `[${roleLabel}]\n${text}`;
+            })
+            .join("\n\n---\n\n");
 
-        showPromptContentDialog(promptName, content);
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        showPromptContentDialog(promptName, `Error: ${errorMessage}`, true);
-      }
+          showPromptContentDialog(promptName, content);
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          showPromptContentDialog(promptName, `Error: ${errorMessage}`, true);
+        }
+      })();
     },
   });
 

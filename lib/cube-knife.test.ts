@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import { cutCubeAtPositions, cutRange, isCubeAlignedForAxis, isCutInsideCube, splitCubeAtPosition } from "./cube-knife";
-import { useGlobals } from "@/tests/helpers/globals";
+import { cutCubeAtPositions, cutRange, isCubeAlignedForAxis, isCutInsideCube, resetClipbenchDuplicateMap, splitCubeAtPosition } from "./cube-knife";
+import { installGlobals, useGlobals } from "@/tests/helpers/globals";
 import type { Vector3Tuple } from "@/tests/helpers/shapes";
 
 const directions = ["north", "east", "south", "west", "up", "down"] as const;
@@ -140,5 +140,33 @@ describe("isCubeAlignedForAxis", () => {
     expect(isCubeAlignedForAxis(asCube(cube), 0)).toBe(true);
     expect(isCubeAlignedForAxis(asCube(cube), 1)).toBe(false);
     expect(isCubeAlignedForAxis(asCube(cube), 2)).toBe(false);
+  });
+});
+
+describe("resetClipbenchDuplicateMap", () => {
+  test("replaces a populated duplicate_map after a plugin-driven split", () => {
+    const stale = new Map<unknown, unknown>([["orig", "copy"]]);
+    const clipbench = { duplicate_map: stale };
+    const restore = installGlobals({ Clipbench: clipbench });
+    try {
+      const cube = new FakeCube("slab", [0, 0, 0], [16, 16, 16]);
+      splitCubeAtPosition(asCube(cube), 0, 8);
+      expect(clipbench.duplicate_map).not.toBe(stale);
+      expect(clipbench.duplicate_map.size).toBe(0);
+    } finally {
+      restore();
+    }
+  });
+
+  test("is a no-op when Clipbench or its duplicate_map is absent (pre-5.2 hosts)", () => {
+    const legacy: { duplicate_map?: unknown } = {};
+    const restore = installGlobals({ Clipbench: legacy });
+    try {
+      resetClipbenchDuplicateMap();
+      expect(legacy.duplicate_map).toBeUndefined();
+    } finally {
+      restore();
+    }
+    expect(() => resetClipbenchDuplicateMap()).not.toThrow();
   });
 });

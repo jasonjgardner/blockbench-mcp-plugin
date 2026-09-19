@@ -8,6 +8,93 @@ import { getProjectTexture } from "@/lib/util";
 import { runUndoableEdit } from "@/lib/undo";
 import { isHytaleFormat } from "@/lib/hytale";
 
+/** Java Edition 26.3+ face-direction shading override values; empty string means no override. */
+export const shadeDirectionOverrideEnum = z
+  .enum(["", "north", "south", "west", "east", "up", "down"])
+  .describe("Java Edition 26.3+ shade direction override: the face direction whose lighting shade is applied to every face. '' removes the override. Replaces the boolean shade flag in formats with java_cube_shade_direction_override (new Java Block projects default to 26.3).");
+
+/** Java block light emission level, exported for formats with Java cube shading properties. */
+const lightEmissionSchema = z
+  .number()
+  .int()
+  .min(0)
+  .max(15)
+  .describe("Block light emitted by the cube (0-15). Exported by Java Block formats.");
+
+/** Legacy boolean shading flag; mapped to shade_direction_override 'up' when false in Java 26.3+ projects. */
+const shadeSchema = z
+  .boolean()
+  .describe("Whether to apply shading to the cube. Java 26.3+ projects ignore this flag; shade=false is mapped to shade_direction_override 'up' there, matching Blockbench's own import.");
+
+/** Shading-related cube fields accepted by place_cube elements and modify_cube. */
+export interface ICubeShadingInput {
+  shade?: boolean;
+  shade_direction_override?: z.infer<typeof shadeDirectionOverrideEnum>;
+  light_emission?: number;
+}
+
+/** Format flags that decide how shading input is stored. */
+export interface ICubeShadingFormat {
+  /** `Format.java_cube_shading_properties`: shade/light_emission are exported. */
+  shading_properties: boolean;
+  /** `Format.java_cube_shade_direction_override`: Java 26.3+, where `shade` is hidden and ignored. */
+  direction_override: boolean;
+}
+
+/** Cube property patch plus notes explaining any translation applied. */
+export interface ICubeShadingPlan {
+  patch: ICubeShadingInput;
+  notes: string[];
+}
+
+/**
+ * Translates shading input into the cube properties the active format honors.
+ *
+ * Mirrors Blockbench 5.2's Java block import compatibility: in 26.3+ projects
+ * (`direction_override`) the `shade` flag is ignored, so `shade: false` without an
+ * explicit override becomes `shade_direction_override: 'up'`; in older formats a
+ * non-empty override without `shade` implies `shade: false`. Pure and global-free.
+ *
+ * @param input - Requested shading fields; undefined fields are left unchanged.
+ * @param format - Flags read from the active `Format` at execution time.
+ * @returns Properties to merge into the cube and human-readable notes.
+ */
+export function planCubeShading(input: ICubeShadingInput, format: ICubeShadingFormat): ICubeShadingPlan {
+  const { shade, shade_direction_override: override, light_emission } = input;
+  const mapsShadeToOverride = format.direction_override && shade === false && override === undefined;
+  const impliesNoShade = !format.direction_override && Boolean(override) && shade === undefined;
+  const patch: ICubeShadingInput = {
+    ...(shade !== undefined && { shade }),
+    ...(impliesNoShade && { shade: false }),
+    ...(override !== undefined && { shade_direction_override: override }),
+    ...(mapsShadeToOverride && { shade_direction_override: "up" as const }),
+    ...(light_emission !== undefined && { light_emission }),
+  };
+  const notes = [
+    mapsShadeToOverride ? "This Java 26.3+ project ignores `shade`; shade=false was stored as shade_direction_override 'up'." : "",
+    impliesNoShade ? "This format predates shade_direction_override (Java 26.3+); Blockbench drops the override in this format, so only shade=false was stored." : "",
+    format.direction_override && shade === true && override === undefined ? "This Java 26.3+ project ignores `shade`; use shade_direction_override '' to remove an override." : "",
+    light_emission !== undefined && !format.shading_properties ? "light_emission is only exported by Java Block formats." : "",
+  ];
+  return { patch, notes: notes.filter((note) => note.length > 0) };
+}
+
+/** Reads the shading flags from the active format; call only inside execute(). */
+function activeShadingFormat(): ICubeShadingFormat {
+  const flags = Format as unknown as { java_cube_shading_properties?: boolean; java_cube_shade_direction_override?: boolean };
+  return {
+    shading_properties: Boolean(flags.java_cube_shading_properties),
+    direction_override: Boolean(flags.java_cube_shade_direction_override),
+  };
+}
+
+/** A place_cube element: shared geometry plus optional shading fields. */
+const placeCubeElementSchema = cubeSchema.extend({
+  shade: shadeSchema.optional(),
+  shade_direction_override: shadeDirectionOverrideEnum.optional(),
+  light_emission: lightEmissionSchema.optional(),
+});
+
 /**
  * Creates a nonempty batch of cubes with optional texture and parent references.
  * Faces default to automatic UV on all sides; false skips texture assignment
@@ -15,7 +102,7 @@ import { isHytaleFormat } from "@/lib/hytale";
  * Explicit arrays never depend on UV editor selection.
  */
 export const placeCubeParameters = z.object({
-  elements: z.array(cubeSchema).min(1).describe("Array of cubes to place."),
+  elements: z.array(placeCubeElementSchema).min(1).describe("Array of cubes to place, with optional Java shading fields."),
   texture: z
     .string()
     .optional()
@@ -91,10 +178,9 @@ export const modifyCubeParameters = z.object({
     .optional()
     .describe("UV offset for the texture."),
   mirror_uv: z.boolean().optional().describe("Whether to mirror the UVs."),
-  shade: z
-    .boolean()
-    .optional()
-    .describe("Whether to apply shading to the cube."),
+  shade: shadeSchema.optional(),
+  shade_direction_override: shadeDirectionOverrideEnum.optional(),
+  light_emission: lightEmissionSchema.optional(),
   inflate: z.number().optional().describe("Inflation amount for the cube."),
   color: z
     .number()
@@ -198,10 +284,13 @@ async function placeCubes({ elements, texture, faces, group }: PlaceCubeInput): 
   const hytale = isHytaleFormat();
   if (hytale) validateHytaleRectangles(elements, rectangles);
   const autouv = hytale || faces === true || (Array.isArray(faces) && rectangles.length === 0 && sides.length > 0);
+  const shadingFormat = activeShadingFormat();
+  const shading = elements.map(element => planCubeShading(element, shadingFormat));
   const cubes: Cube[] = [];
   runUndoableEdit({ elements: cubes, outliner: true }, "Agent placed cubes", () => {
-    elements.forEach(element => {
+    elements.forEach((element, index) => {
       const cube = new Cube({
+        ...shading[index].patch,
         autouv: autouv ? 1 : 0,
         name: element.name,
         from: element.from as [number, number, number],
@@ -223,7 +312,8 @@ async function placeCubes({ elements, texture, faces, group }: PlaceCubeInput): 
     });
     Canvas.updateAll();
   });
-  return JSON.stringify(cubes.map(cube => `Added cube ${cube.name} with ID ${cube.uuid}`));
+  const notes = [...new Set(shading.flatMap(plan => plan.notes))];
+  return JSON.stringify([...cubes.map(cube => `Added cube ${cube.name} with ID ${cube.uuid}`), ...notes]);
 }
 
 /** Registers the cube tools with their shared parameter schemas and runtime implementations. */
@@ -247,6 +337,8 @@ createTool(cubeToolDocs[1].name, {
     autouv,
     mirror_uv,
     shade,
+    shade_direction_override,
+    light_emission,
     inflate,
     color,
     visibility,
@@ -263,6 +355,8 @@ createTool(cubeToolDocs[1].name, {
         throw new Error("No cube selected and no id provided. Select a cube or provide an id.");
       }
     }
+
+    const shading = planCubeShading({ shade, shade_direction_override, light_emission }, activeShadingFormat());
 
     Undo.initEdit({
       elements: Array.isArray(cubes) ? cubes : [cubes],
@@ -289,16 +383,17 @@ createTool(cubeToolDocs[1].name, {
         inflate: inflate ?? cube.inflate,
         color: color ?? cube.color,
         visibility: visibility ?? cube.visibility,
-        shade: shade ?? cube.shade,
+        ...shading.patch,
       });
     });
 
     Undo.finishEdit("Agent modified cubes");
     Canvas.updateAll();
 
-    return `Modified cubes ${cubes
+    const summary = `Modified cubes ${cubes
       .map((cube) => cube.name)
       .join(", ")} with IDs ${cubes.map((cube) => cube.uuid).join(", ")}`;
+    return [summary, ...shading.notes].join(" ");
   },
 }, cubeToolDocs[1].status);
 }

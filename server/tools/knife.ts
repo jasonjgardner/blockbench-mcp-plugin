@@ -215,12 +215,21 @@ function createNameClaimer(existing: Iterable<string>): INameClaimer {
 // ============================================================================
 
 /**
+ * Static side of Blockbench's `KnifeToolContext` (exposed on `window` by
+ * `js/modeling/mesh/knife_tool.js`). blockbench-types 5.2 no longer declares it
+ * globally, so only the one static slot this module reads is described here.
+ */
+interface IKnifeToolContextClass {
+  /** The active interactive knife session, if any. */
+  current?: unknown;
+}
+
+/**
  * Refuses to cut while the interactive Knife tool holds an unfinished cut, and
  * discards an idle hover context so the two never fight over the same cube.
  */
 function releaseInteractiveKnife(): void {
-  if (typeof KnifeToolContext === "undefined") return;
-  const current: unknown = KnifeToolContext.current;
+  const current: unknown = (globalThis as { KnifeToolContext?: IKnifeToolContextClass }).KnifeToolContext?.current;
   if (!current || typeof current !== "object") return;
   const context = current as { first_point_set?: boolean; points?: unknown[]; cancel?: () => void };
   const pending = context.first_point_set === true || (Array.isArray(context.points) && context.points.length > 0);

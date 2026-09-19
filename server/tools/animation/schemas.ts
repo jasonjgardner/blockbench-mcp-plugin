@@ -149,11 +149,13 @@ export const boneRiggingParameters = z.object({
       ik_enabled: z
         .boolean()
         .optional()
-        .describe("Enable inverse kinematics for this bone."),
+        .describe(
+          "Deprecated; prefer set_ik_controller. true makes this bone the end effector of a null-object IK controller (created as <bone>_ik when ik_target is omitted); false clears ik_target on controllers driving it."
+        ),
       ik_target: z
         .string()
         .optional()
-        .describe("Target bone for IK chain."),
+        .describe("Name or UUID of the null object that drives this bone as the IK controller."),
       mirror_axis: axisEnum.optional().describe("Axis to mirror the bone across."),
     })
     .describe("Bone configuration data."),
@@ -172,14 +174,16 @@ export const animationTimelineParameters = z.object({
       "set_fps",
       "loop",
       "select_range",
+      "select_before_playhead",
+      "select_after_playhead",
     ])
-    .describe("Timeline action to perform."),
+    .describe("Timeline action to perform. select_before_playhead/select_after_playhead replace the keyframe selection with bone keyframes at or before/after the playhead (1e-5 s tolerance, like Blockbench 5.2's native actions) and return their UUIDs."),
   time: z
     .number()
     .finite()
     .nonnegative()
     .optional()
-    .describe("Time in seconds (for set_time action)."),
+    .describe("Time in seconds. Required for set_time; for select_before_playhead/select_after_playhead it is the reference time and defaults to the current playhead."),
   length: z
     .number()
     .finite()
@@ -196,6 +200,10 @@ export const animationTimelineParameters = z.object({
     .describe("Integer frames per second, 10–120 (for set_fps action; Blockbench minimum is 10)."),
   loop_mode: loopModeEnum.optional().describe("Loop mode for the animation."),
   range: timeRangeSchema.optional().describe("Time range for selection."),
+  scope: z
+    .enum(["animation", "timeline"])
+    .default("animation")
+    .describe("Keyframes considered by select_before_playhead/select_after_playhead. animation: every bone animator of the target animation, including ones hidden from the timeline. timeline: only animators shown in the timeline with visible channels, matching the native action; requires the target animation to be selected."),
 });
 
 /**
@@ -294,4 +302,93 @@ export const animationCopyPasteParameters = z.object({
     })
     .optional()
     .describe("Target data for paste operation."),
+});
+
+// The placeholder field schemas below are factories: each use gets a fresh
+// instance so the advertised JSON schema stays inlined instead of collapsing
+// repeated instances into a bare `$ref` (see issue #44).
+
+/** Placeholder variable names Blockbench's control parser recognizes (`[\w.-]+`). */
+const placeholderVariableSchema = () => z
+  .string()
+  .regex(/^[A-Za-z_][\w.-]*$/, "Use a Molang variable name such as variable.speed or v.speed.")
+  .describe("Variable assigned by the line, e.g. variable.speed (v./q./t./c. short prefixes are expanded by Blockbench).");
+
+/** Control labels are quoted inside the call, so quotes, parentheses and commas would break parsing. */
+const placeholderControlNameSchema = () => z
+  .string()
+  .regex(/^[^'"(),\r\n]+$/, "Control names cannot contain quotes, parentheses, commas or line breaks.")
+  .describe("Label of the preview control shown in the Variable Placeholders panel.");
+
+/** Optional starting value applied to a new or rebuilt slider/toggle control. */
+const placeholderInitialValueSchema = () => z
+  .number()
+  .finite()
+  .optional()
+  .describe("Initial control value (toggle: 0 or 1). Preview-only; not saved as text.");
+
+/**
+ * One structured placeholder line, mirroring Blockbench 5.2's
+ * "Create Variable Placeholder" dialog types.
+ */
+export const variablePlaceholderEntrySchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("value"),
+    variable: placeholderVariableSchema(),
+    value: z
+      .union([z.number().finite(), z.string().min(1).regex(/^[^\r\n]+$/, "Expressions must be a single line.")])
+      .describe("Constant number or single-line Molang expression."),
+  }),
+  z.object({
+    type: z.literal("slider"),
+    variable: placeholderVariableSchema(),
+    name: placeholderControlNameSchema(),
+    step: z.number().finite().positive().optional().describe("Slider step; defaults to 1 when a range is given."),
+    range: z
+      .tuple([z.number().finite(), z.number().finite()])
+      .optional()
+      .describe("Slider [min, max]."),
+    initial_value: placeholderInitialValueSchema(),
+  }),
+  z.object({
+    type: z.literal("toggle"),
+    variable: placeholderVariableSchema(),
+    name: placeholderControlNameSchema(),
+    initial_value: placeholderInitialValueSchema(),
+  }),
+  z.object({
+    type: z.literal("impulse"),
+    variable: placeholderVariableSchema(),
+    name: placeholderControlNameSchema(),
+    duration: z.number().finite().positive().optional().describe("Seconds the impulse stays at 1 (Blockbench default 0.1)."),
+  }),
+]);
+
+/**
+ * Input for `variable_placeholders`: read, replace, upsert or remove lines of
+ * the project's animation Variable Placeholders text.
+ */
+export const variablePlaceholdersParameters = z.object({
+  action: z
+    .enum(["get", "set", "add", "remove"])
+    .describe("get: read text, parsed lines and live controls. set: replace the whole text. add: write one structured line. remove: delete every line assigning variable."),
+  text: z
+    .string()
+    .max(100_000)
+    .optional()
+    .describe("Complete placeholder text for set; one `variable = expression` per line. Empty clears all placeholders."),
+  entry: variablePlaceholderEntrySchema.optional().describe("Structured line for add."),
+  replace_existing: z
+    .boolean()
+    .default(true)
+    .describe("For add: replace an existing line for the same variable (aliases such as v. match) instead of appending a duplicate."),
+  variable: z.string().min(1).optional().describe("Variable to delete for remove."),
+});
+
+/** Input for `list_molang_variables`: optional name filter over Blockbench's built-in variables. */
+export const listMolangVariablesParameters = z.object({
+  filter: z
+    .string()
+    .optional()
+    .describe("Case-insensitive substring filter on variable names, e.g. 'camera'."),
 });

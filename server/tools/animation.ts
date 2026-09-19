@@ -7,6 +7,7 @@ import { registerBoneRiggingTool } from "@/server/tools/animation/rigging";
 import { registerAnimationTimelineTool } from "@/server/tools/animation/timeline";
 import { registerBatchKeyframeOperationsTool } from "@/server/tools/animation/batch";
 import { registerAnimationCopyPasteTool } from "@/server/tools/animation/copy-paste";
+import { registerVariablePlaceholderTools } from "@/server/tools/animation/variable-placeholders";
 
 export {
   createAnimationParameters,
@@ -16,6 +17,9 @@ export {
   animationTimelineParameters,
   batchKeyframeOperationsParameters,
   animationCopyPasteParameters,
+  variablePlaceholdersParameters,
+  listMolangVariablesParameters,
+  variablePlaceholderEntrySchema,
 } from "@/server/tools/animation/schemas";
 export { animationToolDocs } from "@/server/tools/animation/docs";
 
@@ -31,4 +35,5 @@ export function registerAnimationTools(): void {
   registerAnimationTimelineTool();
   registerBatchKeyframeOperationsTool();
   registerAnimationCopyPasteTool();
+  registerVariablePlaceholderTools();
 }
