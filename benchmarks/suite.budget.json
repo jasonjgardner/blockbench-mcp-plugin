@@ -1,0 +1,157 @@
+{
+  "version": 1,
+  "models": [
+    {
+      "id": "gpt-5-mini",
+      "provider": "OpenAI",
+      "model": "openai/gpt-5-mini",
+      "source": "https://replicate.com/openai/gpt-5-mini",
+      "pricing": {
+        "inputPerMillionUsd": 0.25,
+        "outputPerMillionUsd": 2,
+        "source": "https://replicate.com/openai/gpt-5-mini",
+        "checkedAt": "2026-09-18"
+      }
+    },
+    {
+      "id": "claude-haiku-4-5",
+      "provider": "Anthropic",
+      "model": "anthropic/claude-4.5-haiku",
+      "source": "https://replicate.com/anthropic/claude-4.5-haiku",
+      "pricing": {
+        "inputPerMillionUsd": 1,
+        "outputPerMillionUsd": 5,
+        "source": "https://replicate.com/anthropic/claude-4.5-haiku",
+        "checkedAt": "2026-09-18"
+      }
+    },
+    {
+      "id": "gemini-3-pro",
+      "provider": "Google",
+      "model": "google/gemini-3-pro",
+      "source": "https://replicate.com/google/gemini-3-pro",
+      "pricing": {
+        "inputPerMillionUsd": 2,
+        "outputPerMillionUsd": 12,
+        "source": "https://replicate.com/google/gemini-3-pro",
+        "checkedAt": "2026-09-18"
+      }
+    },
+    {
+      "id": "llama-4-maverick",
+      "provider": "Meta",
+      "model": "meta/llama-4-maverick-instruct",
+      "source": "https://replicate.com/meta/llama-4-maverick-instruct",
+      "pricing": {
+        "inputPerMillionUsd": 0.25,
+        "outputPerMillionUsd": 0.95,
+        "source": "https://replicate.com/meta/llama-4-maverick-instruct",
+        "checkedAt": "2026-09-18"
+      }
+    },
+    {
+      "id": "qwen3-235b",
+      "provider": "Qwen",
+      "model": "qwen/qwen3-235b-a22b-instruct-2507",
+      "source": "https://replicate.com/qwen/qwen3-235b-a22b-instruct-2507",
+      "pricing": {
+        "inputPerMillionUsd": 0.264,
+        "outputPerMillionUsd": 1.06,
+        "source": "https://replicate.com/qwen/qwen3-235b-a22b-instruct-2507",
+        "checkedAt": "2026-09-18"
+      }
+    },
+    {
+      "id": "deepseek-v3-1",
+      "provider": "DeepSeek AI",
+      "model": "deepseek-ai/deepseek-v3.1",
+      "source": "https://replicate.com/deepseek-ai/deepseek-v3.1",
+      "pricing": {
+        "inputPerMillionUsd": 0.672,
+        "outputPerMillionUsd": 2.016,
+        "source": "https://replicate.com/deepseek-ai/deepseek-v3.1",
+        "checkedAt": "2026-09-18"
+      }
+    },
+    {
+      "id": "kimi-k2-thinking",
+      "provider": "Moonshot AI",
+      "model": "moonshotai/kimi-k2-thinking",
+      "source": "https://replicate.com/moonshotai/kimi-k2-thinking",
+      "pricing": {
+        "inputPerMillionUsd": 0.66,
+        "outputPerMillionUsd": 2.7,
+        "source": "https://replicate.com/moonshotai/kimi-k2-thinking",
+        "checkedAt": "2026-09-18"
+      }
+    }
+  ],
+  "cases": [
+    {
+      "id": "minecraft-lantern",
+      "title": "Minecraft hanging lantern",
+      "format": "java_block",
+      "animation": false,
+      "brief": "Create a Minecraft Java block lantern within the 0..16 block bounds: iron frame, warm glowing core, distinct top cap, base and hanging loop. Use cubes compatible with Java block export, a hand-painted 32x32 pixel-art atlas, and readable highlights at inventory-icon scale. Balance appearance and performance; at most 32 cubes. A bright painted core is sufficient; do not imply that the model alone implements game lighting.",
+      "acceptance": [
+        "Recognizable lantern with frame, core, cap, base and loop",
+        "Geometry fits 0..16 on every axis and uses Java-compatible cubes",
+        "32x32 pixel-art texture and coherent texel density",
+        "Readable at small size without excessive tiny geometry",
+        "At most 32 cubes; Java runtime model export is valid"
+      ],
+      "fixture": [
+        {
+          "name": "core_blockout",
+          "from": [5, 3, 5],
+          "to": [11, 11, 11]
+        },
+        {
+          "name": "base_blockout",
+          "from": [4, 1, 4],
+          "to": [12, 3, 12]
+        }
+      ]
+    },
+    {
+      "id": "creeper-mob",
+      "title": "Creeper-style moss golem",
+      "format": "bedrock",
+      "animation": true,
+      "brief": "Create a Minecraft Bedrock Creeper-style moss golem: tall cuboid torso, square head, four short independently rigged feet, a readable dark face and mottled moss-green pixel art on a 64x64 atlas. Add an original stone crack motif. About 24 units tall. Balance appearance and performance, at most 32 cubes. Create a seamless 1-second walk cycle with diagonal leg pairing, planted contacts and subtle body bob. Preserve the familiar silhouette while making the stone-and-moss styling original.",
+      "acceptance": [
+        "Tall Creeper-style silhouette, square head and four independently rigged feet",
+        "64x64 atlas with readable face and moss/stone distinction",
+        "One-second walk loops with diagonal pairing",
+        "Leg pivots and ground contacts remain plausible",
+        "At most 32 cubes; Bedrock geometry and animation are retained"
+      ],
+      "fixture": [
+        {
+          "name": "body_blockout",
+          "from": [-4, 5, -2],
+          "to": [4, 17, 2]
+        },
+        {
+          "name": "head_blockout",
+          "from": [-4, 17, -4],
+          "to": [4, 25, 4]
+        }
+      ]
+    }
+  ],
+  "conditions": ["empty"],
+  "repetitions": 1,
+  "maxCostUsd": 20,
+  "limits": {
+    "turnsPerStage": 30,
+    "predictionsPerTrial": 120,
+    "reviewerTurns": 8,
+    "outputTokens": 2048,
+    "predictionTimeoutMs": 300000,
+    "trialTimeoutMs": 3600000,
+    "contextCharacters": 60000,
+    "observationCharacters": 8000,
+    "minRequestIntervalMs": 1000
+  }
+}

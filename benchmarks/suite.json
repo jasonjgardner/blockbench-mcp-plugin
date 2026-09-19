@@ -1,0 +1,283 @@
+{
+  "version": 1,
+  "models": [
+    {
+      "id": "gpt-5",
+      "provider": "OpenAI",
+      "model": "openai/gpt-5",
+      "source": "https://replicate.com/openai/gpt-5",
+      "pricing": {
+        "inputPerMillionUsd": 1.25,
+        "outputPerMillionUsd": 10,
+        "source": "https://replicate.com/openai/gpt-5",
+        "checkedAt": "2026-09-18"
+      }
+    },
+    {
+      "id": "gpt-5-mini",
+      "provider": "OpenAI",
+      "model": "openai/gpt-5-mini",
+      "source": "https://replicate.com/openai/gpt-5-mini",
+      "pricing": {
+        "inputPerMillionUsd": 0.25,
+        "outputPerMillionUsd": 2,
+        "source": "https://replicate.com/openai/gpt-5-mini",
+        "checkedAt": "2026-09-18"
+      }
+    },
+    {
+      "id": "claude-sonnet-4-5",
+      "provider": "Anthropic",
+      "model": "anthropic/claude-4.5-sonnet",
+      "source": "https://replicate.com/anthropic/claude-4.5-sonnet",
+      "pricing": {
+        "inputPerMillionUsd": 3,
+        "outputPerMillionUsd": 15,
+        "source": "https://replicate.com/anthropic/claude-4.5-sonnet",
+        "checkedAt": "2026-09-18"
+      }
+    },
+    {
+      "id": "claude-haiku-4-5",
+      "provider": "Anthropic",
+      "model": "anthropic/claude-4.5-haiku",
+      "source": "https://replicate.com/anthropic/claude-4.5-haiku",
+      "pricing": {
+        "inputPerMillionUsd": 1,
+        "outputPerMillionUsd": 5,
+        "source": "https://replicate.com/anthropic/claude-4.5-haiku",
+        "checkedAt": "2026-09-18"
+      }
+    },
+    {
+      "id": "gemini-3-pro",
+      "provider": "Google",
+      "model": "google/gemini-3-pro",
+      "source": "https://replicate.com/google/gemini-3-pro",
+      "pricing": {
+        "inputPerMillionUsd": 2,
+        "outputPerMillionUsd": 12,
+        "source": "https://replicate.com/google/gemini-3-pro",
+        "checkedAt": "2026-09-18"
+      }
+    },
+    {
+      "id": "llama-4-maverick",
+      "provider": "Meta",
+      "model": "meta/llama-4-maverick-instruct",
+      "source": "https://replicate.com/meta/llama-4-maverick-instruct",
+      "pricing": {
+        "inputPerMillionUsd": 0.25,
+        "outputPerMillionUsd": 0.95,
+        "source": "https://replicate.com/meta/llama-4-maverick-instruct",
+        "checkedAt": "2026-09-18"
+      }
+    },
+    {
+      "id": "qwen3-235b",
+      "provider": "Qwen",
+      "model": "qwen/qwen3-235b-a22b-instruct-2507",
+      "source": "https://replicate.com/qwen/qwen3-235b-a22b-instruct-2507",
+      "pricing": {
+        "inputPerMillionUsd": 0.264,
+        "outputPerMillionUsd": 1.06,
+        "source": "https://replicate.com/qwen/qwen3-235b-a22b-instruct-2507",
+        "checkedAt": "2026-09-18"
+      }
+    },
+    {
+      "id": "deepseek-v3-1",
+      "provider": "DeepSeek AI",
+      "model": "deepseek-ai/deepseek-v3.1",
+      "source": "https://replicate.com/deepseek-ai/deepseek-v3.1",
+      "pricing": {
+        "inputPerMillionUsd": 0.672,
+        "outputPerMillionUsd": 2.016,
+        "source": "https://replicate.com/deepseek-ai/deepseek-v3.1",
+        "checkedAt": "2026-09-18"
+      }
+    },
+    {
+      "id": "kimi-k2-thinking",
+      "provider": "Moonshot AI",
+      "model": "moonshotai/kimi-k2-thinking",
+      "source": "https://replicate.com/moonshotai/kimi-k2-thinking",
+      "pricing": {
+        "inputPerMillionUsd": 0.66,
+        "outputPerMillionUsd": 2.7,
+        "source": "https://replicate.com/moonshotai/kimi-k2-thinking",
+        "checkedAt": "2026-09-18"
+      }
+    }
+  ],
+  "conditions": ["empty", "scaffold", "repair"],
+  "repetitions": 1,
+  "limits": {
+    "turnsPerStage": 45,
+    "predictionsPerTrial": 200,
+    "reviewerTurns": 12,
+    "outputTokens": 4096,
+    "predictionTimeoutMs": 300000,
+    "trialTimeoutMs": 3600000,
+    "contextCharacters": 180000,
+    "observationCharacters": 24000
+  },
+  "cases": [
+    {
+      "id": "utah-teapot",
+      "title": "Utah Teapot",
+      "format": "free",
+      "animation": false,
+      "brief": "Create a recognizable low-poly Utah Teapot study from primitives or authored mesh geometry. Use a rounded belly, narrow foot, fitted removable-looking lid with knob, open curved spout, and loop handle with visible negative space. Warm glazed terracotta, subtle material variation, coherent UV scale. Approximately 24 units wide including spout and handle, resting at Y=0. Balance appearance and performance; at most 2500 faces. This is an authored approximation, not a claim to reproduce the original Bezier dataset.",
+      "acceptance": [
+        "Recognizable teapot silhouette from front, side and three-quarter views",
+        "Spout opening and handle hole are geometry, not painted circles",
+        "Lid fits the rim; handle and spout meet the body",
+        "Texture mapping preserves detail scale",
+        "At most 2500 faces"
+      ],
+      "fixture": [
+        {
+          "name": "body_blockout",
+          "from": [-5, 2, -5],
+          "to": [5, 10, 5]
+        },
+        {
+          "name": "lid_blockout",
+          "from": [-4, 10, -4],
+          "to": [4, 11, 4]
+        }
+      ]
+    },
+    {
+      "id": "stanford-bunny",
+      "title": "Stanford Bunny",
+      "format": "free",
+      "animation": false,
+      "brief": "Author a stylized low-poly Stanford Bunny study: seated rabbit, tall distinct ears with a slight asymmetric lean, rounded haunches, tucked front paws, small tail and readable muzzle. Matte ivory ceramic with subtle warm shadows. About 24 units tall, resting at Y=0. Balance appearance and performance, at most 3000 faces. Recreate the recognizable subject from authored geometry; do not import the Stanford scan or claim scan accuracy.",
+      "acceptance": [
+        "Seated rabbit silhouette and two separated ears",
+        "Paws contact the ground; tail and muzzle read at thumbnail size",
+        "Coherent topology without obvious accidental holes",
+        "Ceramic material has consistent mapping",
+        "At most 3000 faces"
+      ],
+      "fixture": [
+        {
+          "name": "haunch_blockout",
+          "from": [-5, 0, -4],
+          "to": [5, 10, 5]
+        },
+        {
+          "name": "head_blockout",
+          "from": [-3, 9, -6],
+          "to": [3, 15, 0]
+        }
+      ]
+    },
+    {
+      "id": "stanford-dragon",
+      "title": "Animated Stanford Dragon",
+      "format": "free",
+      "animation": true,
+      "brief": "Author a low-poly interpretation of the Stanford Dragon subject: coiled serpentine body, four clawed limbs, horned head, whiskers, dorsal spines and a curled tail. Jade-green material with a lighter underside. About 32 units tall, grounded at Y=0. This is a recognizable study, not the original scan. Balance appearance and performance, at most 6000 faces. Rig meaningful named groups and create a seamless 4-second looping idle animation with breathing, a restrained head turn and delayed tail sway. Keep feet planted and avoid intersections.",
+      "acceptance": [
+        "Dragon silhouette includes coiled body, four limbs, horns, spines and curled tail",
+        "Named rig hierarchy with anatomically plausible pivots",
+        "Four-second idle loops without a visible seam",
+        "Breathing, head and tail motion are distinct; feet remain planted",
+        "Consistent jade texture mapping; at most 6000 faces"
+      ],
+      "fixture": [
+        {
+          "name": "torso_blockout",
+          "from": [-5, 6, -4],
+          "to": [5, 18, 5]
+        },
+        {
+          "name": "head_blockout",
+          "from": [-4, 18, -8],
+          "to": [4, 24, 0]
+        }
+      ]
+    },
+    {
+      "id": "minecraft-lantern",
+      "title": "Minecraft hanging lantern",
+      "format": "java_block",
+      "animation": false,
+      "brief": "Create a Minecraft Java block lantern within the 0..16 block bounds: iron frame, warm glowing core, distinct top cap, base and hanging loop. Use cubes compatible with Java block export, a hand-painted 32x32 pixel-art atlas, and readable highlights at inventory-icon scale. Balance appearance and performance; at most 32 cubes. A bright painted core is sufficient; do not imply that the model alone implements game lighting.",
+      "acceptance": [
+        "Recognizable lantern with frame, core, cap, base and loop",
+        "Geometry fits 0..16 on every axis and uses Java-compatible cubes",
+        "32x32 pixel-art texture and coherent texel density",
+        "Readable at small size without excessive tiny geometry",
+        "At most 32 cubes; Java runtime model export is valid"
+      ],
+      "fixture": [
+        {
+          "name": "core_blockout",
+          "from": [5, 3, 5],
+          "to": [11, 11, 11]
+        },
+        {
+          "name": "base_blockout",
+          "from": [4, 1, 4],
+          "to": [12, 3, 12]
+        }
+      ]
+    },
+    {
+      "id": "creeper-mob",
+      "title": "Creeper-style moss golem",
+      "format": "bedrock",
+      "animation": true,
+      "brief": "Create a Minecraft Bedrock Creeper-style moss golem: tall cuboid torso, square head, four short independently rigged feet, a readable dark face and mottled moss-green pixel art on a 64x64 atlas. Add an original stone crack motif. About 24 units tall. Balance appearance and performance, at most 32 cubes. Create a seamless 1-second walk cycle with diagonal leg pairing, planted contacts and subtle body bob. Preserve the familiar silhouette while making the stone-and-moss styling original.",
+      "acceptance": [
+        "Tall Creeper-style silhouette, square head and four independently rigged feet",
+        "64x64 atlas with readable face and moss/stone distinction",
+        "One-second walk loops with diagonal pairing",
+        "Leg pivots and ground contacts remain plausible",
+        "At most 32 cubes; Bedrock geometry and animation are retained"
+      ],
+      "fixture": [
+        {
+          "name": "body_blockout",
+          "from": [-4, 5, -2],
+          "to": [4, 17, 2]
+        },
+        {
+          "name": "head_blockout",
+          "from": [-4, 17, -4],
+          "to": [4, 25, 4]
+        }
+      ]
+    },
+    {
+      "id": "treasure-chest",
+      "title": "Animated voxel treasure chest",
+      "format": "bedrock",
+      "animation": true,
+      "brief": "Create a Minecraft Bedrock entity treasure chest with oak boards, iron bands, a front brass latch and a hollow interior. Keep it about 16 units wide, grounded at Y=0. Use a 64x64 pixel-art atlas with consistent grain scale. Balance appearance and performance, at most 64 cubes. Rig the lid around the rear hinge and animate a 2-second open-hold-close cycle; the latch should follow the lid correctly. Prevent lid/body interpenetration.",
+      "acceptance": [
+        "Chest has a hollow usable interior and coherent wooden/metal parts",
+        "Rear hinge pivot makes the lid open plausibly",
+        "Two-second open-hold-close loop includes visibly different poses",
+        "64x64 texture preserves grain scale across boards",
+        "At most 64 cubes; latch follows the correct part"
+      ],
+      "fixture": [
+        {
+          "name": "base_blockout",
+          "from": [-8, 0, -5],
+          "to": [8, 8, 5]
+        },
+        {
+          "name": "lid_blockout",
+          "from": [-8, 8, -5],
+          "to": [8, 11, 5]
+        }
+      ]
+    }
+  ]
+}

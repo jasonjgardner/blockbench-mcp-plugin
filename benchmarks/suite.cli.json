@@ -1,0 +1,110 @@
+{
+  "version": 1,
+  "models": [
+    {
+      "id": "claude-sonnet",
+      "provider": "Anthropic",
+      "model": "sonnet",
+      "runner": "claude",
+      "source": "https://docs.claude.com/en/docs/claude-code/cli-reference"
+    },
+    {
+      "id": "codex-default",
+      "provider": "OpenAI",
+      "model": "default",
+      "runner": "codex",
+      "source": "https://developers.openai.com/codex/cli"
+    },
+    {
+      "id": "gemini-default",
+      "provider": "Google",
+      "model": "default",
+      "runner": "gemini",
+      "source": "https://github.com/google-gemini/gemini-cli"
+    },
+    {
+      "id": "gpt-oss-local",
+      "provider": "OpenAI",
+      "model": "gpt-oss",
+      "runner": "claude",
+      "backend": "ollama",
+      "source": "https://ollama.com/library/gpt-oss"
+    },
+    {
+      "id": "kimi-k2-6-cloud",
+      "provider": "Moonshot AI",
+      "model": "kimi-k2.6:cloud",
+      "runner": "claude",
+      "backend": "ollama",
+      "source": "https://ollama.com/library/kimi-k2.6"
+    }
+  ],
+  "cases": [
+    {
+      "id": "minecraft-lantern",
+      "title": "Minecraft hanging lantern",
+      "format": "java_block",
+      "animation": false,
+      "brief": "Create a Minecraft Java block lantern within the 0..16 block bounds: iron frame, warm glowing core, distinct top cap, base and hanging loop. Use cubes compatible with Java block export, a hand-painted 32x32 pixel-art atlas, and readable highlights at inventory-icon scale. Balance appearance and performance; at most 32 cubes. A bright painted core is sufficient; do not imply that the model alone implements game lighting.",
+      "acceptance": [
+        "Recognizable lantern with frame, core, cap, base and loop",
+        "Geometry fits 0..16 on every axis and uses Java-compatible cubes",
+        "32x32 pixel-art texture and coherent texel density",
+        "Readable at small size without excessive tiny geometry",
+        "At most 32 cubes; Java runtime model export is valid"
+      ],
+      "fixture": [
+        {
+          "name": "core_blockout",
+          "from": [5, 3, 5],
+          "to": [11, 11, 11]
+        },
+        {
+          "name": "base_blockout",
+          "from": [4, 1, 4],
+          "to": [12, 3, 12]
+        }
+      ]
+    },
+    {
+      "id": "creeper-mob",
+      "title": "Creeper-style moss golem",
+      "format": "bedrock",
+      "animation": true,
+      "brief": "Create a Minecraft Bedrock Creeper-style moss golem: tall cuboid torso, square head, four short independently rigged feet, a readable dark face and mottled moss-green pixel art on a 64x64 atlas. Add an original stone crack motif. About 24 units tall. Balance appearance and performance, at most 32 cubes. Create a seamless 1-second walk cycle with diagonal leg pairing, planted contacts and subtle body bob. Preserve the familiar silhouette while making the stone-and-moss styling original.",
+      "acceptance": [
+        "Tall Creeper-style silhouette, square head and four independently rigged feet",
+        "64x64 atlas with readable face and moss/stone distinction",
+        "One-second walk loops with diagonal pairing",
+        "Leg pivots and ground contacts remain plausible",
+        "At most 32 cubes; Bedrock geometry and animation are retained"
+      ],
+      "fixture": [
+        {
+          "name": "body_blockout",
+          "from": [-4, 5, -2],
+          "to": [4, 17, 2]
+        },
+        {
+          "name": "head_blockout",
+          "from": [-4, 17, -4],
+          "to": [4, 25, 4]
+        }
+      ]
+    }
+  ],
+  "conditions": ["empty"],
+  "repetitions": 1,
+  "limits": {
+    "turnsPerStage": 40,
+    "predictionsPerTrial": 8,
+    "reviewerTurns": 8,
+    "outputTokens": 2048,
+    "predictionTimeoutMs": 300000,
+    "trialTimeoutMs": 5400000,
+    "contextCharacters": 60000,
+    "observationCharacters": 8000,
+    "stageTimeoutMs": 900000,
+    "toolCallsPerStage": 0
+  }
+}

@@ -1,0 +1,7 @@
+.env
+.env.*
+!.env.example
+
+# Benchmark evidence stays local; only the folder guide is tracked.
+results/*
+!results/README.md
