@@ -90,8 +90,13 @@ export interface IRenderFrameHost {
 export interface ISamplingClock {
   /** Monotonic timestamp in milliseconds. */
   now(): number;
-  /** Resolves after `ms` milliseconds. */
-  wait(ms: number): Promise<void>;
+  /**
+   * Resolves after `ms` milliseconds. `signal`, when given and later aborted,
+   * lets the implementation drop its scheduled timer once the wait is no
+   * longer needed (the window already ended some other way); it does not
+   * itself settle the returned promise.
+   */
+  wait(ms: number, signal?: AbortSignal): Promise<void>;
 }
 
 /**
@@ -116,7 +121,11 @@ const REAL_VISIBILITY: IVisibilityHost = {
 
 const REAL_CLOCK: ISamplingClock = {
   now: () => performance.now(),
-  wait: ms => new Promise(resolve => setTimeout(resolve, ms)),
+  wait: (ms, signal) =>
+    new Promise(resolve => {
+      const timer = setTimeout(resolve, ms);
+      signal?.addEventListener("abort", () => clearTimeout(timer), { once: true });
+    }),
 };
 
 /**
@@ -131,6 +140,9 @@ const REAL_CLOCK: ISamplingClock = {
  * that is already hidden returns an empty window immediately, and a page that
  * becomes hidden mid-window ends the sample at that point. Both report the
  * frames counted so far; `documentHidden` on the context explains the result.
+ * Ending the window early aborts the clock's pending wait, so a real timer
+ * that would otherwise still be scheduled minutes later is dropped instead of
+ * firing a stray `resolve` on an already-settled promise.
  *
  * @param durationMs - Length of the sampling window; a finite, non-negative number.
  * @param host - Event emitter to observe; defaults to the `Blockbench` global.
@@ -154,14 +166,19 @@ export async function sampleRenderFrames(
   host.on("render_frame", onFrame);
   const started = clock.now();
   let unsubscribe: (() => void) | undefined;
+  const abortWait = new AbortController();
   try {
     await new Promise<void>((resolve, reject) => {
       unsubscribe = visibility.onVisibilityChange(() => {
         if (visibility.isHidden()) resolve();
       });
-      clock.wait(durationMs).then(resolve, reject);
+      clock.wait(durationMs, abortWait.signal).then(resolve, reject);
     });
   } finally {
+    // Drops the clock's scheduled timer when the window ended some other way
+    // (early via visibility, or the promise rejected); a no-op once the timer
+    // has already fired, so the natural-completion path is unaffected.
+    abortWait.abort();
     unsubscribe?.();
     host.removeListener("render_frame", onFrame);
   }

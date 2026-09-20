@@ -157,6 +157,27 @@ test("sampleRenderFrames ends the window early when the page becomes hidden mid-
   expect(host.listeners.size).toBe(0);
 });
 
+test("sampleRenderFrames cancels the clock's pending wait once the window ends early", async () => {
+  const host = createHost();
+  const visibility = createVisibility();
+  let capturedSignal: AbortSignal | undefined;
+  const clock = {
+    now: () => 0,
+    // Mirrors the real clock's frozen timer: never settles on its own, so the
+    // only way this promise moves on is the visibility branch resolving first.
+    wait: (_ms: number, signal?: AbortSignal) => {
+      capturedSignal = signal;
+      return new Promise<void>(() => {});
+    },
+  };
+  const pending = sampleRenderFrames(10_000, host, clock, visibility);
+  visibility.hide();
+  await pending;
+  // Confirms the cleanup path actually tells the clock to drop its timer,
+  // rather than leaving it scheduled to fire minutes after the call returned.
+  expect(capturedSignal?.aborted).toBe(true);
+});
+
 test("sampleRenderFrames unsubscribes from visibility changes once the window ends", async () => {
   const host = createHost();
   const visibility = createVisibility();
