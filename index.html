@@ -11,7 +11,7 @@
     <nav class="sidebar">
       <div class="sidebar-brand">
         <h1>Blockbench MCP</h1>
-        <p>v1.8.0 — API Reference</p>
+        <p>v1.8.1 — API Reference</p>
       </div>
 
       <input id="search" type="text" placeholder="Search tools..." class="search-input" />
@@ -51,7 +51,7 @@
     <main class="main">
       <header class="page-header">
         <h1>Blockbench MCP Plugin</h1>
-        <p class="subtitle">API Reference — v1.8.0</p>
+        <p class="subtitle">API Reference — v1.8.1</p>
         <nav class="stats">
           <a href="#tools"><strong>140</strong> tools (44 stable, 96 experimental)</a>
           <a href="#prompts"><strong>6</strong> prompts</a>
@@ -3995,7 +3995,7 @@
         </div>
       </div>
       <p class="card-title">Get Average FPS</p>
-      <p class="card-desc">Measures the average frames per second of Blockbench's render loop by counting rendered frames for duration_ms, then returns the average with the frame count, the fps_limit setting, Blockbench's own last-second counter, window focus at the start of the window plus whether it changed, and whether rendering was paused because the window was unfocused with background rendering disabled. The call waits for the whole window; keep other tools idle meanwhile for a representative reading.</p>
+      <p class="card-desc">Measures the average frames per second of Blockbench's render loop by counting rendered frames for duration_ms, then returns the average with the frame count, the fps_limit setting, Blockbench's own last-second counter, window focus at the start of the window plus whether it changed, whether the page was hidden, and whether rendering was paused. The call waits for the whole window; keep other tools idle meanwhile for a representative reading. A minimised or fully occluded Blockbench renders no frames and freezes its timers, so the call returns an empty window at once with document_hidden and rendering_paused set rather than waiting; bring the window to the foreground to measure a real frame rate.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -5924,7 +5924,7 @@
       </section>
 
       <footer class="page-footer">
-        Generated 2026-09-20T01:08:19.367Z from Zod schemas
+        Generated 2026-09-20T22:34:34.722Z from Zod schemas
       </footer>
     </main>
   </div>
