@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { readFrameRateContext, readWindowFocus, sampleRenderFrames, summarizeFrameRate, type IFrameRateContext, type IRenderFrameHost } from "@/lib/frame-rate";
+import { readDocumentHidden, readFrameRateContext, readWindowFocus, sampleRenderFrames, summarizeFrameRate, type IFrameRateContext, type IRenderFrameHost, type IVisibilityHost } from "@/lib/frame-rate";
 import { installGlobals, useGlobals } from "@/tests/helpers/globals";
 
 type Handler = () => void;
@@ -21,7 +21,24 @@ function createHost(): IRenderFrameHost & { readonly listeners: Set<Handler>; di
   };
 }
 
-const focused: IFrameRateContext = { fpsLimit: 144, lastSecondFps: 60, backgroundRendering: true, windowFocused: true, windowFocusedAfter: true };
+const focused: IFrameRateContext = { fpsLimit: 144, lastSecondFps: 60, backgroundRendering: true, documentHidden: false, windowFocused: true, windowFocusedAfter: true };
+
+/** Visibility host that never hides, matching a normal foreground window. */
+function createVisibility(hidden = false): IVisibilityHost & { hide(): void } {
+  const listeners = new Set<() => void>();
+  let isHidden = hidden;
+  return {
+    isHidden: () => isHidden,
+    onVisibilityChange(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    hide() {
+      isHidden = true;
+      listeners.forEach(listener => listener());
+    },
+  };
+}
 
 useGlobals(() => ({
   Prop: { fps: 58 },
@@ -96,9 +113,9 @@ test("summarizeFrameRate reports a focus change between the start and end of the
 
 test("readFrameRateContext narrows settings and Prop.fps, and reports focus as unknown without a document", () => {
   expect(readWindowFocus()).toBeNull();
-  expect(readFrameRateContext(null)).toEqual({ fpsLimit: 60, lastSecondFps: 58, backgroundRendering: false, windowFocused: null, windowFocusedAfter: null });
+  expect(readFrameRateContext(null)).toEqual({ fpsLimit: 60, lastSecondFps: 58, backgroundRendering: false, documentHidden: null, windowFocused: null, windowFocusedAfter: null });
   Object.assign(globalThis, { settings: { fps_limit: { value: "fast" } }, Prop: { fps: Number.NaN } });
-  expect(readFrameRateContext(null)).toEqual({ fpsLimit: null, lastSecondFps: null, backgroundRendering: null, windowFocused: null, windowFocusedAfter: null });
+  expect(readFrameRateContext(null)).toEqual({ fpsLimit: null, lastSecondFps: null, backgroundRendering: null, documentHidden: null, windowFocused: null, windowFocusedAfter: null });
 });
 
 test("readFrameRateContext reads focus from the document when one exists", () => {
@@ -108,5 +125,69 @@ test("readFrameRateContext reads focus from the document when one exists", () =>
     expect(readFrameRateContext(true)).toMatchObject({ windowFocused: true, windowFocusedAfter: false });
   } finally {
     restore();
+  }
+});
+
+test("sampleRenderFrames returns an empty window immediately when the page is already hidden", async () => {
+  const host = createHost();
+  let waited = false;
+  const clock = { now: () => 0, wait: async () => { waited = true; } };
+  const sample = await sampleRenderFrames(10_000, host, clock, createVisibility(true));
+  expect(sample).toEqual({ frames: 0, elapsedMs: 0 });
+  // A hidden page freezes its timers, so waiting would never resolve.
+  expect(waited).toBe(false);
+  expect(host.listeners.size).toBe(0);
+});
+
+test("sampleRenderFrames ends the window early when the page becomes hidden mid-sample", async () => {
+  const host = createHost();
+  const visibility = createVisibility();
+  const timeline = { now: 500 };
+  const clock = {
+    now: () => timeline.now,
+    // A frozen timer that never resolves, like a hidden page's setTimeout.
+    wait: () => new Promise<void>(() => {}),
+  };
+  const pending = sampleRenderFrames(10_000, host, clock, visibility);
+  host.dispatch();
+  host.dispatch();
+  timeline.now = 700;
+  visibility.hide();
+  expect(await pending).toEqual({ frames: 2, elapsedMs: 200 });
+  expect(host.listeners.size).toBe(0);
+});
+
+test("sampleRenderFrames unsubscribes from visibility changes once the window ends", async () => {
+  const host = createHost();
+  const visibility = createVisibility();
+  const clock = { now: () => 0, wait: async () => {} };
+  await sampleRenderFrames(100, host, clock, visibility);
+  visibility.hide();
+  expect(host.listeners.size).toBe(0);
+});
+
+test("summarizeFrameRate reports a hidden page as a paused loop whatever background rendering says", () => {
+  const hidden: IFrameRateContext = { ...focused, documentHidden: true };
+  expect(summarizeFrameRate({ frames: 0, elapsedMs: 0 }, hidden).rendering_paused).toBe(true);
+  expect(summarizeFrameRate({ frames: 0, elapsedMs: 0 }, hidden).document_hidden).toBe(true);
+  expect(summarizeFrameRate({ frames: 0, elapsedMs: 0 }, hidden).average_fps).toBe(0);
+  // Frames counted before the page was hidden describe real rendering, not a pause.
+  expect(summarizeFrameRate({ frames: 5, elapsedMs: 200 }, hidden).rendering_paused).toBe(false);
+  expect(summarizeFrameRate({ frames: 0, elapsedMs: 1000 }, focused).document_hidden).toBe(false);
+});
+
+test("readDocumentHidden reports the page visibility state, or null without a document", () => {
+  expect(readDocumentHidden()).toBeNull();
+  const restoreHidden = installGlobals({ document: { visibilityState: "hidden" } });
+  try {
+    expect(readDocumentHidden()).toBe(true);
+  } finally {
+    restoreHidden();
+  }
+  const restoreVisible = installGlobals({ document: { visibilityState: "visible" } });
+  try {
+    expect(readDocumentHidden()).toBe(false);
+  } finally {
+    restoreVisible();
   }
 });
