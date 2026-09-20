@@ -6,10 +6,12 @@ import { armatureToolDocs } from "@/server/tools/armature";
 import { cameraToolDocs } from "@/server/tools/camera";
 import { capabilityToolDocs } from "@/server/tools/capabilities";
 import { cubeToolDocs } from "@/server/tools/cubes";
+import { cubeUvToolDocs } from "@/server/tools/cube-uv";
 import { displayToolDocs } from "@/server/tools/display";
 import { exportToolDocs } from "@/server/tools/export";
 import { historyToolDocs } from "@/server/tools/history";
 import { hytaleToolDocs } from "@/server/tools/hytale";
+import { knifeToolDocs } from "@/server/tools/knife";
 import { materialInstanceToolDocs } from "@/server/tools/material-instances";
 import { meshToolDocs } from "@/server/tools/mesh";
 import { paintToolDocs } from "@/server/tools/paint/docs";
@@ -20,8 +22,8 @@ import { useGlobals } from "@/tests/helpers/globals";
 
 const specs = [
   ...animationToolDocs, ...armatureToolDocs, ...cameraToolDocs,
-  ...capabilityToolDocs, ...cubeToolDocs, ...displayToolDocs, ...exportToolDocs,
-  ...historyToolDocs, ...hytaleToolDocs, ...materialInstanceToolDocs,
+  ...capabilityToolDocs, ...cubeToolDocs, ...cubeUvToolDocs, ...displayToolDocs, ...exportToolDocs,
+  ...historyToolDocs, ...hytaleToolDocs, ...knifeToolDocs, ...materialInstanceToolDocs,
   ...meshToolDocs, ...paintToolDocs, ...projectToolDocs, ...textureToolDocs,
   ...uiToolDocs,
 ];
@@ -56,10 +58,18 @@ function available(name: string): boolean {
 describe("native tool availability contracts", () => {
   test("discovery and project creation remain available without an open project", () => {
     Object.assign(globalThis, { Project: null, ModelProject: { all: [] } });
-    ["get_capabilities", "create_project", "list_export_formats", "create_brush_preset", "capture_app_screenshot"]
+    ["get_capabilities", "create_project", "list_export_formats", "create_brush_preset", "capture_app_screenshot",
+      "create_offscreen_view", "list_views", "resize_offscreen_view", "delete_offscreen_view"]
       .forEach(name => expect(available(name)).toBe(true));
-    ["get_project_info", "place_mesh", "create_animation", "place_cube", "create_texture", "capture_screenshot", "undo"]
+    ["get_project_info", "place_mesh", "create_animation", "place_cube", "create_texture", "capture_screenshot", "undo",
+      "set_camera_angle"]
       .forEach(name => expect(available(name)).toBe(false));
+  });
+
+  test("set_camera_angle needs a render target even with a project open", () => {
+    Object.assign(globalThis, { Preview: { selected: null, all: [] } });
+    expect(available("set_camera_angle")).toBe(false);
+    expect(available("capture_screenshot")).toBe(true);
   });
 
   test("format features distinguish generic models from Java display projects", () => {
@@ -119,5 +129,14 @@ describe("native tool availability contracts", () => {
       Plugins: { installed: [{ id: "hytale_plugin", disabled: true }] },
     });
     expect(available("hytale_create_quad")).toBe(false);
+  });
+});
+
+describe("AI scratchpad mode availability", () => {
+  test("edit-only geometry tools stay available in the scratchpad mode", () => {
+    Object.assign(globalThis, { Modes: { id: "ai_scratchpad" } });
+    ["knife_cut_cube", "slice_cubes_to_block_grid", "set_cube_uv"].forEach(name => {
+      expect(available(name)).toBe(true);
+    });
   });
 });

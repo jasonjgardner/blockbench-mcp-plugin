@@ -1,7 +1,7 @@
 /// <reference types="blockbench-types" />
 import { z } from "zod";
 import { createTool, type IToolSpec } from "@/lib/factories";
-import { GEOMETRY_EPSILON, STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
+import { SCRATCHPAD_MODE_ID, GEOMETRY_EPSILON, STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
 import { runUndoableEdit } from "@/lib/undo";
 import { isHytaleFormat } from "@/lib/hytale";
 
@@ -54,7 +54,7 @@ export const cubeUvToolDocs: IToolSpec[] = [
   },
   {
     name: "set_cube_uv",
-    condition: { project: true, features: ["edit_mode"], modes: ["edit", "paint"] },
+    condition: { project: true, features: ["edit_mode"], modes: ["edit", "paint", SCRATCHPAD_MODE_ID] },
     description: "Edit box UV offsets/mirroring or per-face rectangles, rotation and texture references in one reversible edit. Preserves untargeted faces and selection. Validates UV mode, texture references and rotation support. Hytale rectangles must retain geometry-linked extents and Auto UV; texture assignments use the project/attachment collection, and quads cannot use box UV. Does not pack islands or repaint textures.",
     annotations: { title: "Set Cube UV", destructiveHint: true, openWorldHint: false },
     parameters: setCubeUvParameters,

@@ -65,12 +65,21 @@ const TRANSPARENT_PNG_DATA_URL = "data:image/png;base64,AA==";
 let sequence = 0;
 let failPreview = false;
 let failAdd = false;
+let faceRefreshes = 0;
+let failRefresh = false;
+let selectedTexture: TestTexture | undefined;
 let project: ITextureCollections;
 let files = new Map<string, string>();
 
 class TestTexture {
   static get all(): TestTexture[] {
     return project.textures;
+  }
+  static get selected(): TestTexture | undefined {
+    return selectedTexture;
+  }
+  static set selected(texture: TestTexture | undefined) {
+    selectedTexture = texture;
   }
   uuid = `texture-${++sequence}`;
   id = this.uuid;
@@ -91,6 +100,16 @@ class TestTexture {
   add(): this {
     project.textures.push(this);
     return this;
+  }
+  select(): this {
+    selectedTexture = this;
+    return this;
+  }
+  /** Mirrors `Texture.remove(no_update)`: the tool passes `true` and owns the undo entry itself. */
+  remove(no_update?: boolean): void {
+    if (!no_update) throw new Error("delete_texture must own the undo transaction (remove(true)).");
+    if (selectedTexture === this) selectedTexture = undefined;
+    project.textures = project.textures.filter(texture => texture !== this);
   }
   getActiveCanvas() {
     return { ctx: { clearRect() {}, canvas: { toDataURL: () => TRANSPARENT_PNG_DATA_URL } } };
@@ -153,10 +172,11 @@ function configSnapshot(group: TestGroup): IConfig {
   return structuredClone({ color_value, mer_value, subsurface_value, saved });
 }
 
-function snapshot(aspects: ITextureCollections): ISnapshot {
+/** Like native `UndoSystem.save`, an aspect a tool leaves out is simply not tracked by that entry. */
+function snapshot(aspects: Partial<ITextureCollections>): ISnapshot {
   return {
-    textures: aspects.textures.map(texture => ({ texture, group: texture.group, channel: texture.pbr_channel, name: texture.name })),
-    groups: aspects.texture_groups.map(group => ({ group, config: configSnapshot(group) })),
+    textures: (aspects.textures ?? []).map(texture => ({ texture, group: texture.group, channel: texture.pbr_channel, name: texture.name })),
+    groups: (aspects.texture_groups ?? []).map(group => ({ group, config: configSnapshot(group) })),
   };
 }
 
@@ -177,7 +197,9 @@ function restore(target: ISnapshot, reference: ISnapshot): void {
     Object.assign(group.material_config, structuredClone(config));
   });
   target.textures.forEach(({ texture, group, channel, name }) => {
-    if (!project.textures.includes(texture)) project.textures.push(texture);
+    // Native `loadSave` recreates a texture only when the reference does not name it,
+    // so a cancelled removal (same aspects on both sides) stays removed, as in Blockbench.
+    if (!project.textures.includes(texture) && !referenceTextures.includes(texture)) project.textures.push(texture);
     Object.assign(texture, { group, pbr_channel: channel, name });
   });
 }
@@ -198,19 +220,35 @@ beforeEach(() => {
   sequence = 0;
   failPreview = false;
   failAdd = false;
+  faceRefreshes = 0;
+  failRefresh = false;
+  selectedTexture = undefined;
   project = { textures: [], texture_groups: [] };
   files = new Map();
   undo.reset();
 });
 useGlobals(() => ({
   Condition: evaluateHostCondition,
+  BARS: {
+    updateConditions() {
+      if (failRefresh) throw new Error("Toolbar condition failed");
+    },
+  },
   Blockbench: { isWeb: false },
-  Canvas: { updateAll() {} },
+  Canvas: {
+    updateAll() {},
+    updateAllFaces() {
+      faceRefreshes++;
+    },
+    updateLayeredTextures() {},
+  },
   Format: { id: "free", pbr: true },
   Project: project,
   Texture: TestTexture,
+  TextureAnimator: { updateButton() {} },
   TextureGroup: TestGroup,
   Undo: undo,
+  UVEditor: { vue: { updateTexture() {} } },
   requireNativeModule,
 }));
 
@@ -493,5 +531,66 @@ describe("PBR material transactions", () => {
     texture("Albedo", group.uuid);
     await expect(executeTool("save_material_config", { material: group.uuid })).rejects.toThrow("valid file path");
     expect(files.size).toBe(0);
+  });
+});
+
+describe("delete_texture", () => {
+  test("removes the texture in one history entry and returns what was removed", async () => {
+    const keep = texture("keep");
+    const gone = texture("gone");
+    const result = await executeTool("delete_texture", { texture: "gone" });
+    expect(result).toMatchObject({ structuredContent: { removed: { name: "gone", uuid: gone.uuid, id: gone.uuid }, remaining_textures: 1 } });
+    expect(project.textures).toEqual([keep]);
+    expect(faceRefreshes).toBe(1);
+    expect(undo.history).toHaveLength(1);
+    expect(undo.lastEdit?.message).toBe("Agent removed texture");
+    expect(undo.pending).toBeUndefined();
+  });
+
+  test("undo restores the texture with its group and channel, and redo removes it again", async () => {
+    const group = material("Material");
+    const normal = texture("normal", group.uuid, "normal");
+    await executeTool("delete_texture", { texture: normal.uuid });
+    expect(group.getTextures()).toEqual([]);
+    undo.undo();
+    expect(project.textures).toEqual([normal]);
+    expect(normal.group).toBe(group.uuid);
+    expect(normal.pbr_channel).toBe("normal");
+    undo.redo();
+    expect(project.textures).toEqual([]);
+  });
+
+  test("clears the active texture when it is the one removed", async () => {
+    const active = texture("active").select();
+    await executeTool("delete_texture", { texture: active.name });
+    expect(TestTexture.selected).toBeUndefined();
+  });
+
+  test("keeps the removal undoable when the scene refresh fails after the edit", async () => {
+    const gone = texture("gone");
+    failRefresh = true;
+    await expect(executeTool("delete_texture", { texture: gone.uuid })).rejects.toThrow("Toolbar condition failed");
+    expect(project.textures).toEqual([]);
+    expect(undo.history).toHaveLength(1);
+    expect(undo.pending).toBeUndefined();
+    undo.undo();
+    expect(project.textures).toEqual([gone]);
+  });
+
+  test("rejects unknown textures without opening an undo entry", async () => {
+    texture("only");
+    const before = state();
+    await expect(executeTool("delete_texture", { texture: "missing" })).rejects.toThrow(/Texture "missing" not found/);
+    expect(state()).toBe(before);
+    expect(undo.starts).toBe(0);
+    expect(faceRefreshes).toBe(0);
+  });
+
+  test("is unavailable without textures or a project", async () => {
+    await expect(executeTool("delete_texture", { texture: "none" })).rejects.toThrow('Tool "delete_texture" is unavailable');
+    texture("present");
+    Object.assign(globalThis, { Project: null });
+    await expect(executeTool("delete_texture", { texture: "present" })).rejects.toThrow('Tool "delete_texture" is unavailable');
+    expect(undo.starts).toBe(0);
   });
 });

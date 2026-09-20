@@ -18,30 +18,32 @@
 
       <div class="nav-group">
         <p class="nav-heading">Overview</p>
-        <a href="#tools" class="nav-link">Tools <span class="count">(115)</span></a>
+        <a href="#tools" class="nav-link">Tools <span class="count">(140)</span></a>
         <a href="#prompts" class="nav-link">Prompts <span class="count">(6)</span></a>
         <a href="#resources" class="nav-link">Resources <span class="count">(13)</span></a>
       </div>
 
       <div class="nav-group">
         <p class="nav-heading">Categories</p>
-        <a href="#cat-cubes" class="nav-link">Cubes <span class="count">(2)</span></a>
-        <a href="#cat-camera-screenshots" class="nav-link">Camera &amp; Screenshots <span class="count">(3)</span></a>
+        <a href="#cat-cubes" class="nav-link">Cubes <span class="count">(5)</span></a>
+        <a href="#cat-camera-screenshots" class="nav-link">Camera &amp; Screenshots <span class="count">(7)</span></a>
         <a href="#cat-capabilities" class="nav-link">Capabilities <span class="count">(1)</span></a>
-        <a href="#cat-animation" class="nav-link">Animation <span class="count">(7)</span></a>
-        <a href="#cat-armature" class="nav-link">Armature <span class="count">(16)</span></a>
+        <a href="#cat-animation" class="nav-link">Animation <span class="count">(9)</span></a>
+        <a href="#cat-armature" class="nav-link">Armature <span class="count">(17)</span></a>
         <a href="#cat-display-settings" class="nav-link">Display Settings <span class="count">(3)</span></a>
         <a href="#cat-elements" class="nav-link">Elements <span class="count">(9)</span></a>
         <a href="#cat-export" class="nav-link">Export <span class="count">(2)</span></a>
         <a href="#cat-history" class="nav-link">History <span class="count">(4)</span></a>
         <a href="#cat-import-export" class="nav-link">Import/Export <span class="count">(1)</span></a>
         <a href="#cat-material-instances" class="nav-link">Material Instances <span class="count">(5)</span></a>
-        <a href="#cat-mesh-editing" class="nav-link">Mesh Editing <span class="count">(12)</span></a>
+        <a href="#cat-mesh-editing" class="nav-link">Mesh Editing <span class="count">(15)</span></a>
         <a href="#cat-paint-tools" class="nav-link">Paint Tools <span class="count">(12)</span></a>
+        <a href="#cat-performance" class="nav-link">Performance <span class="count">(1)</span></a>
         <a href="#cat-project" class="nav-link">Project <span class="count">(2)</span></a>
-        <a href="#cat-textures" class="nav-link">Textures <span class="count">(13)</span></a>
+        <a href="#cat-textures" class="nav-link">Textures <span class="count">(14)</span></a>
         <a href="#cat-ui-interaction" class="nav-link">UI Interaction <span class="count">(6)</span></a>
         <a href="#cat-uv-mapping" class="nav-link">UV Mapping <span class="count">(5)</span></a>
+        <a href="#cat-geckolib-integration" class="nav-link">GeckoLib Integration <span class="count">(10)</span></a>
         <a href="#cat-hytale-integration" class="nav-link">Hytale Integration <span class="count">(12)</span></a>
       </div>
     </nav>
@@ -51,7 +53,7 @@
         <h1>Blockbench MCP Plugin</h1>
         <p class="subtitle">API Reference — v1.8.0</p>
         <nav class="stats">
-          <a href="#tools"><strong>115</strong> tools (44 stable, 71 experimental)</a>
+          <a href="#tools"><strong>140</strong> tools (44 stable, 96 experimental)</a>
           <a href="#prompts"><strong>6</strong> prompts</a>
           <a href="#resources"><strong>13</strong> resources</a>
         </nav>
@@ -94,7 +96,7 @@
       <td class="col-name">elements</td>
       <td class="col-type">object[]</td>
       <td><span class="param-required">required</span></td>
-      <td class="col-desc">Array of cubes to place. <span class="param-meta">[minItems: 1]</span></td>
+      <td class="col-desc">Array of cubes to place, with optional Java shading fields. <span class="param-meta">[minItems: 1]</span></td>
     </tr><tr>
       <td class="col-name">texture</td>
       <td class="col-type">string</td>
@@ -183,7 +185,17 @@
       <td class="col-name">shade</td>
       <td class="col-type">boolean</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Whether to apply shading to the cube.</td>
+      <td class="col-desc">Whether to apply shading to the cube. Java 26.3+ projects ignore this flag; shade=false is mapped to shade_direction_override 'up' there, matching Blockbench's own import.</td>
+    </tr><tr>
+      <td class="col-name">shade_direction_override</td>
+      <td class="col-type">&quot;&quot; | &quot;north&quot; | &quot;south&quot; | &quot;west&quot; | &quot;east&quot; | &quot;up&quot; | &quot;down&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Java Edition 26.3+ shade direction override: the face direction whose lighting shade is applied to every face. '' removes the override. Replaces the boolean shade flag in formats with java_cube_shade_direction_override (new Java Block projects default to 26.3).</td>
+    </tr><tr>
+      <td class="col-name">light_emission</td>
+      <td class="col-type">integer</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Block light emitted by the cube (0-15). Exported by Java Block formats. <span class="param-meta">[min: 0, max: 15]</span></td>
     </tr><tr>
       <td class="col-name">inflate</td>
       <td class="col-type">number</td>
@@ -203,6 +215,143 @@
     </table>
       </div>
     </div>
+<div id="tool-knife_cut_cube" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">knife_cut_cube</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Knife Cut Cube</p>
+      <p class="card-desc">Headless Blockbench Knife tool for cubes: splits each target cube with planes perpendicular to one axis at the given positions, keeping each piece's share of the face UVs. The original cube keeps the lowest piece; new pieces get unique names. One undo entry covers every cut and the selection is left unchanged.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">cubes</td>
+      <td class="col-type">string[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Cube UUIDs or unique names to cut. Defaults to the selected cubes. <span class="param-meta">[minItems: 1]</span></td>
+    </tr><tr>
+      <td class="col-name">axis</td>
+      <td class="col-type">&quot;x&quot; | &quot;y&quot; | &quot;z&quot;</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Axis the cut plane is perpendicular to.</td>
+    </tr><tr>
+      <td class="col-name">positions</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Cut-plane coordinates along the axis, in the cube's from/to space (model space for unrotated cubes). Positions closer than the cube's inflate to its from/to edges, or outside it, are skipped for that cube and reported sorted and deduplicated. <span class="param-meta">[minItems: 1]</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-slice_cubes_to_block_grid" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">slice_cubes_to_block_grid</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Slice Cubes To Block Grid</p>
+      <p class="card-desc">Cuts cubes wherever they cross a Bedrock block boundary (16-unit grid, x/z centered) and, by default, regroups the pieces into one group per block cell pivoted at that block's origin. Use it to divide an oversized custom block model into per-block sections that each fit Bedrock's 30×30×30 limit. Rotated cubes are left uncut on the affected axes and reported.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">cubes</td>
+      <td class="col-type">string[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Cube UUIDs or unique names to slice. Defaults to every cube in the project. <span class="param-meta">[minItems: 1]</span></td>
+    </tr><tr>
+      <td class="col-name">axes</td>
+      <td class="col-type">&quot;x&quot; | &quot;y&quot; | &quot;z&quot;[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Axes to slice along. Cubes rotated (or inside groups rotated) about the other two axes are skipped on that axis, as Blockbench's own slicer does. <span class="param-meta">(default: <code>[&quot;x&quot;,&quot;y&quot;,&quot;z&quot;]</code>) [minItems: 1]</span></td>
+    </tr><tr>
+      <td class="col-name">cell_size</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Block size in model units; 16 for Bedrock. Horizontal boundaries sit at ±half a cell, vertical ones at multiples. <span class="param-meta">(default: <code>16</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">regroup</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Move every resulting cube into a group named after its block cell (bottom, top, right_top_front, top2, …) pivoted at that block's origin, so each group is one exportable block section. Pieces leave their previous bone; the report lists each source cube's former group. <span class="param-meta">(default: <code>true</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">parent</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Parent group UUID or name for the cell groups; must not be rotated. Defaults to the project root.</td>
+    </tr><tr>
+      <td class="col-name">group_prefix</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Prefix for cell group names, e.g. `goal_` yields `goal_top`. Existing groups are reused only when their name and block-origin pivot match; otherwise a numbered name is chosen. <span class="param-meta">(default: <code>&quot;&quot;</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-inspect_block_bounds" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">inspect_block_bounds</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">Inspect Block Bounds</p>
+      <p class="card-desc">Reports cube, group, and whole-model extents against Blockbench's Bedrock block limit (a 30×30×30 box whose center may sit up to 7 units from the block center), the block cell each cube occupies, and the grid cut positions slice_cubes_to_block_grid would use. Read-only. Extents ignore rotation; rotated cubes are flagged.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">cubes</td>
+      <td class="col-type">string[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Cube UUIDs or unique names to inspect. Defaults to every cube in the project. <span class="param-meta">[minItems: 1]</span></td>
+    </tr><tr>
+      <td class="col-name">cell_size</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Block size in model units; 16 for Bedrock. <span class="param-meta">(default: <code>16</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">max_size</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Maximum geometry size per axis for one block (Bedrock: 30). <span class="param-meta">(default: <code>30</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">max_center_offset</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">How far the limit box may shift from the block center per axis (Bedrock: 7, giving x/z within ±22 and y within -14…30). <span class="param-meta">(default: <code>7</code>) [min: 0]</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
         </section>
 <section id="cat-camera-screenshots" class="category-section">
           <h3 class="category-title">Camera &amp; Screenshots</h3>
@@ -215,7 +364,7 @@
         </div>
       </div>
       <p class="card-title">Capture Screenshot</p>
-      <p class="card-desc">Returns the image data of the current view.</p>
+      <p class="card-desc">Returns the rendered image of a view. Defaults to the user's active viewport (&quot;active&quot;); pass the ID of an offscreen view from create_offscreen_view to render without disturbing the user, or a viewport ID from list_views.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -231,6 +380,11 @@
       <td class="col-type">string</td>
       <td><span class="param-optional">optional</span></td>
       <td class="col-desc">Project name or UUID.</td>
+    </tr><tr>
+      <td class="col-name">view</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">View to target: &quot;active&quot; for the viewport the user last interacted with, the ID of an offscreen view from create_offscreen_view, or a viewport ID from list_views. <span class="param-meta">(default: <code>&quot;active&quot;</code>) [minLength: 1]</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -258,7 +412,7 @@
         </div>
       </div>
       <p class="card-title">Set Camera Angle</p>
-      <p class="card-desc">Sets the camera angle to the specified value.</p>
+      <p class="card-desc">Moves a view's camera and returns the resulting frame plus the applied camera state. Defaults to the user's active viewport, which changes what they see and clears any side-view lock they had; target an offscreen view from create_offscreen_view to inspect the model from any angle without moving their camera.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -270,6 +424,11 @@
         </tr>
       </thead>
       <tbody><tr>
+      <td class="col-name">view</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">View to target: &quot;active&quot; for the viewport the user last interacted with, the ID of an offscreen view from create_offscreen_view, or a viewport ID from list_views. <span class="param-meta">(default: <code>&quot;active&quot;</code>) [minLength: 1]</span></td>
+    </tr><tr>
       <td class="col-name">position</td>
       <td class="col-type">number[]</td>
       <td><span class="param-required">required</span></td>
@@ -289,6 +448,152 @@
       <td class="col-type">&quot;unset&quot; | &quot;orthographic&quot; | &quot;perspective&quot;</td>
       <td><span class="param-required">required</span></td>
       <td class="col-desc">Camera projection type.</td>
+    </tr><tr>
+      <td class="col-name">zoom</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Orthographic zoom factor (Blockbench default 0.5). Ignored for perspective views and while a side view is locked.</td>
+    </tr><tr>
+      <td class="col-name">fov</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Perspective field of view in degrees. Uses the Blockbench setting when omitted. <span class="param-meta">[min: 1, max: 179]</span></td>
+    </tr><tr>
+      <td class="col-name">locked_angle</td>
+      <td class="col-type">&quot;top&quot; | &quot;bottom&quot; | &quot;north&quot; | &quot;south&quot; | &quot;east&quot; | &quot;west&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Lock an orthographic side view (top, bottom, north, south, east, west). Omit to leave the view free.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-create_offscreen_view" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">create_offscreen_view</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          
+        </div>
+      </div>
+      <p class="card-title">Create Offscreen View</p>
+      <p class="card-desc">Creates a private offscreen viewport that renders the current project without moving the user's camera. Use it with set_camera_angle and capture_screenshot (view: &lt;id&gt;) for multi-angle inspection. The camera starts where the user's is unless copy_view is &quot;none&quot;. Up to 4 views may exist at once; delete them with delete_offscreen_view when done.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">ID for the new view. Generated as view_N when omitted.</td>
+    </tr><tr>
+      <td class="col-name">width</td>
+      <td class="col-type">integer</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Width in pixels (16–2048). <span class="param-meta">(default: <code>1024</code>) [min: 16, max: 2048]</span></td>
+    </tr><tr>
+      <td class="col-name">height</td>
+      <td class="col-type">integer</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Height in pixels (16–2048). <span class="param-meta">(default: <code>768</code>) [min: 16, max: 2048]</span></td>
+    </tr><tr>
+      <td class="col-name">antialias</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Multisample antialiasing. Disable for crisp pixel-art inspection. <span class="param-meta">(default: <code>true</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">copy_view</td>
+      <td class="col-type">string | string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">View whose camera seeds the new one. Defaults to &quot;active&quot; (the user's viewport); pass &quot;none&quot; for Blockbench's default angle. <span class="param-meta">(default: <code>&quot;active&quot;</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-list_views" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">list_views</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">List Views</p>
+      <p class="card-desc">Lists render targets: the user's connected viewports (the active one flagged) and the plugin's offscreen views, each with size and camera position, target, projection, FOV, zoom, and side-view lock.</p>
+      <div class="overflow-x">
+        <p class="empty-params">No parameters</p>
+      </div>
+    </div>
+<div id="tool-resize_offscreen_view" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">resize_offscreen_view</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          
+        </div>
+      </div>
+      <p class="card-title">Resize Offscreen View</p>
+      <p class="card-desc">Changes the pixel size of an offscreen view. The user's viewports follow their layout and cannot be resized here.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">view</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">ID of the offscreen view to resize.</td>
+    </tr><tr>
+      <td class="col-name">width</td>
+      <td class="col-type">integer</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Width in pixels (16–2048). <span class="param-meta">[min: 16, max: 2048]</span></td>
+    </tr><tr>
+      <td class="col-name">height</td>
+      <td class="col-type">integer</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Height in pixels (16–2048). <span class="param-meta">[min: 16, max: 2048]</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-delete_offscreen_view" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">delete_offscreen_view</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Delete Offscreen View</p>
+      <p class="card-desc">Disposes an offscreen view and releases its WebGL context. The user's viewports are not affected.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">view</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">ID of the offscreen view to dispose.</td>
     </tr></tbody>
     </table>
       </div>
@@ -305,7 +610,7 @@
         </div>
       </div>
       <p class="card-title">Get Capabilities</p>
-      <p class="card-desc">Discover Blockbench/plugin versions, desktop or web environment, active project summary, and registered model formats. Returns detailed boolean format features (null means unknown), compact supported-feature lists for all formats, and optional tool registration states. Works with no open project. Format features do not guarantee that every enabled MCP tool can run in the current mode or selection.</p>
+      <p class="card-desc">Discover Blockbench/plugin versions, desktop or web environment, active project summary, and registered model formats. Returns detailed boolean format features (null means unknown; includes molang and java_cube_shade_direction_override) plus the format's remember_files and animation_grouping settings, compact supported-feature lists for all formats, and optional tool registration states. Works with no open project. Format features do not guarantee that every enabled MCP tool can run in the current mode or selection.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -440,7 +745,7 @@
         </div>
       </div>
       <p class="card-title">Animation Graph Editor</p>
-      <p class="card-desc">Controls animation curves in the graph editor for fine-tuning animations.</p>
+      <p class="card-desc">Edits a bone channel's interpolation or numeric Bezier easing in one reversible edit. Uses native per-axis handle arrays and chronological segment durations. Custom points are normalized time/value fractions. Partial-axis edits require existing Bezier keys; key-wide mode changes require all axes. Rejects curve edits ignored by quaternion rotation. Inspect neighboring segments after range edits.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -470,22 +775,22 @@
       <td class="col-name">axis</td>
       <td class="col-type">&quot;x&quot; | &quot;y&quot; | &quot;z&quot; | string</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Axis to modify curves for. <span class="param-meta">(default: <code>&quot;all&quot;</code>)</span></td>
+      <td class="col-desc">Axes to edit. Linear, stepped and smooth require all because interpolation is key-wide. Partial-axis easing/custom edits require selected keys already using Bezier interpolation, preserving other axes' handles. <span class="param-meta">(default: <code>&quot;all&quot;</code>)</span></td>
     </tr><tr>
       <td class="col-name">action</td>
       <td class="col-type">&quot;smooth&quot; | &quot;linear&quot; | &quot;ease_in&quot; | &quot;ease_out&quot; | &quot;ease_in_out&quot; | &quot;stepped&quot; | &quot;custom&quot;</td>
       <td><span class="param-required">required</span></td>
-      <td class="col-desc">Type of curve modification to apply.</td>
+      <td class="col-desc">Curve modification. Easing/custom require at least two distinct chronological numeric single-data-point keys. Smooth and Bezier rotation edits are unavailable when native quaternion interpolation would ignore them.</td>
     </tr><tr>
       <td class="col-name">keyframe_range</td>
       <td class="col-type">object</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Time range to apply the curve modification. If not provided, applies to all keyframes.</td>
+      <td class="col-desc">Finite ordered time range selecting existing keys; omitted means the full channel. Key-wide interpolation can affect neighboring segments at range boundaries, so edit the full channel when boundary continuity matters.</td>
     </tr><tr>
       <td class="col-name">custom_curve</td>
       <td class="col-type">object</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Custom bezier curve control points (only for 'custom' action).</td>
+      <td class="col-desc">Normalized cubic Bezier control points, required for custom action. Conversion uses each segment's duration and edited-axis endpoint values; unrelated axis handles are preserved.</td>
     </tr></tbody>
     </table>
       </div>
@@ -499,7 +804,7 @@
         </div>
       </div>
       <p class="card-title">Bone Rigging</p>
-      <p class="card-desc">Creates and manipulates the bone structure (rig) of a model for animation.</p>
+      <p class="card-desc">Creates and manipulates the bone structure (rig) of a model for animation. The set_ik action is deprecated; use set_ik_controller for Blockbench's null-object IK (source, target, pole).</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -533,7 +838,7 @@
         </div>
       </div>
       <p class="card-title">Animation Timeline</p>
-      <p class="card-desc">Controls the animation timeline, including playback, time scrubbing, and timeline settings.</p>
+      <p class="card-desc">Controls the animation timeline: playback, time scrubbing, length, FPS, loop mode, and keyframe selection by time range or relative to the playhead (select_before_playhead/select_after_playhead return the selected keyframe UUIDs).</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -551,14 +856,14 @@
       <td class="col-desc">Animation UUID or name. If not provided, uses current animation.</td>
     </tr><tr>
       <td class="col-name">action</td>
-      <td class="col-type">&quot;play&quot; | &quot;pause&quot; | &quot;stop&quot; | &quot;set_time&quot; | &quot;set_length&quot; | &quot;set_fps&quot; | &quot;loop&quot; | &quot;select_range&quot;</td>
+      <td class="col-type">&quot;play&quot; | &quot;pause&quot; | &quot;stop&quot; | &quot;set_time&quot; | &quot;set_length&quot; | &quot;set_fps&quot; | &quot;loop&quot; | &quot;select_range&quot; | &quot;select_before_playhead&quot; | &quot;select_after_playhead&quot;</td>
       <td><span class="param-required">required</span></td>
-      <td class="col-desc">Timeline action to perform.</td>
+      <td class="col-desc">Timeline action to perform. select_before_playhead/select_after_playhead replace the keyframe selection with bone keyframes at or before/after the playhead (1e-5 s tolerance, like Blockbench 5.2's native actions) and return their UUIDs.</td>
     </tr><tr>
       <td class="col-name">time</td>
       <td class="col-type">number</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Time in seconds (for set_time action). <span class="param-meta">[min: 0]</span></td>
+      <td class="col-desc">Time in seconds. Required for set_time; for select_before_playhead/select_after_playhead it is the reference time and defaults to the current playhead. <span class="param-meta">[min: 0]</span></td>
     </tr><tr>
       <td class="col-name">length</td>
       <td class="col-type">number</td>
@@ -579,6 +884,11 @@
       <td class="col-type">object</td>
       <td><span class="param-optional">optional</span></td>
       <td class="col-desc">Time range for selection.</td>
+    </tr><tr>
+      <td class="col-name">scope</td>
+      <td class="col-type">&quot;animation&quot; | &quot;timeline&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Keyframes considered by select_before_playhead/select_after_playhead. animation: every bone animator of the target animation, including ones hidden from the timeline. timeline: only animators shown in the timeline with visible channels, matching the native action; requires the target animation to be selected. <span class="param-meta">(default: <code>&quot;animation&quot;</code>)</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -667,6 +977,84 @@
       <td class="col-type">object</td>
       <td><span class="param-optional">optional</span></td>
       <td class="col-desc">Target data for paste operation.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-variable_placeholders" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">variable_placeholders</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Variable Placeholders</p>
+      <p class="card-desc">Reads or edits the project's animation Variable Placeholders text (one `variable = expression` per line), used to preview Molang animations. add writes a value, slider('name', step, min, max), toggle('name') or impulse('name', duration) line like the native Create Variable Placeholder dialog; set replaces all text; remove deletes a variable's lines. Changes sync through the native panel, refresh the animation preview and return the parsed lines and live controls. Placeholder edits are not recorded in Undo. Requires a format with Molang enabled.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">action</td>
+      <td class="col-type">&quot;get&quot; | &quot;set&quot; | &quot;add&quot; | &quot;remove&quot;</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">get: read text, parsed lines and live controls. set: replace the whole text. add: write one structured line. remove: delete every line assigning variable.</td>
+    </tr><tr>
+      <td class="col-name">text</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Complete placeholder text for set; one `variable = expression` per line. Empty clears all placeholders. <span class="param-meta">[maxLength: 100000]</span></td>
+    </tr><tr>
+      <td class="col-name">entry</td>
+      <td class="col-type">object | object | object | object</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Structured line for add.</td>
+    </tr><tr>
+      <td class="col-name">replace_existing</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">For add: replace an existing line for the same variable (aliases such as v. match) instead of appending a duplicate. <span class="param-meta">(default: <code>true</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">variable</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Variable to delete for remove. <span class="param-meta">[minLength: 1]</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-list_molang_variables" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">list_molang_variables</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">List Molang Variables</p>
+      <p class="card-desc">Lists Blockbench's built-in Molang variables and query functions available in animation previews (like the native View Built-in Variables dialog), with current values for constants and live queries, plus the project's placeholder assignments. Read-only.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">filter</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Case-insensitive substring filter on variable names, e.g. 'camera'.</td>
     </tr></tbody>
     </table>
       </div>
@@ -902,7 +1290,7 @@
       <td class="col-name">include_weights</td>
       <td class="col-type">boolean</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Whether to include all vertex weights in response. <span class="param-meta">(default: <code>false</code>)</span></td>
+      <td class="col-desc">Whether to include the bone's raw vertex_weights map in the response. Keys are `&lt;first 6 chars of mesh UUID&gt;:&lt;vertex key&gt;` (legacy projects may still hold bare `&lt;vertex key&gt;` entries until reweighted); use get_vertex_weights for per-mesh vertex-key maps. <span class="param-meta">(default: <code>false</code>)</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -1293,7 +1681,7 @@
         </div>
       </div>
       <p class="card-title">Clear Vertex Weights</p>
-      <p class="card-desc">Clears all vertex weights from a bone for a specific mesh.</p>
+      <p class="card-desc">Clears all vertex weights from a bone for a specific mesh, including legacy bare vertex-key entries that still apply to that mesh.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -1314,6 +1702,70 @@
       <td class="col-type">string</td>
       <td><span class="param-optional">optional</span></td>
       <td class="col-desc">ID or name of the mesh. If not provided, uses selected mesh.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-set_ik_controller" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">set_ik_controller</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Set IK Controller</p>
+      <p class="card-desc">Creates or updates an inverse-kinematics controller. Blockbench drives IK from a null object: ik_target is the end effector (group/bone, armature bone, or locator) that reaches for the null object, ik_source is the chain root (defaults to the null object's parent), ik_pole (Blockbench 5.2+) sets the bend direction, and lock_ik_target_rotation keeps the effector's rotation. Works with bone rigs and armatures (5.2 allows null objects under armatures and armature bones). Validates every reference and that the target lies below the chain root; returns the solved chain. Replaces the deprecated bone_rigging set_ik flags, which Blockbench never read.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">null_object</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">UUID or name of an existing null object to update. Omit to create a new IK controller null object.</td>
+    </tr><tr>
+      <td class="col-name">name</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Name for the null object. Defaults to '&lt;ik_target name&gt;_ik' when creating.</td>
+    </tr><tr>
+      <td class="col-name">position</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Null object position [x, y, z] as Blockbench stores it (model space for root and group parents). Defaults to the end effector's world pivot when creating. <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
+    </tr><tr>
+      <td class="col-name">parent</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Parent group, armature, or armature bone (UUID or name), or 'root'. Defaults to root when creating. When ik_source is empty the parent is the implicit chain root, so keep IK controllers outside the chain they drive.</td>
+    </tr><tr>
+      <td class="col-name">ik_target</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">End effector that reaches for the null object: a group/bone, armature bone, or locator (UUID or name). Required when creating; must be a descendant of the chain root. Empty string clears.</td>
+    </tr><tr>
+      <td class="col-name">ik_source</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Chain root: a group/bone or armature bone (UUID or name). The chain spans from here down to ik_target. Empty string clears, making the null object's parent the chain root.</td>
+    </tr><tr>
+      <td class="col-name">ik_pole</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Pole target controlling the bend direction (Blockbench 5.2+): a group, locator, or other null object (UUID or name). Empty string clears.</td>
+    </tr><tr>
+      <td class="col-name">lock_ik_target_rotation</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Keep the end effector's world rotation while the chain solves.</td>
     </tr></tbody>
     </table>
       </div>
@@ -1359,7 +1811,7 @@
         </div>
       </div>
       <p class="card-title">Set Display Transform</p>
-      <p class="card-desc">Writes a Java Edition display slot's transform (translation, rotation, scale, mirror, pivots). Creates the slot if it does not exist yet and wraps the change in an undo step. This edits data that ships in the exported model JSON — it changes the deliverable, not just the preview. Requires a format that supports display mode (e.g. Java Block/Item).</p>
+      <p class="card-desc">Writes a Java Edition display slot's transform (translation, rotation, scale, mirror, pivots). Creates the slot if it does not exist yet (seeded from Blockbench's Bedrock item display defaults on bedrock_block projects, identity otherwise) and wraps the change in an undo step. This edits data that ships in the exported model JSON — it changes the deliverable, not just the preview. Requires a format that supports display mode (e.g. Java Block/Item).</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -1409,7 +1861,7 @@
       <td class="col-name">reset</td>
       <td class="col-type">boolean</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Reset the slot to its default (identity) transform before applying any of the other values. <span class="param-meta">(default: <code>false</code>)</span></td>
+      <td class="col-desc">Reset the slot to its default transform before applying any of the other values: identity, or Blockbench's Bedrock defaults on bedrock_block projects. <span class="param-meta">(default: <code>false</code>)</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -1539,7 +1991,7 @@
       <td class="col-name">shade</td>
       <td class="col-type">boolean</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc"> <span class="param-meta">(default: <code>false</code>)</span></td>
+      <td class="col-desc">Outliner shading toggle, matching Blockbench's default (true). Ignored by Java 26.3+ projects, which use per-cube shade_direction_override instead. <span class="param-meta">(default: <code>true</code>)</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -1592,7 +2044,7 @@
         </div>
       </div>
       <p class="card-title">Duplicate Element</p>
-      <p class="card-desc">Duplicates a cube, mesh or group by ID or name.  You may offset the duplicate or assign a new name.</p>
+      <p class="card-desc">Duplicates any outliner element or group (with its children) by ID or name using Blockbench's native duplicate, so every property, face UV, texture and mesh vertex key is preserved. Mesh copies inherit their armature bone vertex weights. Optionally offsets the copy and assigns a new name. Selection is left unchanged.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -1612,12 +2064,12 @@
       <td class="col-name">offset</td>
       <td class="col-type">number[]</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">3D vector [x, y, z]. <span class="param-meta">(default: <code>[0,0,0]</code>) [minItems: 3, maxItems: 3]</span></td>
+      <td class="col-desc">Model-space offset [x, y, z] applied to the copy and every descendant. <span class="param-meta">(default: <code>[0,0,0]</code>) [minItems: 3, maxItems: 3]</span></td>
     </tr><tr>
       <td class="col-name">newName</td>
       <td class="col-type">string</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc"></td>
+      <td class="col-desc">Name for the top-level copy. Defaults to Blockbench's duplicate naming (trailing number incremented, unique where required).</td>
     </tr></tbody>
     </table>
       </div>
@@ -1848,7 +2300,7 @@
         </div>
       </div>
       <p class="card-title">Export Model</p>
-      <p class="card-desc">Compiles the current project through a codec whose native export action is available. Returns JSON metadata and a live .bbmodel resource link; result_format='embedded' returns complete exports as text/blob resources with URI and MIME type. Optionally writes to a local path (requires Blockbench filesystem permission). Use `list_export_formats` to discover codecs.</p>
+      <p class="card-desc">Compiles the current project through a codec whose native export action is available. Returns JSON metadata and a live .bbmodel resource link; result_format='embedded' returns complete exports as text/blob resources with URI and MIME type. Optionally writes to a local path (requires Blockbench filesystem permission). Partial codec options merge over the configured defaults; for glTF armatures, options.merge_armature=true merges each armature's meshes into one SkinnedMesh. Use `list_export_formats` to discover codecs.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -1868,7 +2320,7 @@
       <td class="col-name">options</td>
       <td class="col-type">Record&lt;string, unknown&gt;</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Codec-specific export options. Defaults to the codec's configured export options.</td>
+      <td class="col-desc">Codec-specific export options, merged over the codec's configured export options (keys match the native export dialog). glTF ('gltf'): encoding ('ascii' | 'binary'), scale, embed_textures, armature (export groups as skinned bones), animations, and merge_armature (Blockbench 5.2+; default false exports one SkinnedMesh per armature child mesh, true merges each armature's meshes into a single SkinnedMesh).</td>
     </tr><tr>
       <td class="col-name">path</td>
       <td class="col-type">string</td>
@@ -2268,7 +2720,7 @@
       <td class="col-name">distance</td>
       <td class="col-type">number</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Signed distance along averaged selected face normals, in local model units. <span class="param-meta">(default: <code>1</code>)</span></td>
+      <td class="col-desc">Signed distance along averaged selected face normals, in local model units. Defaults to Blockbench's current grid snap interval (getSpatialInterval), or 1 when unavailable.</td>
     </tr><tr>
       <td class="col-name">mode</td>
       <td class="col-type">&quot;faces&quot; | &quot;edges&quot; | &quot;vertices&quot;</td>
@@ -2599,7 +3051,7 @@
         </div>
       </div>
       <p class="card-title">Knife Tool</p>
-      <p class="card-desc">Currently unsupported: Blockbench's interactive Knife context requires pointer topology that this point-list API cannot safely provide. Use subdivide_mesh or create geometry with place_mesh, or use Knife manually.</p>
+      <p class="card-desc">Currently unsupported for meshes: Blockbench's interactive Knife context requires pointer topology that this point-list API cannot safely provide. Use subdivide_mesh or place_mesh for meshes; use knife_cut_cube or slice_cubes_to_block_grid to cut cubes headlessly.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -2620,6 +3072,138 @@
       <td class="col-type">object[]</td>
       <td><span class="param-required">required</span></td>
       <td class="col-desc">Points defining the cut path. <span class="param-meta">[minItems: 2]</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-create_polyhedron" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">create_polyhedron</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Create Polyhedron</p>
+      <p class="card-desc">Creates icosphere, octahedron, or dodecahedron meshes (Blockbench 5.2 primitives) with a detail level of 0-6, as triangles with coincident vertices merged and planar per-face UVs. Returns vertex_keys/face_keys per mesh.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">elements</td>
+      <td class="col-type">object[]</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Polyhedra to create. <span class="param-meta">[minItems: 1]</span></td>
+    </tr><tr>
+      <td class="col-name">texture</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Texture ID or name to apply to every face.</td>
+    </tr><tr>
+      <td class="col-name">group</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Group/bone to which the meshes belong.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-loop_cut_mesh" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">loop_cut_mesh</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Loop Cut Mesh</p>
+      <p class="card-desc">Runs Blockbench's native Loop Cut on a mesh: splits the quad ring crossing the start edge with one or more parallel cuts, with offset, direction and 5.2 spacing modes (proportional, even_start, even_end). One undo entry. The new loop vertices become the selection and are returned.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">mesh_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">ID or name of the mesh. If not provided, uses selected mesh.</td>
+    </tr><tr>
+      <td class="col-name">edge</td>
+      <td class="col-type">string[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Two vertex keys of the edge to start the loop from; the cut runs across the face ring perpendicular to it. Defaults to the mesh's current vertex/face selection (at least two selected vertices). <span class="param-meta">[minItems: 2, maxItems: 2]</span></td>
+    </tr><tr>
+      <td class="col-name">cuts</td>
+      <td class="col-type">integer</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Number of parallel loop cuts. <span class="param-meta">(default: <code>1</code>) [min: 1, max: 16]</span></td>
+    </tr><tr>
+      <td class="col-name">offset</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Distance of the (first) cut from the start of the edge, in the given unit. Defaults to the edge midpoint (or even spacing for multiple cuts). <span class="param-meta">[min: 0]</span></td>
+    </tr><tr>
+      <td class="col-name">unit</td>
+      <td class="col-type">&quot;size&quot; | &quot;percent&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Unit of offset: model units ('size') or percent of the start edge length. <span class="param-meta">(default: <code>&quot;size&quot;</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">direction</td>
+      <td class="col-type">integer</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Rotates which edge of the start face the loop starts from, as the native Direction slider. <span class="param-meta">(default: <code>0</code>) [min: 0]</span></td>
+    </tr><tr>
+      <td class="col-name">spacing</td>
+      <td class="col-type">&quot;proportional&quot; | &quot;even_start&quot; | &quot;even_end&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Blockbench 5.2 spacing: proportional keeps the same ratio on every edge of the loop; even_start/even_end keep the same absolute distance from the loop's start/end side. <span class="param-meta">(default: <code>&quot;proportional&quot;</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-flip_in_place" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">flip_in_place</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Flip In Place</p>
+      <p class="card-desc">Mirrors elements in place along an axis using Blockbench's native Flip In Place (flip_in_place_x/y/z): cubes flip around their own center, meshes around their origin, groups also invert rotations in bone-rig formats. For meshes in vertex/edge/face selection mode only the selected components flip. Edit mode only.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">ids</td>
+      <td class="col-type">string[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Element or group UUIDs/names to flip. Replaces the selection with these. Defaults to the current selection. <span class="param-meta">[minItems: 1]</span></td>
+    </tr><tr>
+      <td class="col-name">axis</td>
+      <td class="col-type">&quot;x&quot; | &quot;y&quot; | &quot;z&quot;</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Axis to mirror across each element's own center (cubes) or pivot (meshes, groups, other elements).</td>
     </tr></tbody>
     </table>
       </div>
@@ -2695,7 +3279,7 @@
         </div>
       </div>
       <p class="card-title">Paint Fill Tool</p>
-      <p class="card-desc">Uses the fill/bucket tool to fill areas with color.</p>
+      <p class="card-desc">Uses the fill/bucket tool to fill areas with color. In 'face' and 'element' fill modes only the face or element whose UV area contains the given texture pixel is filled. Opacity is 0-255 regardless of Blockbench's opacity range setting.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -2740,7 +3324,7 @@
       <td class="col-name">fill_mode</td>
       <td class="col-type">&quot;color&quot; | &quot;color_connected&quot; | &quot;face&quot; | &quot;element&quot; | &quot;selected_elements&quot; | &quot;selection&quot;</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Fill mode. <span class="param-meta">(default: <code>&quot;color_connected&quot;</code>)</span></td>
+      <td class="col-desc">Fill mode. 'face' and 'element' fill only the face/element whose UV area contains (x, y) in texture space (Blockbench 5.2 looks it up with UVEditor.findFaceAtUV); 'color'/'color_connected' match exact colors; 'selected_elements' fills every selected element; 'selection' fills the texture selection (image editor). <span class="param-meta">(default: <code>&quot;color_connected&quot;</code>)</span></td>
     </tr><tr>
       <td class="col-name">blend_mode</td>
       <td class="col-type">&quot;default&quot; | &quot;set_opacity&quot; | &quot;color&quot; | &quot;behind&quot; | &quot;multiply&quot; | &quot;add&quot; | &quot;screen&quot; | &quot;overlay&quot; | &quot;difference&quot;</td>
@@ -2972,6 +3556,11 @@
       <td class="col-type">&quot;copy&quot; | &quot;sample&quot; | &quot;pattern&quot;</td>
       <td><span class="param-optional">optional</span></td>
       <td class="col-desc">Copy brush mode. <span class="param-meta">(default: <code>&quot;copy&quot;</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">aspect_ratio</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Brush aspect ratio (-16 to 16). Negative narrows the width, positive narrows the height, 0 keeps the brush square/round. <span class="param-meta">[min: -16, max: 16]</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -3044,7 +3633,7 @@
         </div>
       </div>
       <p class="card-title">Paint Settings</p>
-      <p class="card-desc">Configures paint mode settings and preferences.</p>
+      <p class="card-desc">Configures paint mode settings and preferences, including Blockbench 5.2 screen-space brush projection, brush lock mode and brush aspect ratio. The result also reports the active opacity range (0-255 or 0-100); tool opacity parameters stay 0-255 and are converted automatically.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -3105,6 +3694,21 @@
       <td class="col-type">boolean</td>
       <td><span class="param-optional">optional</span></td>
       <td class="col-desc">Pick combined layer colors.</td>
+    </tr><tr>
+      <td class="col-name">screen_space_brush_projection</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Project brushes in screen space when painting in the 3D viewport (Blockbench 5.2+, brush tools only).</td>
+    </tr><tr>
+      <td class="col-name">brush_lock_mode</td>
+      <td class="col-type">&quot;none&quot; | &quot;element&quot; | &quot;selected_faces&quot; | &quot;face&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Restrict viewport strokes: 'none', the 'element' the stroke started on, 'selected_faces', or the single 'face' it started on (Blockbench 5.2+).</td>
+    </tr><tr>
+      <td class="col-name">brush_aspect_ratio</td>
+      <td class="col-type">number</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Brush aspect ratio (-16 to 16) applied to every tool that supports it (brush and copy brush; Blockbench 5.2+). <span class="param-meta">[min: -16, max: 16]</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -3118,7 +3722,7 @@
         </div>
       </div>
       <p class="card-title">Paint with Brush</p>
-      <p class="card-desc">Paints on textures using the brush tool with customizable settings.</p>
+      <p class="card-desc">Paints on textures using the brush tool with customizable settings (opacity 0-255, softness 0-100%, optional aspect ratio). Paints on the selected pixel layer; if a layer group is selected, a pixel layer inside it is used.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -3143,7 +3747,7 @@
       <td class="col-name">brush_settings</td>
       <td class="col-type">object</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Brush settings to apply.</td>
+      <td class="col-desc">Brush settings to apply. Opacity is 0-255; softness is a 0-100 percentage.</td>
     </tr><tr>
       <td class="col-name">connect_strokes</td>
       <td class="col-type">boolean</td>
@@ -3162,7 +3766,7 @@
         </div>
       </div>
       <p class="card-title">Create Brush Preset</p>
-      <p class="card-desc">Creates a custom brush preset with specified settings.</p>
+      <p class="card-desc">Creates a custom brush preset with specified settings. Omitted settings are stored as unset so loading the preset keeps the current value.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -3187,7 +3791,7 @@
       <td class="col-name">opacity</td>
       <td class="col-type">number</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Opacity (0-255). <span class="param-meta">[min: 0, max: 255]</span></td>
+      <td class="col-desc">Opacity (0-255), independent of Blockbench's opacity range setting. <span class="param-meta">[min: 0, max: 255]</span></td>
     </tr><tr>
       <td class="col-name">softness</td>
       <td class="col-type">number</td>
@@ -3197,7 +3801,7 @@
       <td class="col-name">shape</td>
       <td class="col-type">&quot;square&quot; | &quot;circle&quot;</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Brush shape.</td>
+      <td class="col-desc">Brush shape. Omit to keep the current shape when loading.</td>
     </tr><tr>
       <td class="col-name">color</td>
       <td class="col-type">string</td>
@@ -3207,12 +3811,17 @@
       <td class="col-name">blend_mode</td>
       <td class="col-type">&quot;default&quot; | &quot;set_opacity&quot; | &quot;color&quot; | &quot;behind&quot; | &quot;multiply&quot; | &quot;add&quot; | &quot;screen&quot; | &quot;overlay&quot; | &quot;difference&quot;</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Brush blend mode.</td>
+      <td class="col-desc">Brush blend mode. Omit to keep the current blend mode when loading.</td>
     </tr><tr>
       <td class="col-name">pixel_perfect</td>
       <td class="col-type">boolean</td>
       <td><span class="param-optional">optional</span></td>
       <td class="col-desc">Enable pixel perfect drawing.</td>
+    </tr><tr>
+      <td class="col-name">screen_space</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Enable screen-space brush projection when the preset is loaded (Blockbench 5.2+). Omit to keep the current setting.</td>
     </tr></tbody>
     </table>
       </div>
@@ -3226,7 +3835,7 @@
         </div>
       </div>
       <p class="card-title">Load Brush Preset</p>
-      <p class="card-desc">Loads and applies a brush preset by name.</p>
+      <p class="card-desc">Loads and applies a custom or built-in brush preset (e.g. 'screen_space') by name.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -3241,7 +3850,7 @@
       <td class="col-name">preset_name</td>
       <td class="col-type">string</td>
       <td><span class="param-required">required</span></td>
-      <td class="col-desc">Name of the brush preset to load.</td>
+      <td class="col-desc">Name of the brush preset to load: a custom preset name, or a built-in one such as 'pixel_brush', 'pixel_perfect', 'smooth_brush' or 'screen_space' (also accepts the full 'menu.brush_presets.*' key or its translated label).</td>
     </tr></tbody>
     </table>
       </div>
@@ -3304,7 +3913,7 @@
         </div>
       </div>
       <p class="card-title">Texture Layer Management</p>
-      <p class="card-desc">Creates, manages, and manipulates texture layers.</p>
+      <p class="card-desc">Lists, creates, manages, and reorders texture layers and layer groups (Blockbench 5.2 hierarchy). Target a layer or group by UUID or name with layer_id; list_layers reports type, parent and depth.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -3317,34 +3926,91 @@
       </thead>
       <tbody><tr>
       <td class="col-name">action</td>
-      <td class="col-type">&quot;create_layer&quot; | &quot;delete_layer&quot; | &quot;duplicate_layer&quot; | &quot;merge_down&quot; | &quot;set_opacity&quot; | &quot;set_blend_mode&quot; | &quot;move_layer&quot; | &quot;rename_layer&quot; | &quot;flatten_layers&quot;</td>
+      <td class="col-type">&quot;list_layers&quot; | &quot;select_layer&quot; | &quot;create_layer&quot; | &quot;delete_layer&quot; | &quot;duplicate_layer&quot; | &quot;merge_down&quot; | &quot;set_opacity&quot; | &quot;set_blend_mode&quot; | &quot;move_layer&quot; | &quot;rename_layer&quot; | &quot;flatten_layers&quot; | &quot;toggle_visibility&quot; | &quot;create_group&quot; | &quot;ungroup&quot; | &quot;move_to_group&quot; | &quot;set_group_folded&quot;</td>
       <td><span class="param-required">required</span></td>
-      <td class="col-desc">Layer management action.</td>
+      <td class="col-desc">Layer action. list_layers reports the hierarchy (read-only); select_layer makes a layer the paint target; create_group, ungroup, move_to_group and set_group_folded manage layer groups (Blockbench 5.2+); toggle_visibility works on layers and groups; flatten_layers composites visible layers into the texture and disables layers.</td>
     </tr><tr>
       <td class="col-name">texture_id</td>
       <td class="col-type">string</td>
       <td><span class="param-optional">optional</span></td>
       <td class="col-desc">Texture ID or name. If not provided, uses selected texture.</td>
     </tr><tr>
+      <td class="col-name">layer_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">UUID or exact name of the layer or group to act on. Defaults to the texture's selected layer.</td>
+    </tr><tr>
       <td class="col-name">layer_name</td>
       <td class="col-type">string</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Name of the layer.</td>
+      <td class="col-desc">Name for create_layer/create_group/duplicate_layer, or the new name for rename_layer.</td>
+    </tr><tr>
+      <td class="col-name">layer_ids</td>
+      <td class="col-type">string[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">create_group: UUIDs or names of layers/groups to move into the new group. They must share the same parent.</td>
+    </tr><tr>
+      <td class="col-name">group_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">UUID or name of the destination group for move_to_group and create_layer. Use an empty string for the root.</td>
     </tr><tr>
       <td class="col-name">opacity</td>
       <td class="col-type">number</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Layer opacity percentage. <span class="param-meta">[min: 0, max: 100]</span></td>
+      <td class="col-desc">Layer opacity percentage (0-100) for set_opacity. <span class="param-meta">[min: 0, max: 100]</span></td>
     </tr><tr>
       <td class="col-name">blend_mode</td>
-      <td class="col-type">&quot;normal&quot; | &quot;multiply&quot; | &quot;screen&quot; | &quot;overlay&quot; | &quot;soft_light&quot; | &quot;hard_light&quot; | &quot;color_dodge&quot; | &quot;color_burn&quot; | &quot;darken&quot; | &quot;lighten&quot; | &quot;difference&quot; | &quot;exclusion&quot;</td>
+      <td class="col-type">&quot;default&quot; | &quot;normal&quot; | &quot;set_opacity&quot; | &quot;color&quot; | &quot;multiply&quot; | &quot;add&quot; | &quot;darken&quot; | &quot;lighten&quot; | &quot;screen&quot; | &quot;overlay&quot; | &quot;difference&quot; | &quot;alpha_mask&quot;</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Layer blend mode.</td>
+      <td class="col-desc">Layer blend mode for set_blend_mode ('normal' is an alias of 'default').</td>
     </tr><tr>
       <td class="col-name">target_index</td>
-      <td class="col-type">number</td>
+      <td class="col-type">integer</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Target position for moving layers.</td>
+      <td class="col-desc">move_layer/move_to_group: position among siblings in the same parent, 0 = bottom-most; clamped to the valid range.</td>
+    </tr><tr>
+      <td class="col-name">folded</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">set_group_folded / create_group: whether the group is collapsed in the layers panel.</td>
+    </tr><tr>
+      <td class="col-name">visible</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">toggle_visibility: explicit visibility to set. Omit to toggle.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+        </section>
+<section id="cat-performance" class="category-section">
+          <h3 class="category-title">Performance</h3>
+          <div id="tool-get_average_fps" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">get_average_fps</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">Get Average FPS</p>
+      <p class="card-desc">Measures the average frames per second of Blockbench's render loop by counting rendered frames for duration_ms, then returns the average with the frame count, the fps_limit setting, Blockbench's own last-second counter, window focus at the start of the window plus whether it changed, and whether rendering was paused because the window was unfocused with background rendering disabled. The call waits for the whole window; keep other tools idle meanwhile for a representative reading.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">duration_ms</td>
+      <td class="col-type">integer</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Sampling window in milliseconds (250–10000). The call waits this long while counting rendered frames. <span class="param-meta">(default: <code>2000</code>) [min: 250, max: 10000]</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -3381,7 +4047,7 @@
       <td class="col-name">format</td>
       <td class="col-type">string</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Project format ID from Blockbench's Formats registry. <span class="param-meta">(default: <code>&quot;bedrock_block&quot;</code>)</span></td>
+      <td class="col-desc">Project format ID from Blockbench's Formats registry (e.g. bedrock_block, java_block, free). Unknown IDs are rejected with the list of valid IDs. <span class="param-meta">(default: <code>&quot;bedrock_block&quot;</code>)</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -3905,6 +4571,35 @@
     </table>
       </div>
     </div>
+<div id="tool-delete_texture" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">delete_texture</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Delete Texture</p>
+      <p class="card-desc">Removes a texture from the project in one undoable edit, like deleting it from the Textures panel. Faces keep their UV mapping but lose the texture assignment, and a PBR material loses that channel, until the edit is undone. Use list_textures to find IDs.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">texture</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Texture ID, UUID, or name to remove.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
         </section>
 <section id="cat-ui-interaction" class="category-section">
           <h3 class="category-title">UI Interaction</h3>
@@ -4067,7 +4762,7 @@
         </div>
       </div>
       <p class="card-title">Set Mode</p>
-      <p class="card-desc">Switches Blockbench's editor tab through its native mode trigger, respecting the mode's condition. Use mode_id='animate' to enter Animate before animation work, 'paint' before native painting tools, or 'edit' to return. Returns the resulting mode and available modes; refresh tools/list for changed tool availability. Selecting the current mode does nothing. Does not change the project's format.</p>
+      <p class="card-desc">Switches Blockbench's editor tab through its native mode trigger, respecting the mode's condition. Use mode_id='animate' to enter Animate before animation work, 'paint' before native painting tools, or 'edit' to return. Returns the resulting mode and available modes; refresh tools/list for changed tool availability. Selecting the current mode does nothing. Does not change the project's format. When the user enabled the AI Scratchpad setting, mode_id='ai_scratchpad' relaxes the format's cube size, rotation and integer-size guardrails until another mode is selected.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -4286,6 +4981,374 @@
       </div>
     </div>
         </section>
+<section id="cat-geckolib-integration" class="category-section">
+          <h3 class="category-title">GeckoLib Integration</h3>
+          <div id="tool-geckolib_get_format_info" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">geckolib_get_format_info</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">Get GeckoLib Format Info</p>
+      <p class="card-desc">Returns the active GeckoLib project's model type, mod ID, object ID, bone and animation counts, cached export paths, and the installed plugin version. Requires the GeckoLib plugin and a GeckoLib Animated Model project.</p>
+      <div class="overflow-x">
+        <p class="empty-params">No parameters</p>
+      </div>
+    </div>
+<div id="tool-geckolib_set_project_settings" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">geckolib_set_project_settings</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          
+        </div>
+      </div>
+      <p class="card-title">Set GeckoLib Project Settings</p>
+      <p class="card-desc">Sets the GeckoLib mod ID, model type and object ID on the active project. Values are validated against the plugin's namespace rules before anything is written. Does not generate the armor template rig.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">modid</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Mod namespace exports are written for, e.g. my_mod.</td>
+    </tr><tr>
+      <td class="col-name">model_type</td>
+      <td class="col-type">&quot;Entity&quot; | &quot;Block&quot; | &quot;Item&quot; | &quot;Armor&quot; | &quot;Object&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">GeckoLib model type. Armor only records the type; it does not generate the plugin's armor template rig, which requires creating a new Armor project in Blockbench.</td>
+    </tr><tr>
+      <td class="col-name">model_identifier</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Registered object ID the geometry exports as (geometry.&lt;identifier&gt;); may include a folder path.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-geckolib_list_easings" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">geckolib_list_easings</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">List GeckoLib Easings</p>
+      <p class="card-desc">Lists every easing name GeckoLib accepts on keyframes, which of them read easingArgs, and each argument's default and meaning. Needs no project, so it can be called while planning an animation.</p>
+      <div class="overflow-x">
+        <p class="empty-params">No parameters</p>
+      </div>
+    </div>
+<div id="tool-geckolib_get_keyframe_easing" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">geckolib_get_keyframe_easing</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">Get GeckoLib Keyframe Easing</p>
+      <p class="card-desc">Reads the GeckoLib easing, easing arguments and interpolation of keyframes on one bone channel, or of the current timeline selection. An easing governs the segment arriving at its keyframe, so the first keyframe of a channel is reported as inert.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">animation_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Animation UUID or name. If not provided, uses current animation.</td>
+    </tr><tr>
+      <td class="col-name">bone_name</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Bone whose keyframes to target. Omit to act on the current timeline keyframe selection.</td>
+    </tr><tr>
+      <td class="col-name">channel</td>
+      <td class="col-type">&quot;rotation&quot; | &quot;position&quot; | &quot;scale&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Transform channel to target. Required with bone_name, and meaningless without it.</td>
+    </tr><tr>
+      <td class="col-name">times</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Keyframe times in seconds. Requires bone_name; omit to target every keyframe of that channel. <span class="param-meta">[minItems: 1]</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-geckolib_set_keyframe_easing" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">geckolib_set_keyframe_easing</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          
+        </div>
+      </div>
+      <p class="card-title">Set GeckoLib Keyframe Easing</p>
+      <p class="card-desc">Writes a GeckoLib easing (and its arguments) onto keyframes on one bone channel, or onto the current timeline selection, as one undoable edit. GeckoLib easings apply only to linear keyframes and shape the segment arriving at the keyframe they are set on, so the first keyframe of each channel is skipped and reported. Nothing in Blockbench's native keyframe API can author these.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">animation_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Animation UUID or name. If not provided, uses current animation.</td>
+    </tr><tr>
+      <td class="col-name">bone_name</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Bone whose keyframes to target. Omit to act on the current timeline keyframe selection.</td>
+    </tr><tr>
+      <td class="col-name">channel</td>
+      <td class="col-type">&quot;rotation&quot; | &quot;position&quot; | &quot;scale&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Transform channel to target. Required with bone_name, and meaningless without it.</td>
+    </tr><tr>
+      <td class="col-name">times</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Keyframe times in seconds. Requires bone_name; omit to target every keyframe of that channel. <span class="param-meta">[minItems: 1]</span></td>
+    </tr><tr>
+      <td class="col-name">easing</td>
+      <td class="col-type">&quot;linear&quot; | &quot;step&quot; | &quot;easeInQuad&quot; | &quot;easeOutQuad&quot; | &quot;easeInOutQuad&quot; | &quot;easeInCubic&quot; | &quot;easeOutCubic&quot; | &quot;easeInOutCubic&quot; | &quot;easeInQuart&quot; | &quot;easeOutQuart&quot; | &quot;easeInOutQuart&quot; | &quot;easeInQuint&quot; | &quot;easeOutQuint&quot; | &quot;easeInOutQuint&quot; | &quot;easeInSine&quot; | &quot;easeOutSine&quot; | &quot;easeInOutSine&quot; | &quot;easeInExpo&quot; | &quot;easeOutExpo&quot; | &quot;easeInOutExpo&quot; | &quot;easeInCirc&quot; | &quot;easeOutCirc&quot; | &quot;easeInOutCirc&quot; | &quot;easeInBack&quot; | &quot;easeOutBack&quot; | &quot;easeInOutBack&quot; | &quot;easeInElastic&quot; | &quot;easeOutElastic&quot; | &quot;easeInOutElastic&quot; | &quot;easeInBounce&quot; | &quot;easeOutBounce&quot; | &quot;easeInOutBounce&quot; | &quot;none&quot;</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">GeckoLib easing name, or &quot;none&quot; to remove the easing and fall back to linear.</td>
+    </tr><tr>
+      <td class="col-name">easing_args</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Arguments for the Back, Elastic, Bounce and step easings. Omit to use GeckoLib's default (1 overshoot, 0.5 bounciness, 5 steps). Ignored by every other easing. <span class="param-meta">[minItems: 1]</span></td>
+    </tr><tr>
+      <td class="col-name">convert_interpolation</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Set targeted keyframes to linear interpolation as part of the same edit. GeckoLib wipes easings from catmullrom, step and bezier keyframes on the next render frame, so without this the call is rejected instead of writing an easing that would not survive. <span class="param-meta">(default: <code>false</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-geckolib_reverse_keyframe_easing" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">geckolib_reverse_keyframe_easing</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          
+        </div>
+      </div>
+      <p class="card-title">Reverse GeckoLib Keyframe Easing</p>
+      <p class="card-desc">Mirrors easing directions the way GeckoLib's own reverse-keyframes handler does: each easeIn becomes easeOut and back, the easings shift one keyframe later in time, and the first keyframe of each channel is cleared. Use after reversing keyframe values.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">animation_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Animation UUID or name. If not provided, uses current animation.</td>
+    </tr><tr>
+      <td class="col-name">bone_name</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Bone whose keyframes to target. Omit to act on the current timeline keyframe selection.</td>
+    </tr><tr>
+      <td class="col-name">channel</td>
+      <td class="col-type">&quot;rotation&quot; | &quot;position&quot; | &quot;scale&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Transform channel to target. Required with bone_name, and meaningless without it.</td>
+    </tr><tr>
+      <td class="col-name">times</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Keyframe times in seconds. Requires bone_name; omit to target every keyframe of that channel. <span class="param-meta">[minItems: 1]</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-geckolib_validate_model" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">geckolib_validate_model</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">Validate GeckoLib Model</p>
+      <p class="card-desc">Checks the GeckoLib project against rules derived from the plugin and the GeckoLib runtime: bone-name charset and duplicates, mod ID and object ID validity, armor template bones, texture size against the UV base, and (optionally) compiled animation loop values, easing names, easing arguments and lengths. Each finding carries a stable check ID. Passing does not prove in-game correctness.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">include_animations</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Also compile the project's animations and validate their loop values, easings and lengths. <span class="param-meta">(default: <code>true</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-geckolib_export_model" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">geckolib_export_model</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-openworld">open-world</span>
+        </div>
+      </div>
+      <p class="card-title">Export GeckoLib Model</p>
+      <p class="card-desc">Compiles the GeckoLib geometry the plugin's model export produces, returning it as JSON and optionally writing it to a path. Set mode='dialog' to trigger the plugin's own export action and its save dialog instead.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">mode</td>
+      <td class="col-type">&quot;compile&quot; | &quot;dialog&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">compile returns the file content without touching the UI. dialog triggers the GeckoLib plugin's own export action, which opens a native save dialog for the user to complete and updates the project's cached export path. <span class="param-meta">(default: <code>&quot;compile&quot;</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">path</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode.</td>
+    </tr><tr>
+      <td class="col-name">max_content_length</td>
+      <td class="col-type">integer</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Maximum characters of content to return. Use 0 to omit the content and only report its size. <span class="param-meta">(default: <code>100000</code>) [min: 0, max: 2000000]</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-geckolib_export_animations" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">geckolib_export_animations</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-openworld">open-world</span>
+        </div>
+      </div>
+      <p class="card-title">Export GeckoLib Animations</p>
+      <p class="card-desc">Compiles the project's animations into GeckoLib animation-file JSON, including the easing and easingArgs the plugin writes, and optionally writes it to a path. Reports which host API compiled it, since only the plugin-patched route stamps geckolib_format_version. Set mode='dialog' to trigger the plugin's own animation export action instead.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">mode</td>
+      <td class="col-type">&quot;compile&quot; | &quot;dialog&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">compile returns the file content without touching the UI. dialog triggers the GeckoLib plugin's own export action, which opens a native save dialog for the user to complete and updates the project's cached export path. <span class="param-meta">(default: <code>&quot;compile&quot;</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">path</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode.</td>
+    </tr><tr>
+      <td class="col-name">max_content_length</td>
+      <td class="col-type">integer</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Maximum characters of content to return. Use 0 to omit the content and only report its size. <span class="param-meta">(default: <code>100000</code>) [min: 0, max: 2000000]</span></td>
+    </tr><tr>
+      <td class="col-name">animation_ids</td>
+      <td class="col-type">string[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Animation UUIDs or names to include. Omit to export every animation in the project. <span class="param-meta">[minItems: 1]</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-geckolib_export_display" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">geckolib_export_display</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-openworld">open-world</span>
+        </div>
+      </div>
+      <p class="card-title">Export GeckoLib Display Settings</p>
+      <p class="card-desc">Builds the Java item/block display-settings JSON for GeckoLib Item and Block models: parent model, texture size, GUI light, per-perspective display transforms and the namespaced particle texture. Reports when the active model type would not normally ship one. Set mode='dialog' to trigger the plugin's own display export action instead.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">mode</td>
+      <td class="col-type">&quot;compile&quot; | &quot;dialog&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">compile returns the file content without touching the UI. dialog triggers the GeckoLib plugin's own export action, which opens a native save dialog for the user to complete and updates the project's cached export path. <span class="param-meta">(default: <code>&quot;compile&quot;</code>)</span></td>
+    </tr><tr>
+      <td class="col-name">path</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode.</td>
+    </tr><tr>
+      <td class="col-name">max_content_length</td>
+      <td class="col-type">integer</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Maximum characters of content to return. Use 0 to omit the content and only report its size. <span class="param-meta">(default: <code>100000</code>) [min: 0, max: 2000000]</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+        </section>
 <section id="cat-hytale-integration" class="category-section">
           <h3 class="category-title">Hytale Integration</h3>
           <div id="tool-hytale_get_format_info" class="card tool-card">
@@ -4393,7 +5456,7 @@
         </div>
       </div>
       <p class="card-title">Create Hytale Quad</p>
-      <p class="card-desc">Creates a Hytale quad (2D plane) with a specified normal direction. Quads are single-face elements useful for flat surfaces.</p>
+      <p class="card-desc">Creates a Hytale quad with exactly one enabled face matching the signed normal direction, per-face UV and Auto UV 1. Positive width/height and parent references are validated before one reversible edit.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -4413,7 +5476,7 @@
       <td class="col-name">position</td>
       <td class="col-type">number[]</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Position [x, y, z] <span class="param-meta">(default: <code>[0,0,0]</code>) [minItems: 3, maxItems: 3]</span></td>
+      <td class="col-desc">Finite position [x, y, z] of the quad's starting corner. <span class="param-meta">(default: <code>[0,0,0]</code>) [minItems: 3, maxItems: 3]</span></td>
     </tr><tr>
       <td class="col-name">normal</td>
       <td class="col-type">&quot;+X&quot; | &quot;-X&quot; | &quot;+Y&quot; | &quot;-Y&quot; | &quot;+Z&quot; | &quot;-Z&quot;</td>
@@ -4423,12 +5486,12 @@
       <td class="col-name">size</td>
       <td class="col-type">number[]</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Size [width, height]. <span class="param-meta">(default: <code>[16,16]</code>) [minItems: 2, maxItems: 2]</span></td>
+      <td class="col-desc">Positive finite [width, height]. Width/height axes are Z/Y for X normals, X/Z for Y normals, and X/Y for Z normals. <span class="param-meta">(default: <code>[16,16]</code>) [minItems: 2, maxItems: 2]</span></td>
     </tr><tr>
       <td class="col-name">group</td>
       <td class="col-type">string</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Parent group/bone name</td>
+      <td class="col-desc">Parent group UUID or unique name, or root (default). Missing or ambiguous names are rejected.</td>
     </tr><tr>
       <td class="col-name">double_sided</td>
       <td class="col-type">boolean</td>
@@ -4529,7 +5592,7 @@
       <td class="col-name">time</td>
       <td class="col-type">number</td>
       <td><span class="param-required">required</span></td>
-      <td class="col-desc">Time in seconds for the keyframe</td>
+      <td class="col-desc">Finite time in seconds between 0 and 10000 for the visibility keyframe. <span class="param-meta">[min: 0, max: 10000]</span></td>
     </tr><tr>
       <td class="col-name">visible</td>
       <td class="col-type">boolean</td>
@@ -4861,7 +5924,7 @@
       </section>
 
       <footer class="page-footer">
-        Generated 2026-09-13T20:44:59.501Z from Zod schemas
+        Generated 2026-09-18T17:36:30.446Z from Zod schemas
       </footer>
     </main>
   </div>

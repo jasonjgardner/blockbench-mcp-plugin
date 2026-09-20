@@ -232,7 +232,7 @@ export function registerMeshInspectionTools(): void {
     parameters: getMeshInfoParameters,
     async execute(args) {
       const result = inspectMesh(args);
-      return { content: [{ type: "text", text: JSON.stringify(result) }], structuredContent: result };
+      return { content: [{ type: "text", text: JSON.stringify(result) }], structuredContent: { ...result } };
     },
   }, spec.status);
 }

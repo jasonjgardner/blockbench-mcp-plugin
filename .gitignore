@@ -1,5 +1,8 @@
+.env
 node_modules
 dist/
 /artifacts/
 .claude
 nul
+output*/
+*.zip

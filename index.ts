@@ -17,6 +17,9 @@ import { initPromptLoader } from "@/lib/promptLoader";
 import { setupMaterialUndoRefresh, teardownMaterialUndoRefresh } from "@/lib/material-preview";
 import { setupAnimationUndoRestore, teardownAnimationUndoRestore } from "@/lib/animation-undo";
 import { setupEditorStateSync, teardownEditorStateSync } from "@/lib/editor-state";
+import { setupAiDisclosure, teardownAiDisclosure } from "@/lib/ai-disclosure";
+import { setupScratchpadMode, teardownScratchpadMode } from "@/lib/scratchpad-mode";
+import { teardownOffscreenViews } from "@/lib/views";
 import type { NetServer, SessionTransports } from "@/server/net";
 import createNetServer from "@/server/net";
 import { getIcon } from "@/macros/getIcon" with { type: "macro" };
@@ -36,6 +39,8 @@ BBPlugin.register("mcp", {
   bug_tracker: "https://github.com/jasonjgardner/blockbench-mcp-plugin/issues",
   icon: getIcon(),
   variant: "desktop",
+  // requireNativeModule() permission handling first shipped in Blockbench 5.0.
+  min_version: "5.0.0",
   async onload() {
     // Get network module with Blockbench permission handling
     // @ts-ignore - requireNativeModule is a Blockbench global
@@ -55,6 +60,8 @@ BBPlugin.register("mcp", {
     setupI18n();
 
     settingsSetup();
+    setupAiDisclosure();
+    setupScratchpadMode();
     setupMaterialUndoRefresh();
     setupAnimationUndoRestore();
     setupEditorStateSync();
@@ -104,6 +111,8 @@ BBPlugin.register("mcp", {
   },
 
   onunload() {
+    teardownScratchpadMode();
+    teardownAiDisclosure();
     teardownEditorStateSync();
     teardownMaterialUndoRefresh();
     teardownAnimationUndoRestore();
@@ -122,6 +131,9 @@ BBPlugin.register("mcp", {
 
     // Clear all sessions
     sessionManager.clear();
+
+    // Release plugin-owned offscreen previews only after no request can create another
+    teardownOffscreenViews();
 
     uiTeardown();
     settingsTeardown();

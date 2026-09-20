@@ -4,16 +4,17 @@ import { createTool } from "@/lib/factories";
 import { runUndoableAnimationEdit } from "@/lib/animation-undo";
 import { animationToolDocs } from "./docs";
 import { animationTimelineParameters } from "./schemas";
-import { findAnimationOrSelected, replaceTimelineSelection } from "./shared";
+import { filterFramesByPlayhead, type PlayheadDirection } from "./playhead";
+import { findAnimationOrSelected, getAnimationClass, replaceTimelineSelection } from "./shared";
 
 type TimelineInput = z.infer<typeof animationTimelineParameters>;
 type TimelineAction = TimelineInput["action"];
 
 /** A validated timeline request with the target animation's keyframes precomputed. */
 interface ITimelineRequest {
-  animation: _Animation;
+  animation: BBAnimation;
   input: TimelineInput;
-  allFrames: _Keyframe[];
+  allFrames: BBKeyframe[];
   lastTime: number;
 }
 
@@ -57,7 +58,62 @@ const TIMELINE_HANDLERS: Record<TimelineAction, (request: ITimelineRequest) => s
     if (loop_mode) animation.setLoop(loop_mode, false);
   }),
   select_range: selectKeyframeRange,
+  select_before_playhead: (request) => selectRelativeToPlayhead(request, "before"),
+  select_after_playhead: (request) => selectRelativeToPlayhead(request, "after"),
 };
+
+/** Native timeline Vue data; published types only declare `Timeline.vue` as a generic Vue instance. */
+interface ITimelineChannelState {
+  channels?: Record<string, boolean>;
+}
+
+/**
+ * Collects the bone keyframes a playhead selection may pick from.
+ *
+ * `animation` scope reads every bone animator deterministically. `timeline`
+ * scope mirrors Blockbench 5.2's `selectKeyframes()`: only animators listed in
+ * `Timeline.animators` and channels not hidden by the timeline channel filter.
+ * @throws When `timeline` scope targets an animation that is not selected.
+ */
+function playheadCandidates(animation: BBAnimation, scope: TimelineInput["scope"]): BBKeyframe[] {
+  const boneAnimators = Object.values<GeneralAnimator>(animation.animators)
+    .filter((animator): animator is BoneAnimator => animator instanceof BoneAnimator);
+  if (scope === "animation") return boneAnimators.flatMap((animator) => animator.keyframes);
+  if (getAnimationClass().selected !== animation) {
+    throw new Error(`scope "timeline" requires "${animation.name}" to be the selected animation; select it first or use scope "animation".`);
+  }
+  const channels = (Timeline.vue as unknown as ITimelineChannelState).channels ?? {};
+  return boneAnimators
+    .filter((animator) => Timeline.animators.includes(animator))
+    .flatMap((animator) => animator.keyframes)
+    .filter((frame) => channels[frame.channel] !== false);
+}
+
+/**
+ * Replaces the keyframe selection with bone keyframes on one side of the
+ * playhead (or `input.time`), matching Blockbench 5.2's
+ * `keyframe_select_before_playhead` / `keyframe_select_after_playhead`
+ * comparisons. Implemented in the plugin rather than by clicking the actions
+ * so the reference time and animator scope are explicit, the selection is one
+ * selection-history entry, and the chosen keyframe UUIDs can be returned.
+ */
+function selectRelativeToPlayhead({ animation, input }: ITimelineRequest, direction: PlayheadDirection): string {
+  const time = input.time ?? Timeline.time;
+  const selected = filterFramesByPlayhead(playheadCandidates(animation, input.scope), time, direction);
+  replaceTimelineSelection(animation, selected, `Select keyframes ${direction} playhead`);
+  return JSON.stringify({
+    action: input.action,
+    time,
+    scope: input.scope,
+    count: selected.length,
+    keyframes: selected.map((frame) => ({
+      uuid: frame.uuid,
+      bone: frame.animator.name,
+      channel: frame.channel,
+      time: frame.time,
+    })),
+  });
+}
 
 /** Selects the target animation, runs a playback control, and refreshes the preview. */
 function runPlayback({ animation, input }: ITimelineRequest, control: () => void): string {
@@ -70,7 +126,7 @@ function runPlayback({ animation, input }: ITimelineRequest, control: () => void
 /** Applies an animation setting in one undo entry, reverting it if the preview fails. */
 function runTimelineEdit(
   { animation, input }: ITimelineRequest,
-  apply: (animation: _Animation, input: TimelineInput) => void
+  apply: (animation: BBAnimation, input: TimelineInput) => void
 ): string {
   runUndoableAnimationEdit({ animations: [animation] }, `Animation timeline: ${input.action}`, () => {
     apply(animation, input);

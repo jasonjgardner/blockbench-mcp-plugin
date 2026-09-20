@@ -10,6 +10,8 @@ import {
   getChannelTextureInfo,
 } from "@/lib/util";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
+import { createJsonResult } from "@/lib/tool-results";
+import { runUndoableEdit } from "@/lib/undo";
 import {
   colorByte,
   colorSchema,
@@ -259,6 +261,11 @@ export const saveMaterialConfigParameters = z.object({
   material: z.string().describe("Material name or UUID to save."),
 });
 
+/** Remove one texture from the project by ID, UUID, or name. */
+export const deleteTextureParameters = z.object({
+  texture: textureIdSchema.describe("Texture ID, UUID, or name to remove."),
+});
+
 // ============================================================================
 // Texture Tool Docs
 // ============================================================================
@@ -427,7 +434,32 @@ export const textureToolDocs: IToolSpec[] = [
     parameters: activateTextureParameters,
     status: STATUS_STABLE,
   },
+  {
+    name: "delete_texture",
+    condition: { project: true, method: () => Texture.all.length > 0 },
+    description:
+      "Removes a texture from the project in one undoable edit, like deleting it from the Textures panel. Faces keep their UV mapping but lose the texture assignment, and a PBR material loses that channel, until the edit is undone. Use list_textures to find IDs.",
+    annotations: {
+      title: "Delete Texture",
+      destructiveHint: true,
+    },
+    parameters: deleteTextureParameters,
+    status: STATUS_EXPERIMENTAL,
+  },
 ];
+
+/**
+ * Refreshes the scene after a texture leaves the project, mirroring the
+ * native delete action in `js/texturing/textures.js`: faces re-render without
+ * the texture, layered previews rebuild, and toolbars re-evaluate conditions.
+ */
+function refreshAfterTextureRemoval(): void {
+  Canvas.updateAllFaces();
+  if (Reflect.get(Canvas, "layered_material")) Canvas.updateLayeredTextures();
+  TextureAnimator.updateButton();
+  UVEditor.vue?.updateTexture();
+  BARS.updateConditions();
+}
 
 // ============================================================================
 // Tool Registration
@@ -725,4 +757,24 @@ export function registerTextureTools(): void {
       return `Activated texture "${target.name}" (uuid: ${target.uuid}). Paint tools will now target it by default.`;
     },
   }, textureToolDocs[12].status);
+
+  createTool(textureToolDocs[13].name, {
+    ...textureToolDocs[13],
+    async execute({ texture }) {
+      const target = findTextureOrThrow(texture);
+      const removed = { name: target.name, uuid: target.uuid, id: target.id };
+      // The transaction holds only the removal: Blockbench cannot revert a removed
+      // object from a cancelled edit, so nothing that may throw belongs inside it.
+      // `bitmap` keeps layered pixels for undo; the finish aspects list no texture
+      // so the history entry records it as gone instead of resurrecting it on redo.
+      runUndoableEdit(
+        { textures: [target], bitmap: true, selected_texture: true },
+        "Agent removed texture",
+        () => target.remove(true),
+        { textures: [], selected_texture: true },
+      );
+      refreshAfterTextureRemoval();
+      return createJsonResult({ removed, remaining_textures: (Project?.textures ?? Texture.all).length });
+    },
+  }, textureToolDocs[13].status);
 }

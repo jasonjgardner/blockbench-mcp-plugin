@@ -138,3 +138,9 @@ No automated tests yet. Manual verification:
 ## Commits
 
 Use conventional prefixes: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`. Be specific (e.g., `feat: add mesh selection tools`).
+
+## Benchmark results
+
+`benchmarks/results/` holds local, git-ignored benchmark evidence (large traces,
+`.bbmodel` snapshots and images). Do not search, read or summarize it unless the
+user points to a specific file there, and never stage, commit or force-add it.

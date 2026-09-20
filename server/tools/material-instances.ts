@@ -177,7 +177,7 @@ export function registerMaterialInstanceTools() {
           if (face) {
             result[faceDir] = {
               material_name: face.material_name || "",
-              texture: face.texture ? (face.getTexture()?.name || face.texture.toString()) : null,
+              texture: face.texture ? ((face.getTexture() || undefined)?.name || face.texture.toString()) : null,
             };
           }
         }
@@ -214,7 +214,6 @@ export function registerMaterialInstanceTools() {
 
         Undo.initEdit({
           elements: cubes,
-          // @ts-expect-error - uv_only is a valid Blockbench API property
           uv_only: true,
         });
 
@@ -301,7 +300,6 @@ export function registerMaterialInstanceTools() {
 
         Undo.initEdit({
           elements: cubesToEdit,
-          // @ts-expect-error - uv_only is a valid Blockbench API property
           uv_only: true,
         });
 
@@ -353,7 +351,6 @@ export function registerMaterialInstanceTools() {
 
         Undo.initEdit({
           elements: cubes,
-          // @ts-expect-error - uv_only is a valid Blockbench API property
           uv_only: true,
         });
 

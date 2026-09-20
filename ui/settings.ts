@@ -1,3 +1,6 @@
+import { SETTING_DISCLOSE_AI_USAGE, SETTING_SCRATCHPAD_ENABLED } from "@/lib/constants";
+import { onScratchpadSettingChanged } from "@/lib/scratchpad-mode";
+
 const settings: Setting[] = [];
 
 export function settingsSetup() {
@@ -57,6 +60,23 @@ export function settingsSetup() {
       max: 600,
       category,
       icon: "favorite",
+    }),
+    new Setting(SETTING_SCRATCHPAD_ENABLED, {
+      name: tl("mcp.settings.scratchpad_name"),
+      description: tl("mcp.settings.scratchpad_desc"),
+      type: "toggle",
+      value: false,
+      category,
+      icon: "science",
+      onChange: onScratchpadSettingChanged,
+    }),
+    new Setting(SETTING_DISCLOSE_AI_USAGE, {
+      name: tl("mcp.settings.disclose_ai_name"),
+      description: tl("mcp.settings.disclose_ai_desc"),
+      type: "toggle",
+      value: true,
+      category,
+      icon: "verified_user",
     })
   );
 }

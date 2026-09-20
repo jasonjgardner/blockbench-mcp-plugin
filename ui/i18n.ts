@@ -67,6 +67,25 @@ const en: Record<string, string> = {
   "mcp.settings.session_timeout_desc": "Disconnect MCP sessions after this many minutes of inactivity. Lower values free resources faster; higher values tolerate idle clients.",
   "mcp.settings.sse_heartbeat_name": "SSE Heartbeat Interval (seconds)",
   "mcp.settings.sse_heartbeat_desc": "Send keep-alive comments on streaming responses to prevent proxies/firewalls from closing idle connections. Set to 0 to disable.",
+  "mcp.settings.scratchpad_name": "Enable AI Scratchpad",
+  "mcp.settings.scratchpad_desc": "Adds an AI Scratchpad mode where agents can model without the format's guardrails (cube size limits, rotation limits and snapping, integer sizes). Guardrails are restored when leaving the mode; existing geometry is not clamped.",
+  "mcp.settings.disclose_ai_name": "Disclose AI Usage",
+  "mcp.settings.disclose_ai_desc": "Stamps ai_used and ai_agents onto a project the first time an MCP tool writes to it, so saved .bbmodel files record which AI clients edited them.",
+
+  // Panel toolbar
+  "mcp.toolbar.show_experimental": "Show Experimental",
+  "mcp.toolbar.show_experimental_desc": "Include experimental tools and prompts in the MCP panel lists.",
+  "mcp.toolbar.ai_used": "AI used",
+  "mcp.toolbar.ai_used_desc": "An MCP client modified this project. Click to open the project settings.",
+
+  // Scratchpad mode
+  "mcp.mode.ai_scratchpad": "AI Scratchpad",
+
+  // Project properties
+  "mcp.project.ai_used": "AI Used",
+  "mcp.project.ai_used_desc": "An MCP client modified this project.",
+  "mcp.project.ai_agents": "AI Agents",
+  "mcp.project.ai_agents_desc": "MCP clients that modified this project.",
 
   // Tool test dialog
   "mcp.dialog.result_title": "Result: %0",

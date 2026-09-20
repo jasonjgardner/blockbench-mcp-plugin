@@ -1,52 +1,42 @@
+/* Lives inside Blockbench's fixed-height #status_bar flex row; inherit its sizing and use theme colors. */
 #mcp-status-bar {
-    display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 4px 12px;
-    background-color: var(--color-dark);
-    border-block-start: 1px solid var(--color-border);
+    display: flex;
     font-size: 0.85em;
+    margin-inline-start: auto;
     user-select: none;
 }
 
 #mcp-status-bar .mcp-status-indicator {
-    display: flex;
     align-items: center;
-    gap: 6px;
+    border-radius: 0.25rem;
     cursor: pointer;
-    padding: 2px 8px;
-    border-radius: 4px;
-    transition: background-color 0.2s;
-}
+    display: flex;
+    gap: 0.375rem;
+    padding: 0.125rem 0.5rem;
+    transition: background-color 200ms ease;
 
-#mcp-status-bar .mcp-status-indicator:hover {
-    background-color: var(--color-button);
+    &:hover {
+        background-color: var(--color-button);
+        color: var(--color-light);
+    }
 }
 
 #mcp-status-bar .mcp-status-dot {
-    inline-size: 8px;
-    block-size: 8px;
-    border-radius: 50%;
     background-color: var(--color-subtle_text);
-    transition: background-color 0.3s;
-}
+    block-size: 0.5rem;
+    border-radius: 50%;
+    inline-size: 0.5rem;
+    transition: background-color 300ms ease;
 
-#mcp-status-bar .mcp-status-dot.connected {
-    background-color: #4caf50;
-    box-shadow: 0 0 8px rgba(76, 175, 80, 0.6);
-    animation: pulse 2s ease-in-out infinite;
-}
-
-#mcp-status-bar .mcp-status-dot.disconnected {
-    background-color: #f44336;
-}
-
-@keyframes pulse {
-    0%, 100% {
-    opacity: 1;
+    &.connected {
+        animation: mcp-status-pulse 2s ease-in-out infinite;
+        background-color: var(--color-confirm);
+        box-shadow: 0 0 0.5rem rgb(from var(--color-confirm) r g b / 60%);
     }
-    50% {
-    opacity: 0.5;
+
+    &.disconnected {
+        background-color: var(--color-error);
     }
 }
 
@@ -57,6 +47,21 @@
 
 #mcp-status-bar .mcp-server-info {
     color: var(--color-subtle_text);
+    font-family: var(--font-code);
     font-size: 0.9em;
-    margin-inline-start: 4px;
+}
+
+@keyframes mcp-status-pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #mcp-status-bar .mcp-status-dot.connected {
+        animation: none;
+    }
 }

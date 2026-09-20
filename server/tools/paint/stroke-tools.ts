@@ -11,13 +11,7 @@ import {
   eraserToolParameters,
 } from "./schemas";
 import { nativePaintStroke, setCopyBrushSource, startTextureStroke } from "./native-painter";
-
-/** Applies optional toolbar values in declaration order, leaving omitted (undefined) options untouched. */
-function applyToolbarValues(values: Record<string, unknown>): void {
-  Object.entries(values)
-    .filter(([, value]) => value !== undefined)
-    .forEach(([id, value]) => setBarItemValue(id, value));
-}
+import { applyToolbarValues, brushOpacityForToolbar, ensurePaintableLayer } from "./runtime";
 
 /**
  * Registers `paint_fill_tool` (`paintToolDocs[0]`): a native bucket fill that
@@ -33,16 +27,15 @@ export function registerPaintFillTool(): void {
       async execute({ texture_id, x, y, color, opacity, tolerance, fill_mode, blend_mode }) {
         if (tolerance !== undefined && tolerance !== 0) throw new Error("Native fill supports exact color matching only. Omit tolerance or set it to 0; nonzero tolerance is unsupported.");
         const texture = getAndActivateTexture(texture_id);
+        ensurePaintableLayer(texture);
 
-        // Apply settings
+        // Select the tool first: slider values are stored per tool.
+        // @ts-ignore
+        BarItems.fill_tool.select();
         if (color) {
           ColorPanel.set(color);
         }
-        applyToolbarValues({ slider_brush_opacity: opacity, fill_mode, blend_mode });
-
-        // Select fill tool
-        // @ts-ignore
-        BarItems.fill_tool.select();
+        applyToolbarValues({ slider_brush_opacity: brushOpacityForToolbar(opacity), fill_mode, blend_mode });
 
         // Perform fill
         nativePaintStroke(painter => startTextureStroke(painter, texture, x, y));
@@ -67,19 +60,16 @@ export function registerDrawShapeTool(): void {
       parameters: drawShapeToolParameters,
       async execute({ texture_id, shape, start, end, color, line_width, opacity, blend_mode }) {
         const texture = getAndActivateTexture(texture_id);
+        ensurePaintableLayer(texture);
 
-        // Apply settings
+        // Select the tool first: slider values are stored per tool.
+        // @ts-ignore
+        BarItems.draw_shape_tool.select();
         if (color) {
           ColorPanel.set(color);
         }
-        applyToolbarValues({ slider_brush_opacity: opacity, slider_brush_size: line_width, blend_mode });
-
-        // Set shape type
+        applyToolbarValues({ slider_brush_opacity: brushOpacityForToolbar(opacity), slider_brush_size: line_width, blend_mode });
         setBarItemValue("draw_shape_type", shape);
-
-        // Select draw shape tool
-        // @ts-ignore
-        BarItems.draw_shape_tool.select();
 
         // Draw shape
         nativePaintStroke(
@@ -107,16 +97,15 @@ export function registerGradientTool(): void {
       parameters: gradientToolParameters,
       async execute({ texture_id, start, end, start_color, end_color, opacity, blend_mode }) {
         const texture = getAndActivateTexture(texture_id);
+        ensurePaintableLayer(texture);
 
-        // Apply settings
+        // Select the tool first: slider values are stored per tool.
+        // @ts-ignore
+        BarItems.gradient_tool.select();
         ColorPanel.set(start_color);
         // @ts-ignore
         ColorPanel.set(end_color, true); // Set as secondary color
-        applyToolbarValues({ slider_brush_opacity: opacity, blend_mode });
-
-        // Select gradient tool
-        // @ts-ignore
-        BarItems.gradient_tool.select();
+        applyToolbarValues({ slider_brush_opacity: brushOpacityForToolbar(opacity), blend_mode });
 
         // Apply gradient
         nativePaintStroke(
@@ -142,15 +131,19 @@ export function registerCopyBrushTool(): void {
     {
       ...paintToolDocs[4],
       parameters: copyBrushToolParameters,
-      async execute({ texture_id, source, target, brush_size, opacity, mode }) {
+      async execute({ texture_id, source, target, brush_size, opacity, mode, aspect_ratio }) {
         const texture = getAndActivateTexture(texture_id);
+        ensurePaintableLayer(texture);
 
-        // Apply settings
-        applyToolbarValues({ slider_brush_size: brush_size, slider_brush_opacity: opacity, copy_brush_mode: mode });
-
-        // Select copy brush tool
+        // Select the tool first: slider values are stored per tool.
         // @ts-ignore
         BarItems.copy_brush.select();
+        applyToolbarValues({
+          slider_brush_size: brush_size,
+          slider_brush_opacity: brushOpacityForToolbar(opacity),
+          slider_brush_aspect_ratio: aspect_ratio,
+          copy_brush_mode: mode,
+        });
 
         // Set source point (Ctrl+click equivalent)
         setCopyBrushSource(texture, source.x, source.y);
@@ -179,18 +172,17 @@ export function registerEraserTool(): void {
       parameters: eraserToolParameters,
       async execute({ texture_id, coordinates, brush_size, opacity, softness, shape, connect_strokes }) {
         const texture = getAndActivateTexture(texture_id);
+        ensurePaintableLayer(texture);
 
-        // Apply settings
+        // Select the tool first: slider values are stored per tool.
+        // @ts-ignore
+        BarItems.eraser.select();
         applyToolbarValues({
           slider_brush_size: brush_size,
-          slider_brush_opacity: opacity,
+          slider_brush_opacity: brushOpacityForToolbar(opacity),
           slider_brush_softness: softness,
           brush_shape: shape,
         });
-
-        // Select eraser tool
-        // @ts-ignore
-        BarItems.eraser.select();
 
         const strokes = connect_strokes ? [coordinates] : coordinates.map(point => [point]);
         strokes.forEach(([first, ...rest]) => nativePaintStroke(

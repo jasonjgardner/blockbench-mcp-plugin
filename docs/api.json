@@ -1,6 +1,6 @@
 {
   "version": "1.8.0",
-  "generatedAt": "2026-09-13T20:44:59.501Z",
+  "generatedAt": "2026-09-18T17:36:30.446Z",
   "tools": [
     {
       "name": "place_cube",
@@ -84,6 +84,32 @@
                         0,
                         0
                       ]
+                    },
+                    "shade": {
+                      "type": "boolean",
+                      "description": "Whether to apply shading to the cube. Java 26.3+ projects ignore this flag; shade=false is mapped to shade_direction_override 'up' there, matching Blockbench's own import.",
+                      "markdownDescription": "Whether to apply shading to the cube. Java 26.3+ projects ignore this flag; shade=false is mapped to shade_direction_override 'up' there, matching Blockbench's own import."
+                    },
+                    "shade_direction_override": {
+                      "type": "string",
+                      "enum": [
+                        "",
+                        "north",
+                        "south",
+                        "west",
+                        "east",
+                        "up",
+                        "down"
+                      ],
+                      "description": "Java Edition 26.3+ shade direction override: the face direction whose lighting shade is applied to every face. '' removes the override. Replaces the boolean shade flag in formats with java_cube_shade_direction_override (new Java Block projects default to 26.3).",
+                      "markdownDescription": "Java Edition 26.3+ shade direction override: the face direction whose lighting shade is applied to every face. '' removes the override. Replaces the boolean shade flag in formats with java_cube_shade_direction_override (new Java Block projects default to 26.3)."
+                    },
+                    "light_emission": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 15,
+                      "description": "Block light emitted by the cube (0-15). Exported by Java Block formats.",
+                      "markdownDescription": "Block light emitted by the cube (0-15). Exported by Java Block formats."
                     }
                   },
                   "required": [
@@ -92,8 +118,8 @@
                   "additionalProperties": false
                 },
                 "minItems": 1,
-                "description": "Array of cubes to place.",
-                "markdownDescription": "Array of cubes to place."
+                "description": "Array of cubes to place, with optional Java shading fields.",
+                "markdownDescription": "Array of cubes to place, with optional Java shading fields."
               },
               "texture": {
                 "type": "string",
@@ -280,8 +306,29 @@
               },
               "shade": {
                 "type": "boolean",
-                "description": "Whether to apply shading to the cube.",
-                "markdownDescription": "Whether to apply shading to the cube."
+                "description": "Whether to apply shading to the cube. Java 26.3+ projects ignore this flag; shade=false is mapped to shade_direction_override 'up' there, matching Blockbench's own import.",
+                "markdownDescription": "Whether to apply shading to the cube. Java 26.3+ projects ignore this flag; shade=false is mapped to shade_direction_override 'up' there, matching Blockbench's own import."
+              },
+              "shade_direction_override": {
+                "type": "string",
+                "enum": [
+                  "",
+                  "north",
+                  "south",
+                  "west",
+                  "east",
+                  "up",
+                  "down"
+                ],
+                "description": "Java Edition 26.3+ shade direction override: the face direction whose lighting shade is applied to every face. '' removes the override. Replaces the boolean shade flag in formats with java_cube_shade_direction_override (new Java Block projects default to 26.3).",
+                "markdownDescription": "Java Edition 26.3+ shade direction override: the face direction whose lighting shade is applied to every face. '' removes the override. Replaces the boolean shade flag in formats with java_cube_shade_direction_override (new Java Block projects default to 26.3)."
+              },
+              "light_emission": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 15,
+                "description": "Block light emitted by the cube (0-15). Exported by Java Block formats.",
+                "markdownDescription": "Block light emitted by the cube (0-15). Exported by Java Block formats."
               },
               "inflate": {
                 "type": "number",
@@ -306,9 +353,189 @@
       }
     },
     {
+      "name": "knife_cut_cube",
+      "title": "Knife Cut Cube",
+      "description": "Headless Blockbench Knife tool for cubes: splits each target cube with planes perpendicular to one axis at the given positions, keeping each piece's share of the face UVs. The original cube keeps the lowest piece; new pieces get unique names. One undo entry covers every cut and the selection is left unchanged.",
+      "status": "experimental",
+      "category": "Cubes",
+      "annotations": {
+        "destructiveHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/knife_cut_cube",
+        "definitions": {
+          "knife_cut_cube": {
+            "type": "object",
+            "properties": {
+              "cubes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "description": "Cube UUIDs or unique names to cut. Defaults to the selected cubes.",
+                "markdownDescription": "Cube UUIDs or unique names to cut. Defaults to the selected cubes."
+              },
+              "axis": {
+                "type": "string",
+                "enum": [
+                  "x",
+                  "y",
+                  "z"
+                ],
+                "description": "Axis the cut plane is perpendicular to.",
+                "markdownDescription": "Axis the cut plane is perpendicular to."
+              },
+              "positions": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 1,
+                "description": "Cut-plane coordinates along the axis, in the cube's from/to space (model space for unrotated cubes). Positions closer than the cube's inflate to its from/to edges, or outside it, are skipped for that cube and reported sorted and deduplicated.",
+                "markdownDescription": "Cut-plane coordinates along the axis, in the cube's from/to space (model space for unrotated cubes). Positions closer than the cube's inflate to its from/to edges, or outside it, are skipped for that cube and reported sorted and deduplicated."
+              }
+            },
+            "required": [
+              "axis",
+              "positions"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "slice_cubes_to_block_grid",
+      "title": "Slice Cubes To Block Grid",
+      "description": "Cuts cubes wherever they cross a Bedrock block boundary (16-unit grid, x/z centered) and, by default, regroups the pieces into one group per block cell pivoted at that block's origin. Use it to divide an oversized custom block model into per-block sections that each fit Bedrock's 30×30×30 limit. Rotated cubes are left uncut on the affected axes and reported.",
+      "status": "experimental",
+      "category": "Cubes",
+      "annotations": {
+        "destructiveHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/slice_cubes_to_block_grid",
+        "definitions": {
+          "slice_cubes_to_block_grid": {
+            "type": "object",
+            "properties": {
+              "cubes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "description": "Cube UUIDs or unique names to slice. Defaults to every cube in the project.",
+                "markdownDescription": "Cube UUIDs or unique names to slice. Defaults to every cube in the project."
+              },
+              "axes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "x",
+                    "y",
+                    "z"
+                  ]
+                },
+                "minItems": 1,
+                "default": [
+                  "x",
+                  "y",
+                  "z"
+                ],
+                "description": "Axes to slice along. Cubes rotated (or inside groups rotated) about the other two axes are skipped on that axis, as Blockbench's own slicer does.",
+                "markdownDescription": "Axes to slice along. Cubes rotated (or inside groups rotated) about the other two axes are skipped on that axis, as Blockbench's own slicer does."
+              },
+              "cell_size": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 16,
+                "description": "Block size in model units; 16 for Bedrock. Horizontal boundaries sit at ±half a cell, vertical ones at multiples.",
+                "markdownDescription": "Block size in model units; 16 for Bedrock. Horizontal boundaries sit at ±half a cell, vertical ones at multiples."
+              },
+              "regroup": {
+                "type": "boolean",
+                "default": true,
+                "description": "Move every resulting cube into a group named after its block cell (bottom, top, right_top_front, top2, …) pivoted at that block's origin, so each group is one exportable block section. Pieces leave their previous bone; the report lists each source cube's former group.",
+                "markdownDescription": "Move every resulting cube into a group named after its block cell (bottom, top, right_top_front, top2, …) pivoted at that block's origin, so each group is one exportable block section. Pieces leave their previous bone; the report lists each source cube's former group."
+              },
+              "parent": {
+                "type": "string",
+                "description": "Parent group UUID or name for the cell groups; must not be rotated. Defaults to the project root.",
+                "markdownDescription": "Parent group UUID or name for the cell groups; must not be rotated. Defaults to the project root."
+              },
+              "group_prefix": {
+                "type": "string",
+                "default": "",
+                "description": "Prefix for cell group names, e.g. `goal_` yields `goal_top`. Existing groups are reused only when their name and block-origin pivot match; otherwise a numbered name is chosen.",
+                "markdownDescription": "Prefix for cell group names, e.g. `goal_` yields `goal_top`. Existing groups are reused only when their name and block-origin pivot match; otherwise a numbered name is chosen."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "inspect_block_bounds",
+      "title": "Inspect Block Bounds",
+      "description": "Reports cube, group, and whole-model extents against Blockbench's Bedrock block limit (a 30×30×30 box whose center may sit up to 7 units from the block center), the block cell each cube occupies, and the grid cut positions slice_cubes_to_block_grid would use. Read-only. Extents ignore rotation; rotated cubes are flagged.",
+      "status": "experimental",
+      "category": "Cubes",
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/inspect_block_bounds",
+        "definitions": {
+          "inspect_block_bounds": {
+            "type": "object",
+            "properties": {
+              "cubes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "description": "Cube UUIDs or unique names to inspect. Defaults to every cube in the project.",
+                "markdownDescription": "Cube UUIDs or unique names to inspect. Defaults to every cube in the project."
+              },
+              "cell_size": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 16,
+                "description": "Block size in model units; 16 for Bedrock.",
+                "markdownDescription": "Block size in model units; 16 for Bedrock."
+              },
+              "max_size": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 30,
+                "description": "Maximum geometry size per axis for one block (Bedrock: 30).",
+                "markdownDescription": "Maximum geometry size per axis for one block (Bedrock: 30)."
+              },
+              "max_center_offset": {
+                "type": "number",
+                "minimum": 0,
+                "default": 7,
+                "description": "How far the limit box may shift from the block center per axis (Bedrock: 7, giving x/z within ±22 and y within -14…30).",
+                "markdownDescription": "How far the limit box may shift from the block center per axis (Bedrock: 7, giving x/z within ±22 and y within -14…30)."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
       "name": "capture_screenshot",
       "title": "Capture Screenshot",
-      "description": "Returns the image data of the current view.",
+      "description": "Returns the rendered image of a view. Defaults to the user's active viewport (\"active\"); pass the ID of an offscreen view from create_offscreen_view to render without disturbing the user, or a viewport ID from list_views.",
       "status": "stable",
       "category": "Camera & Screenshots",
       "annotations": {
@@ -324,6 +551,13 @@
                 "type": "string",
                 "description": "Project name or UUID.",
                 "markdownDescription": "Project name or UUID."
+              },
+              "view": {
+                "type": "string",
+                "minLength": 1,
+                "description": "View to target: \"active\" for the viewport the user last interacted with, the ID of an offscreen view from create_offscreen_view, or a viewport ID from list_views.",
+                "markdownDescription": "View to target: \"active\" for the viewport the user last interacted with, the ID of an offscreen view from create_offscreen_view, or a viewport ID from list_views.",
+                "default": "active"
               }
             },
             "additionalProperties": false
@@ -356,7 +590,7 @@
     {
       "name": "set_camera_angle",
       "title": "Set Camera Angle",
-      "description": "Sets the camera angle to the specified value.",
+      "description": "Moves a view's camera and returns the resulting frame plus the applied camera state. Defaults to the user's active viewport, which changes what they see and clears any side-view lock they had; target an offscreen view from create_offscreen_view to inspect the model from any angle without moving their camera.",
       "status": "experimental",
       "category": "Camera & Screenshots",
       "annotations": {
@@ -368,6 +602,13 @@
           "set_camera_angle": {
             "type": "object",
             "properties": {
+              "view": {
+                "type": "string",
+                "minLength": 1,
+                "description": "View to target: \"active\" for the viewport the user last interacted with, the ID of an offscreen view from create_offscreen_view, or a viewport ID from list_views.",
+                "markdownDescription": "View to target: \"active\" for the viewport the user last interacted with, the ID of an offscreen view from create_offscreen_view, or a viewport ID from list_views.",
+                "default": "active"
+              },
               "position": {
                 "type": "array",
                 "items": {
@@ -407,6 +648,32 @@
                 ],
                 "description": "Camera projection type.",
                 "markdownDescription": "Camera projection type."
+              },
+              "zoom": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Orthographic zoom factor (Blockbench default 0.5). Ignored for perspective views and while a side view is locked.",
+                "markdownDescription": "Orthographic zoom factor (Blockbench default 0.5). Ignored for perspective views and while a side view is locked."
+              },
+              "fov": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 179,
+                "description": "Perspective field of view in degrees. Uses the Blockbench setting when omitted.",
+                "markdownDescription": "Perspective field of view in degrees. Uses the Blockbench setting when omitted."
+              },
+              "locked_angle": {
+                "type": "string",
+                "enum": [
+                  "top",
+                  "bottom",
+                  "north",
+                  "south",
+                  "east",
+                  "west"
+                ],
+                "description": "Lock an orthographic side view (top, bottom, north, south, east, west). Omit to leave the view free.",
+                "markdownDescription": "Lock an orthographic side view (top, bottom, north, south, east, west). Omit to leave the view free."
               }
             },
             "required": [
@@ -420,13 +687,189 @@
       }
     },
     {
+      "name": "create_offscreen_view",
+      "title": "Create Offscreen View",
+      "description": "Creates a private offscreen viewport that renders the current project without moving the user's camera. Use it with set_camera_angle and capture_screenshot (view: <id>) for multi-angle inspection. The camera starts where the user's is unless copy_view is \"none\". Up to 4 views may exist at once; delete them with delete_offscreen_view when done.",
+      "status": "experimental",
+      "category": "Camera & Screenshots",
+      "annotations": {
+        "idempotentHint": false
+      },
+      "parameters": {
+        "$ref": "#/definitions/create_offscreen_view",
+        "definitions": {
+          "create_offscreen_view": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{1,64}$",
+                "errorMessage": {
+                  "pattern": "Use 1–64 letters, digits, underscores, or hyphens."
+                },
+                "description": "ID for the new view. Generated as view_N when omitted.",
+                "markdownDescription": "ID for the new view. Generated as view_N when omitted."
+              },
+              "width": {
+                "type": "integer",
+                "minimum": 16,
+                "maximum": 2048,
+                "description": "Width in pixels (16–2048).",
+                "markdownDescription": "Width in pixels (16–2048).",
+                "default": 1024
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 16,
+                "maximum": 2048,
+                "description": "Height in pixels (16–2048).",
+                "markdownDescription": "Height in pixels (16–2048).",
+                "default": 768
+              },
+              "antialias": {
+                "type": "boolean",
+                "default": true,
+                "description": "Multisample antialiasing. Disable for crisp pixel-art inspection.",
+                "markdownDescription": "Multisample antialiasing. Disable for crisp pixel-art inspection."
+              },
+              "copy_view": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "View to target: \"active\" for the viewport the user last interacted with, the ID of an offscreen view from create_offscreen_view, or a viewport ID from list_views.",
+                    "markdownDescription": "View to target: \"active\" for the viewport the user last interacted with, the ID of an offscreen view from create_offscreen_view, or a viewport ID from list_views."
+                  },
+                  {
+                    "type": "string",
+                    "const": "none"
+                  }
+                ],
+                "default": "active",
+                "description": "View whose camera seeds the new one. Defaults to \"active\" (the user's viewport); pass \"none\" for Blockbench's default angle.",
+                "markdownDescription": "View whose camera seeds the new one. Defaults to \"active\" (the user's viewport); pass \"none\" for Blockbench's default angle."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "list_views",
+      "title": "List Views",
+      "description": "Lists render targets: the user's connected viewports (the active one flagged) and the plugin's offscreen views, each with size and camera position, target, projection, FOV, zoom, and side-view lock.",
+      "status": "experimental",
+      "category": "Camera & Screenshots",
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/list_views",
+        "definitions": {
+          "list_views": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "resize_offscreen_view",
+      "title": "Resize Offscreen View",
+      "description": "Changes the pixel size of an offscreen view. The user's viewports follow their layout and cannot be resized here.",
+      "status": "experimental",
+      "category": "Camera & Screenshots",
+      "annotations": {
+        "idempotentHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/resize_offscreen_view",
+        "definitions": {
+          "resize_offscreen_view": {
+            "type": "object",
+            "properties": {
+              "view": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{1,64}$",
+                "errorMessage": {
+                  "pattern": "Use 1–64 letters, digits, underscores, or hyphens."
+                },
+                "description": "ID of the offscreen view to resize.",
+                "markdownDescription": "ID of the offscreen view to resize."
+              },
+              "width": {
+                "type": "integer",
+                "minimum": 16,
+                "maximum": 2048,
+                "description": "Width in pixels (16–2048).",
+                "markdownDescription": "Width in pixels (16–2048)."
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 16,
+                "maximum": 2048,
+                "description": "Height in pixels (16–2048).",
+                "markdownDescription": "Height in pixels (16–2048)."
+              }
+            },
+            "required": [
+              "view",
+              "width",
+              "height"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "delete_offscreen_view",
+      "title": "Delete Offscreen View",
+      "description": "Disposes an offscreen view and releases its WebGL context. The user's viewports are not affected.",
+      "status": "experimental",
+      "category": "Camera & Screenshots",
+      "annotations": {
+        "destructiveHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/delete_offscreen_view",
+        "definitions": {
+          "delete_offscreen_view": {
+            "type": "object",
+            "properties": {
+              "view": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{1,64}$",
+                "errorMessage": {
+                  "pattern": "Use 1–64 letters, digits, underscores, or hyphens."
+                },
+                "description": "ID of the offscreen view to dispose.",
+                "markdownDescription": "ID of the offscreen view to dispose."
+              }
+            },
+            "required": [
+              "view"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
       "name": "get_capabilities",
       "title": "Get Capabilities",
-      "description": "Discover Blockbench/plugin versions, desktop or web environment, active project summary, and registered model formats. Returns detailed boolean format features (null means unknown), compact supported-feature lists for all formats, and optional tool registration states. Works with no open project. Format features do not guarantee that every enabled MCP tool can run in the current mode or selection.",
+      "description": "Discover Blockbench/plugin versions, desktop or web environment, active project summary, and registered model formats. Returns detailed boolean format features (null means unknown; includes molang and java_cube_shade_direction_override) plus the format's remember_files and animation_grouping settings, compact supported-feature lists for all formats, and optional tool registration states. Works with no open project. Format features do not guarantee that every enabled MCP tool can run in the current mode or selection.",
       "status": "stable",
       "category": "Capabilities",
       "annotations": {
         "destructiveHint": false,
+        "idempotentHint": true,
         "readOnlyHint": true,
         "openWorldHint": false
       },
@@ -727,7 +1170,7 @@
     {
       "name": "animation_graph_editor",
       "title": "Animation Graph Editor",
-      "description": "Controls animation curves in the graph editor for fine-tuning animations.",
+      "description": "Edits a bone channel's interpolation or numeric Bezier easing in one reversible edit. Uses native per-axis handle arrays and chronological segment durations. Custom points are normalized time/value fractions. Partial-axis edits require existing Bezier keys; key-wide mode changes require all axes. Rejects curve edits ignored by quaternion rotation. Inspect neighboring segments after range edits.",
       "status": "experimental",
       "category": "Animation",
       "annotations": {
@@ -775,8 +1218,8 @@
                   }
                 ],
                 "default": "all",
-                "description": "Axis to modify curves for.",
-                "markdownDescription": "Axis to modify curves for."
+                "description": "Axes to edit. Linear, stepped and smooth require all because interpolation is key-wide. Partial-axis easing/custom edits require selected keys already using Bezier interpolation, preserving other axes' handles.",
+                "markdownDescription": "Axes to edit. Linear, stepped and smooth require all because interpolation is key-wide. Partial-axis easing/custom edits require selected keys already using Bezier interpolation, preserving other axes' handles."
               },
               "action": {
                 "type": "string",
@@ -789,8 +1232,8 @@
                   "stepped",
                   "custom"
                 ],
-                "description": "Type of curve modification to apply.",
-                "markdownDescription": "Type of curve modification to apply."
+                "description": "Curve modification. Easing/custom require at least two distinct chronological numeric single-data-point keys. Smooth and Bezier rotation edits are unavailable when native quaternion interpolation would ignore them.",
+                "markdownDescription": "Curve modification. Easing/custom require at least two distinct chronological numeric single-data-point keys. Smooth and Bezier rotation edits are unavailable when native quaternion interpolation would ignore them."
               },
               "keyframe_range": {
                 "type": "object",
@@ -811,8 +1254,8 @@
                   "end"
                 ],
                 "additionalProperties": false,
-                "description": "Time range to apply the curve modification. If not provided, applies to all keyframes.",
-                "markdownDescription": "Time range to apply the curve modification. If not provided, applies to all keyframes."
+                "description": "Finite ordered time range selecting existing keys; omitted means the full channel. Key-wide interpolation can affect neighboring segments at range boundaries, so edit the full channel when boundary continuity matters.",
+                "markdownDescription": "Finite ordered time range selecting existing keys; omitted means the full channel. Key-wide interpolation can affect neighboring segments at range boundaries, so edit the full channel when boundary continuity matters."
               },
               "custom_curve": {
                 "type": "object",
@@ -824,8 +1267,8 @@
                     },
                     "minItems": 2,
                     "maxItems": 2,
-                    "description": "First control point [time, value].",
-                    "markdownDescription": "First control point [time, value]."
+                    "description": "Outgoing normalized control point [time fraction in 0..1, value fraction] for each selected adjacent-key segment. Finite value fractions outside 0..1 allow overshoot.",
+                    "markdownDescription": "Outgoing normalized control point [time fraction in 0..1, value fraction] for each selected adjacent-key segment. Finite value fractions outside 0..1 allow overshoot."
                   },
                   "control_point_2": {
                     "type": "array",
@@ -834,8 +1277,8 @@
                     },
                     "minItems": 2,
                     "maxItems": 2,
-                    "description": "Second control point [time, value].",
-                    "markdownDescription": "Second control point [time, value]."
+                    "description": "Incoming normalized control point [time fraction in 0..1, value fraction], measured from the segment start. Converted to native per-axis offsets relative to the ending key.",
+                    "markdownDescription": "Incoming normalized control point [time fraction in 0..1, value fraction], measured from the segment start. Converted to native per-axis offsets relative to the ending key."
                   }
                 },
                 "required": [
@@ -843,8 +1286,8 @@
                   "control_point_2"
                 ],
                 "additionalProperties": false,
-                "description": "Custom bezier curve control points (only for 'custom' action).",
-                "markdownDescription": "Custom bezier curve control points (only for 'custom' action)."
+                "description": "Normalized cubic Bezier control points, required for custom action. Conversion uses each segment's duration and edited-axis endpoint values; unrelated axis handles are preserved.",
+                "markdownDescription": "Normalized cubic Bezier control points, required for custom action. Conversion uses each segment's duration and edited-axis endpoint values; unrelated axis handles are preserved."
               }
             },
             "required": [
@@ -861,7 +1304,7 @@
     {
       "name": "bone_rigging",
       "title": "Bone Rigging",
-      "description": "Creates and manipulates the bone structure (rig) of a model for animation.",
+      "description": "Creates and manipulates the bone structure (rig) of a model for animation. The set_ik action is deprecated; use set_ik_controller for Blockbench's null-object IK (source, target, pole).",
       "status": "experimental",
       "category": "Animation",
       "annotations": {
@@ -931,13 +1374,13 @@
                   },
                   "ik_enabled": {
                     "type": "boolean",
-                    "description": "Enable inverse kinematics for this bone.",
-                    "markdownDescription": "Enable inverse kinematics for this bone."
+                    "description": "Deprecated; prefer set_ik_controller. true makes this bone the end effector of a null-object IK controller (created as <bone>_ik when ik_target is omitted); false clears ik_target on controllers driving it.",
+                    "markdownDescription": "Deprecated; prefer set_ik_controller. true makes this bone the end effector of a null-object IK controller (created as <bone>_ik when ik_target is omitted); false clears ik_target on controllers driving it."
                   },
                   "ik_target": {
                     "type": "string",
-                    "description": "Target bone for IK chain.",
-                    "markdownDescription": "Target bone for IK chain."
+                    "description": "Name or UUID of the null object that drives this bone as the IK controller.",
+                    "markdownDescription": "Name or UUID of the null object that drives this bone as the IK controller."
                   },
                   "mirror_axis": {
                     "type": "string",
@@ -971,7 +1414,7 @@
     {
       "name": "animation_timeline",
       "title": "Animation Timeline",
-      "description": "Controls the animation timeline, including playback, time scrubbing, and timeline settings.",
+      "description": "Controls the animation timeline: playback, time scrubbing, length, FPS, loop mode, and keyframe selection by time range or relative to the playhead (select_before_playhead/select_after_playhead return the selected keyframe UUIDs).",
       "status": "experimental",
       "category": "Animation",
       "annotations": {
@@ -998,16 +1441,18 @@
                   "set_length",
                   "set_fps",
                   "loop",
-                  "select_range"
+                  "select_range",
+                  "select_before_playhead",
+                  "select_after_playhead"
                 ],
-                "description": "Timeline action to perform.",
-                "markdownDescription": "Timeline action to perform."
+                "description": "Timeline action to perform. select_before_playhead/select_after_playhead replace the keyframe selection with bone keyframes at or before/after the playhead (1e-5 s tolerance, like Blockbench 5.2's native actions) and return their UUIDs.",
+                "markdownDescription": "Timeline action to perform. select_before_playhead/select_after_playhead replace the keyframe selection with bone keyframes at or before/after the playhead (1e-5 s tolerance, like Blockbench 5.2's native actions) and return their UUIDs."
               },
               "time": {
                 "type": "number",
                 "minimum": 0,
-                "description": "Time in seconds (for set_time action).",
-                "markdownDescription": "Time in seconds (for set_time action)."
+                "description": "Time in seconds. Required for set_time; for select_before_playhead/select_after_playhead it is the reference time and defaults to the current playhead.",
+                "markdownDescription": "Time in seconds. Required for set_time; for select_before_playhead/select_after_playhead it is the reference time and defaults to the current playhead."
               },
               "length": {
                 "type": "number",
@@ -1054,6 +1499,16 @@
                 "additionalProperties": false,
                 "description": "Time range for selection.",
                 "markdownDescription": "Time range for selection."
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "animation",
+                  "timeline"
+                ],
+                "default": "animation",
+                "description": "Keyframes considered by select_before_playhead/select_after_playhead. animation: every bone animator of the target animation, including ones hidden from the timeline. timeline: only animators shown in the timeline with visible channels, matching the native action; requires the target animation to be selected.",
+                "markdownDescription": "Keyframes considered by select_before_playhead/select_after_playhead. animation: every bone animator of the target animation, including ones hidden from the timeline. timeline: only animators shown in the timeline with visible channels, matching the native action; requires the target animation to be selected."
               }
             },
             "required": [
@@ -1343,6 +1798,270 @@
       }
     },
     {
+      "name": "variable_placeholders",
+      "title": "Variable Placeholders",
+      "description": "Reads or edits the project's animation Variable Placeholders text (one `variable = expression` per line), used to preview Molang animations. add writes a value, slider('name', step, min, max), toggle('name') or impulse('name', duration) line like the native Create Variable Placeholder dialog; set replaces all text; remove deletes a variable's lines. Changes sync through the native panel, refresh the animation preview and return the parsed lines and live controls. Placeholder edits are not recorded in Undo. Requires a format with Molang enabled.",
+      "status": "experimental",
+      "category": "Animation",
+      "annotations": {
+        "destructiveHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/variable_placeholders",
+        "definitions": {
+          "variable_placeholders": {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "get",
+                  "set",
+                  "add",
+                  "remove"
+                ],
+                "description": "get: read text, parsed lines and live controls. set: replace the whole text. add: write one structured line. remove: delete every line assigning variable.",
+                "markdownDescription": "get: read text, parsed lines and live controls. set: replace the whole text. add: write one structured line. remove: delete every line assigning variable."
+              },
+              "text": {
+                "type": "string",
+                "maxLength": 100000,
+                "description": "Complete placeholder text for set; one `variable = expression` per line. Empty clears all placeholders.",
+                "markdownDescription": "Complete placeholder text for set; one `variable = expression` per line. Empty clears all placeholders."
+              },
+              "entry": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "value"
+                      },
+                      "variable": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z_][\\w.-]*$",
+                        "errorMessage": {
+                          "pattern": "Use a Molang variable name such as variable.speed or v.speed."
+                        },
+                        "description": "Variable assigned by the line, e.g. variable.speed (v./q./t./c. short prefixes are expanded by Blockbench).",
+                        "markdownDescription": "Variable assigned by the line, e.g. variable.speed (v./q./t./c. short prefixes are expanded by Blockbench)."
+                      },
+                      "value": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "^[^\\r\\n]+$",
+                            "errorMessage": {
+                              "pattern": "Expressions must be a single line."
+                            }
+                          }
+                        ],
+                        "description": "Constant number or single-line Molang expression.",
+                        "markdownDescription": "Constant number or single-line Molang expression."
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "variable",
+                      "value"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "slider"
+                      },
+                      "variable": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z_][\\w.-]*$",
+                        "errorMessage": {
+                          "pattern": "Use a Molang variable name such as variable.speed or v.speed."
+                        },
+                        "description": "Variable assigned by the line, e.g. variable.speed (v./q./t./c. short prefixes are expanded by Blockbench).",
+                        "markdownDescription": "Variable assigned by the line, e.g. variable.speed (v./q./t./c. short prefixes are expanded by Blockbench)."
+                      },
+                      "name": {
+                        "type": "string",
+                        "pattern": "^[^'\"(),\\r\\n]+$",
+                        "errorMessage": {
+                          "pattern": "Control names cannot contain quotes, parentheses, commas or line breaks."
+                        },
+                        "description": "Label of the preview control shown in the Variable Placeholders panel.",
+                        "markdownDescription": "Label of the preview control shown in the Variable Placeholders panel."
+                      },
+                      "step": {
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                        "description": "Slider step; defaults to 1 when a range is given.",
+                        "markdownDescription": "Slider step; defaults to 1 when a range is given."
+                      },
+                      "range": {
+                        "type": "array",
+                        "minItems": 2,
+                        "maxItems": 2,
+                        "items": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ],
+                        "description": "Slider [min, max].",
+                        "markdownDescription": "Slider [min, max]."
+                      },
+                      "initial_value": {
+                        "type": "number",
+                        "description": "Initial control value (toggle: 0 or 1). Preview-only; not saved as text.",
+                        "markdownDescription": "Initial control value (toggle: 0 or 1). Preview-only; not saved as text."
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "variable",
+                      "name"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "toggle"
+                      },
+                      "variable": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z_][\\w.-]*$",
+                        "errorMessage": {
+                          "pattern": "Use a Molang variable name such as variable.speed or v.speed."
+                        },
+                        "description": "Variable assigned by the line, e.g. variable.speed (v./q./t./c. short prefixes are expanded by Blockbench).",
+                        "markdownDescription": "Variable assigned by the line, e.g. variable.speed (v./q./t./c. short prefixes are expanded by Blockbench)."
+                      },
+                      "name": {
+                        "type": "string",
+                        "pattern": "^[^'\"(),\\r\\n]+$",
+                        "errorMessage": {
+                          "pattern": "Control names cannot contain quotes, parentheses, commas or line breaks."
+                        },
+                        "description": "Label of the preview control shown in the Variable Placeholders panel.",
+                        "markdownDescription": "Label of the preview control shown in the Variable Placeholders panel."
+                      },
+                      "initial_value": {
+                        "type": "number",
+                        "description": "Initial control value (toggle: 0 or 1). Preview-only; not saved as text.",
+                        "markdownDescription": "Initial control value (toggle: 0 or 1). Preview-only; not saved as text."
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "variable",
+                      "name"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "impulse"
+                      },
+                      "variable": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z_][\\w.-]*$",
+                        "errorMessage": {
+                          "pattern": "Use a Molang variable name such as variable.speed or v.speed."
+                        },
+                        "description": "Variable assigned by the line, e.g. variable.speed (v./q./t./c. short prefixes are expanded by Blockbench).",
+                        "markdownDescription": "Variable assigned by the line, e.g. variable.speed (v./q./t./c. short prefixes are expanded by Blockbench)."
+                      },
+                      "name": {
+                        "type": "string",
+                        "pattern": "^[^'\"(),\\r\\n]+$",
+                        "errorMessage": {
+                          "pattern": "Control names cannot contain quotes, parentheses, commas or line breaks."
+                        },
+                        "description": "Label of the preview control shown in the Variable Placeholders panel.",
+                        "markdownDescription": "Label of the preview control shown in the Variable Placeholders panel."
+                      },
+                      "duration": {
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                        "description": "Seconds the impulse stays at 1 (Blockbench default 0.1).",
+                        "markdownDescription": "Seconds the impulse stays at 1 (Blockbench default 0.1)."
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "variable",
+                      "name"
+                    ],
+                    "additionalProperties": false
+                  }
+                ],
+                "description": "Structured line for add.",
+                "markdownDescription": "Structured line for add."
+              },
+              "replace_existing": {
+                "type": "boolean",
+                "default": true,
+                "description": "For add: replace an existing line for the same variable (aliases such as v. match) instead of appending a duplicate.",
+                "markdownDescription": "For add: replace an existing line for the same variable (aliases such as v. match) instead of appending a duplicate."
+              },
+              "variable": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Variable to delete for remove.",
+                "markdownDescription": "Variable to delete for remove."
+              }
+            },
+            "required": [
+              "action"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "list_molang_variables",
+      "title": "List Molang Variables",
+      "description": "Lists Blockbench's built-in Molang variables and query functions available in animation previews (like the native View Built-in Variables dialog), with current values for constants and live queries, plus the project's placeholder assignments. Read-only.",
+      "status": "experimental",
+      "category": "Animation",
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/list_molang_variables",
+        "definitions": {
+          "list_molang_variables": {
+            "type": "object",
+            "properties": {
+              "filter": {
+                "type": "string",
+                "description": "Case-insensitive substring filter on variable names, e.g. 'camera'.",
+                "markdownDescription": "Case-insensitive substring filter on variable names, e.g. 'camera'."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
       "name": "list_armatures",
       "title": "List Armatures",
       "description": "Lists all armatures in the current project with their basic info.",
@@ -1567,8 +2286,8 @@
               "include_weights": {
                 "type": "boolean",
                 "default": false,
-                "description": "Whether to include all vertex weights in response.",
-                "markdownDescription": "Whether to include all vertex weights in response."
+                "description": "Whether to include the bone's raw vertex_weights map in the response. Keys are `<first 6 chars of mesh UUID>:<vertex key>` (legacy projects may still hold bare `<vertex key>` entries until reweighted); use get_vertex_weights for per-mesh vertex-key maps.",
+                "markdownDescription": "Whether to include the bone's raw vertex_weights map in the response. Keys are `<first 6 chars of mesh UUID>:<vertex key>` (legacy projects may still hold bare `<vertex key>` entries until reweighted); use get_vertex_weights for per-mesh vertex-key maps."
               }
             },
             "required": [
@@ -2000,7 +2719,7 @@
     {
       "name": "clear_vertex_weights",
       "title": "Clear Vertex Weights",
-      "description": "Clears all vertex weights from a bone for a specific mesh.",
+      "description": "Clears all vertex weights from a bone for a specific mesh, including legacy bare vertex-key entries that still apply to that mesh.",
       "status": "experimental",
       "category": "Armature",
       "annotations": {
@@ -2026,6 +2745,73 @@
             "required": [
               "bone_id"
             ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "set_ik_controller",
+      "title": "Set IK Controller",
+      "description": "Creates or updates an inverse-kinematics controller. Blockbench drives IK from a null object: ik_target is the end effector (group/bone, armature bone, or locator) that reaches for the null object, ik_source is the chain root (defaults to the null object's parent), ik_pole (Blockbench 5.2+) sets the bend direction, and lock_ik_target_rotation keeps the effector's rotation. Works with bone rigs and armatures (5.2 allows null objects under armatures and armature bones). Validates every reference and that the target lies below the chain root; returns the solved chain. Replaces the deprecated bone_rigging set_ik flags, which Blockbench never read.",
+      "status": "experimental",
+      "category": "Armature",
+      "annotations": {
+        "destructiveHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/set_ik_controller",
+        "definitions": {
+          "set_ik_controller": {
+            "type": "object",
+            "properties": {
+              "null_object": {
+                "type": "string",
+                "description": "UUID or name of an existing null object to update. Omit to create a new IK controller null object.",
+                "markdownDescription": "UUID or name of an existing null object to update. Omit to create a new IK controller null object."
+              },
+              "name": {
+                "type": "string",
+                "description": "Name for the null object. Defaults to '<ik_target name>_ik' when creating.",
+                "markdownDescription": "Name for the null object. Defaults to '<ik_target name>_ik' when creating."
+              },
+              "position": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 3,
+                "maxItems": 3,
+                "description": "Null object position [x, y, z] as Blockbench stores it (model space for root and group parents). Defaults to the end effector's world pivot when creating.",
+                "markdownDescription": "Null object position [x, y, z] as Blockbench stores it (model space for root and group parents). Defaults to the end effector's world pivot when creating."
+              },
+              "parent": {
+                "type": "string",
+                "description": "Parent group, armature, or armature bone (UUID or name), or 'root'. Defaults to root when creating. When ik_source is empty the parent is the implicit chain root, so keep IK controllers outside the chain they drive.",
+                "markdownDescription": "Parent group, armature, or armature bone (UUID or name), or 'root'. Defaults to root when creating. When ik_source is empty the parent is the implicit chain root, so keep IK controllers outside the chain they drive."
+              },
+              "ik_target": {
+                "type": "string",
+                "description": "End effector that reaches for the null object: a group/bone, armature bone, or locator (UUID or name). Required when creating; must be a descendant of the chain root. Empty string clears.",
+                "markdownDescription": "End effector that reaches for the null object: a group/bone, armature bone, or locator (UUID or name). Required when creating; must be a descendant of the chain root. Empty string clears."
+              },
+              "ik_source": {
+                "type": "string",
+                "description": "Chain root: a group/bone or armature bone (UUID or name). The chain spans from here down to ik_target. Empty string clears, making the null object's parent the chain root.",
+                "markdownDescription": "Chain root: a group/bone or armature bone (UUID or name). The chain spans from here down to ik_target. Empty string clears, making the null object's parent the chain root."
+              },
+              "ik_pole": {
+                "type": "string",
+                "description": "Pole target controlling the bend direction (Blockbench 5.2+): a group, locator, or other null object (UUID or name). Empty string clears.",
+                "markdownDescription": "Pole target controlling the bend direction (Blockbench 5.2+): a group, locator, or other null object (UUID or name). Empty string clears."
+              },
+              "lock_ik_target_rotation": {
+                "type": "boolean",
+                "description": "Keep the end effector's world rotation while the chain solves.",
+                "markdownDescription": "Keep the end effector's world rotation while the chain solves."
+              }
+            },
             "additionalProperties": false
           }
         },
@@ -2074,7 +2860,7 @@
     {
       "name": "set_display_transform",
       "title": "Set Display Transform",
-      "description": "Writes a Java Edition display slot's transform (translation, rotation, scale, mirror, pivots). Creates the slot if it does not exist yet and wraps the change in an undo step. This edits data that ships in the exported model JSON — it changes the deliverable, not just the preview. Requires a format that supports display mode (e.g. Java Block/Item).",
+      "description": "Writes a Java Edition display slot's transform (translation, rotation, scale, mirror, pivots). Creates the slot if it does not exist yet (seeded from Blockbench's Bedrock item display defaults on bedrock_block projects, identity otherwise) and wraps the change in an undo step. This edits data that ships in the exported model JSON — it changes the deliverable, not just the preview. Requires a format that supports display mode (e.g. Java Block/Item).",
       "status": "experimental",
       "category": "Display Settings",
       "annotations": {
@@ -2166,8 +2952,8 @@
               "reset": {
                 "type": "boolean",
                 "default": false,
-                "description": "Reset the slot to its default (identity) transform before applying any of the other values.",
-                "markdownDescription": "Reset the slot to its default (identity) transform before applying any of the other values."
+                "description": "Reset the slot to its default transform before applying any of the other values: identity, or Blockbench's Bedrock defaults on bedrock_block projects.",
+                "markdownDescription": "Reset the slot to its default transform before applying any of the other values: identity, or Blockbench's Bedrock defaults on bedrock_block projects."
               }
             },
             "required": [
@@ -2332,7 +3118,9 @@
               },
               "shade": {
                 "type": "boolean",
-                "default": false
+                "default": true,
+                "description": "Outliner shading toggle, matching Blockbench's default (true). Ignored by Java 26.3+ projects, which use per-cube shade_direction_override instead.",
+                "markdownDescription": "Outliner shading toggle, matching Blockbench's default (true). Ignored by Java 26.3+ projects, which use per-cube shade_direction_override instead."
               }
             },
             "required": [
@@ -2389,7 +3177,7 @@
     {
       "name": "duplicate_element",
       "title": "Duplicate Element",
-      "description": "Duplicates a cube, mesh or group by ID or name.  You may offset the duplicate or assign a new name.",
+      "description": "Duplicates any outliner element or group (with its children) by ID or name using Blockbench's native duplicate, so every property, face UV, texture and mesh vertex key is preserved. Mesh copies inherit their armature bone vertex weights. Optionally offsets the copy and assigns a new name. Selection is left unchanged.",
       "status": "experimental",
       "category": "Elements",
       "annotations": {
@@ -2413,8 +3201,8 @@
                 },
                 "minItems": 3,
                 "maxItems": 3,
-                "description": "3D vector [x, y, z].",
-                "markdownDescription": "3D vector [x, y, z].",
+                "description": "Model-space offset [x, y, z] applied to the copy and every descendant.",
+                "markdownDescription": "Model-space offset [x, y, z] applied to the copy and every descendant.",
                 "default": [
                   0,
                   0,
@@ -2422,7 +3210,9 @@
                 ]
               },
               "newName": {
-                "type": "string"
+                "type": "string",
+                "description": "Name for the top-level copy. Defaults to Blockbench's duplicate naming (trailing number incremented, unique where required).",
+                "markdownDescription": "Name for the top-level copy. Defaults to Blockbench's duplicate naming (trailing number incremented, unique where required)."
               }
             },
             "required": [
@@ -2687,7 +3477,7 @@
     {
       "name": "export_model",
       "title": "Export Model",
-      "description": "Compiles the current project through a codec whose native export action is available. Returns JSON metadata and a live .bbmodel resource link; result_format='embedded' returns complete exports as text/blob resources with URI and MIME type. Optionally writes to a local path (requires Blockbench filesystem permission). Use `list_export_formats` to discover codecs.",
+      "description": "Compiles the current project through a codec whose native export action is available. Returns JSON metadata and a live .bbmodel resource link; result_format='embedded' returns complete exports as text/blob resources with URI and MIME type. Optionally writes to a local path (requires Blockbench filesystem permission). Partial codec options merge over the configured defaults; for glTF armatures, options.merge_armature=true merges each armature's meshes into one SkinnedMesh. Use `list_export_formats` to discover codecs.",
       "status": "experimental",
       "category": "Export",
       "annotations": {
@@ -2708,8 +3498,8 @@
               "options": {
                 "type": "object",
                 "additionalProperties": {},
-                "description": "Codec-specific export options. Defaults to the codec's configured export options.",
-                "markdownDescription": "Codec-specific export options. Defaults to the codec's configured export options."
+                "description": "Codec-specific export options, merged over the codec's configured export options (keys match the native export dialog). glTF ('gltf'): encoding ('ascii' | 'binary'), scale, embed_textures, armature (export groups as skinned bones), animations, and merge_armature (Blockbench 5.2+; default false exports one SkinnedMesh per armature child mesh, true merges each armature's meshes into a single SkinnedMesh).",
+                "markdownDescription": "Codec-specific export options, merged over the codec's configured export options (keys match the native export dialog). glTF ('gltf'): encoding ('ascii' | 'binary'), scale, embed_textures, armature (export groups as skinned bones), animations, and merge_armature (Blockbench 5.2+; default false exports one SkinnedMesh per armature child mesh, true merges each armature's meshes into a single SkinnedMesh)."
               },
               "path": {
                 "type": "string",
@@ -3284,9 +4074,8 @@
               },
               "distance": {
                 "type": "number",
-                "default": 1,
-                "description": "Signed distance along averaged selected face normals, in local model units.",
-                "markdownDescription": "Signed distance along averaged selected face normals, in local model units."
+                "description": "Signed distance along averaged selected face normals, in local model units. Defaults to Blockbench's current grid snap interval (getSpatialInterval), or 1 when unavailable.",
+                "markdownDescription": "Signed distance along averaged selected face normals, in local model units. Defaults to Blockbench's current grid snap interval (getSpatialInterval), or 1 when unavailable."
               },
               "mode": {
                 "type": "string",
@@ -3791,7 +4580,7 @@
     {
       "name": "knife_tool",
       "title": "Knife Tool",
-      "description": "Currently unsupported: Blockbench's interactive Knife context requires pointer topology that this point-list API cannot safely provide. Use subdivide_mesh or create geometry with place_mesh, or use Knife manually.",
+      "description": "Currently unsupported for meshes: Blockbench's interactive Knife context requires pointer topology that this point-list API cannot safely provide. Use subdivide_mesh or place_mesh for meshes; use knife_cut_cube or slice_cubes_to_block_grid to cut cubes headlessly.",
       "status": "experimental",
       "category": "Mesh Editing",
       "annotations": {
@@ -3850,6 +4639,237 @@
       }
     },
     {
+      "name": "create_polyhedron",
+      "title": "Create Polyhedron",
+      "description": "Creates icosphere, octahedron, or dodecahedron meshes (Blockbench 5.2 primitives) with a detail level of 0-6, as triangles with coincident vertices merged and planar per-face UVs. Returns vertex_keys/face_keys per mesh.",
+      "status": "experimental",
+      "category": "Mesh Editing",
+      "annotations": {
+        "destructiveHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/create_polyhedron",
+        "definitions": {
+          "create_polyhedron": {
+            "type": "object",
+            "properties": {
+              "elements": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "Name of the mesh.",
+                      "markdownDescription": "Name of the mesh."
+                    },
+                    "shape": {
+                      "type": "string",
+                      "enum": [
+                        "icosphere",
+                        "octahedron",
+                        "dodecahedron"
+                      ],
+                      "description": "icosphere (subdivided icosahedron), octahedron, or dodecahedron.",
+                      "markdownDescription": "icosphere (subdivided icosahedron), octahedron, or dodecahedron."
+                    },
+                    "position": {
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      },
+                      "minItems": 3,
+                      "maxItems": 3,
+                      "description": "Position of the polyhedron center (mesh origin).",
+                      "markdownDescription": "Position of the polyhedron center (mesh origin)."
+                    },
+                    "diameter": {
+                      "type": "number",
+                      "minimum": 1,
+                      "maximum": 64,
+                      "default": 16,
+                      "description": "Diameter of the circumscribed sphere; every vertex lies at diameter / 2 from the center.",
+                      "markdownDescription": "Diameter of the circumscribed sphere; every vertex lies at diameter / 2 from the center."
+                    },
+                    "detail": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 6,
+                      "default": 1,
+                      "description": "Subdivision level: each base triangle becomes (detail + 1)^2 triangles projected onto the sphere. 0 is the plain solid.",
+                      "markdownDescription": "Subdivision level: each base triangle becomes (detail + 1)^2 triangles projected onto the sphere. 0 is the plain solid."
+                    },
+                    "rotation": {
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      },
+                      "minItems": 3,
+                      "maxItems": 3,
+                      "description": "Rotation in degrees.",
+                      "markdownDescription": "Rotation in degrees.",
+                      "default": [
+                        0,
+                        0,
+                        0
+                      ]
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "shape",
+                    "position"
+                  ],
+                  "additionalProperties": false
+                },
+                "minItems": 1,
+                "description": "Polyhedra to create.",
+                "markdownDescription": "Polyhedra to create."
+              },
+              "texture": {
+                "type": "string",
+                "description": "Texture ID or name to apply to every face.",
+                "markdownDescription": "Texture ID or name to apply to every face."
+              },
+              "group": {
+                "type": "string",
+                "description": "Group/bone to which the meshes belong.",
+                "markdownDescription": "Group/bone to which the meshes belong."
+              }
+            },
+            "required": [
+              "elements"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "loop_cut_mesh",
+      "title": "Loop Cut Mesh",
+      "description": "Runs Blockbench's native Loop Cut on a mesh: splits the quad ring crossing the start edge with one or more parallel cuts, with offset, direction and 5.2 spacing modes (proportional, even_start, even_end). One undo entry. The new loop vertices become the selection and are returned.",
+      "status": "experimental",
+      "category": "Mesh Editing",
+      "annotations": {
+        "destructiveHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/loop_cut_mesh",
+        "definitions": {
+          "loop_cut_mesh": {
+            "type": "object",
+            "properties": {
+              "mesh_id": {
+                "type": "string",
+                "description": "ID or name of the mesh. If not provided, uses selected mesh.",
+                "markdownDescription": "ID or name of the mesh. If not provided, uses selected mesh."
+              },
+              "edge": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 2,
+                "maxItems": 2,
+                "description": "Two vertex keys of the edge to start the loop from; the cut runs across the face ring perpendicular to it. Defaults to the mesh's current vertex/face selection (at least two selected vertices).",
+                "markdownDescription": "Two vertex keys of the edge to start the loop from; the cut runs across the face ring perpendicular to it. Defaults to the mesh's current vertex/face selection (at least two selected vertices)."
+              },
+              "cuts": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 16,
+                "default": 1,
+                "description": "Number of parallel loop cuts.",
+                "markdownDescription": "Number of parallel loop cuts."
+              },
+              "offset": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Distance of the (first) cut from the start of the edge, in the given unit. Defaults to the edge midpoint (or even spacing for multiple cuts).",
+                "markdownDescription": "Distance of the (first) cut from the start of the edge, in the given unit. Defaults to the edge midpoint (or even spacing for multiple cuts)."
+              },
+              "unit": {
+                "type": "string",
+                "enum": [
+                  "size",
+                  "percent"
+                ],
+                "default": "size",
+                "description": "Unit of offset: model units ('size') or percent of the start edge length.",
+                "markdownDescription": "Unit of offset: model units ('size') or percent of the start edge length."
+              },
+              "direction": {
+                "type": "integer",
+                "minimum": 0,
+                "default": 0,
+                "description": "Rotates which edge of the start face the loop starts from, as the native Direction slider.",
+                "markdownDescription": "Rotates which edge of the start face the loop starts from, as the native Direction slider."
+              },
+              "spacing": {
+                "type": "string",
+                "enum": [
+                  "proportional",
+                  "even_start",
+                  "even_end"
+                ],
+                "default": "proportional",
+                "description": "Blockbench 5.2 spacing: proportional keeps the same ratio on every edge of the loop; even_start/even_end keep the same absolute distance from the loop's start/end side.",
+                "markdownDescription": "Blockbench 5.2 spacing: proportional keeps the same ratio on every edge of the loop; even_start/even_end keep the same absolute distance from the loop's start/end side."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "flip_in_place",
+      "title": "Flip In Place",
+      "description": "Mirrors elements in place along an axis using Blockbench's native Flip In Place (flip_in_place_x/y/z): cubes flip around their own center, meshes around their origin, groups also invert rotations in bone-rig formats. For meshes in vertex/edge/face selection mode only the selected components flip. Edit mode only.",
+      "status": "experimental",
+      "category": "Mesh Editing",
+      "annotations": {
+        "destructiveHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/flip_in_place",
+        "definitions": {
+          "flip_in_place": {
+            "type": "object",
+            "properties": {
+              "ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "description": "Element or group UUIDs/names to flip. Replaces the selection with these. Defaults to the current selection.",
+                "markdownDescription": "Element or group UUIDs/names to flip. Replaces the selection with these. Defaults to the current selection."
+              },
+              "axis": {
+                "type": "string",
+                "enum": [
+                  "x",
+                  "y",
+                  "z"
+                ],
+                "description": "Axis to mirror across each element's own center (cubes) or pivot (meshes, groups, other elements).",
+                "markdownDescription": "Axis to mirror across each element's own center (cubes) or pivot (meshes, groups, other elements)."
+              }
+            },
+            "required": [
+              "axis"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
       "name": "get_mesh_info",
       "title": "Get Mesh Info",
       "description": "Inspects a mesh by UUID/name or the first selected mesh without changing geometry, selection, or undo history. Returns transforms, parent, total counts, mesh-local bounds, selection counts, and optional paginated vertices/faces with actual runtime keys. Faces use perimeter vertex order and normalized mesh-local normals (zero for degenerate faces), stored texture references, and optional UVs. Texture status distinguishes resolved, missing, unassigned (false), disabled (null), and unset; default format materials are not resolved. Pages sort keys lexicographically and expose next_offset; geometry must remain unchanged between calls. Set include_vertices/include_faces false for a compact summary.",
@@ -3857,6 +4877,7 @@
       "category": "Mesh Editing",
       "annotations": {
         "destructiveHint": false,
+        "idempotentHint": true,
         "readOnlyHint": true,
         "openWorldHint": false
       },
@@ -3922,7 +4943,7 @@
     {
       "name": "paint_fill_tool",
       "title": "Paint Fill Tool",
-      "description": "Uses the fill/bucket tool to fill areas with color.",
+      "description": "Uses the fill/bucket tool to fill areas with color. In 'face' and 'element' fill modes only the face or element whose UV area contains the given texture pixel is filled. Opacity is 0-255 regardless of Blockbench's opacity range setting.",
       "status": "experimental",
       "category": "Paint Tools",
       "annotations": {
@@ -3979,8 +5000,8 @@
                   "selection"
                 ],
                 "default": "color_connected",
-                "description": "Fill mode.",
-                "markdownDescription": "Fill mode."
+                "description": "Fill mode. 'face' and 'element' fill only the face/element whose UV area contains (x, y) in texture space (Blockbench 5.2 looks it up with UVEditor.findFaceAtUV); 'color'/'color_connected' match exact colors; 'selected_elements' fills every selected element; 'selection' fills the texture selection (image editor).",
+                "markdownDescription": "Fill mode. 'face' and 'element' fill only the face/element whose UV area contains (x, y) in texture space (Blockbench 5.2 looks it up with UVEditor.findFaceAtUV); 'color'/'color_connected' match exact colors; 'selected_elements' fills every selected element; 'selection' fills the texture selection (image editor)."
               },
               "blend_mode": {
                 "type": "string",
@@ -4370,6 +5391,13 @@
                 "default": "copy",
                 "description": "Copy brush mode.",
                 "markdownDescription": "Copy brush mode."
+              },
+              "aspect_ratio": {
+                "type": "number",
+                "minimum": -16,
+                "maximum": 16,
+                "description": "Brush aspect ratio (-16 to 16). Negative narrows the width, positive narrows the height, 0 keeps the brush square/round.",
+                "markdownDescription": "Brush aspect ratio (-16 to 16). Negative narrows the width, positive narrows the height, 0 keeps the brush square/round."
               }
             },
             "required": [
@@ -4477,7 +5505,7 @@
     {
       "name": "paint_settings",
       "title": "Paint Settings",
-      "description": "Configures paint mode settings and preferences.",
+      "description": "Configures paint mode settings and preferences, including Blockbench 5.2 screen-space brush projection, brush lock mode and brush aspect ratio. The result also reports the active opacity range (0-255 or 0-100); tool opacity parameters stay 0-255 and are converted automatically.",
       "status": "experimental",
       "category": "Paint Tools",
       "annotations": {
@@ -4599,6 +5627,29 @@
                 "type": "boolean",
                 "description": "Pick combined layer colors.",
                 "markdownDescription": "Pick combined layer colors."
+              },
+              "screen_space_brush_projection": {
+                "type": "boolean",
+                "description": "Project brushes in screen space when painting in the 3D viewport (Blockbench 5.2+, brush tools only).",
+                "markdownDescription": "Project brushes in screen space when painting in the 3D viewport (Blockbench 5.2+, brush tools only)."
+              },
+              "brush_lock_mode": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "element",
+                  "selected_faces",
+                  "face"
+                ],
+                "description": "Restrict viewport strokes: 'none', the 'element' the stroke started on, 'selected_faces', or the single 'face' it started on (Blockbench 5.2+).",
+                "markdownDescription": "Restrict viewport strokes: 'none', the 'element' the stroke started on, 'selected_faces', or the single 'face' it started on (Blockbench 5.2+)."
+              },
+              "brush_aspect_ratio": {
+                "type": "number",
+                "minimum": -16,
+                "maximum": 16,
+                "description": "Brush aspect ratio (-16 to 16) applied to every tool that supports it (brush and copy brush; Blockbench 5.2+).",
+                "markdownDescription": "Brush aspect ratio (-16 to 16) applied to every tool that supports it (brush and copy brush; Blockbench 5.2+)."
               }
             },
             "additionalProperties": false
@@ -4610,7 +5661,7 @@
     {
       "name": "paint_with_brush",
       "title": "Paint with Brush",
-      "description": "Paints on textures using the brush tool with customizable settings.",
+      "description": "Paints on textures using the brush tool with customizable settings (opacity 0-255, softness 0-100%, optional aspect ratio). Paints on the selected pixel layer; if a layer group is selected, a pixel layer inside it is used.",
       "status": "experimental",
       "category": "Paint Tools",
       "annotations": {
@@ -4667,8 +5718,8 @@
                     "type": "number",
                     "minimum": 0,
                     "maximum": 255,
-                    "description": "Opacity (0-255).",
-                    "markdownDescription": "Opacity (0-255)."
+                    "description": "Opacity (0-255), independent of Blockbench's opacity range setting.",
+                    "markdownDescription": "Opacity (0-255), independent of Blockbench's opacity range setting."
                   },
                   "softness": {
                     "type": "number",
@@ -4706,11 +5757,18 @@
                     ],
                     "description": "Brush blend mode.",
                     "markdownDescription": "Brush blend mode."
+                  },
+                  "aspect_ratio": {
+                    "type": "number",
+                    "minimum": -16,
+                    "maximum": 16,
+                    "description": "Brush aspect ratio (-16 to 16). Negative narrows the width, positive narrows the height, 0 keeps the brush square/round.",
+                    "markdownDescription": "Brush aspect ratio (-16 to 16). Negative narrows the width, positive narrows the height, 0 keeps the brush square/round."
                   }
                 },
                 "additionalProperties": false,
-                "description": "Brush settings to apply.",
-                "markdownDescription": "Brush settings to apply."
+                "description": "Brush settings to apply. Opacity is 0-255; softness is a 0-100 percentage.",
+                "markdownDescription": "Brush settings to apply. Opacity is 0-255; softness is a 0-100 percentage."
               },
               "connect_strokes": {
                 "type": "boolean",
@@ -4731,7 +5789,7 @@
     {
       "name": "create_brush_preset",
       "title": "Create Brush Preset",
-      "description": "Creates a custom brush preset with specified settings.",
+      "description": "Creates a custom brush preset with specified settings. Omitted settings are stored as unset so loading the preset keeps the current value.",
       "status": "experimental",
       "category": "Paint Tools",
       "annotations": {
@@ -4759,8 +5817,8 @@
                 "type": "number",
                 "minimum": 0,
                 "maximum": 255,
-                "description": "Opacity (0-255).",
-                "markdownDescription": "Opacity (0-255)."
+                "description": "Opacity (0-255), independent of Blockbench's opacity range setting.",
+                "markdownDescription": "Opacity (0-255), independent of Blockbench's opacity range setting."
               },
               "softness": {
                 "type": "number",
@@ -4775,8 +5833,8 @@
                   "square",
                   "circle"
                 ],
-                "description": "Brush shape.",
-                "markdownDescription": "Brush shape."
+                "description": "Brush shape. Omit to keep the current shape when loading.",
+                "markdownDescription": "Brush shape. Omit to keep the current shape when loading."
               },
               "color": {
                 "type": "string",
@@ -4796,13 +5854,18 @@
                   "overlay",
                   "difference"
                 ],
-                "description": "Brush blend mode.",
-                "markdownDescription": "Brush blend mode."
+                "description": "Brush blend mode. Omit to keep the current blend mode when loading.",
+                "markdownDescription": "Brush blend mode. Omit to keep the current blend mode when loading."
               },
               "pixel_perfect": {
                 "type": "boolean",
                 "description": "Enable pixel perfect drawing.",
                 "markdownDescription": "Enable pixel perfect drawing."
+              },
+              "screen_space": {
+                "type": "boolean",
+                "description": "Enable screen-space brush projection when the preset is loaded (Blockbench 5.2+). Omit to keep the current setting.",
+                "markdownDescription": "Enable screen-space brush projection when the preset is loaded (Blockbench 5.2+). Omit to keep the current setting."
               }
             },
             "required": [
@@ -4817,7 +5880,7 @@
     {
       "name": "load_brush_preset",
       "title": "Load Brush Preset",
-      "description": "Loads and applies a brush preset by name.",
+      "description": "Loads and applies a custom or built-in brush preset (e.g. 'screen_space') by name.",
       "status": "experimental",
       "category": "Paint Tools",
       "annotations": {
@@ -4831,8 +5894,8 @@
             "properties": {
               "preset_name": {
                 "type": "string",
-                "description": "Name of the brush preset to load.",
-                "markdownDescription": "Name of the brush preset to load."
+                "description": "Name of the brush preset to load: a custom preset name, or a built-in one such as 'pixel_brush', 'pixel_perfect', 'smooth_brush' or 'screen_space' (also accepts the full 'menu.brush_presets.*' key or its translated label).",
+                "markdownDescription": "Name of the brush preset to load: a custom preset name, or a built-in one such as 'pixel_brush', 'pixel_perfect', 'smooth_brush' or 'screen_space' (also accepts the full 'menu.brush_presets.*' key or its translated label)."
               }
             },
             "required": [
@@ -4943,7 +6006,7 @@
     {
       "name": "texture_layer_management",
       "title": "Texture Layer Management",
-      "description": "Creates, manages, and manipulates texture layers.",
+      "description": "Lists, creates, manages, and reorders texture layers and layer groups (Blockbench 5.2 hierarchy). Target a layer or group by UUID or name with layer_id; list_layers reports type, parent and depth.",
       "status": "experimental",
       "category": "Paint Tools",
       "annotations": {
@@ -4958,6 +6021,8 @@
               "action": {
                 "type": "string",
                 "enum": [
+                  "list_layers",
+                  "select_layer",
                   "create_layer",
                   "delete_layer",
                   "duplicate_layer",
@@ -4966,56 +6031,119 @@
                   "set_blend_mode",
                   "move_layer",
                   "rename_layer",
-                  "flatten_layers"
+                  "flatten_layers",
+                  "toggle_visibility",
+                  "create_group",
+                  "ungroup",
+                  "move_to_group",
+                  "set_group_folded"
                 ],
-                "description": "Layer management action.",
-                "markdownDescription": "Layer management action."
+                "description": "Layer action. list_layers reports the hierarchy (read-only); select_layer makes a layer the paint target; create_group, ungroup, move_to_group and set_group_folded manage layer groups (Blockbench 5.2+); toggle_visibility works on layers and groups; flatten_layers composites visible layers into the texture and disables layers.",
+                "markdownDescription": "Layer action. list_layers reports the hierarchy (read-only); select_layer makes a layer the paint target; create_group, ungroup, move_to_group and set_group_folded manage layer groups (Blockbench 5.2+); toggle_visibility works on layers and groups; flatten_layers composites visible layers into the texture and disables layers."
               },
               "texture_id": {
                 "type": "string",
                 "description": "Texture ID or name. If not provided, uses selected texture.",
                 "markdownDescription": "Texture ID or name. If not provided, uses selected texture."
               },
+              "layer_id": {
+                "type": "string",
+                "description": "UUID or exact name of the layer or group to act on. Defaults to the texture's selected layer.",
+                "markdownDescription": "UUID or exact name of the layer or group to act on. Defaults to the texture's selected layer."
+              },
               "layer_name": {
                 "type": "string",
-                "description": "Name of the layer.",
-                "markdownDescription": "Name of the layer."
+                "description": "Name for create_layer/create_group/duplicate_layer, or the new name for rename_layer.",
+                "markdownDescription": "Name for create_layer/create_group/duplicate_layer, or the new name for rename_layer."
+              },
+              "layer_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "create_group: UUIDs or names of layers/groups to move into the new group. They must share the same parent.",
+                "markdownDescription": "create_group: UUIDs or names of layers/groups to move into the new group. They must share the same parent."
+              },
+              "group_id": {
+                "type": "string",
+                "description": "UUID or name of the destination group for move_to_group and create_layer. Use an empty string for the root.",
+                "markdownDescription": "UUID or name of the destination group for move_to_group and create_layer. Use an empty string for the root."
               },
               "opacity": {
                 "type": "number",
                 "minimum": 0,
                 "maximum": 100,
-                "description": "Layer opacity percentage.",
-                "markdownDescription": "Layer opacity percentage."
+                "description": "Layer opacity percentage (0-100) for set_opacity.",
+                "markdownDescription": "Layer opacity percentage (0-100) for set_opacity."
               },
               "blend_mode": {
                 "type": "string",
                 "enum": [
+                  "default",
                   "normal",
+                  "set_opacity",
+                  "color",
                   "multiply",
-                  "screen",
-                  "overlay",
-                  "soft_light",
-                  "hard_light",
-                  "color_dodge",
-                  "color_burn",
+                  "add",
                   "darken",
                   "lighten",
+                  "screen",
+                  "overlay",
                   "difference",
-                  "exclusion"
+                  "alpha_mask"
                 ],
-                "description": "Layer blend mode.",
-                "markdownDescription": "Layer blend mode."
+                "description": "Layer blend mode for set_blend_mode ('normal' is an alias of 'default').",
+                "markdownDescription": "Layer blend mode for set_blend_mode ('normal' is an alias of 'default')."
               },
               "target_index": {
-                "type": "number",
-                "description": "Target position for moving layers.",
-                "markdownDescription": "Target position for moving layers."
+                "type": "integer",
+                "description": "move_layer/move_to_group: position among siblings in the same parent, 0 = bottom-most; clamped to the valid range.",
+                "markdownDescription": "move_layer/move_to_group: position among siblings in the same parent, 0 = bottom-most; clamped to the valid range."
+              },
+              "folded": {
+                "type": "boolean",
+                "description": "set_group_folded / create_group: whether the group is collapsed in the layers panel.",
+                "markdownDescription": "set_group_folded / create_group: whether the group is collapsed in the layers panel."
+              },
+              "visible": {
+                "type": "boolean",
+                "description": "toggle_visibility: explicit visibility to set. Omit to toggle.",
+                "markdownDescription": "toggle_visibility: explicit visibility to set. Omit to toggle."
               }
             },
             "required": [
               "action"
             ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_average_fps",
+      "title": "Get Average FPS",
+      "description": "Measures the average frames per second of Blockbench's render loop by counting rendered frames for duration_ms, then returns the average with the frame count, the fps_limit setting, Blockbench's own last-second counter, window focus at the start of the window plus whether it changed, and whether rendering was paused because the window was unfocused with background rendering disabled. The call waits for the whole window; keep other tools idle meanwhile for a representative reading.",
+      "status": "experimental",
+      "category": "Performance",
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/get_average_fps",
+        "definitions": {
+          "get_average_fps": {
+            "type": "object",
+            "properties": {
+              "duration_ms": {
+                "type": "integer",
+                "minimum": 250,
+                "maximum": 10000,
+                "default": 2000,
+                "description": "Sampling window in milliseconds (250–10000). The call waits this long while counting rendered frames.",
+                "markdownDescription": "Sampling window in milliseconds (250–10000). The call waits this long while counting rendered frames."
+              }
+            },
             "additionalProperties": false
           }
         },
@@ -5044,8 +6172,8 @@
               "format": {
                 "type": "string",
                 "default": "bedrock_block",
-                "description": "Project format ID from Blockbench's Formats registry.",
-                "markdownDescription": "Project format ID from Blockbench's Formats registry."
+                "description": "Project format ID from Blockbench's Formats registry (e.g. bedrock_block, java_block, free). Unknown IDs are rejected with the list of valid IDs.",
+                "markdownDescription": "Project format ID from Blockbench's Formats registry (e.g. bedrock_block, java_block, free). Unknown IDs are rejected with the list of valid IDs."
               }
             },
             "required": [
@@ -5735,7 +6863,8 @@
       "status": "stable",
       "category": "Textures",
       "annotations": {
-        "destructiveHint": false
+        "destructiveHint": false,
+        "idempotentHint": true
       },
       "parameters": {
         "$ref": "#/definitions/activate_texture",
@@ -5747,6 +6876,36 @@
                 "type": "string",
                 "description": "Texture ID, UUID, or name to activate in the texture panel.",
                 "markdownDescription": "Texture ID, UUID, or name to activate in the texture panel."
+              }
+            },
+            "required": [
+              "texture"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "delete_texture",
+      "title": "Delete Texture",
+      "description": "Removes a texture from the project in one undoable edit, like deleting it from the Textures panel. Faces keep their UV mapping but lose the texture assignment, and a PBR material loses that channel, until the edit is undone. Use list_textures to find IDs.",
+      "status": "experimental",
+      "category": "Textures",
+      "annotations": {
+        "destructiveHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/delete_texture",
+        "definitions": {
+          "delete_texture": {
+            "type": "object",
+            "properties": {
+              "texture": {
+                "type": "string",
+                "description": "Texture ID, UUID, or name to remove.",
+                "markdownDescription": "Texture ID, UUID, or name to remove."
               }
             },
             "required": [
@@ -5982,11 +7141,12 @@
     {
       "name": "set_mode",
       "title": "Set Mode",
-      "description": "Switches Blockbench's editor tab through its native mode trigger, respecting the mode's condition. Use mode_id='animate' to enter Animate before animation work, 'paint' before native painting tools, or 'edit' to return. Returns the resulting mode and available modes; refresh tools/list for changed tool availability. Selecting the current mode does nothing. Does not change the project's format.",
+      "description": "Switches Blockbench's editor tab through its native mode trigger, respecting the mode's condition. Use mode_id='animate' to enter Animate before animation work, 'paint' before native painting tools, or 'edit' to return. Returns the resulting mode and available modes; refresh tools/list for changed tool availability. Selecting the current mode does nothing. Does not change the project's format. When the user enabled the AI Scratchpad setting, mode_id='ai_scratchpad' relaxes the format's cube size, rotation and integer-size guardrails until another mode is selected.",
       "status": "stable",
       "category": "UI Interaction",
       "annotations": {
         "destructiveHint": false,
+        "idempotentHint": true,
         "openWorldHint": false
       },
       "parameters": {
@@ -6164,6 +7324,7 @@
       "category": "UV Mapping",
       "annotations": {
         "destructiveHint": false,
+        "idempotentHint": true,
         "readOnlyHint": true,
         "openWorldHint": false
       },
@@ -6514,6 +7675,489 @@
       }
     },
     {
+      "name": "geckolib_get_format_info",
+      "title": "Get GeckoLib Format Info",
+      "description": "Returns the active GeckoLib project's model type, mod ID, object ID, bone and animation counts, cached export paths, and the installed plugin version. Requires the GeckoLib plugin and a GeckoLib Animated Model project.",
+      "status": "experimental",
+      "category": "GeckoLib Integration",
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/geckolib_get_format_info",
+        "definitions": {
+          "geckolib_get_format_info": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "geckolib_set_project_settings",
+      "title": "Set GeckoLib Project Settings",
+      "description": "Sets the GeckoLib mod ID, model type and object ID on the active project. Values are validated against the plugin's namespace rules before anything is written. Does not generate the armor template rig.",
+      "status": "experimental",
+      "category": "GeckoLib Integration",
+      "annotations": {
+        "destructiveHint": false
+      },
+      "parameters": {
+        "$ref": "#/definitions/geckolib_set_project_settings",
+        "definitions": {
+          "geckolib_set_project_settings": {
+            "type": "object",
+            "properties": {
+              "modid": {
+                "type": "string",
+                "pattern": "^[_\\-.a-z0-9]+$",
+                "errorMessage": {
+                  "pattern": "Mod IDs may only contain lowercase letters, digits, underscore, hyphen and period."
+                },
+                "description": "Mod namespace exports are written for, e.g. my_mod.",
+                "markdownDescription": "Mod namespace exports are written for, e.g. my_mod."
+              },
+              "model_type": {
+                "type": "string",
+                "enum": [
+                  "Entity",
+                  "Block",
+                  "Item",
+                  "Armor",
+                  "Object"
+                ],
+                "description": "GeckoLib model type. Armor only records the type; it does not generate the plugin's armor template rig, which requires creating a new Armor project in Blockbench.",
+                "markdownDescription": "GeckoLib model type. Armor only records the type; it does not generate the plugin's armor template rig, which requires creating a new Armor project in Blockbench."
+              },
+              "model_identifier": {
+                "type": "string",
+                "pattern": "^[_\\-/.a-z0-9]+$",
+                "errorMessage": {
+                  "pattern": "Object IDs may only contain lowercase letters, digits, underscore, hyphen, period and forward slash."
+                },
+                "description": "Registered object ID the geometry exports as (geometry.<identifier>); may include a folder path.",
+                "markdownDescription": "Registered object ID the geometry exports as (geometry.<identifier>); may include a folder path."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "geckolib_list_easings",
+      "title": "List GeckoLib Easings",
+      "description": "Lists every easing name GeckoLib accepts on keyframes, which of them read easingArgs, and each argument's default and meaning. Needs no project, so it can be called while planning an animation.",
+      "status": "experimental",
+      "category": "GeckoLib Integration",
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/geckolib_list_easings",
+        "definitions": {
+          "geckolib_list_easings": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "geckolib_get_keyframe_easing",
+      "title": "Get GeckoLib Keyframe Easing",
+      "description": "Reads the GeckoLib easing, easing arguments and interpolation of keyframes on one bone channel, or of the current timeline selection. An easing governs the segment arriving at its keyframe, so the first keyframe of a channel is reported as inert.",
+      "status": "experimental",
+      "category": "GeckoLib Integration",
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/geckolib_get_keyframe_easing",
+        "definitions": {
+          "geckolib_get_keyframe_easing": {
+            "type": "object",
+            "properties": {
+              "animation_id": {
+                "type": "string",
+                "description": "Animation UUID or name. If not provided, uses current animation.",
+                "markdownDescription": "Animation UUID or name. If not provided, uses current animation."
+              },
+              "bone_name": {
+                "type": "string",
+                "description": "Bone whose keyframes to target. Omit to act on the current timeline keyframe selection.",
+                "markdownDescription": "Bone whose keyframes to target. Omit to act on the current timeline keyframe selection."
+              },
+              "channel": {
+                "type": "string",
+                "enum": [
+                  "rotation",
+                  "position",
+                  "scale"
+                ],
+                "description": "Transform channel to target. Required with bone_name, and meaningless without it.",
+                "markdownDescription": "Transform channel to target. Required with bone_name, and meaningless without it."
+              },
+              "times": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "minItems": 1,
+                "description": "Keyframe times in seconds. Requires bone_name; omit to target every keyframe of that channel.",
+                "markdownDescription": "Keyframe times in seconds. Requires bone_name; omit to target every keyframe of that channel."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "geckolib_set_keyframe_easing",
+      "title": "Set GeckoLib Keyframe Easing",
+      "description": "Writes a GeckoLib easing (and its arguments) onto keyframes on one bone channel, or onto the current timeline selection, as one undoable edit. GeckoLib easings apply only to linear keyframes and shape the segment arriving at the keyframe they are set on, so the first keyframe of each channel is skipped and reported. Nothing in Blockbench's native keyframe API can author these.",
+      "status": "experimental",
+      "category": "GeckoLib Integration",
+      "annotations": {
+        "destructiveHint": false
+      },
+      "parameters": {
+        "$ref": "#/definitions/geckolib_set_keyframe_easing",
+        "definitions": {
+          "geckolib_set_keyframe_easing": {
+            "type": "object",
+            "properties": {
+              "animation_id": {
+                "type": "string",
+                "description": "Animation UUID or name. If not provided, uses current animation.",
+                "markdownDescription": "Animation UUID or name. If not provided, uses current animation."
+              },
+              "bone_name": {
+                "type": "string",
+                "description": "Bone whose keyframes to target. Omit to act on the current timeline keyframe selection.",
+                "markdownDescription": "Bone whose keyframes to target. Omit to act on the current timeline keyframe selection."
+              },
+              "channel": {
+                "type": "string",
+                "enum": [
+                  "rotation",
+                  "position",
+                  "scale"
+                ],
+                "description": "Transform channel to target. Required with bone_name, and meaningless without it.",
+                "markdownDescription": "Transform channel to target. Required with bone_name, and meaningless without it."
+              },
+              "times": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "minItems": 1,
+                "description": "Keyframe times in seconds. Requires bone_name; omit to target every keyframe of that channel.",
+                "markdownDescription": "Keyframe times in seconds. Requires bone_name; omit to target every keyframe of that channel."
+              },
+              "easing": {
+                "type": "string",
+                "enum": [
+                  "linear",
+                  "step",
+                  "easeInQuad",
+                  "easeOutQuad",
+                  "easeInOutQuad",
+                  "easeInCubic",
+                  "easeOutCubic",
+                  "easeInOutCubic",
+                  "easeInQuart",
+                  "easeOutQuart",
+                  "easeInOutQuart",
+                  "easeInQuint",
+                  "easeOutQuint",
+                  "easeInOutQuint",
+                  "easeInSine",
+                  "easeOutSine",
+                  "easeInOutSine",
+                  "easeInExpo",
+                  "easeOutExpo",
+                  "easeInOutExpo",
+                  "easeInCirc",
+                  "easeOutCirc",
+                  "easeInOutCirc",
+                  "easeInBack",
+                  "easeOutBack",
+                  "easeInOutBack",
+                  "easeInElastic",
+                  "easeOutElastic",
+                  "easeInOutElastic",
+                  "easeInBounce",
+                  "easeOutBounce",
+                  "easeInOutBounce",
+                  "none"
+                ],
+                "description": "GeckoLib easing name, or \"none\" to remove the easing and fall back to linear.",
+                "markdownDescription": "GeckoLib easing name, or \"none\" to remove the easing and fall back to linear."
+              },
+              "easing_args": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 1,
+                "description": "Arguments for the Back, Elastic, Bounce and step easings. Omit to use GeckoLib's default (1 overshoot, 0.5 bounciness, 5 steps). Ignored by every other easing.",
+                "markdownDescription": "Arguments for the Back, Elastic, Bounce and step easings. Omit to use GeckoLib's default (1 overshoot, 0.5 bounciness, 5 steps). Ignored by every other easing."
+              },
+              "convert_interpolation": {
+                "type": "boolean",
+                "default": false,
+                "description": "Set targeted keyframes to linear interpolation as part of the same edit. GeckoLib wipes easings from catmullrom, step and bezier keyframes on the next render frame, so without this the call is rejected instead of writing an easing that would not survive.",
+                "markdownDescription": "Set targeted keyframes to linear interpolation as part of the same edit. GeckoLib wipes easings from catmullrom, step and bezier keyframes on the next render frame, so without this the call is rejected instead of writing an easing that would not survive."
+              }
+            },
+            "required": [
+              "easing"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "geckolib_reverse_keyframe_easing",
+      "title": "Reverse GeckoLib Keyframe Easing",
+      "description": "Mirrors easing directions the way GeckoLib's own reverse-keyframes handler does: each easeIn becomes easeOut and back, the easings shift one keyframe later in time, and the first keyframe of each channel is cleared. Use after reversing keyframe values.",
+      "status": "experimental",
+      "category": "GeckoLib Integration",
+      "annotations": {
+        "destructiveHint": false
+      },
+      "parameters": {
+        "$ref": "#/definitions/geckolib_reverse_keyframe_easing",
+        "definitions": {
+          "geckolib_reverse_keyframe_easing": {
+            "type": "object",
+            "properties": {
+              "animation_id": {
+                "type": "string",
+                "description": "Animation UUID or name. If not provided, uses current animation.",
+                "markdownDescription": "Animation UUID or name. If not provided, uses current animation."
+              },
+              "bone_name": {
+                "type": "string",
+                "description": "Bone whose keyframes to target. Omit to act on the current timeline keyframe selection.",
+                "markdownDescription": "Bone whose keyframes to target. Omit to act on the current timeline keyframe selection."
+              },
+              "channel": {
+                "type": "string",
+                "enum": [
+                  "rotation",
+                  "position",
+                  "scale"
+                ],
+                "description": "Transform channel to target. Required with bone_name, and meaningless without it.",
+                "markdownDescription": "Transform channel to target. Required with bone_name, and meaningless without it."
+              },
+              "times": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "minItems": 1,
+                "description": "Keyframe times in seconds. Requires bone_name; omit to target every keyframe of that channel.",
+                "markdownDescription": "Keyframe times in seconds. Requires bone_name; omit to target every keyframe of that channel."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "geckolib_validate_model",
+      "title": "Validate GeckoLib Model",
+      "description": "Checks the GeckoLib project against rules derived from the plugin and the GeckoLib runtime: bone-name charset and duplicates, mod ID and object ID validity, armor template bones, texture size against the UV base, and (optionally) compiled animation loop values, easing names, easing arguments and lengths. Each finding carries a stable check ID. Passing does not prove in-game correctness.",
+      "status": "experimental",
+      "category": "GeckoLib Integration",
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/geckolib_validate_model",
+        "definitions": {
+          "geckolib_validate_model": {
+            "type": "object",
+            "properties": {
+              "include_animations": {
+                "type": "boolean",
+                "default": true,
+                "description": "Also compile the project's animations and validate their loop values, easings and lengths.",
+                "markdownDescription": "Also compile the project's animations and validate their loop values, easings and lengths."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "geckolib_export_model",
+      "title": "Export GeckoLib Model",
+      "description": "Compiles the GeckoLib geometry the plugin's model export produces, returning it as JSON and optionally writing it to a path. Set mode='dialog' to trigger the plugin's own export action and its save dialog instead.",
+      "status": "experimental",
+      "category": "GeckoLib Integration",
+      "annotations": {
+        "destructiveHint": false,
+        "openWorldHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/geckolib_export_model",
+        "definitions": {
+          "geckolib_export_model": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "compile",
+                  "dialog"
+                ],
+                "default": "compile",
+                "description": "compile returns the file content without touching the UI. dialog triggers the GeckoLib plugin's own export action, which opens a native save dialog for the user to complete and updates the project's cached export path.",
+                "markdownDescription": "compile returns the file content without touching the UI. dialog triggers the GeckoLib plugin's own export action, which opens a native save dialog for the user to complete and updates the project's cached export path."
+              },
+              "path": {
+                "type": "string",
+                "description": "Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode.",
+                "markdownDescription": "Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode."
+              },
+              "max_content_length": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2000000,
+                "default": 100000,
+                "description": "Maximum characters of content to return. Use 0 to omit the content and only report its size.",
+                "markdownDescription": "Maximum characters of content to return. Use 0 to omit the content and only report its size."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "geckolib_export_animations",
+      "title": "Export GeckoLib Animations",
+      "description": "Compiles the project's animations into GeckoLib animation-file JSON, including the easing and easingArgs the plugin writes, and optionally writes it to a path. Reports which host API compiled it, since only the plugin-patched route stamps geckolib_format_version. Set mode='dialog' to trigger the plugin's own animation export action instead.",
+      "status": "experimental",
+      "category": "GeckoLib Integration",
+      "annotations": {
+        "destructiveHint": false,
+        "openWorldHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/geckolib_export_animations",
+        "definitions": {
+          "geckolib_export_animations": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "compile",
+                  "dialog"
+                ],
+                "default": "compile",
+                "description": "compile returns the file content without touching the UI. dialog triggers the GeckoLib plugin's own export action, which opens a native save dialog for the user to complete and updates the project's cached export path.",
+                "markdownDescription": "compile returns the file content without touching the UI. dialog triggers the GeckoLib plugin's own export action, which opens a native save dialog for the user to complete and updates the project's cached export path."
+              },
+              "path": {
+                "type": "string",
+                "description": "Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode.",
+                "markdownDescription": "Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode."
+              },
+              "max_content_length": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2000000,
+                "default": 100000,
+                "description": "Maximum characters of content to return. Use 0 to omit the content and only report its size.",
+                "markdownDescription": "Maximum characters of content to return. Use 0 to omit the content and only report its size."
+              },
+              "animation_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "description": "Animation UUIDs or names to include. Omit to export every animation in the project.",
+                "markdownDescription": "Animation UUIDs or names to include. Omit to export every animation in the project."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "geckolib_export_display",
+      "title": "Export GeckoLib Display Settings",
+      "description": "Builds the Java item/block display-settings JSON for GeckoLib Item and Block models: parent model, texture size, GUI light, per-perspective display transforms and the namespaced particle texture. Reports when the active model type would not normally ship one. Set mode='dialog' to trigger the plugin's own display export action instead.",
+      "status": "experimental",
+      "category": "GeckoLib Integration",
+      "annotations": {
+        "destructiveHint": false,
+        "openWorldHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/geckolib_export_display",
+        "definitions": {
+          "geckolib_export_display": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "compile",
+                  "dialog"
+                ],
+                "default": "compile",
+                "description": "compile returns the file content without touching the UI. dialog triggers the GeckoLib plugin's own export action, which opens a native save dialog for the user to complete and updates the project's cached export path.",
+                "markdownDescription": "compile returns the file content without touching the UI. dialog triggers the GeckoLib plugin's own export action, which opens a native save dialog for the user to complete and updates the project's cached export path."
+              },
+              "path": {
+                "type": "string",
+                "description": "Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode.",
+                "markdownDescription": "Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode."
+              },
+              "max_content_length": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2000000,
+                "default": 100000,
+                "description": "Maximum characters of content to return. Use 0 to omit the content and only report its size.",
+                "markdownDescription": "Maximum characters of content to return. Use 0 to omit the content and only report its size."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
       "name": "hytale_get_format_info",
       "title": "Get Hytale Format Info",
       "description": "Returns information about the current Hytale format. Requires the Hytale plugin and a Hytale format project to be active.",
@@ -6628,7 +8272,7 @@
     {
       "name": "hytale_create_quad",
       "title": "Create Hytale Quad",
-      "description": "Creates a Hytale quad (2D plane) with a specified normal direction. Quads are single-face elements useful for flat surfaces.",
+      "description": "Creates a Hytale quad with exactly one enabled face matching the signed normal direction, per-face UV and Auto UV 1. Positive width/height and parent references are validated before one reversible edit.",
       "status": "experimental",
       "category": "Hytale Integration",
       "annotations": {
@@ -6652,8 +8296,8 @@
                 },
                 "minItems": 3,
                 "maxItems": 3,
-                "description": "Position [x, y, z]",
-                "markdownDescription": "Position [x, y, z]",
+                "description": "Finite position [x, y, z] of the quad's starting corner.",
+                "markdownDescription": "Finite position [x, y, z] of the quad's starting corner.",
                 "default": [
                   0,
                   0,
@@ -6681,8 +8325,8 @@
                 },
                 "minItems": 2,
                 "maxItems": 2,
-                "description": "Size [width, height].",
-                "markdownDescription": "Size [width, height].",
+                "description": "Positive finite [width, height]. Width/height axes are Z/Y for X normals, X/Z for Y normals, and X/Y for Z normals.",
+                "markdownDescription": "Positive finite [width, height]. Width/height axes are Z/Y for X normals, X/Z for Y normals, and X/Y for Z normals.",
                 "default": [
                   16,
                   16
@@ -6690,8 +8334,8 @@
               },
               "group": {
                 "type": "string",
-                "description": "Parent group/bone name",
-                "markdownDescription": "Parent group/bone name"
+                "description": "Parent group UUID or unique name, or root (default). Missing or ambiguous names are rejected.",
+                "markdownDescription": "Parent group UUID or unique name, or root (default). Missing or ambiguous names are rejected."
               },
               "double_sided": {
                 "type": "boolean",
@@ -6809,8 +8453,10 @@
               },
               "time": {
                 "type": "number",
-                "description": "Time in seconds for the keyframe",
-                "markdownDescription": "Time in seconds for the keyframe"
+                "minimum": 0,
+                "maximum": 10000,
+                "description": "Finite time in seconds between 0 and 10000 for the visibility keyframe.",
+                "markdownDescription": "Finite time in seconds between 0 and 10000 for the visibility keyframe."
               },
               "visible": {
                 "type": "boolean",

@@ -100,3 +100,9 @@ Prompt and resource specs are defined **inline in the manifest** (not imported f
 - Server config lives in Blockbench Settings: MCP port and endpoint (defaults `:3000/bb-mcp`).
 - Do not commit secrets. Keep network calls behind tools; validate all inputs (use `zod`).
 - Keep bundle lean: add only necessary deps; prefer tree-shakeable utilities.
+
+## Benchmark results
+
+`benchmarks/results/` holds local, git-ignored benchmark evidence (large traces,
+`.bbmodel` snapshots and images). Do not search, read or summarize it unless the
+user points to a specific file there, and never stage, commit or force-add it.

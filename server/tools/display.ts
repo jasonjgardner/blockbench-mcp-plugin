@@ -40,7 +40,7 @@ export const setDisplayTransformParameters = z.object({
     .optional()
     .default(false)
     .describe(
-      "Reset the slot to its default (identity) transform before applying any of the other values."
+      "Reset the slot to its default transform before applying any of the other values: identity, or Blockbench's Bedrock defaults on bedrock_block projects."
     ),
 });
 
@@ -75,7 +75,7 @@ export const displayToolDocs: IToolSpec[] = [
     name: "set_display_transform",
     condition: { project: true, features: ["display_mode"] },
     description:
-      "Writes a Java Edition display slot's transform (translation, rotation, scale, mirror, pivots). Creates the slot if it does not exist yet and wraps the change in an undo step. This edits data that ships in the exported model JSON — it changes the deliverable, not just the preview. Requires a format that supports display mode (e.g. Java Block/Item).",
+      "Writes a Java Edition display slot's transform (translation, rotation, scale, mirror, pivots). Creates the slot if it does not exist yet (seeded from Blockbench's Bedrock item display defaults on bedrock_block projects, identity otherwise) and wraps the change in an undo step. This edits data that ships in the exported model JSON — it changes the deliverable, not just the preview. Requires a format that supports display mode (e.g. Java Block/Item).",
     annotations: {
       title: "Set Display Transform",
       destructiveHint: true,
@@ -105,7 +105,25 @@ export const displayToolDocs: IToolSpec[] = [
 /** Subset of the runtime DisplayMode global used here (types only cover `slots`). */
 interface IDisplayModeRuntime {
   load?: (slot: string) => void;
-  display_slot?: string;
+  /** Blockbench 5.2+: per-slot Bedrock item display defaults used by bedrock_block projects. */
+  bedrock_defaults?: Record<string, DisplaySlotOptions | undefined>;
+}
+
+/**
+ * Returns the default transform a new or reset slot should start from.
+ *
+ * Blockbench 5.2 seeds Bedrock block display slots from
+ * `DisplayMode.bedrock_defaults` (extracted from the Bedrock client) when
+ * importing and when applying the block preset, so a slot created or reset
+ * with plain identity values would not match what the game uses. Other
+ * formats, and older hosts without the table, use identity.
+ *
+ * @param slot - Display slot ID.
+ * @returns The Bedrock defaults for the slot, or `undefined` for identity.
+ */
+function getSlotDefaults(slot: string): DisplaySlotOptions | undefined {
+  if (Format?.id !== "bedrock_block") return undefined;
+  return (DisplayMode as unknown as IDisplayModeRuntime).bedrock_defaults?.[slot];
 }
 
 /** Subset of the runtime displayReferenceObjects global (not in blockbench-types). */
@@ -226,15 +244,16 @@ export function registerDisplayTools() {
 
         Undo.initEdit({ display_slots: [slot] });
 
-        // Create the slot on demand, mirroring Blockbench's own loadDisp().
-        let displaySlot = settings[slot];
-        if (!displaySlot) {
-          displaySlot = new DisplaySlot(slot, {});
-          settings[slot] = displaySlot;
-        }
+        // Create the slot on demand like Blockbench's loadDisp(), seeded from
+        // the format's defaults (Bedrock defaults on bedrock_block).
+        const slotDefaults = getSlotDefaults(slot);
+        const existingSlot = settings[slot];
+        const displaySlot = existingSlot ?? new DisplaySlot(slot, slotDefaults ?? {});
+        if (!existingSlot) settings[slot] = displaySlot;
 
         if (reset) {
           displaySlot.default();
+          if (slotDefaults) displaySlot.extend(slotDefaults);
         }
 
         // Only forward the fields the caller actually supplied so unspecified
@@ -259,6 +278,7 @@ export function registerDisplayTools() {
           {
             slot,
             reset: Boolean(reset),
+            defaults: slotDefaults ? "bedrock_block" : "identity",
             transform: serializeSlot(displaySlot),
           },
           null,
@@ -299,27 +319,19 @@ export function registerDisplayTools() {
           alreadyDisplay ? "Already in display mode." : "Entered display mode."
         );
 
-        // 2. Activate the requested slot. Slot-activation internals differ
-        //    across Blockbench versions, so try the canonical entry point first
-        //    and fall back to older/global variants, reporting which worked.
+        // 2. Activate the requested slot. `DisplayMode.load(slot)` is the
+        //    window-exposed entry point (Blockbench 4.x–5.2) that dispatches to
+        //    the per-slot loaders (loadThirdRight, loadGUI, …), which call the
+        //    module-scoped loadDisp() and position the preview camera. loadDisp
+        //    itself is not a window global, so there is no other path to try.
         const displayModeRuntime = DisplayMode as unknown as IDisplayModeRuntime;
-        const loadDisp = (
-          globalThis as unknown as { loadDisp?: (slot: string) => void }
-        ).loadDisp;
-
-        const activateSlot = (): string => {
-          if (typeof displayModeRuntime.load === "function") {
-            displayModeRuntime.load(slot);
-            return "DisplayMode.load";
-          }
-          if (typeof loadDisp === "function") {
-            loadDisp(slot);
-            return "loadDisp";
-          }
-          displayModeRuntime.display_slot = slot;
-          return "DisplayMode.display_slot";
-        };
-        notes.push(`Activated slot "${slot}" via ${activateSlot()}.`);
+        if (typeof displayModeRuntime.load !== "function") {
+          throw new Error(
+            "This Blockbench build does not expose DisplayMode.load, so display slots cannot be switched programmatically."
+          );
+        }
+        displayModeRuntime.load(slot);
+        notes.push(`Activated slot "${slot}".`);
 
         // 3. Load the reference model, if requested.
         if (reference) {

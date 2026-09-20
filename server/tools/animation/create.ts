@@ -5,7 +5,7 @@ import { findGroupOrThrow } from "@/lib/util";
 import { runUndoableAnimationEdit } from "@/lib/animation-undo";
 import { animationToolDocs } from "./docs";
 import { createAnimationParameters } from "./schemas";
-import { TRANSFORM_CHANNELS, applyKeyframeValues, getAnimationClass } from "./shared";
+import { TRANSFORM_CHANNELS, applyKeyframeValues, getAnimationClass, requireBoneAnimator } from "./shared";
 
 type CreateAnimationInput = z.infer<typeof createAnimationParameters>;
 type BoneKeyframeInput = CreateAnimationInput["bones"][string][number];
@@ -91,7 +91,7 @@ function addBoneKeyframes(animator: BoneAnimator, data: BoneKeyframeInput): void
 }
 
 /** Adds an effects animator carrying particle keyframes, when any were requested. */
-function addParticleKeyframes(animation: _Animation, particles: IParticleKeyframe[]): void {
+function addParticleKeyframes(animation: BBAnimation, particles: IParticleKeyframe[]): void {
   if (!particles.length) return;
   const effects = new EffectAnimator(animation);
   animation.animators.effects = effects;
@@ -101,9 +101,9 @@ function addParticleKeyframes(animation: _Animation, particles: IParticleKeyfram
 }
 
 /** Populates a new animation with validated bone and particle keyframes. */
-function buildAnimationKeyframes(animation: _Animation, { targets, particles }: IValidatedAnimationInput): void {
+function buildAnimationKeyframes(animation: BBAnimation, { targets, particles }: IValidatedAnimationInput): void {
   targets.forEach(({ group, keyframes }) => {
-    const animator = animation.getBoneAnimator(group);
+    const animator = requireBoneAnimator(animation, group);
     keyframes.forEach((data) => addBoneKeyframes(animator, data));
   });
   addParticleKeyframes(animation, particles);
@@ -124,7 +124,7 @@ export function registerCreateAnimationTool(): void {
           throw new Error("The current project format does not support animations. Use get_capabilities to inspect supported formats.");
         }
         const validated = validateAnimationInput(input);
-        const animations: _Animation[] = [];
+        const animations: BBAnimation[] = [];
         const animation = runUndoableAnimationEdit({ animations }, "Create animation", () => {
           const AnimationClass = getAnimationClass();
           const created = new AnimationClass({

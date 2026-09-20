@@ -3,11 +3,13 @@
 import { z } from "zod";
 import { createTool, type IToolSpec } from "@/lib/factories";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
+import { runUndoableEdit } from "@/lib/undo";
 import {
   elementIdSchema,
   vector3Schema,
   meshIdOptionalSchema,
 } from "@/lib/zodObjects";
+import { applyIkController, setIkControllerParameters } from "@/server/tools/animation/rigging";
 
 // ============================================================================
 // Helper Functions
@@ -158,7 +160,7 @@ export const getArmatureBoneParameters = z.object({
     .boolean()
     .optional()
     .default(false)
-    .describe("Whether to include all vertex weights in response."),
+    .describe("Whether to include the bone's raw vertex_weights map in the response. Keys are `<first 6 chars of mesh UUID>:<vertex key>` (legacy projects may still hold bare `<vertex key>` entries until reweighted); use get_vertex_weights for per-mesh vertex-key maps."),
 });
 
 export const addArmatureBoneParameters = z.object({
@@ -448,12 +450,24 @@ export const armatureToolDocs: IToolSpec[] = [
   {
     name: "clear_vertex_weights",
     condition: { project: true, features: ["armature_rig", "meshes"] },
-    description: "Clears all vertex weights from a bone for a specific mesh.",
+    description: "Clears all vertex weights from a bone for a specific mesh, including legacy bare vertex-key entries that still apply to that mesh.",
     annotations: {
       title: "Clear Vertex Weights",
       destructiveHint: true,
     },
     parameters: clearVertexWeightsParameters,
+    status: STATUS_EXPERIMENTAL,
+  },
+  {
+    name: "set_ik_controller",
+    condition: { project: true, features: ["animation_mode"] },
+    description:
+      "Creates or updates an inverse-kinematics controller. Blockbench drives IK from a null object: ik_target is the end effector (group/bone, armature bone, or locator) that reaches for the null object, ik_source is the chain root (defaults to the null object's parent), ik_pole (Blockbench 5.2+) sets the bend direction, and lock_ik_target_rotation keeps the effector's rotation. Works with bone rigs and armatures (5.2 allows null objects under armatures and armature bones). Validates every reference and that the target lies below the chain root; returns the solved chain. Replaces the deprecated bone_rigging set_ik flags, which Blockbench never read.",
+    annotations: {
+      title: "Set IK Controller",
+      destructiveHint: true,
+    },
+    parameters: setIkControllerParameters,
     status: STATUS_EXPERIMENTAL,
   },
 ];
@@ -633,7 +647,11 @@ export function registerArmatureTools() {
 
       if (include_weights) {
         return JSON.stringify(
-          { ...result, vertex_weights: bone.vertex_weights },
+          {
+            ...result,
+            vertex_weights_key_format: "<mesh uuid first 6 chars>:<vertex key>; bare <vertex key> entries are legacy and apply to any mesh with that vertex",
+            vertex_weights: bone.vertex_weights,
+          },
           null,
           2
         );
@@ -977,13 +995,12 @@ export function registerArmatureTools() {
 
       Undo.initEdit({ elements: [bone] });
 
-      let count = 0;
-      for (const [vertex_key, weight] of Object.entries(weights)) {
-        if (vertex_key in mesh.vertices) {
-          bone.setVertexWeight(mesh, vertex_key, weight);
-          count++;
-        }
-      }
+      const target = mesh;
+      // Zod's record output is typed loosely; keep only numeric weights on existing vertices.
+      const applicable = Object.entries(weights as Record<string, unknown>)
+        .filter((entry): entry is [string, number] => typeof entry[1] === "number" && entry[0] in target.vertices);
+      applicable.forEach(([vertex_key, weight]) => bone.setVertexWeight(target, vertex_key, weight));
+      const count = applicable.length;
 
       Undo.finishEdit("Agent set vertex weights (batch)");
 
@@ -1023,19 +1040,15 @@ export function registerArmatureTools() {
         throw new Error("No mesh found. Provide mesh_id or select a mesh.");
       }
 
-      Undo.initEdit({ elements: [bone] });
-
-      let count = 0;
-      const meshPrefix = mesh.uuid.substring(0, 6) + ":";
-
-      for (const key in bone.vertex_weights) {
-        if (key.startsWith(meshPrefix)) {
-          delete bone.vertex_weights[key];
-          count++;
-        }
-      }
-
-      Undo.finishEdit("Agent cleared vertex weights");
+      // Iterate the mesh's vertices rather than the key prefix: getVertexWeight still
+      // falls back to legacy bare `vkey` entries, and setVertexWeight without a
+      // weight removes both the `uuid6:vkey` and the legacy form.
+      const target = mesh;
+      const count = runUndoableEdit({ elements: [bone] }, "Agent cleared vertex weights", () => {
+        const weighted = Object.keys(target.vertices).filter((vkey) => bone.getVertexWeight(target, vkey) > 0);
+        weighted.forEach((vkey) => bone.setVertexWeight(target, vkey));
+        return weighted.length;
+      });
 
       Canvas.updateView({
         elements: [mesh],
@@ -1054,4 +1067,15 @@ export function registerArmatureTools() {
       );
     },
   }, armatureToolDocs[15].status);
+
+  // ---------------------------------------------------------------------------
+  // Set IK Controller (NullObject)
+  // ---------------------------------------------------------------------------
+  createTool(armatureToolDocs[16].name, {
+    ...armatureToolDocs[16],
+    parameters: setIkControllerParameters,
+    async execute(input) {
+      return JSON.stringify(applyIkController(input), null, 2);
+    },
+  }, armatureToolDocs[16].status);
 }

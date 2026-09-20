@@ -1,4 +1,5 @@
 /// <reference types="blockbench-types" />
+import type { FormResultValue } from "blockbench-types/generated/interface/form";
 
 /**
  * `MouseEventInit` members that JSON can express as booleans: event flags and

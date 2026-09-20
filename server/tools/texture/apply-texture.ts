@@ -13,7 +13,7 @@ export type PaintableElement = Cube | Mesh;
 interface ISelectionSnapshot {
   cubes: Cube[];
   meshes: Mesh[];
-  group: typeof Group.selected | null;
+  groups: Group[];
 }
 
 /** Depth-first list of every cube and mesh below `group`, in outliner order. */
@@ -33,7 +33,7 @@ function collectPaintableDescendants(group: Group): PaintableElement[] {
  * @returns Paintable elements in outliner order (empty for a group without any).
  * @throws When the element is not a group, cube, or mesh.
  */
-export function resolveTextureTargets(element: OutlinerElement, id: string): PaintableElement[] {
+export function resolveTextureTargets(element: OutlinerElement | Group, id: string): PaintableElement[] {
   if (element instanceof Group) return collectPaintableDescendants(element);
   if (element instanceof Cube || element instanceof Mesh) return [element];
   throw new Error(`Element "${id}" is not a cube, mesh, or group — cannot apply texture to it.`);
@@ -45,7 +45,7 @@ export function resolveTextureTargets(element: OutlinerElement, id: string): Pai
  * @param element - Element previously accepted by {@link resolveTextureTargets}.
  * @returns `"group"`, `"cube"`, or `"mesh"`.
  */
-export function describeTargetKind(element: OutlinerElement): string {
+export function describeTargetKind(element: OutlinerElement | Group): string {
   if (element instanceof Group) return "group";
   return element instanceof Cube ? "cube" : "mesh";
 }
@@ -73,7 +73,12 @@ function restoreSelection(snapshot: ISelectionSnapshot): void {
   clearElementSelection();
   addToSelection(snapshot.cubes);
   addToSelection(snapshot.meshes);
-  if (snapshot.group) snapshot.group.selected = true;
+  // Group.selected is a list in Blockbench 5; restore membership and the group's own
+  // selected flag (what the outliner renders) without re-running click selection.
+  snapshot.groups.forEach(group => {
+    if (!Group.multi_selected.includes(group)) Group.multi_selected.push(group);
+    group.selected = true;
+  });
   updateSelection();
 }
 
@@ -90,7 +95,7 @@ export function applyTextureToTargets(projectTexture: Texture, targets: Paintabl
   const previousSelection: ISelectionSnapshot = {
     cubes: [...Cube.selected],
     meshes: [...Mesh.selected],
-    group: Group.selected ?? null,
+    groups: [...Group.multi_selected],
   };
   // Undo must capture the element face-texture state, not just outliner.
   Undo.initEdit({ elements: targets, outliner: false, collections: [] });

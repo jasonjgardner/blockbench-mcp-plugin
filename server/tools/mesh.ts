@@ -19,8 +19,11 @@ import {
   addCylinderGeometry,
   addIndexedGeometry,
   addNewMesh,
+  addPolyhedronGeometry,
   addSphereGeometry,
   createMeshEdit,
+  MAX_POLYHEDRON_DETAIL,
+  POLYHEDRON_SHAPES,
   type IIndexedGeometryKeys,
   type IMeshCreationContext,
 } from "@/lib/mesh-primitives";
@@ -42,7 +45,12 @@ export const placeMeshParameters = z.object({
 /** Face-region extrusion parameters; unsupported edge/vertex modes produce an actionable error. */
 export const extrudeMeshParameters = z.object({
   mesh_id: meshIdOptionalSchema,
-  distance: z.number().finite().refine(value => value !== 0, "Distance must be nonzero").default(1).describe("Signed distance along averaged selected face normals, in local model units."),
+  distance: z
+    .number()
+    .finite()
+    .refine(value => value !== 0, "Distance must be nonzero")
+    .optional()
+    .describe("Signed distance along averaged selected face normals, in local model units. Defaults to Blockbench's current grid snap interval (getSpatialInterval), or 1 when unavailable."),
   mode: z
     .enum(["faces", "edges", "vertices"])
     .default("faces")
@@ -192,6 +200,63 @@ export const createCylinderParameters = z.object({
   group: groupIdOptionalSchema,
 });
 
+/** Regular polyhedron primitives from Blockbench 5.2's Add Mesh dialog, created as triangle meshes with planar UVs. */
+export const createPolyhedronParameters = z.object({
+  elements: z
+    .array(
+      z.object({
+        name: z.string().describe("Name of the mesh."),
+        shape: z.enum(POLYHEDRON_SHAPES).describe("icosphere (subdivided icosahedron), octahedron, or dodecahedron."),
+        position: vector3Schema.describe("Position of the polyhedron center (mesh origin)."),
+        diameter: z.number().min(1).max(64).default(16).describe("Diameter of the circumscribed sphere; every vertex lies at diameter / 2 from the center."),
+        detail: z
+          .number()
+          .int()
+          .min(0)
+          .max(MAX_POLYHEDRON_DETAIL)
+          .default(1)
+          .describe("Subdivision level: each base triangle becomes (detail + 1)^2 triangles projected onto the sphere. 0 is the plain solid."),
+        rotation: vector3Schema.optional().default([0, 0, 0]).describe("Rotation in degrees."),
+      })
+    )
+    .min(1)
+    .describe("Polyhedra to create."),
+  texture: textureIdOptionalSchema.describe("Texture ID or name to apply to every face."),
+  group: groupIdOptionalSchema.describe("Group/bone to which the meshes belong."),
+});
+
+/** Native Blockbench loop cut (Shift+R), driven headlessly through its amend-edit form. */
+export const loopCutMeshParameters = z.object({
+  mesh_id: meshIdOptionalSchema,
+  edge: z
+    .array(z.string())
+    .length(2)
+    .optional()
+    .describe("Two vertex keys of the edge to start the loop from; the cut runs across the face ring perpendicular to it. Defaults to the mesh's current vertex/face selection (at least two selected vertices)."),
+  cuts: z.number().int().min(1).max(16).default(1).describe("Number of parallel loop cuts."),
+  offset: z
+    .number()
+    .min(0)
+    .optional()
+    .describe("Distance of the (first) cut from the start of the edge, in the given unit. Defaults to the edge midpoint (or even spacing for multiple cuts)."),
+  unit: z.enum(["size", "percent"]).default("size").describe("Unit of offset: model units ('size') or percent of the start edge length."),
+  direction: z.number().int().min(0).default(0).describe("Rotates which edge of the start face the loop starts from, as the native Direction slider."),
+  spacing: z
+    .enum(["proportional", "even_start", "even_end"])
+    .default("proportional")
+    .describe("Blockbench 5.2 spacing: proportional keeps the same ratio on every edge of the loop; even_start/even_end keep the same absolute distance from the loop's start/end side."),
+});
+
+/** Flip selected elements in place (Blockbench's flip_in_place_x/y/z actions). */
+export const flipInPlaceParameters = z.object({
+  ids: z
+    .array(z.string())
+    .min(1)
+    .optional()
+    .describe("Element or group UUIDs/names to flip. Replaces the selection with these. Defaults to the current selection."),
+  axis: z.enum(["x", "y", "z"]).describe("Axis to mirror across each element's own center (cubes) or pivot (meshes, groups, other elements)."),
+});
+
 /** Retained for contract stability; knife_tool validates the mesh, then reports that headless cuts are unsupported. */
 export const knifeToolParameters = z.object({
   mesh_id: meshIdSchema.describe("ID or name of the mesh to cut."),
@@ -219,7 +284,8 @@ export const knifeToolParameters = z.object({
  * Registration addresses entries by index, so the order is part of the contract:
  * place_mesh, extrude_mesh, subdivide_mesh, create_sphere, select_mesh_elements,
  * move_mesh_vertices, delete_mesh_elements, merge_mesh_vertices, create_mesh_face,
- * create_cylinder, knife_tool. Building this array touches no Blockbench globals.
+ * create_cylinder, knife_tool, create_polyhedron, loop_cut_mesh, flip_in_place.
+ * Building this array touches no Blockbench globals.
  */
 export const meshToolDocs: IToolSpec[] = [
   {
@@ -336,12 +402,39 @@ export const meshToolDocs: IToolSpec[] = [
   {
     name: "knife_tool",
     condition: false,
-    description: "Currently unsupported: Blockbench's interactive Knife context requires pointer topology that this point-list API cannot safely provide. Use subdivide_mesh or create geometry with place_mesh, or use Knife manually.",
+    description: "Currently unsupported for meshes: Blockbench's interactive Knife context requires pointer topology that this point-list API cannot safely provide. Use subdivide_mesh or place_mesh for meshes; use knife_cut_cube or slice_cubes_to_block_grid to cut cubes headlessly.",
     annotations: {
       title: "Knife Tool",
       destructiveHint: true,
     },
     parameters: knifeToolParameters,
+    status: STATUS_EXPERIMENTAL,
+  },
+  {
+    name: "create_polyhedron",
+    condition: { project: true, features: ["meshes"] },
+    description:
+      "Creates icosphere, octahedron, or dodecahedron meshes (Blockbench 5.2 primitives) with a detail level of 0-6, as triangles with coincident vertices merged and planar per-face UVs. Returns vertex_keys/face_keys per mesh.",
+    annotations: { title: "Create Polyhedron", destructiveHint: true },
+    parameters: createPolyhedronParameters,
+    status: STATUS_EXPERIMENTAL,
+  },
+  {
+    name: "loop_cut_mesh",
+    condition: { project: true, modes: ["edit"], features: ["meshes"] },
+    description:
+      "Runs Blockbench's native Loop Cut on a mesh: splits the quad ring crossing the start edge with one or more parallel cuts, with offset, direction and 5.2 spacing modes (proportional, even_start, even_end). One undo entry. The new loop vertices become the selection and are returned.",
+    annotations: { title: "Loop Cut Mesh", destructiveHint: true },
+    parameters: loopCutMeshParameters,
+    status: STATUS_EXPERIMENTAL,
+  },
+  {
+    name: "flip_in_place",
+    condition: { project: true, modes: ["edit"] },
+    description:
+      "Mirrors elements in place along an axis using Blockbench's native Flip In Place (flip_in_place_x/y/z): cubes flip around their own center, meshes around their origin, groups also invert rotations in bone-rig formats. For meshes in vertex/edge/face selection mode only the selected components flip. Edit mode only.",
+    annotations: { title: "Flip In Place", destructiveHint: true },
+    parameters: flipInPlaceParameters,
     status: STATUS_EXPERIMENTAL,
   },
 ];
@@ -417,7 +510,8 @@ export function registerMeshTools(): void {
     async execute({ mesh_id, distance, mode }) {
       const mesh = getMeshOrSelected(mesh_id);
       if (mode !== "faces") throw new Error("Headless extrusion currently supports mode 'faces' only. Select faces with select_mesh_elements, or create explicit edge/vertex geometry with place_mesh.");
-      return JSON.stringify({ mesh: mesh.uuid, distance, ...extrudeMeshFaces(mesh, distance) });
+      const resolved = distance ?? defaultExtrudeDistance();
+      return JSON.stringify({ mesh: mesh.uuid, distance: resolved, ...extrudeMeshFaces(mesh, resolved) });
     },
   }, meshToolDocs[1].status);
 
@@ -773,7 +867,164 @@ export function registerMeshTools(): void {
     ...meshToolDocs[10],
     async execute({ mesh_id }) {
       findMeshOrThrow(mesh_id);
-      throw new Error("Headless knife_tool is unsupported: Blockbench requires interactive pointer/edge topology. Use subdivide_mesh or place_mesh for explicit geometry, or use Knife manually in Blockbench.");
+      throw new Error("Headless knife_tool is unsupported for meshes: Blockbench requires interactive pointer/edge topology. Use subdivide_mesh or place_mesh for meshes, or knife_cut_cube / slice_cubes_to_block_grid for cubes.");
     },
   }, meshToolDocs[10].status);
+
+  createTool(meshToolDocs[11].name, {
+    ...meshToolDocs[11],
+    parameters: createPolyhedronParameters,
+    async execute({ elements, texture, group }, context) {
+      const creation = resolveMeshCreationContext(texture, group);
+      const total = elements.length;
+      const created = createMeshEdit("Agent created polyhedra", (tracked) => elements.map((element, index): IPlacedMesh => {
+        const [mesh, keys] = addNewMesh(tracked, element, creation, (target) => addPolyhedronGeometry(target, element));
+        context?.reportProgress({ progress: index + 1, total });
+        return { name: mesh.name, uuid: mesh.uuid, ...keys };
+      }));
+      return JSON.stringify({ meshes: created });
+    },
+  }, meshToolDocs[11].status);
+
+  createTool(meshToolDocs[12].name, {
+    ...meshToolDocs[12],
+    parameters: loopCutMeshParameters,
+    async execute(input) {
+      return JSON.stringify(runNativeLoopCut(input));
+    },
+  }, meshToolDocs[12].status);
+
+  createTool(meshToolDocs[13].name, {
+    ...meshToolDocs[13],
+    parameters: flipInPlaceParameters,
+    async execute({ ids, axis }) {
+      return JSON.stringify(flipInPlace(ids, axis));
+    },
+  }, meshToolDocs[13].status);
+}
+
+// ============================================================================
+// Native action bridges (Blockbench 5.2)
+// ============================================================================
+
+/** Default extrusion distance: the grid snap interval, as Blockbench's own extrude uses. */
+function defaultExtrudeDistance(): number {
+  const interval: unknown = typeof getSpatialInterval === "function" ? getSpatialInterval() : undefined;
+  return typeof interval === "number" && Number.isFinite(interval) && interval !== 0 ? interval : 1;
+}
+
+/** Minimal slice of a native `Action` used to trigger it headlessly. */
+interface ITriggerableAction {
+  condition?: unknown;
+  trigger(event?: unknown): boolean;
+}
+
+/** Looks up a native action, failing clearly when the host Blockbench predates it. */
+function nativeAction(id: string): ITriggerableAction {
+  const action = (BarItems as unknown as Record<string, ITriggerableAction | undefined>)[id];
+  if (!action || typeof action.trigger !== "function") {
+    throw new Error(`Blockbench action "${id}" is unavailable. Update Blockbench (5.2+) or check the active format.`);
+  }
+  return action;
+}
+
+/** The amend-edit popup Blockbench opens after loop cut, exposed on `Undo` at runtime. */
+interface IAmendEditHost {
+  amend_edit_menu?: { form?: { setValues(values: Record<string, unknown>, update?: boolean): void } };
+  closeAmendEditMenu?: () => void;
+}
+
+/** Selection map entry for one mesh. */
+interface IMeshComponentSelection {
+  vertices: string[];
+  edges: unknown[];
+  faces: string[];
+}
+
+type LoopCutInput = z.infer<typeof loopCutMeshParameters>;
+
+/**
+ * Offset to put in the native loop cut form. The form's own default is half
+ * the edge length in model units, which means something else once `unit` is
+ * `"percent"`, so an omitted percent offset becomes 50 (the midpoint).
+ * Returns `undefined` to keep the form's default for model units.
+ */
+function loopCutOffset(input: LoopCutInput): number | undefined {
+  if (input.offset !== undefined) return input.offset;
+  return input.unit === "percent" ? 50 : undefined;
+}
+
+/**
+ * Runs the native `loop_cut` action, then drives its amend-edit form so the
+ * parameters apply exactly as if typed into Blockbench's popup (each form change
+ * undoes and re-runs the cut inside the same history entry). Direction is set in
+ * its own pass because the native form resets the offset when direction changes.
+ */
+function runNativeLoopCut(input: LoopCutInput): { mesh: string; new_vertices: string[]; faces: number } {
+  if (!Modes.edit) throw new Error("loop_cut_mesh requires Edit mode. Use set_mode to switch.");
+  const mesh = getMeshOrSelected(input.mesh_id);
+  const edge = input.edge;
+  if (edge && edge.some((vkey) => !(vkey in mesh.vertices))) {
+    throw new Error(`Edge ${JSON.stringify(edge)} references vertices that do not exist on mesh "${mesh.name}". Use get_mesh_info to list vertex keys.`);
+  }
+  mesh.select();
+  const selectionMap = Project!.mesh_selection as unknown as Record<string, IMeshComponentSelection | undefined>;
+  if (edge) selectionMap[mesh.uuid] = { vertices: [...edge], edges: [[edge[0], edge[1]]], faces: [] };
+  if (mesh.getSelectedVertices().length < 2) {
+    throw new Error("Loop cut needs at least two selected vertices on the mesh. Pass edge or select an edge/face with select_mesh_elements.");
+  }
+  const facesBefore = Object.keys(mesh.faces).length;
+  // Compare the newest entry by identity: the history length stays the same at
+  // undo_limit (oldest entry shifted out) or after undos (redo tail dropped).
+  const lastBefore = Undo.history.at(-1);
+  const undoHost = Undo as unknown as IAmendEditHost;
+  try {
+    const triggered = nativeAction("loop_cut").trigger();
+    if (!triggered || Undo.history.at(-1) === lastBefore) {
+      throw new Error("Blockbench's loop cut did not run. Ensure the mesh is selected in Edit mode and the selected vertices form an edge of a quad.");
+    }
+    const form = undoHost.amend_edit_menu?.form;
+    if (form && input.direction !== 0) form.setValues({ direction: input.direction });
+    const offset = loopCutOffset(input);
+    if (form) form.setValues({ cuts: input.cuts, unit: input.unit, spacing: input.spacing, ...(offset !== undefined && { offset }) });
+  } finally {
+    undoHost.closeAmendEditMenu?.();
+  }
+  const newVertices = selectionMap[mesh.uuid]?.vertices ?? [];
+  return { mesh: mesh.uuid, new_vertices: [...newVertices], faces: Object.keys(mesh.faces).length - facesBefore };
+}
+
+/** Axis letter to Blockbench's flip-in-place action id. */
+const FLIP_IN_PLACE_ACTIONS: Readonly<Record<"x" | "y" | "z", string>> = {
+  x: "flip_in_place_x",
+  y: "flip_in_place_y",
+  z: "flip_in_place_z",
+};
+
+/**
+ * Triggers Blockbench's Flip In Place action on the given (or selected) nodes.
+ * The native action (`mirrorSelectedInPlace`, not exposed on `window`) owns its
+ * undo entry and mesh auto-fix. Passing ids replaces the selection first.
+ */
+function flipInPlace(ids: string[] | undefined, axis: "x" | "y" | "z"): { axis: string; flipped: { uuid: string; name: string }[] } {
+  if (!Modes.edit) throw new Error("flip_in_place requires Edit mode. Use set_mode to switch.");
+  // Resolve the action before touching the selection so an old host fails without side effects.
+  const action = nativeAction(FLIP_IN_PLACE_ACTIONS[axis]);
+  const targets = ids?.map((id) => {
+    const node = Outliner.elements.find((element) => element.uuid === id) ?? Group.all.find((group) => group.uuid === id)
+      ?? Outliner.elements.find((element) => element.name === id) ?? Group.all.find((group) => group.name === id);
+    if (!node) throw new Error(`Element "${id}" not found. Use list_outline to inspect UUIDs and names.`);
+    return node;
+  });
+  if (targets) {
+    unselectAllElements();
+    targets.forEach((node) => (node instanceof Group ? node.multiSelect() : node.markAsSelected()));
+    updateSelection();
+  }
+  if (Outliner.selected.length === 0 && !Group.first_selected) throw new Error("Nothing to flip. Pass ids or select elements first.");
+  const flipped = [...Outliner.selected, ...Group.all.filter((group) => group.selected)].map((node) => ({ uuid: node.uuid, name: node.name }));
+  if (!action.trigger()) {
+    throw new Error(`Blockbench refused ${FLIP_IN_PLACE_ACTIONS[axis]}; it requires Edit mode.`);
+  }
+  return { axis, flipped };
 }

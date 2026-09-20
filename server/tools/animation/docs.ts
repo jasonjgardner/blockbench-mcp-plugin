@@ -8,6 +8,8 @@ import {
   animationTimelineParameters,
   batchKeyframeOperationsParameters,
   animationCopyPasteParameters,
+  variablePlaceholdersParameters,
+  listMolangVariablesParameters,
 } from "./schemas";
 
 /**
@@ -17,7 +19,8 @@ import {
  * Registration reads these entries by index, so the order is part of the
  * contract: `[0]` create_animation, `[1]` manage_keyframes,
  * `[2]` animation_graph_editor, `[3]` bone_rigging, `[4]` animation_timeline,
- * `[5]` batch_keyframe_operations, `[6]` animation_copy_paste.
+ * `[5]` batch_keyframe_operations, `[6]` animation_copy_paste,
+ * `[7]` variable_placeholders, `[8]` list_molang_variables.
  */
 export const animationToolDocs: IToolSpec[] = [
   {
@@ -59,7 +62,7 @@ export const animationToolDocs: IToolSpec[] = [
     name: "bone_rigging",
     condition: { project: true, features: ["bone_rig"] },
     description:
-      "Creates and manipulates the bone structure (rig) of a model for animation.",
+      "Creates and manipulates the bone structure (rig) of a model for animation. The set_ik action is deprecated; use set_ik_controller for Blockbench's null-object IK (source, target, pole).",
     annotations: {
       title: "Bone Rigging",
       destructiveHint: true,
@@ -71,7 +74,7 @@ export const animationToolDocs: IToolSpec[] = [
     name: "animation_timeline",
     condition: { project: true, features: ["animation_mode"] },
     description:
-      "Controls the animation timeline, including playback, time scrubbing, and timeline settings.",
+      "Controls the animation timeline: playback, time scrubbing, length, FPS, loop mode, and keyframe selection by time range or relative to the playhead (select_before_playhead/select_after_playhead return the selected keyframe UUIDs).",
     annotations: {
       title: "Animation Timeline",
       destructiveHint: true,
@@ -100,6 +103,30 @@ export const animationToolDocs: IToolSpec[] = [
       destructiveHint: true,
     },
     parameters: animationCopyPasteParameters,
+    status: STATUS_EXPERIMENTAL,
+  },
+  {
+    name: "variable_placeholders",
+    condition: { project: true, features: ["animation_mode"] },
+    description:
+      "Reads or edits the project's animation Variable Placeholders text (one `variable = expression` per line), used to preview Molang animations. add writes a value, slider('name', step, min, max), toggle('name') or impulse('name', duration) line like the native Create Variable Placeholder dialog; set replaces all text; remove deletes a variable's lines. Changes sync through the native panel, refresh the animation preview and return the parsed lines and live controls. Placeholder edits are not recorded in Undo. Requires a format with Molang enabled.",
+    annotations: {
+      title: "Variable Placeholders",
+      destructiveHint: true,
+    },
+    parameters: variablePlaceholdersParameters,
+    status: STATUS_EXPERIMENTAL,
+  },
+  {
+    name: "list_molang_variables",
+    condition: { project: true, features: ["animation_mode"] },
+    description:
+      "Lists Blockbench's built-in Molang variables and query functions available in animation previews (like the native View Built-in Variables dialog), with current values for constants and live queries, plus the project's placeholder assignments. Read-only.",
+    annotations: {
+      title: "List Molang Variables",
+      readOnlyHint: true,
+    },
+    parameters: listMolangVariablesParameters,
     status: STATUS_EXPERIMENTAL,
   },
 ];

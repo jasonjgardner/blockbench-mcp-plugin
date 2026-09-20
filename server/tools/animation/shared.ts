@@ -17,14 +17,14 @@ export const KEYFRAME_TIME_EPSILON = 0.001;
  * Returns Blockbench's runtime `Animation` class with its real static API.
  *
  * blockbench-types cannot override libdom's global `Animation` (Web Animations)
- * declaration, so the Blockbench class is only typed as `_Animation`. This is
+ * declaration, so the Blockbench class is only typed as `BBAnimation`. This is
  * the single bridge between the two; tools must not repeat the cast. Call it
  * at runtime only — the global does not exist when docs import this module.
  *
  * @returns The `Animation` constructor, including `all` and `selected`.
  */
-export function getAnimationClass(): typeof _Animation {
-  return Animation as unknown as typeof _Animation;
+export function getAnimationClass(): typeof BBAnimation {
+  return Animation as unknown as typeof BBAnimation;
 }
 
 /**
@@ -35,7 +35,7 @@ export function getAnimationClass(): typeof _Animation {
  * @returns The matching animation, or `undefined`/`null` when nothing matches
  *   or nothing is selected. Callers own the "not found" message.
  */
-export function findAnimationOrSelected(animationId?: string): _Animation | null | undefined {
+export function findAnimationOrSelected(animationId?: string): BBAnimation | null | undefined {
   const AnimationClass = getAnimationClass();
   return animationId
     ? AnimationClass.all.find((item) => item.uuid === animationId || item.name === animationId)
@@ -70,7 +70,7 @@ export function toVector3(value: number | number[]): ArrayVector3 {
  * @param values - `[x, y, z]` for position/rotation, or a number for uniform scale.
  */
 export function applyKeyframeValues(
-  keyframe: _Keyframe,
+  keyframe: BBKeyframe,
   values: number[] | number
 ): void {
   const vals = toVector3(values);
@@ -94,8 +94,8 @@ export function applyKeyframeValues(
  * @param label - Selection history label shown in Blockbench.
  */
 export function replaceTimelineSelection(
-  animation: _Animation,
-  frames: readonly (_Keyframe | undefined)[],
+  animation: BBAnimation,
+  frames: readonly (BBKeyframe | undefined)[],
   label: string
 ): void {
   Undo.initSelection({ timeline: true });
@@ -105,4 +105,26 @@ export function replaceTimelineSelection(
   frames.forEach((frame) => frame?.select({ ctrlOrCmd: true }));
   updateKeyframeSelection();
   Undo.finishSelection(label);
+}
+
+/**
+ * Returns the bone animator for `node`, creating it when needed.
+ *
+ * Blockbench 5.2 `getBoneAnimator()` returns nothing when the node type has no
+ * animator or, under a scope-isolated multi-file ruleset, when the node lives
+ * in a different scope than the animation. Tools must surface that as a clear
+ * error instead of dereferencing `null`. Call inside an undoable edit so a
+ * newly created animator is rolled back if a later step fails.
+ *
+ * @param animation - Animation that should own the animator.
+ * @param node - Bone/group (or other animatable outliner node) to animate.
+ * @returns The existing or newly created bone animator.
+ * @throws When Blockbench cannot provide an animator for this node.
+ */
+export function requireBoneAnimator(animation: BBAnimation, node: OutlinerNode): BoneAnimator {
+  const animator = animation.getBoneAnimator(node);
+  if (animator) return animator;
+  throw new Error(
+    `"${node.name}" cannot be animated by "${animation.name}". It may not support animation, or it belongs to a different scope than this animation.`
+  );
 }

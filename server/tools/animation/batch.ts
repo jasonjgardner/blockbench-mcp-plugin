@@ -19,14 +19,14 @@ interface ISample {
   channel: string;
   time: number;
   values: ArrayVector3;
-  existing?: _Keyframe;
+  existing?: BBKeyframe;
 }
 interface IInterpolatingAnimator extends GeneralAnimator {
   interpolate(channel: string, allowExpression: boolean): ArrayVector3 | false;
 }
 
 /** Includes collapsed/off-timeline animators when selecting all frames. */
-function selectFrames(animation: _Animation, input: Input): _Keyframe[] {
+function selectFrames(animation: BBAnimation, input: Input): BBKeyframe[] {
   const all = Object.values(animation.animators).flatMap(animator => animator.keyframes);
   if (input.selection === "selected") {
     if (Timeline.selected.some(frame => !all.includes(frame))) throw new Error("Selected keyframes must belong to the active animation.");
@@ -49,7 +49,7 @@ function selectFrames(animation: _Animation, input: Input): _Keyframe[] {
 }
 
 /** Rejects expressions, effects and pre/post values before numeric arithmetic. */
-function numericValues(frame: _Keyframe): ArrayVector3 {
+function numericValues(frame: BBKeyframe): ArrayVector3 {
   if (!TRANSFORM_CHANNELS.some(channel => channel === frame.channel) || frame.data_points.length !== 1) {
     throw new Error("Value edits and baking require transform keyframes with one data point; effects and pre/post keyframes are unsupported.");
   }
@@ -62,7 +62,7 @@ function numericValues(frame: _Keyframe): ArrayVector3 {
 }
 
 /** Stages all times and checks channel collisions before history or mutation. */
-function planTimes(frames: _Keyframe[], timeFor: (frame: _Keyframe) => number): Mutation {
+function planTimes(frames: BBKeyframe[], timeFor: (frame: BBKeyframe) => number): Mutation {
   const edits = frames.map(frame => ({ frame, time: timeFor(frame) }));
   if (edits.some(({ time }) => !Number.isFinite(time) || time < 0 || time > MAX_TIME)) {
     throw new Error(`Resulting keyframe times must be finite and between 0 and ${MAX_TIME} seconds.`);
@@ -75,13 +75,13 @@ function planTimes(frames: _Keyframe[], timeFor: (frame: _Keyframe) => number): 
 }
 
 /** Validates all values so an unsupported frame cannot leave earlier frames changed. */
-function planValues(frames: _Keyframe[], transform: (values: ArrayVector3) => ArrayVector3): Mutation {
+function planValues(frames: BBKeyframe[], transform: (values: ArrayVector3) => ArrayVector3): Mutation {
   const edits = frames.map(frame => ({ frame, values: transform(numericValues(frame)) }));
   if (edits.some(({ values }) => values.some(value => !Number.isFinite(value)))) throw new Error("The value operation produced non-finite coordinates.");
   return () => { edits.forEach(({ frame, values }) => applyKeyframeValues(frame, values)); };
 }
 
-function planOffset(frames: _Keyframe[], parameters: Parameters): Mutation {
+function planOffset(frames: BBKeyframe[], parameters: Parameters): Mutation {
   const offset = parameters.offset_values;
   if (parameters.offset_time === undefined && offset === undefined) throw new Error("Offset requires offset_time or offset_values.");
   const times = parameters.offset_time === undefined ? undefined : planTimes(frames, frame => frame.time + (parameters.offset_time ?? 0));
@@ -89,14 +89,14 @@ function planOffset(frames: _Keyframe[], parameters: Parameters): Mutation {
   return () => { times?.(); values?.(); };
 }
 
-function planScale(frames: _Keyframe[], parameters: Parameters): Mutation {
+function planScale(frames: BBKeyframe[], parameters: Parameters): Mutation {
   const factor = parameters.scale_factor;
   if (factor === undefined) throw new Error("Scale requires scale_factor.");
   const pivot = parameters.scale_pivot ?? 0;
   return planTimes(frames, frame => pivot + (frame.time - pivot) * factor);
 }
 
-function planMirror(frames: _Keyframe[], parameters: Parameters): Mutation {
+function planMirror(frames: BBKeyframe[], parameters: Parameters): Mutation {
   const axis = parameters.mirror_axis;
   if (!axis) throw new Error("Mirror requires mirror_axis.");
   const index = { x: 0, y: 1, z: 2 }[axis];
@@ -112,7 +112,7 @@ function isInterpolatingAnimator(animator: GeneralAnimator): animator is IInterp
 }
 
 /** Sample a selected channel span while retaining all existing keyframe times. */
-function sampleTimes(selected: _Keyframe[], channelFrames: _Keyframe[], interval: number): number[] {
+function sampleTimes(selected: BBKeyframe[], channelFrames: BBKeyframe[], interval: number): number[] {
   const start = Math.min(...selected.map(frame => frame.time));
   const end = Math.max(...selected.map(frame => frame.time));
   if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end > MAX_TIME || start === end) {
@@ -127,7 +127,7 @@ function sampleTimes(selected: _Keyframe[], channelFrames: _Keyframe[], interval
 }
 
 /** Samples original curves before any insertion, restoring the playhead on every exit. */
-function planBake(frames: _Keyframe[], animation: _Animation, parameters: Parameters): Mutation {
+function planBake(frames: BBKeyframe[], animation: BBAnimation, parameters: Parameters): Mutation {
   const interval = parameters.bake_interval ?? 1 / animation.snapping;
   if (!Number.isFinite(interval) || interval < KEYFRAME_TIME_EPSILON) throw new Error(`bake_interval must be at least ${KEYFRAME_TIME_EPSILON} seconds.`);
   const groups = [...Map.groupBy(frames, frame => frame.animator)].flatMap(([animator, selected]) =>
@@ -167,7 +167,7 @@ function planBake(frames: _Keyframe[], animation: _Animation, parameters: Parame
   };
 }
 
-const planners: Record<Input["operation"], (frames: _Keyframe[], animation: _Animation, parameters: Parameters) => Mutation> = {
+const planners: Record<Input["operation"], (frames: BBKeyframe[], animation: BBAnimation, parameters: Parameters) => Mutation> = {
   offset: (frames, _animation, parameters) => planOffset(frames, parameters),
   scale: (frames, _animation, parameters) => planScale(frames, parameters),
   reverse: frames => {

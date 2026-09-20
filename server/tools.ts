@@ -12,10 +12,12 @@ import { registerCubeUvTools } from "@/server/tools/cube-uv";
 import { registerDisplayTools } from "@/server/tools/display";
 import { registerElementTools } from "@/server/tools/element";
 import { registerImportTools } from "@/server/tools/import";
+import { registerKnifeTools } from "@/server/tools/knife";
 import { registerMeshTools } from "@/server/tools/mesh";
 import { registerMeshInspectionTools } from "@/server/tools/mesh-inspection";
 import { registerModeTools } from "@/server/tools/modes";
 import { registerPaintTools } from "@/server/tools/paint";
+import { registerPerformanceTools } from "@/server/tools/performance";
 import { registerProjectTools } from "@/server/tools/project";
 import { registerTextureTools } from "@/server/tools/texture";
 import { registerUITools } from "@/server/tools/ui";
@@ -29,6 +31,7 @@ import { registerExportTools } from "@/server/tools/export";
 import { registerValidatorResources } from "@/server/resources/validator";
 
 // Optional plugin integrations (tool availability is checked by native conditions)
+import { registerGeckolibTools } from "@/server/tools/geckolib";
 import { registerHytaleTools } from "@/server/tools/hytale";
 import { registerHytaleResources } from "@/server/resources/hytale";
 import { registerHytalePrompts } from "@/server/prompts/hytale";
@@ -46,11 +49,13 @@ const registrationFunctions = [
   registerExportTools,
   registerHistoryTools,
   registerImportTools,
+  registerKnifeTools,
   registerMaterialInstanceTools,
   registerMeshTools,
   registerMeshInspectionTools,
   registerModeTools,
   registerPaintTools,
+  registerPerformanceTools,
   registerProjectTools,
   registerTextureTools,
   registerUITools,
@@ -58,10 +63,11 @@ const registrationFunctions = [
   registerValidatorResources,
 ];
 
-// Optional integration registrations: Hytale tools always register definitions
-// so availability can follow later plugin load/unload; resources and prompts
-// retain their own registration rules.
+// Optional integration registrations: GeckoLib and Hytale tools always register
+// definitions so availability can follow later plugin load/unload; resources and
+// prompts retain their own registration rules.
 const optionalRegistrationFunctions = [
+  registerGeckolibTools,
   registerHytaleTools,
   registerHytaleResources,
   registerHytalePrompts,

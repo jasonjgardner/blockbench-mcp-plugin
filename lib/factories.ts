@@ -5,6 +5,7 @@ import { ResourceTemplate, type McpServer, type RegisteredTool } from "@modelcon
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { ToolCondition } from "@/server/tool-conditions";
 import { withResourceErrors } from "@/lib/resourceErrors";
+import { resolveAgentName, trackToolWrites } from "@/lib/ai-disclosure";
 
 /**
  * MCP tool annotations advertised to clients. Hints are advisory metadata that
@@ -75,6 +76,8 @@ export const resources: Record<string, IMCPResource> = {};
  */
 export interface IToolContext {
   reportProgress: (progress: { progress: number; total: number }) => void;
+  /** MCP session issuing the call; resolves the client name credited by AI usage disclosure. */
+  sessionId?: string;
 }
 
 /** Plain text convenience result or a complete SDK result, including resource content and errors. */
@@ -174,7 +177,11 @@ export function createTool<T extends z.ZodType>(
         throw new Error(`Tool "${name}" is unavailable in the current Blockbench project, format, mode, or selection. Refresh tools/list before retrying.`);
       }
       try {
-        return await tool.execute(args, context);
+        // Calls from MCP sessions stamp the project they write to (see lib/ai-disclosure);
+        // the plugin panel's own test dialog passes no session and is not AI usage.
+        const run = () => tool.execute(args, context);
+        if (!context?.sessionId) return await run();
+        return await trackToolWrites(resolveAgentName(context.sessionId), run);
       } finally {
         refreshToolAvailability();
       }
@@ -249,15 +256,15 @@ function registerToolOnServer(server: McpServer, name: string, definition: ITool
   const register = server.registerTool.bind(server) as unknown as (
     toolName: string,
     config: { title: string; description: string; inputSchema: z.ZodType; annotations?: IToolAnnotations },
-    callback: (args: Record<string, unknown>) => Promise<CallToolResult>
+    callback: (args: Record<string, unknown>, extra?: { sessionId?: string }) => Promise<CallToolResult>
   ) => RegisteredTool;
   const registration = register(name, {
     title: definition.title,
     description: definition.description,
     inputSchema: definition.parameterSchema,
     annotations: definition.annotations,
-  }, async args => {
-    const result = await definition.execute(args, { reportProgress: () => {} });
+  }, async (args, extra) => {
+    const result = await definition.execute(args, { reportProgress: () => {}, sessionId: extra?.sessionId });
     if (typeof result === "string") return { content: [{ type: "text", text: result }] };
     return result;
   });
