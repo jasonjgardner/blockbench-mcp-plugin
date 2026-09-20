@@ -30,9 +30,13 @@ export interface IFrameRateContext {
   /** Blockbench's `background_rendering` setting. */
   readonly backgroundRendering: boolean | null;
   /**
-   * Whether the page was hidden when sampling started, from
-   * `document.visibilityState`; `null` where no document exposes it. A hidden
-   * page renders no frames, because Chromium stops `requestAnimationFrame`.
+   * Whether the page is hidden, from `document.visibilityState`; `null` where
+   * no document exposes it. Read once sampling ends, not when it starts — the
+   * caller builds this context from {@link readFrameRateContext} right after
+   * {@link sampleRenderFrames} resolves. A page hidden at any point during the
+   * window is still hidden at that moment (a hidden page ends the window
+   * immediately), so this still reports `true` for it; a hidden page renders
+   * no frames, because Chromium stops `requestAnimationFrame`.
    */
   readonly documentHidden: boolean | null;
   /** Whether the Blockbench window had focus when sampling started, from `document.hasFocus()`. */
