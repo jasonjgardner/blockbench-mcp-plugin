@@ -29,7 +29,7 @@ type GetAverageFpsArgs = z.infer<typeof getAverageFpsParameters>;
 const getAverageFpsSpec: IToolSpec = {
   name: "get_average_fps",
   description:
-    "Measures the average frames per second of Blockbench's render loop by counting rendered frames for duration_ms, then returns the average with the frame count, the fps_limit setting, Blockbench's own last-second counter, window focus at the start of the window plus whether it changed, and whether rendering was paused because the window was unfocused with background rendering disabled. The call waits for the whole window; keep other tools idle meanwhile for a representative reading.",
+    "Measures the average frames per second of Blockbench's render loop by counting rendered frames for duration_ms, then returns the average with the frame count, the fps_limit setting, Blockbench's own last-second counter, window focus at the start of the window plus whether it changed, whether the page was hidden, and whether rendering was paused. The call waits for the whole window; keep other tools idle meanwhile for a representative reading. A minimised or fully occluded Blockbench renders no frames and freezes its timers, so the call returns an empty window at once with document_hidden and rendering_paused set rather than waiting; bring the window to the foreground to measure a real frame rate.",
   annotations: {
     title: "Get Average FPS",
     readOnlyHint: true,

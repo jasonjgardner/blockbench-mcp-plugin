@@ -29,6 +29,16 @@ export interface IFrameRateContext {
   readonly lastSecondFps: number | null;
   /** Blockbench's `background_rendering` setting. */
   readonly backgroundRendering: boolean | null;
+  /**
+   * Whether the page is hidden, from `document.visibilityState`; `null` where
+   * no document exposes it. Read once sampling ends, not when it starts — the
+   * caller builds this context from {@link readFrameRateContext} right after
+   * {@link sampleRenderFrames} resolves. A page hidden at any point during the
+   * window is still hidden at that moment (a hidden page ends the window
+   * immediately), so this still reports `true` for it; a hidden page renders
+   * no frames, because Chromium stops `requestAnimationFrame`.
+   */
+  readonly documentHidden: boolean | null;
   /** Whether the Blockbench window had focus when sampling started, from `document.hasFocus()`. */
   readonly windowFocused: boolean | null;
   /** Whether the window had focus when sampling ended; `null` when unknown. */
@@ -49,6 +59,13 @@ export interface IFrameRateSummary extends Record<string, unknown> {
   readonly last_second_fps: number | null;
   /** The `background_rendering` setting, or `null` when unavailable. */
   readonly background_rendering: boolean | null;
+  /**
+   * `true` when the Blockbench page was hidden (minimised or fully occluded),
+   * or `null` outside a browser document. Chromium freezes both
+   * `requestAnimationFrame` and timers for a hidden page, so no frame can
+   * render and the window is reported as empty rather than waited out.
+   */
+  readonly document_hidden: boolean | null;
   /** Whether the window had focus when sampling started, or `null` outside a browser document. */
   readonly window_focused: boolean | null;
   /**
@@ -58,11 +75,11 @@ export interface IFrameRateSummary extends Record<string, unknown> {
    */
   readonly focus_changed: boolean;
   /**
-   * `true` when no frame rendered at all while the window was unfocused with
-   * background rendering disabled. Blockbench skips rendering in that state
-   * (unless the pointer hovers the viewport), so the average describes a paused
-   * loop rather than slow rendering. A window that was only partly paused shows
-   * up as `focus_changed` instead.
+   * `true` when no frame rendered at all because the render loop was stopped
+   * rather than slow: either the page was hidden, or the window was unfocused
+   * with background rendering disabled. Blockbench skips rendering in the
+   * second state (unless the pointer hovers the viewport). A window that was
+   * only partly paused shows up as `focus_changed` instead.
    */
   readonly rendering_paused: boolean;
 }
@@ -77,13 +94,42 @@ export interface IRenderFrameHost {
 export interface ISamplingClock {
   /** Monotonic timestamp in milliseconds. */
   now(): number;
-  /** Resolves after `ms` milliseconds. */
-  wait(ms: number): Promise<void>;
+  /**
+   * Resolves after `ms` milliseconds. `signal`, when given and later aborted,
+   * lets the implementation drop its scheduled timer once the wait is no
+   * longer needed (the window already ended some other way); it does not
+   * itself settle the returned promise.
+   */
+  wait(ms: number, signal?: AbortSignal): Promise<void>;
 }
+
+/**
+ * Page-visibility surface, so sampling never waits on a frozen timer;
+ * overridable for deterministic tests.
+ */
+export interface IVisibilityHost {
+  /** Whether the page is currently hidden, so no frame can render. */
+  isHidden(): boolean;
+  /** Subscribes to visibility changes; the returned function unsubscribes. */
+  onVisibilityChange(listener: () => void): () => void;
+}
+
+const REAL_VISIBILITY: IVisibilityHost = {
+  isHidden: () => typeof document !== "undefined" && document.visibilityState === "hidden",
+  onVisibilityChange: listener => {
+    if (typeof document === "undefined") return () => {};
+    document.addEventListener("visibilitychange", listener);
+    return () => document.removeEventListener("visibilitychange", listener);
+  },
+};
 
 const REAL_CLOCK: ISamplingClock = {
   now: () => performance.now(),
-  wait: ms => new Promise(resolve => setTimeout(resolve, ms)),
+  wait: (ms, signal) =>
+    new Promise(resolve => {
+      const timer = setTimeout(resolve, ms);
+      signal?.addEventListener("abort", () => clearTimeout(timer), { once: true });
+    }),
 };
 
 /**
@@ -92,9 +138,20 @@ const REAL_CLOCK: ISamplingClock = {
  * The listener is always removed, even when waiting fails, so a cancelled
  * request never leaves a counter attached to the render loop.
  *
+ * Chromium freezes `requestAnimationFrame` *and* timers while a page is hidden,
+ * so a hidden Blockbench window renders no frames and never fires the timer that
+ * would end the window. Waiting there would hang the caller forever, so a page
+ * that is already hidden returns an empty window immediately, and a page that
+ * becomes hidden mid-window ends the sample at that point. Both report the
+ * frames counted so far; `documentHidden` on the context explains the result.
+ * Ending the window early aborts the clock's pending wait, so a real timer
+ * that would otherwise still be scheduled minutes later is dropped instead of
+ * firing a stray `resolve` on an already-settled promise.
+ *
  * @param durationMs - Length of the sampling window; a finite, non-negative number.
  * @param host - Event emitter to observe; defaults to the `Blockbench` global.
  * @param clock - Time source; defaults to `performance.now` and `setTimeout`.
+ * @param visibility - Page-visibility source; defaults to the `document` global.
  * @returns Frames rendered and the real elapsed time.
  * @throws {RangeError} When `durationMs` is negative or not finite.
  */
@@ -102,17 +159,31 @@ export async function sampleRenderFrames(
   durationMs: number,
   host: IRenderFrameHost = Blockbench,
   clock: ISamplingClock = REAL_CLOCK,
+  visibility: IVisibilityHost = REAL_VISIBILITY,
 ): Promise<IFrameSample> {
   if (!Number.isFinite(durationMs) || durationMs < 0) throw new RangeError(`Sampling window must be a non-negative number of milliseconds, received ${durationMs}.`);
+  if (visibility.isHidden()) return { frames: 0, elapsedMs: 0 };
   let frames = 0;
   const onFrame = (): void => {
     frames += 1;
   };
   host.on("render_frame", onFrame);
   const started = clock.now();
+  let unsubscribe: (() => void) | undefined;
+  const abortWait = new AbortController();
   try {
-    await clock.wait(durationMs);
+    await new Promise<void>((resolve, reject) => {
+      unsubscribe = visibility.onVisibilityChange(() => {
+        if (visibility.isHidden()) resolve();
+      });
+      clock.wait(durationMs, abortWait.signal).then(resolve, reject);
+    });
   } finally {
+    // Drops the clock's scheduled timer when the window ended some other way
+    // (early via visibility, or the promise rejected); a no-op once the timer
+    // has already fired, so the natural-completion path is unaffected.
+    abortWait.abort();
+    unsubscribe?.();
     host.removeListener("render_frame", onFrame);
   }
   return { frames, elapsedMs: clock.now() - started };
@@ -129,6 +200,7 @@ export function summarizeFrameRate(sample: IFrameSample, context: IFrameRateCont
   const averageFps = sample.elapsedMs > 0 ? sample.frames / (sample.elapsedMs / 1000) : 0;
   const focusChanged = context.windowFocused !== null && context.windowFocusedAfter !== null && context.windowFocused !== context.windowFocusedAfter;
   const unfocused = context.windowFocused === false || context.windowFocusedAfter === false;
+  const loopStopped = context.documentHidden === true || (unfocused && context.backgroundRendering === false);
   return {
     average_fps: Math.round(averageFps * 10) / 10,
     frames: sample.frames,
@@ -136,9 +208,10 @@ export function summarizeFrameRate(sample: IFrameSample, context: IFrameRateCont
     fps_limit: context.fpsLimit,
     last_second_fps: context.lastSecondFps,
     background_rendering: context.backgroundRendering,
+    document_hidden: context.documentHidden,
     window_focused: context.windowFocused,
     focus_changed: focusChanged,
-    rendering_paused: sample.frames === 0 && unfocused && context.backgroundRendering === false,
+    rendering_paused: sample.frames === 0 && loopStopped,
   };
 }
 
@@ -149,6 +222,17 @@ export function summarizeFrameRate(sample: IFrameSample, context: IFrameRateCont
  */
 export function readWindowFocus(): boolean | null {
   return typeof document === "undefined" ? null : document.hasFocus();
+}
+
+/**
+ * Reads whether the Blockbench page is hidden, so no frame can render.
+ *
+ * @returns `true` when `document.visibilityState` is `hidden`, `false` when it
+ * reports any other state, and `null` where no document exposes it.
+ */
+export function readDocumentHidden(): boolean | null {
+  if (typeof document === "undefined" || typeof document.visibilityState !== "string") return null;
+  return document.visibilityState === "hidden";
 }
 
 /**
@@ -163,6 +247,7 @@ export function readFrameRateContext(windowFocused: boolean | null): IFrameRateC
     fpsLimit: readNumberSetting("fps_limit"),
     lastSecondFps: readLastSecondFps(),
     backgroundRendering: readBooleanSetting("background_rendering"),
+    documentHidden: readDocumentHidden(),
     windowFocused,
     windowFocusedAfter: readWindowFocus(),
   };
