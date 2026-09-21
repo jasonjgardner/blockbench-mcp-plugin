@@ -134,7 +134,8 @@ Tag deployments require a passing local desktop record in `releases/desktop-smok
 2. Run `bun install --frozen-lockfile` and `bun run build`.
 3. Load or reload this repository's `dist/mcp.js` in Blockbench desktop. Reconnect existing MCP clients after reloading.
 4. Run `bun run release:smoke`. For a custom server address, append its URL, for example `bun run release:smoke http://localhost:3100/bb-mcp`.
-5. Review the passing record and outputs in `artifacts/`. Commit the record together with the tested source. Run `bun run release:verify v<version>` before creating the matching version tag.
+5. Review the passing record and outputs in `artifacts/`. Commit the record together with the tested source, and make that the last commit: any later change, even to a comment, moves the source fingerprint and CI rejects the tag.
+6. Run `bun run release:tag` (add `--push` to push it). It runs the same verification as CI against the committed tree, refuses a dirty checkout or an existing tag, and only then creates `v<version>`.
 
 The command checks the loaded plugin's source build ID, production build mode and desktop environment, runs Bun regression tests and the animation, action, PBR, MCP identity, and read-only inspection suites, then writes the record. Animation checks exercise real rig rotation, playback, keyframe data, and undo/redo. The live suites create separate temporary projects and leave the MCP identity project open. Save other work before testing. A failed repeat replaces the prior passing record with a failed result.
 
