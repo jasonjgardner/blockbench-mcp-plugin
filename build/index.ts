@@ -135,6 +135,15 @@ let process = requireNativeModule('process');`;
     log.step(`Copied ${c.cyan}about.md${c.reset}`);
   }
 
+  // Public API types for other plugins; shipped beside the bundle and on the site.
+  const apiTypesSource = resolve("./lib/mcp-api.d.ts");
+  const apiTypesDest = join(OUTPUT_DIR, "blockbench-mcp-api.d.ts");
+
+  if (await Bun.file(apiTypesSource).exists()) {
+    await copyFile(apiTypesSource, apiTypesDest);
+    log.step(`Copied ${c.gray}lib/mcp-api.d.ts${c.reset} → ${c.cyan}blockbench-mcp-api.d.ts${c.reset}`);
+  }
+
   return true;
 }
 

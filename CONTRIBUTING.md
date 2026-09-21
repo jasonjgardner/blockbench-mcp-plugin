@@ -62,6 +62,9 @@ Then import and call the registration function in `server/tools.ts`.
 - Naming: Tools are registered with the name you provide (no automatic prefix).
 - Validate inputs with `zod`. Avoid blocking UI during execution.
 
+### From another Blockbench plugin
+Other plugins register tools at runtime through the `MCP` global and the `MCP_QUEUE` bootstrap array; see the README section "Extending from another plugin" for the author-facing guide. The contract is `lib/mcp-api.d.ts` (copied to `dist/blockbench-mcp-api.d.ts` and published with releases), the runtime is `lib/plugin-api.ts`, and `lib/plugin-api.test.ts` covers load order, ownership cleanup, live-session propagation and validation. Keep the `.d.ts` and the runtime in step: `lib/plugin-api.ts` imports its types from the `.d.ts`, so a drift fails `tsc`.
+
 ## Adding Resources
 Use `createResource()` from `lib/factories.ts` in `server/resources.ts`:
 ```ts

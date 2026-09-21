@@ -40,6 +40,8 @@
                                 {{getDisplayName(tool.name)}}
                                 <i v-if="tool.status === 'experimental'" class="material-icons mcp-row__status"
                                     aria-hidden="true" :title="tl('mcp.status.experimental_tooltip')">science</i>
+                                <span v-if="tool.plugin" class="mcp-badge mcp-row__plugin"
+                                    :title="tl('mcp.tooltip.plugin_tool', [tool.plugin])">{{tool.plugin}}</span>
                             </span>
                             <span class="mcp-row__description" :title="tool.description">{{tool.description}}</span>
                         </span>

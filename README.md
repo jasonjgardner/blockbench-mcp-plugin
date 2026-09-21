@@ -136,6 +136,48 @@ opencode mcp add
 
 Use Agent Skills to orchestrate tool usage.
 
+## Extending from another plugin
+
+Any Blockbench plugin can add its own MCP tools. The MCP Server plugin installs a global `MCP` API when it loads and drains an `MCP_QUEUE` array, so registration works whichever plugin Blockbench loads first. Nothing is bundled or imported: your plugin stays independent of this one.
+
+1. Copy [`blockbench-mcp-api.d.ts`](https://jasonjgardner.github.io/blockbench-mcp-plugin/blockbench-mcp-api.d.ts) (also shipped in `dist/` and with each release) into your plugin source for types. Its schema types come from `zod`, so add it as a dev dependency: `bun add -d zod`. At runtime you use `mcp.z`, MCP's own instance, and never bundle zod.
+2. In your plugin's `onload`, queue a setup entry:
+
+```ts
+onload() {
+  (globalThis.MCP_QUEUE ??= []).push({
+    plugin: "my_plugin",
+    setup(mcp) {
+      mcp.registerTool({
+        name: "my_plugin_bake",
+        description: "Bakes the selected groups into keyframes of a new animation.",
+        parameters: mcp.z.object({
+          fps: mcp.z.number().int().min(1).max(120).default(24).describe("Keyframes per second."),
+        }),
+        condition: { project: true, modes: ["animate"] },
+        annotations: { title: "Bake Selection" },
+        execute: ({ fps }) => mcp.createJsonResult(bakeSelection(fps)),
+      });
+    },
+  });
+}
+```
+
+That is the whole integration. Tools registered with a `plugin` id are removed when that plugin unloads; `registerTool` also returns a disposer for `onunload`. Connected MCP clients receive `tools/list_changed`, and the MCP panel lists the tool with a badge naming your plugin.
+
+To publish an existing Blockbench `Action` instead of writing a tool, use `mcp.exposeAction("my_action_id")`: the tool follows the action's own condition and runs `action.trigger()`. Pass `execute` to run something other than the click handler, for example when the action normally opens a dialog.
+
+Things worth knowing:
+
+- Tool names share one namespace with the built-in tools and must match `^[a-zA-Z0-9_-]{1,64}$`. Prefix yours with your plugin id; a clash throws at registration.
+- `parameters` must be a Zod object schema. Build it with `mcp.z` so it is not validated by a second, bundled copy of zod.
+- Wrap edits in `mcp.runUndoableEdit(aspects, label, edit)` so a failing call reverts cleanly and the write is credited by [AI usage disclosure](https://jasonjgardner.github.io/blockbench-mcp-plugin/) like a built-in tool.
+- `condition` uses Blockbench's native rules (`modes`, `formats`, `features`, `project`, `method`), so an unavailable tool is hidden from clients without running your code.
+- Return a string for text, or `mcp.createJsonResult({...})` for data that clients can read as structured content.
+- Reloading the MCP plugin re-runs queued entries, so your tools come back without reloading your plugin. Entries in the `{ plugin, setup }` form are dropped when your plugin unloads; a bare function entry should check that your plugin is still loaded before registering.
+
+A complete example lives in the [Havok Physics Animations plugin](https://github.com/jasonjgardner/blockbench-plugins), which registers `havok_simulate_physics` this way.
+
 ## Plugin Development
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed instructions on setting up the development environment and how to add new tools, resources, and prompts.

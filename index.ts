@@ -19,6 +19,7 @@ import { setupAnimationUndoRestore, teardownAnimationUndoRestore } from "@/lib/a
 import { setupEditorStateSync, teardownEditorStateSync } from "@/lib/editor-state";
 import { setupAiDisclosure, teardownAiDisclosure } from "@/lib/ai-disclosure";
 import { setupScratchpadMode, teardownScratchpadMode } from "@/lib/scratchpad-mode";
+import { installPluginApi, uninstallPluginApi } from "@/lib/plugin-api";
 import { teardownOffscreenViews } from "@/lib/views";
 import type { NetServer, SessionTransports } from "@/server/net";
 import createNetServer from "@/server/net";
@@ -100,6 +101,10 @@ BBPlugin.register("mcp", {
       },
     });
 
+    // Built-in tools registered when @/server/tools was imported, so other
+    // plugins can now add theirs; this also drains any MCP_QUEUE entries.
+    installPluginApi();
+
     // Create a reference server for UI display purposes
     const referenceServer = createServer();
     uiSetup({
@@ -111,6 +116,8 @@ BBPlugin.register("mcp", {
   },
 
   onunload() {
+    // First: removes plugin-contributed tools while session servers still exist to notify.
+    uninstallPluginApi();
     teardownScratchpadMode();
     teardownAiDisclosure();
     teardownEditorStateSync();

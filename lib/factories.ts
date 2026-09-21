@@ -96,12 +96,22 @@ interface IToolDefinition {
   /** Explicit registration preference; conditions cannot enable a manually disabled tool. */
   configuredEnabled: boolean;
   condition?: ToolCondition;
+  /** Owning plugin id for tools contributed through the plugin API (`lib/plugin-api.ts`). */
+  plugin?: string;
 }
 
 /**
  * Store tool definitions for dynamic server reconstruction
  */
 const toolDefinitions: Record<string, IToolDefinition> = {};
+
+/** DOM event dispatched after a tool joins or leaves the registry, so the panel re-reads `tools`. */
+export const TOOL_REGISTRY_CHANGED = "mcp:tool-registry-changed";
+
+function notifyToolRegistryChanged(): void {
+  if (typeof document === "undefined") return;
+  document.dispatchEvent(new CustomEvent(TOOL_REGISTRY_CHANGED));
+}
 
 /**
  * Extracts the shape from a Zod schema, unwrapping ZodEffects if necessary.
@@ -145,6 +155,7 @@ function createInputSchema(schema: z.ZodType): z.ZodType {
  * @param tool.parameters - Zod schema for input parameters (supports ZodObject or ZodEffects from .refine()).
  * @param tool.execute - The async function to execute when the tool is called.
  * @param tool.condition - Native Blockbench availability condition, rechecked before every execution.
+ * @param tool.plugin - Owning plugin id when another plugin contributes the tool.
  * @param status - The status of the tool (stable, experimental, deprecated).
  * @param enabled - Whether the tool is enabled.
  * @returns - The created tool metadata.
@@ -157,6 +168,7 @@ export function createTool<T extends z.ZodType>(
     annotations?: IToolAnnotations;
     parameters: T;
     condition?: ToolCondition;
+    plugin?: string;
     execute: (args: z.infer<T>, context?: IToolContext) => Promise<ToolResult>;
   },
   status: IMCPTool["status"] = "stable",
@@ -172,6 +184,7 @@ export function createTool<T extends z.ZodType>(
     annotations: tool.annotations,
     configuredEnabled: enabled,
     condition: tool.condition,
+    plugin: tool.plugin,
     execute: async (args, context) => {
       if (!isToolAvailable(name)) {
         throw new Error(`Tool "${name}" is unavailable in the current Blockbench project, format, mode, or selection. Refresh tools/list before retrying.`);
@@ -193,8 +206,10 @@ export function createTool<T extends z.ZodType>(
     description: toolDef.title,
     enabled: isToolAvailable(name),
     status,
+    plugin: tool.plugin,
   };
-  registerToolOnServer(getServer(), name, toolDef);
+  registerToolOnAllServers(name, toolDef);
+  notifyToolRegistryChanged();
   return tools[name];
 }
 
@@ -270,6 +285,35 @@ function registerToolOnServer(server: McpServer, name: string, definition: ITool
   });
   registrations.set(name, registration);
   if (!isToolAvailable(name)) registration.disable();
+}
+
+/**
+ * Registers on the reference server and every live session server, so a tool
+ * added after clients connected (for example by another plugin) reaches them.
+ * The SDK notifies connected sessions itself; disconnected ones are skipped.
+ */
+function registerToolOnAllServers(name: string, definition: IToolDefinition): void {
+  registerToolOnServer(getServer(), name, definition);
+  serverTools.forEach((_registrations, server) => registerToolOnServer(server, name, definition));
+}
+
+/**
+ * Removes a tool from the registry, the panel, and every session server.
+ * Connected clients receive a list-changed notification from the SDK.
+ *
+ * @param name - Registered tool name.
+ * @returns `false` when no such tool exists.
+ */
+export function removeTool(name: string): boolean {
+  if (!toolDefinitions[name]) return false;
+  serverTools.forEach(registrations => {
+    registrations.get(name)?.remove();
+    registrations.delete(name);
+  });
+  delete toolDefinitions[name];
+  delete tools[name];
+  notifyToolRegistryChanged();
+  return true;
 }
 
 /** Returns all stored schemas and guarded implementations for the plugin's test UI. */

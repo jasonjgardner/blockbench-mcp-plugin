@@ -45,6 +45,7 @@ const en: Record<string, string> = {
 
   // Tooltips
   "mcp.tooltip.click_to_test": "Click to test %0",
+  "mcp.tooltip.plugin_tool": "Provided by the %0 plugin",
   "mcp.tooltip.click_to_preview": "Click to preview %0",
   "mcp.tooltip.click_to_view_panel": "Click to view MCP panel",
 
@@ -160,6 +161,7 @@ const de: Record<string, string> = {
 
   // Tooltips
   "mcp.tooltip.click_to_test": "Klicken zum Testen von %0",
+  "mcp.tooltip.plugin_tool": "Bereitgestellt vom Plugin %0",
   "mcp.tooltip.click_to_preview": "Klicken zur Vorschau von %0",
   "mcp.tooltip.click_to_view_panel": "Klicken zum Anzeigen des MCP-Panels",
 
@@ -256,6 +258,7 @@ const ja: Record<string, string> = {
 
   // Tooltips
   "mcp.tooltip.click_to_test": "クリックして %0 をテスト",
+  "mcp.tooltip.plugin_tool": "プラグイン %0 が提供",
   "mcp.tooltip.click_to_preview": "クリックして %0 をプレビュー",
   "mcp.tooltip.click_to_view_panel": "クリックしてMCPパネルを表示",
 
@@ -352,6 +355,7 @@ const zh: Record<string, string> = {
 
   // Tooltips
   "mcp.tooltip.click_to_test": "点击测试 %0",
+  "mcp.tooltip.plugin_tool": "由插件 %0 提供",
   "mcp.tooltip.click_to_preview": "点击预览 %0",
   "mcp.tooltip.click_to_view_panel": "点击查看MCP面板",
 
