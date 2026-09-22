@@ -136,7 +136,8 @@ BBPlugin.register("mcp", {
     teardownOffscreenViews();
 
     uiTeardown();
-    settingsTeardown();
+    // Keep user-changed values (port, endpoint, ...) across plugin reloads; only uninstall drops them.
+    settingsTeardown({ keepValues: true });
   },
 
   oninstall() {
