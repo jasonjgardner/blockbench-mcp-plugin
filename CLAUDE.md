@@ -17,6 +17,10 @@ bun run ./build.ts --clean      # Clean dist/ before building
 bun run docs:build              # Generate API docs from Zod schemas
 bun run docs:serve              # Serve docs locally with Tailwind
 bunx @modelcontextprotocol/inspector  # Test MCP tools locally
+bun run headless --root <dir>   # Headless .bbmodel MCP server over stdio (no Blockbench)
+bun run build:headless          # Bundle it to dist/headless/blockbench-mcp-headless.js
+bun run test:headless           # Unit + in-memory MCP tests for headless/
+bun run test:headless:live      # Stdio + real bb-render renders (needs Node 23.6+, GPU)
 ```
 
 Output goes to `dist/mcp.js`. Load in Blockbench via File > Plugins > Load Plugin from File.
@@ -52,6 +56,16 @@ build/
   plugins.ts          # Bun plugins (text loader, Blockbench compatibility shims)
   docs.ts             # Documentation generator (Zod → JSON Schema → HTML)
   docs-manifest.ts    # Aggregates all tool/prompt/resource specs for doc generation
+headless/             # Standalone Bun MCP server that edits .bbmodel files without Blockbench
+  index.ts            # stdio CLI entry (--root sandbox, --bb-render)
+  server.ts           # Registers every bbmodel_* tool
+  document/           # Zod .bbmodel schema, 4.x<->5.0 conversion, store (sandbox, lock, revisions)
+  geometry/           # ZYX transforms, world bounds, box UV, animation pose sampler
+  gates/              # Geometry/animation validation gates + defect injectors (self-test)
+  formats/            # Bedrock .geo.json compiler (port of Blockbench's codec)
+  edit/operations.ts  # Pure batch edit operations used by bbmodel_edit
+  render/             # bb-render child-process bridge (Node, WebGPU)
+  tools/              # Tool definitions by domain
 docs/
   api.json            # Generated: machine-readable API documentation
   index.html          # Generated: styled single-page documentation site
@@ -106,6 +120,8 @@ After adding a tool: import the `toolDocs` in `build/docs-manifest.ts`, add to `
 **Path Alias**: Use `@/*` for imports (e.g., `@/lib/factories`).
 
 **Documentation Generation**: Run `bun run docs` to regenerate `docs/api.json` and `docs/index.html` from Zod schemas. The doc system uses `build/docs-manifest.ts` (imports tool schemas, defines prompt/resource specs inline) and `build/docs.ts` (converts via `zod-to-json-schema`, renders HTML with Tailwind).
+
+**Headless package**: `headless/` must never touch Blockbench globals. It may import pure `lib/` modules (`block-grid`, `geckolib-validate`, `constants`, `ai-disclosure` constants). Its tools use `defineTool()` from `headless/tool.ts`, not `createTool()`. Keep ports of Blockbench logic (box UV, Molang inversion, legacy conversion, Bedrock compile) faithful and cite the source function. Rendering goes through bb-render in a Node child process because Bun cannot load Dawn.
 
 ## Code Style
 
