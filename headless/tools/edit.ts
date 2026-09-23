@@ -78,6 +78,7 @@ const OPERATIONS_HELP = [
   "update_texture {target, name?, source?, width?, height?, material?, channel?, wrap_mode?, render_mode?} (material null removes it from its material);",
   "assign_texture {targets, texture, faces?};",
   "add_animation {name, length, loop, snapping};",
+  "remove_animation {animation};",
   "set_keyframe {animation, bone, channel, time, value, interpolation} (replaces a key at the same channel and time);",
   "remove_keyframe {animation, bone, channel, time};",
   "set_model_properties {name?, model_identifier?, resolution?}.",

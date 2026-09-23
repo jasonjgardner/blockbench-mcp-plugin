@@ -159,6 +159,9 @@ export const addAnimationOp = z.object({
   uuid: z.string().uuid().optional(),
 });
 
+/** Deletes an animation clip and all of its keyframes. */
+export const removeAnimationOp = z.object({ op: z.literal("remove_animation"), animation: nodeRef.describe("Animation UUID or name.") });
+
 /** Adds or replaces a keyframe. */
 export const setKeyframeOp = z.object({
   op: z.literal("set_keyframe"),
@@ -199,6 +202,7 @@ export const operationSchema = z.discriminatedUnion("op", [
   updateTextureOp,
   assignTextureOp,
   addAnimationOp,
+  removeAnimationOp,
   setKeyframeOp,
   removeKeyframeOp,
   setModelPropertiesOp,
@@ -587,6 +591,11 @@ function applyAddAnimation(doc: IBBModel, op: z.infer<typeof addAnimationOp>): [
   return [{ ...doc, animations: [...(doc.animations ?? []), animation] }, { op: op.op, uuid, name: op.name }];
 }
 
+function applyRemoveAnimation(doc: IBBModel, op: z.infer<typeof removeAnimationOp>): [IBBModel, IOperationResult] {
+  const animation = findAnimation(doc, op.animation);
+  return [{ ...doc, animations: (doc.animations ?? []).filter((entry) => entry.uuid !== animation.uuid) }, { op: op.op, uuid: animation.uuid, name: animation.name }];
+}
+
 function updateAnimator(doc: IBBModel, animationRef: string, boneRef: string, edit: (keys: IKeyframe[]) => IKeyframe[]): { doc: IBBModel; animation: IAnimation; bone: IGroup } {
   const animation = findAnimation(doc, animationRef);
   const index = indexModel(doc);
@@ -650,6 +659,7 @@ const HANDLERS: { [K in Operation["op"]]: Handler<K> } = {
   update_texture: applyUpdateTexture,
   assign_texture: applyAssignTexture,
   add_animation: applyAddAnimation,
+  remove_animation: applyRemoveAnimation,
   set_keyframe: applySetKeyframe,
   remove_keyframe: applyRemoveKeyframe,
   set_model_properties: applySetModelProperties,

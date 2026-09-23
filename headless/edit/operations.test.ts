@@ -89,3 +89,11 @@ describe("element name search", () => {
     expect(performance.now() - started).toBeLessThan(250);
   });
 });
+
+describe("animations", () => {
+  test("remove_animation deletes a clip by name", () => {
+    const doc = applyOperations(creatureModel(true), ops([{ op: "remove_animation", animation: "animation.creature.walk" }])).doc;
+    expect(doc.animations).toEqual([]);
+    expect(() => applyOperations(doc, ops([{ op: "remove_animation", animation: "nope" }]))).toThrow("No animation");
+  });
+});
