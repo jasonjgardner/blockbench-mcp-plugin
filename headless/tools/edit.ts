@@ -13,7 +13,7 @@ import { z } from "zod";
 import { VERSION } from "@/lib/constants";
 import { applyOperations, operationSchema, stampAiUsage } from "../edit/operations";
 import { decodePngDataUrl, pngDataUrl, pngSize } from "../document/png";
-import { bbmodelSchema, type IBBModel } from "../document/schema";
+import { bbmodelSchema, type IBBModel, PBR_CHANNELS } from "../document/schema";
 import { defineTool, fileParam, type IHeadlessContext, type IRegistrableTool, revisionParam } from "../tool";
 
 /** Blockbench formats that default to box UV. */
@@ -70,9 +70,12 @@ const OPERATIONS_HELP = [
   "Operations (field op):",
   "add_group {name, origin, rotation, parent};",
   "add_cube {name, from, to, origin?, rotation?, inflate?, parent?, box_uv?, uv_offset?, mirror_uv?, texture?, faces?} (box-UV faces are laid out automatically);",
-  "update_node {target, name?, origin?, rotation?, from?, to?, inflate?, uv_offset?, mirror_uv?, parent?} (parent moves the node; box UV is recomputed);",
+  "update_node {target, name?, origin?, rotation?, from?, to?, inflate?, uv_offset?, mirror_uv?, faces?, parent?} (parent moves the node; box UV is recomputed);",
   "remove_node {target} (groups are removed with their contents and animators);",
-  "add_texture {name, source: PNG data URL, width, height} (bbmodel_add_texture reads a PNG file for you);",
+  "add_texture {name, source: PNG data URL, width, height, material?, channel?, wrap_mode?, render_mode?} (bbmodel_add_texture reads a PNG file for you);",
+  "add_material {name, color_value?, mer_value?, subsurface_value?} (a PBR material; its textures fill the color, normal or height, and mer channels);",
+  "update_material {target, name?, color_value?, mer_value?, subsurface_value?};",
+  "update_texture {target, name?, source?, width?, height?, material?, channel?, wrap_mode?, render_mode?} (material null removes it from its material);",
   "assign_texture {targets, texture, faces?};",
   "add_animation {name, length, loop, snapping};",
   "set_keyframe {animation, bone, channel, time, value, interpolation} (replaces a key at the same channel and time);",
@@ -103,16 +106,21 @@ const editTool = defineTool({
 const addTextureTool = defineTool({
   name: "bbmodel_add_texture",
   title: "Add Texture",
-  description: "Embeds a PNG into a .bbmodel file as a new texture, from a PNG file inside the workspace or a PNG data URL. Optionally assigns it to every face of some cubes or groups.",
+  description:
+    "Embeds a PNG into a .bbmodel file as a new texture, from a PNG file inside the workspace or a PNG data URL. Optionally puts it in a PBR material channel (create the material first with bbmodel_edit add_material) and assigns it to every face of some cubes or groups. Assign only color textures to faces; normal, height and MER textures reach the faces through their material.",
   parameters: {
     file: fileParam,
     expected_revision: revisionParam,
     image: z.string().min(1).describe("Path to a .png file inside the workspace, or a data:image/png;base64 URL."),
     name: z.string().optional().describe("Defaults to the PNG file name."),
+    material: z.string().min(1).optional().describe("PBR material (UUID or name) to put the texture in."),
+    channel: z.enum(PBR_CHANNELS).optional().describe("Channel inside the material: color, normal, height or mer (R metal, G emissive, B roughness). Defaults to color."),
+    wrap_mode: z.enum(["limited", "repeat"]).optional().describe("repeat tiles the image on faces whose UVs exceed it."),
+    render_mode: z.enum(["default", "emissive", "additive", "layered"]).optional().describe("emissive makes the texture glow (signs, light panels)."),
     assign_to: z.array(z.string().min(1)).default([]).describe("Cubes or groups (UUID or name) whose faces should use the texture."),
   },
   readOnly: false,
-  async execute({ file, expected_revision, image, name, assign_to }, context) {
+  async execute({ file, expected_revision, image, name, material, channel, wrap_mode, render_mode, assign_to }, context) {
     const isDataUrl = image.startsWith("data:");
     const imagePath = isDataUrl ? undefined : context.store.resolvePath(image, [".png"]);
     const bytes = imagePath ? new Uint8Array(await Bun.file(imagePath).arrayBuffer()) : decodePngDataUrl(image);
@@ -120,7 +128,7 @@ const addTextureTool = defineTool({
     const textureName = name ?? imagePath?.split(/[\\/]/).at(-1) ?? "texture.png";
     const uuid = crypto.randomUUID();
     const operations = operationSchema.array().parse([
-      { op: "add_texture", name: textureName, source: pngDataUrl(bytes), width, height, uuid },
+      { op: "add_texture", name: textureName, source: pngDataUrl(bytes), width, height, uuid, material, channel, wrap_mode, render_mode },
       ...(assign_to.length > 0 ? [{ op: "assign_texture", targets: assign_to, texture: uuid }] : []),
     ]);
     const written = await context.store.update(file, expected_revision, ({ doc }) => {

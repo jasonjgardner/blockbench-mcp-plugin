@@ -211,9 +211,19 @@ const texturesTool = defineTool({
       width: texture.width ?? null,
       height: texture.height ?? null,
       embedded: typeof texture.source === "string" && texture.source.startsWith("data:"),
+      material: (doc.texture_groups ?? []).find((group) => group.uuid === texture.group)?.name ?? null,
+      channel: texture.group ? texture.pbr_channel ?? "color" : null,
+      wrap_mode: texture.wrap_mode ?? "limited",
       path: texture.path ?? "",
     }));
-    return { revision, resolution: doc.resolution, textures };
+    const materials = (doc.texture_groups ?? []).map((group) => ({
+      name: group.name,
+      uuid: group.uuid,
+      is_material: group.is_material === true,
+      channels: Object.fromEntries(doc.textures.filter((texture) => texture.group === group.uuid).map((texture) => [texture.pbr_channel ?? "color", texture.name])),
+      material_config: group.material_config ?? {},
+    }));
+    return { revision, resolution: doc.resolution, textures, materials };
   },
 });
 

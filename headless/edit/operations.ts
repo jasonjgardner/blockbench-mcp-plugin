@@ -23,6 +23,9 @@ import {
   type IKeyframe,
   isCube,
   type ITexture,
+  type ITextureGroup,
+  PBR_CHANNELS,
+  type PbrChannel,
   type UvRect,
   uvRectSchema,
   vec2Schema,
@@ -38,7 +41,7 @@ const keyValue = z.union([z.number(), z.string()]);
 
 /** Face overrides for a cube. */
 export const faceInputSchema = z.object({
-  uv: uvRectSchema.optional().describe("[u1, v1, u2, v2] in texture pixels. Ignored for box-UV cubes."),
+  uv: uvRectSchema.optional().describe("[u1, v1, u2, v2] in project-resolution units (every texture spans 0..resolution whatever its pixel size); values past the resolution tile when the texture's wrap_mode is repeat. Ignored for box-UV cubes."),
   texture: textureRef.nullable().optional().describe("Texture for this face; null disables the face."),
   rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).optional(),
 });
@@ -82,6 +85,7 @@ export const updateNodeOp = z.object({
   to: vec3Schema.optional().describe("Cubes only."),
   inflate: z.number().optional().describe("Cubes only."),
   uv_offset: vec2Schema.optional().describe("Cubes only."),
+  faces: z.record(cubeFaceNameSchema, faceInputSchema).optional().describe("Cubes only. Per-face UV, texture or rotation changes; unlisted faces are kept."),
   mirror_uv: z.boolean().optional(),
   parent: z.string().min(1).nullable().optional().describe("Move under this group; null moves to the root."),
 });
@@ -96,7 +100,45 @@ export const addTextureOp = z.object({
   source: z.string().startsWith("data:image/").describe("PNG data URL."),
   width: z.number().int().positive(),
   height: z.number().int().positive(),
+  material: z.string().min(1).optional().describe("Material (UUID or name) this texture belongs to."),
+  channel: z.enum(PBR_CHANNELS).optional().describe("PBR channel inside the material; defaults to color."),
+  wrap_mode: z.enum(["limited", "repeat"]).optional().describe("repeat tiles the image when face UVs exceed the texture."),
+  render_mode: z.enum(["default", "emissive", "additive", "layered"]).optional().describe("emissive makes the texture glow in Blockbench and bb-render (signs, light panels)."),
   uuid: z.string().uuid().optional(),
+});
+
+/** Adds a PBR material (a texture group with `is_material`). */
+export const addMaterialOp = z.object({
+  op: z.literal("add_material"),
+  name: z.string().min(1),
+  color_value: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional().describe("Uniform RGBA 0-255, used when no color texture is assigned."),
+  mer_value: z.tuple([z.number(), z.number(), z.number()]).optional().describe("Uniform metalness, emissive, roughness 0-255, used when no MER texture is assigned."),
+  subsurface_value: z.number().min(0).max(255).optional(),
+  uuid: z.string().uuid().optional(),
+});
+
+/** Changes a material's name or uniform values. */
+export const updateMaterialOp = z.object({
+  op: z.literal("update_material"),
+  target: z.string().min(1).describe("Material UUID or name."),
+  name: z.string().min(1).optional(),
+  color_value: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional(),
+  mer_value: z.tuple([z.number(), z.number(), z.number()]).optional(),
+  subsurface_value: z.number().min(0).max(255).optional(),
+});
+
+/** Moves a texture into a material channel, renames it, or changes its wrap mode. */
+export const updateTextureOp = z.object({
+  op: z.literal("update_texture"),
+  target: z.union([z.string().min(1), z.number().int().min(0)]).describe("Texture UUID, name, or index."),
+  name: z.string().min(1).optional(),
+  source: z.string().startsWith("data:image/").optional().describe("New PNG data URL; replaces the image and keeps every face and material assignment."),
+  width: z.number().int().positive().optional().describe("Pixel width of the new source (required with source)."),
+  height: z.number().int().positive().optional().describe("Pixel height of the new source (required with source)."),
+  material: z.string().min(1).nullable().optional().describe("Material UUID or name; null removes the texture from its material."),
+  channel: z.enum(PBR_CHANNELS).optional(),
+  wrap_mode: z.enum(["limited", "repeat"]).optional(),
+  render_mode: z.enum(["default", "emissive", "additive", "layered"]).optional().describe("emissive makes the texture glow in Blockbench and bb-render (signs, light panels)."),
 });
 
 /** Assigns a texture to cube faces. */
@@ -152,6 +194,9 @@ export const operationSchema = z.discriminatedUnion("op", [
   updateNodeOp,
   removeNodeOp,
   addTextureOp,
+  addMaterialOp,
+  updateMaterialOp,
+  updateTextureOp,
   assignTextureOp,
   addAnimationOp,
   setKeyframeOp,
@@ -191,7 +236,7 @@ export function resolveTexture(doc: IBBModel, ref: string | number): number {
  */
 export function freshUuid(doc: IBBModel, requested: string | undefined): string {
   if (requested === undefined) return crypto.randomUUID();
-  const taken = [doc.groups, doc.elements, doc.textures, doc.animations ?? []].some((list) => list.some((entry) => entry.uuid === requested));
+  const taken = [doc.groups, doc.elements, doc.textures, doc.animations ?? [], doc.texture_groups ?? []].some((list) => list.some((entry) => entry.uuid === requested));
   if (taken) throw new Error(`UUID ${requested} is already used in this model.`);
   return requested;
 }
@@ -247,6 +292,25 @@ function buildFaces(doc: IBBModel, op: z.infer<typeof addCubeOp>, boxUv: boolean
   ) as Record<CubeFaceName, ICubeFace>;
 }
 
+/** Applies per-face overrides to existing faces; omitted fields keep their saved values. */
+function mergeFaces(doc: IBBModel, faces: ICube["faces"], overrides: Partial<Record<CubeFaceName, z.infer<typeof faceInputSchema>>>): ICube["faces"] {
+  return Object.fromEntries(
+    CUBE_FACES.flatMap((face) => {
+      const existing = faces[face];
+      const input = overrides[face];
+      if (!input) return existing ? [[face, existing]] : [];
+      const texture = faceTexture(doc, input.texture, undefined);
+      const merged: ICubeFace = {
+        ...(existing ?? { uv: [0, 0, 0, 0] }),
+        ...(input.uv ? { uv: input.uv } : {}),
+        ...(input.texture === undefined ? {} : { texture }),
+        ...(input.rotation === undefined ? {} : { rotation: input.rotation }),
+      };
+      return [[face, merged]];
+    }),
+  );
+}
+
 function applyAddCube(doc: IBBModel, op: z.infer<typeof addCubeOp>): [IBBModel, IOperationResult] {
   const index = indexModel(doc);
   const parent = op.parent ? resolveNode(index, op.parent, ["group"]).uuid : null;
@@ -296,7 +360,7 @@ function applyUpdateNode(doc: IBBModel, op: z.infer<typeof updateNodeOp>): [IBBM
     ...(op.mirror_uv === undefined ? {} : { mirror_uv: op.mirror_uv }),
   };
   if (target.kind === "group") {
-    const cubeOnly = [op.from, op.to, op.inflate, op.uv_offset].some((value) => value !== undefined);
+    const cubeOnly = [op.from, op.to, op.inflate, op.uv_offset, op.faces].some((value) => value !== undefined);
     if (cubeOnly) throw new Error("from, to, inflate and uv_offset apply to cubes, not groups.");
     const groups = doc.groups.map((group) => (group.uuid === target.uuid ? { ...group, ...shared } : group));
     return [{ ...doc, groups, outliner: moved }, { op: op.op, uuid: target.uuid, name: op.name ?? index.groups.get(target.uuid)?.name }];
@@ -304,7 +368,7 @@ function applyUpdateNode(doc: IBBModel, op: z.infer<typeof updateNodeOp>): [IBBM
   const elements = doc.elements.map((element) => {
     if (element.uuid !== target.uuid) return element;
     if (!isCube(element)) {
-      const cubeOnly = [op.from, op.to, op.inflate, op.uv_offset].some((value) => value !== undefined);
+      const cubeOnly = [op.from, op.to, op.inflate, op.uv_offset, op.faces].some((value) => value !== undefined);
       if (cubeOnly) throw new Error(`${element.name} is a ${element.type}; from, to, inflate and uv_offset apply to cubes.`);
       return { ...element, ...shared };
     }
@@ -315,6 +379,7 @@ function applyUpdateNode(doc: IBBModel, op: z.infer<typeof updateNodeOp>): [IBBM
       ...(op.to === undefined ? {} : { to: op.to }),
       ...(op.inflate === undefined ? {} : { inflate: op.inflate }),
       ...(op.uv_offset === undefined ? {} : { uv_offset: op.uv_offset }),
+      ...(op.faces === undefined ? {} : { faces: mergeFaces(doc, element.faces, op.faces) }),
     };
     return refreshBoxUv(updated, doc.meta);
   });
@@ -356,7 +421,7 @@ function applyAddTexture(doc: IBBModel, op: z.infer<typeof addTextureOp>): [IBBM
     use_as_default: false,
     layers_enabled: false,
     sync_to_project: "",
-    render_mode: "default",
+    render_mode: op.render_mode ?? "default",
     render_sides: "auto",
     frame_time: 1,
     frame_order_type: "loop",
@@ -368,8 +433,110 @@ function applyAddTexture(doc: IBBModel, op: z.infer<typeof addTextureOp>): [IBBM
     uuid,
     relative_path: "",
     source: op.source,
+    ...(op.wrap_mode ? { wrap_mode: op.wrap_mode } : {}),
   };
-  return [{ ...doc, textures: [...doc.textures, texture] }, { op: op.op, uuid, name: op.name, detail: `index ${doc.textures.length}` }];
+  const withTexture: IBBModel = { ...doc, textures: [...doc.textures, texture] };
+  if (op.material === undefined) {
+    if (op.channel !== undefined) throw new Error("channel needs a material.");
+    return [withTexture, { op: op.op, uuid, name: op.name, detail: `index ${doc.textures.length}` }];
+  }
+  const placed = placeInMaterial(withTexture, uuid, op.material, op.channel ?? "color");
+  return [placed, { op: op.op, uuid, name: op.name, detail: `index ${doc.textures.length}, ${op.channel ?? "color"} of ${op.material}` }];
+}
+
+/** Resolves a material (a texture group with `is_material`) by UUID or name. */
+export function resolveMaterial(doc: IBBModel, ref: string): ITextureGroup {
+  const matches = (doc.texture_groups ?? []).filter((group) => group.uuid === ref || group.name === ref);
+  const [only] = matches;
+  if (matches.length === 1 && only) return only;
+  if (matches.length > 1) throw new Error(`"${ref}" matches ${matches.length} materials; pass a UUID.`);
+  throw new Error(`No material named or identified "${ref}". Create it with add_material first.`);
+}
+
+/**
+ * Puts a texture into a material channel.
+ *
+ * @throws Error when the channel is already filled by another texture, or when normal and height would coexist
+ *   (Bedrock texture sets allow only one of them).
+ */
+function placeInMaterial(doc: IBBModel, textureUuid: string, materialRef: string, channel: PbrChannel): IBBModel {
+  const material = resolveMaterial(doc, materialRef);
+  const siblings = doc.textures.filter((texture) => texture.group === material.uuid && texture.uuid !== textureUuid);
+  const channelOf = (texture: ITexture): string => texture.pbr_channel ?? "color";
+  const occupant = siblings.find((texture) => channelOf(texture) === channel);
+  if (occupant) throw new Error(`Material ${material.name} already has a ${channel} texture (${occupant.name}); move it out with update_texture first.`);
+  const exclusive = ({ normal: "height", height: "normal" } as Readonly<Record<string, string>>)[channel];
+  const conflict = exclusive === undefined ? undefined : siblings.find((texture) => channelOf(texture) === exclusive);
+  if (conflict) throw new Error(`Material ${material.name} already has a ${exclusive} texture (${conflict.name}); a material uses normal or height, not both.`);
+  return {
+    ...doc,
+    textures: doc.textures.map((texture) => (texture.uuid === textureUuid ? { ...texture, group: material.uuid, pbr_channel: channel } : texture)),
+  };
+}
+
+function applyAddMaterial(doc: IBBModel, op: z.infer<typeof addMaterialOp>): [IBBModel, IOperationResult] {
+  const uuid = freshUuid(doc, op.uuid);
+  const taken = (doc.texture_groups ?? []).some((group) => group.name === op.name);
+  if (taken) throw new Error(`A material or texture group named ${op.name} already exists.`);
+  const material: ITextureGroup = {
+    uuid,
+    name: op.name,
+    is_material: true,
+    material_config: {
+      color_value: op.color_value ?? [255, 255, 255, 255],
+      ...(op.mer_value ? { mer_value: op.mer_value } : {}),
+      ...(op.subsurface_value === undefined ? {} : { subsurface_value: op.subsurface_value }),
+      saved: false,
+    },
+  };
+  return [{ ...doc, texture_groups: [...(doc.texture_groups ?? []), material] }, { op: op.op, uuid, name: op.name }];
+}
+
+function applyUpdateMaterial(doc: IBBModel, op: z.infer<typeof updateMaterialOp>): [IBBModel, IOperationResult] {
+  const material = resolveMaterial(doc, op.target);
+  const config = {
+    ...material.material_config,
+    ...(op.color_value ? { color_value: op.color_value } : {}),
+    ...(op.mer_value ? { mer_value: op.mer_value } : {}),
+    ...(op.subsurface_value === undefined ? {} : { subsurface_value: op.subsurface_value }),
+    saved: false,
+  };
+  const updated: ITextureGroup = { ...material, ...(op.name === undefined ? {} : { name: op.name }), material_config: config };
+  const groups = (doc.texture_groups ?? []).map((group) => (group.uuid === material.uuid ? updated : group));
+  return [{ ...doc, texture_groups: groups }, { op: op.op, uuid: material.uuid, name: updated.name }];
+}
+
+function applyUpdateTexture(doc: IBBModel, op: z.infer<typeof updateTextureOp>): [IBBModel, IOperationResult] {
+  const target = doc.textures[resolveTexture(doc, op.target)];
+  if (!target) throw new Error(`Texture ${op.target} not found.`);
+  if (op.source !== undefined && (op.width === undefined || op.height === undefined)) throw new Error("source needs width and height.");
+  const image = op.source === undefined ? {} : { source: op.source, width: op.width, height: op.height };
+  const renamed: IBBModel = {
+    ...doc,
+    textures: doc.textures.map((texture) =>
+      texture.uuid === target.uuid
+        ? { ...texture, ...image, ...(op.name === undefined ? {} : { name: op.name }), ...(op.wrap_mode === undefined ? {} : { wrap_mode: op.wrap_mode }), ...(op.render_mode === undefined ? {} : { render_mode: op.render_mode }) }
+        : texture,
+    ),
+  };
+  if (op.material === null) {
+    const detached: IBBModel = {
+      ...renamed,
+      textures: renamed.textures.map((texture) => {
+        if (texture.uuid !== target.uuid) return texture;
+        const { group: _group, ...rest } = texture;
+        return { ...rest, pbr_channel: "color" };
+      }),
+    };
+    return [detached, { op: op.op, uuid: target.uuid, detail: "removed from its material" }];
+  }
+  const materialRef = op.material ?? target.group;
+  if (materialRef === undefined) {
+    if (op.channel !== undefined) throw new Error(`${target.name} is not in a material; pass material with channel.`);
+    return [renamed, { op: op.op, uuid: target.uuid }];
+  }
+  const channel = op.channel ?? ((target.pbr_channel as PbrChannel | undefined) ?? "color");
+  return [placeInMaterial(renamed, target.uuid, materialRef, channel), { op: op.op, uuid: target.uuid, detail: `${channel} of ${resolveMaterial(renamed, materialRef).name}` }];
 }
 
 function applyAssignTexture(doc: IBBModel, op: z.infer<typeof assignTextureOp>): [IBBModel, IOperationResult] {
@@ -478,6 +645,9 @@ const HANDLERS: { [K in Operation["op"]]: Handler<K> } = {
   update_node: applyUpdateNode,
   remove_node: applyRemoveNode,
   add_texture: applyAddTexture,
+  add_material: applyAddMaterial,
+  update_material: applyUpdateMaterial,
+  update_texture: applyUpdateTexture,
   assign_texture: applyAssignTexture,
   add_animation: applyAddAnimation,
   set_keyframe: applySetKeyframe,

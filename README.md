@@ -208,7 +208,7 @@ Configure it in an MCP client as a stdio server. `--root` is required and may be
 |---|---|
 | `bbmodel_info`, `bbmodel_outline`, `bbmodel_find_elements`, `bbmodel_get_node`, `bbmodel_list_textures`, `bbmodel_list_animations` | Read a model file |
 | `bbmodel_sample_pose` | Evaluate an animation at a time and report bone positions and bounds |
-| `bbmodel_create`, `bbmodel_edit`, `bbmodel_add_texture` | Create a model, apply a batch of edits (groups, cubes, textures, animations, keyframes) atomically, embed a PNG |
+| `bbmodel_create`, `bbmodel_edit`, `bbmodel_add_texture` | Create a model, apply a batch of edits atomically, embed a PNG. Edits cover groups, cubes and face UVs, textures (including replacing an image, tiling with `wrap_mode`, emissive `render_mode`), PBR materials with color, normal or height, and MER channels, animations and keyframes. |
 | `bbmodel_validate` | Geometry checks: broken outliner, slivers, block-size limits, floating parts, parts passing through each other, broken left/right symmetry. `self_test` proves each check still detects its defect on this model. GeckoLib rules run for GeckoLib models. |
 | `bbmodel_validate_animations` | Samples each clip and flags parts sinking into the ground or limbs detaching from their parent |
 | `bbmodel_convert_legacy` | Writes a copy Blockbench 4.x can open |
@@ -227,6 +227,15 @@ Configure it in an MCP client as a stdio server. `--root` is required and may be
 - Written models get the same `ai_used` and `ai_agents` fields the plugin adds. Pass `--no-ai-disclosure` to turn this off.
 
 Run `bun run headless --help` for every option.
+
+Agents without an MCP connection to the server, such as subagents or shell scripts, can call any tool through `headless/call.ts`. It starts the server, calls one tool, prints the result and exits. Arguments can be inline JSON or `@file.json`.
+
+```bash
+bun run headless/call.ts --root ./models --list
+bun run headless/call.ts --root ./models bbmodel_edit @ops.json
+```
+
+Normal maps for free-format models use the OpenGL convention (green up). Blockbench flips the green channel only for Bedrock formats.
 
 ## Plugin Development
 

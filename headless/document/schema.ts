@@ -191,8 +191,43 @@ export const textureSchema = z
     height: z.number().optional(),
     uv_width: z.number().optional(),
     uv_height: z.number().optional(),
+    /** UUID of the texture group (material) this texture belongs to. */
+    group: z.string().optional(),
+    /** Which PBR channel the texture fills inside its material. */
+    pbr_channel: z.string().optional(),
+    wrap_mode: z.string().optional(),
   })
   .passthrough();
+
+/** PBR channels a material texture can fill (Blockbench `Texture.pbr_channel`). */
+export const PBR_CHANNELS = ["color", "normal", "height", "mer"] as const;
+
+/** One PBR channel. */
+export type PbrChannel = (typeof PBR_CHANNELS)[number];
+
+/**
+ * A texture group. With `is_material: true` Blockbench treats it as a PBR
+ * material: its textures fill channels by `pbr_channel`, and `material_config`
+ * holds uniform fallbacks (`TextureGroup.getSaveCopy` in js/texturing/texture_groups.js).
+ */
+export const textureGroupSchema = z
+  .object({
+    uuid: z.string().min(1),
+    name: z.string(),
+    is_material: z.boolean().optional(),
+    material_config: z
+      .object({
+        color_value: z.array(z.number()).optional(),
+        mer_value: z.array(z.number()).optional(),
+        subsurface_value: z.number().optional(),
+      })
+      .passthrough()
+      .optional(),
+  })
+  .passthrough();
+
+/** A saved texture group or material. */
+export type ITextureGroup = z.infer<typeof textureGroupSchema>;
 
 /** A saved texture. */
 export type ITexture = z.infer<typeof textureSchema>;
@@ -273,6 +308,7 @@ export const bbmodelSchema = z
     groups: z.array(groupSchema).default([]),
     outliner: z.array(outlinerNodeSchema).default([]),
     textures: z.array(textureSchema).default([]),
+    texture_groups: z.array(textureGroupSchema).optional(),
     animations: z.array(animationSchema).optional(),
   })
   .passthrough();
