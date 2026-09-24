@@ -1,6 +1,6 @@
 {
-  "version": "1.8.1",
-  "generatedAt": "2026-09-24T20:06:45.872Z",
+  "version": "1.9.0",
+  "generatedAt": "2026-09-24T20:38:32.028Z",
   "tools": [
     {
       "name": "place_cube",
@@ -993,11 +993,11 @@
                 "type": "object",
                 "additionalProperties": {
                   "type": "string",
-                  "description": "Effect name",
-                  "markdownDescription": "Effect name"
+                  "description": "Effect name; a particle effect loaded with create_particle_effect is attached so Blockbench previews it",
+                  "markdownDescription": "Effect name; a particle effect loaded with create_particle_effect is attached so Blockbench previews it"
                 },
-                "description": "Particle effects with timestamps as keys",
-                "markdownDescription": "Particle effects with timestamps as keys"
+                "description": "Particle effects with timestamps (seconds) as keys, spawned at the entity origin. Use manage_particle_keyframes for locators, scripts and more options.",
+                "markdownDescription": "Particle effects with timestamps (seconds) as keys, spawned at the entity origin. Use manage_particle_keyframes for locators, scripts and more options."
               }
             },
             "required": [
@@ -6113,6 +6113,1840 @@
             },
             "required": [
               "action"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "list_particle_presets",
+      "title": "List Particle Presets",
+      "description": "Lists particle effect presets (smoke, fire, sparks, magic, glow, snow, drip, ...), built-in sprites and textures, materials and facing modes. Every preset uses a texture that ships with Minecraft and Blockbench, so it previews and runs with no image file. Read this before create_particle_effect.",
+      "status": "experimental",
+      "category": "Particles",
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/list_particle_presets",
+        "definitions": {
+          "list_particle_presets": {
+            "type": "object",
+            "properties": {
+              "include_designs": {
+                "type": "boolean",
+                "default": true,
+                "description": "Include each preset's design knobs, useful as a template for custom effects.",
+                "markdownDescription": "Include each preset's design knobs, useful as a template for custom effects."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "create_particle_effect",
+      "title": "Create Particle Effect",
+      "description": "Creates a Bedrock particle effect (the Snowstorm format Blockbench, Minecraft Bedrock and GeckoLib use) from a preset plus design knobs, or from raw JSON. Writes <pack_root>/particles/<name>.json (and an optional custom texture to textures/particle/), validates it, and loads it into Blockbench's particle preview. Then place it with manage_particle_keyframes, usually at a locator from add_locator. Refuses invalid effects and existing files unless overwrite is true. Blockbench desktop only.",
+      "status": "experimental",
+      "category": "Particles",
+      "annotations": {
+        "destructiveHint": false,
+        "openWorldHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/create_particle_effect",
+        "definitions": {
+          "create_particle_effect": {
+            "type": "object",
+            "properties": {
+              "identifier": {
+                "type": "string",
+                "pattern": "^[a-z0-9_.-]+:[a-z0-9_./-]+$",
+                "errorMessage": {
+                  "pattern": "Use a lowercase namespace:name identifier, such as mymod:chimney_smoke."
+                },
+                "description": "Particle identifier, lowercase namespace:name (for example mymod:chimney_smoke). Do not use the minecraft namespace for new effects.",
+                "markdownDescription": "Particle identifier, lowercase namespace:name (for example mymod:chimney_smoke). Do not use the minecraft namespace for new effects."
+              },
+              "preset": {
+                "type": "string",
+                "enum": [
+                  "smoke",
+                  "campfire_smoke",
+                  "fire",
+                  "flame",
+                  "embers",
+                  "sparks",
+                  "magic",
+                  "sparkle",
+                  "glow",
+                  "dust",
+                  "snow",
+                  "drip",
+                  "bubbles",
+                  "hearts",
+                  "poof",
+                  "soul",
+                  "portal",
+                  "steam",
+                  "electric"
+                ],
+                "description": "Starting point; list_particle_presets describes each. design knobs override it.",
+                "markdownDescription": "Starting point; list_particle_presets describes each. design knobs override it."
+              },
+              "design": {
+                "type": "object",
+                "properties": {
+                  "material": {
+                    "type": "string",
+                    "enum": [
+                      "particles_alpha",
+                      "particles_blend",
+                      "particles_add",
+                      "particles_opaque"
+                    ],
+                    "description": "particles_alpha: cutout, cheapest. particles_blend: soft translucency (smoke, glow). particles_add: additive light (fire, magic, sparks). particles_opaque: solid.",
+                    "markdownDescription": "particles_alpha: cutout, cheapest. particles_blend: soft translucency (smoke, glow). particles_add: additive light (fire, magic, sparks). particles_opaque: solid."
+                  },
+                  "sprite": {
+                    "type": "string",
+                    "enum": [
+                      "puff",
+                      "dot",
+                      "small_dot",
+                      "bubble",
+                      "flame",
+                      "ember",
+                      "note",
+                      "heart",
+                      "angry",
+                      "happy",
+                      "drop",
+                      "star",
+                      "glow",
+                      "spell",
+                      "crit",
+                      "spark",
+                      "twinkle",
+                      "sparkler",
+                      "fire",
+                      "soul",
+                      "campfire_smoke"
+                    ],
+                    "description": "Built-in sprite; sets the texture and UVs. See list_particle_presets for descriptions.",
+                    "markdownDescription": "Built-in sprite; sets the texture and UVs. See list_particle_presets for descriptions."
+                  },
+                  "texture": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Custom Bedrock texture path without .png, such as textures/particle/leaf. Overrides sprite.",
+                    "markdownDescription": "Custom Bedrock texture path without .png, such as textures/particle/leaf. Overrides sprite."
+                  },
+                  "texture_size": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": [
+                      {
+                        "type": "integer",
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "integer",
+                        "exclusiveMinimum": 0
+                      }
+                    ],
+                    "description": "Pixel size of the custom texture. Tools fill it from the PNG when they copy one.",
+                    "markdownDescription": "Pixel size of the custom texture. Tools fill it from the PNG when they copy one."
+                  },
+                  "flipbook": {
+                    "type": "object",
+                    "properties": {
+                      "frame_size": {
+                        "type": "array",
+                        "minItems": 2,
+                        "maxItems": 2,
+                        "items": [
+                          {
+                            "type": "integer",
+                            "exclusiveMinimum": 0
+                          },
+                          {
+                            "type": "integer",
+                            "exclusiveMinimum": 0
+                          }
+                        ],
+                        "description": "Pixel width and height of one frame.",
+                        "markdownDescription": "Pixel width and height of one frame."
+                      },
+                      "frames": {
+                        "type": "integer",
+                        "minimum": 2,
+                        "description": "Frame count.",
+                        "markdownDescription": "Frame count."
+                      },
+                      "axis": {
+                        "type": "string",
+                        "enum": [
+                          "vertical",
+                          "horizontal"
+                        ],
+                        "default": "vertical",
+                        "description": "Direction frames are stacked in the image; Blockbench flipbook textures are vertical.",
+                        "markdownDescription": "Direction frames are stacked in the image; Blockbench flipbook textures are vertical."
+                      },
+                      "fps": {
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                        "description": "Playback rate. Omit to stretch the frames over each particle's lifetime.",
+                        "markdownDescription": "Playback rate. Omit to stretch the frames over each particle's lifetime."
+                      },
+                      "loop": {
+                        "type": "boolean",
+                        "description": "Loop the frames when fps is set.",
+                        "markdownDescription": "Loop the frames when fps is set."
+                      }
+                    },
+                    "required": [
+                      "frame_size",
+                      "frames"
+                    ],
+                    "additionalProperties": false,
+                    "description": "Animate a custom texture as a sprite sheet.",
+                    "markdownDescription": "Animate a custom texture as a sprite sheet."
+                  },
+                  "rate": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Steady emission, particles per second. Mutually exclusive with burst.",
+                    "markdownDescription": "Steady emission, particles per second. Mutually exclusive with burst."
+                  },
+                  "burst": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "description": "Emit this many particles at once when the emitter starts. Mutually exclusive with rate.",
+                    "markdownDescription": "Emit this many particles at once when the emitter starts. Mutually exclusive with rate."
+                  },
+                  "max_particles": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "description": "Cap on live particles for a steady emitter.",
+                    "markdownDescription": "Cap on live particles for a steady emitter."
+                  },
+                  "looping": {
+                    "type": "boolean",
+                    "description": "Emitter restarts after duration (+ sleep_time). An existing effect keeps its mode; a new one loops for rate and runs once for burst. Emitters fired from animation keyframes should not loop in Bedrock.",
+                    "markdownDescription": "Emitter restarts after duration (+ sleep_time). An existing effect keeps its mode; a new one loops for rate and runs once for burst. Emitters fired from animation keyframes should not loop in Bedrock."
+                  },
+                  "duration": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Seconds the emitter is active per cycle. Loops default to 10: with no sleep_time the game emits continuously either way, and Blockbench's preview restarts a looping emitter every `duration` seconds, so keep it at least as long as the clip.",
+                    "markdownDescription": "Seconds the emitter is active per cycle. Loops default to 10: with no sleep_time the game emits continuously either way, and Blockbench's preview restarts a looping emitter every `duration` seconds, so keep it at least as long as the clip."
+                  },
+                  "sleep_time": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Pause between looping cycles, in seconds.",
+                    "markdownDescription": "Pause between looping cycles, in seconds."
+                  },
+                  "shape": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "point",
+                          "sphere",
+                          "box",
+                          "disc",
+                          "entity_aabb"
+                        ],
+                        "description": "point: one spot. sphere/disc: radius around the emitter. box: half_dimensions. entity_aabb: the entity's hitbox (in-game only; Blockbench previews it as a point).",
+                        "markdownDescription": "point: one spot. sphere/disc: radius around the emitter. box: half_dimensions. entity_aabb: the entity's hitbox (in-game only; Blockbench previews it as a point)."
+                      },
+                      "offset": {
+                        "type": "array",
+                        "minItems": 3,
+                        "maxItems": 3,
+                        "items": [
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            ]
+                          },
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            ]
+                          },
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            ]
+                          }
+                        ],
+                        "description": "Spawn center offset from the emitter, in blocks.",
+                        "markdownDescription": "Spawn center offset from the emitter, in blocks."
+                      },
+                      "radius": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        ],
+                        "description": "Sphere or disc radius in blocks.",
+                        "markdownDescription": "Sphere or disc radius in blocks."
+                      },
+                      "half_dimensions": {
+                        "type": "array",
+                        "minItems": 3,
+                        "maxItems": 3,
+                        "items": [
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            ]
+                          },
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            ]
+                          },
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            ]
+                          }
+                        ],
+                        "description": "Box half extents in blocks.",
+                        "markdownDescription": "Box half extents in blocks."
+                      },
+                      "plane_normal": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "x",
+                              "y",
+                              "z"
+                            ]
+                          },
+                          {
+                            "type": "array",
+                            "minItems": 3,
+                            "maxItems": 3,
+                            "items": [
+                              {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                ]
+                              },
+                              {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                ]
+                              },
+                              {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ],
+                        "description": "Disc facing; y (the default) lays it flat.",
+                        "markdownDescription": "Disc facing; y (the default) lays it flat."
+                      },
+                      "surface_only": {
+                        "type": "boolean",
+                        "description": "Spawn on the surface/rim instead of throughout the volume.",
+                        "markdownDescription": "Spawn on the surface/rim instead of throughout the volume."
+                      }
+                    },
+                    "required": [
+                      "type"
+                    ],
+                    "additionalProperties": false,
+                    "description": "Emitter shape.",
+                    "markdownDescription": "Emitter shape."
+                  },
+                  "direction": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "outwards",
+                          "inwards"
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "minItems": 3,
+                        "maxItems": 3,
+                        "items": [
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            ]
+                          },
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            ]
+                          },
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ],
+                    "description": "Initial direction: away from or toward the shape center, or a vector such as [0, 1, 0] (up). Molang allowed, e.g. ['math.random(-0.2,0.2)', 1, 0].",
+                    "markdownDescription": "Initial direction: away from or toward the shape center, or a vector such as [0, 1, 0] (up). Molang allowed, e.g. ['math.random(-0.2,0.2)', 1, 0]."
+                  },
+                  "local_space": {
+                    "type": "boolean",
+                    "description": "Particles move with the emitter (auras, rings on a moving bone). False leaves them behind (smoke, trails).",
+                    "markdownDescription": "Particles move with the emitter (auras, rings on a moving bone). False leaves them behind (smoke, trails)."
+                  },
+                  "lifetime": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "array",
+                        "minItems": 2,
+                        "maxItems": 2,
+                        "items": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    ],
+                    "description": "Particle lifetime in seconds; [min, max] picks a random value per particle.",
+                    "markdownDescription": "Particle lifetime in seconds; [min, max] picks a random value per particle."
+                  },
+                  "speed": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "array",
+                        "minItems": 2,
+                        "maxItems": 2,
+                        "items": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    ],
+                    "description": "Initial speed in blocks per second; [min, max] randomizes it.",
+                    "markdownDescription": "Initial speed in blocks per second; [min, max] randomizes it."
+                  },
+                  "acceleration": {
+                    "type": "array",
+                    "minItems": 3,
+                    "maxItems": 3,
+                    "items": [
+                      {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        ]
+                      },
+                      {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        ]
+                      },
+                      {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        ]
+                      }
+                    ],
+                    "description": "Blocks per second squared, e.g. [0, -9.8, 0] for gravity or [0, 0.5, 0] for rising smoke.",
+                    "markdownDescription": "Blocks per second squared, e.g. [0, -9.8, 0] for gravity or [0, 0.5, 0] for rising smoke."
+                  },
+                  "drag": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Linear drag coefficient; 1-3 slows bursts naturally.",
+                    "markdownDescription": "Linear drag coefficient; 1-3 slows bursts naturally."
+                  },
+                  "size": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "array",
+                        "minItems": 2,
+                        "maxItems": 2,
+                        "items": [
+                          {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          {
+                            "type": "number",
+                            "minimum": 0
+                          }
+                        ]
+                      }
+                    ],
+                    "description": "Billboard half-width in blocks (Bedrock sizes are half extents: 0.5 spans a whole block), or [start, end] to grow or shrink over life. Vanilla smoke is 0.1.",
+                    "markdownDescription": "Billboard half-width in blocks (Bedrock sizes are half extents: 0.5 spans a whole block), or [start, end] to grow or shrink over life. Vanilla smoke is 0.1."
+                  },
+                  "size_variation": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Random size spread per particle, 0-1 (0.3 means +/-15%).",
+                    "markdownDescription": "Random size spread per particle, 0-1 (0.3 means +/-15%)."
+                  },
+                  "spin": {
+                    "type": "object",
+                    "properties": {
+                      "initial": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "array",
+                            "minItems": 2,
+                            "maxItems": 2,
+                            "items": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "number"
+                              }
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        ]
+                      },
+                      "rate": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "array",
+                            "minItems": 2,
+                            "maxItems": 2,
+                            "items": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "number"
+                              }
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        ]
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Billboard rotation in degrees and degrees per second.",
+                    "markdownDescription": "Billboard rotation in degrees and degrees per second."
+                  },
+                  "color": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$",
+                        "errorMessage": {
+                          "pattern": "Use #RRGGBB or #RRGGBBAA."
+                        }
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$",
+                          "errorMessage": {
+                            "pattern": "Use #RRGGBB or #RRGGBBAA."
+                          }
+                        },
+                        "minItems": 2,
+                        "maxItems": 8
+                      }
+                    ],
+                    "description": "Tint as #RRGGBB/#RRGGBBAA, or 2-8 colors spread evenly over the particle's life. White keeps a sprite's own colors.",
+                    "markdownDescription": "Tint as #RRGGBB/#RRGGBBAA, or 2-8 colors spread evenly over the particle's life. White keeps a sprite's own colors."
+                  },
+                  "fade_out": {
+                    "type": "boolean",
+                    "description": "true fades alpha to zero at the end of life; false makes the end opaque again. Without color it adjusts the current tint. Needs particles_blend or particles_add to look smooth.",
+                    "markdownDescription": "true fades alpha to zero at the end of life; false makes the end opaque again. Without color it adjusts the current tint. Needs particles_blend or particles_add to look smooth."
+                  },
+                  "facing": {
+                    "type": "string",
+                    "enum": [
+                      "lookat_xyz",
+                      "lookat_y",
+                      "rotate_xyz",
+                      "rotate_y",
+                      "direction_x",
+                      "direction_y",
+                      "direction_z",
+                      "lookat_direction",
+                      "emitter_transform_xy",
+                      "emitter_transform_xz",
+                      "emitter_transform_yz"
+                    ],
+                    "description": "Billboard orientation. lookat_xyz faces the camera; lookat_y stays upright; direction_* and lookat_direction stretch along velocity (sparks, rain).",
+                    "markdownDescription": "Billboard orientation. lookat_xyz faces the camera; lookat_y stays upright; direction_* and lookat_direction stretch along velocity (sparks, rain)."
+                  },
+                  "lighting": {
+                    "type": "boolean",
+                    "description": "Shade the particle by world light. Leave off for glowing effects.",
+                    "markdownDescription": "Shade the particle by world light. Leave off for glowing effects."
+                  },
+                  "collision": {
+                    "type": "object",
+                    "properties": {
+                      "radius": {
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                        "maximum": 0.5,
+                        "description": "Collision radius in blocks (Bedrock allows up to 0.5).",
+                        "markdownDescription": "Collision radius in blocks (Bedrock allows up to 0.5)."
+                      },
+                      "bounciness": {
+                        "type": "number",
+                        "minimum": 0,
+                        "description": "Coefficient of restitution; 0 stops dead, 0.5 bounces.",
+                        "markdownDescription": "Coefficient of restitution; 0 stops dead, 0.5 bounces."
+                      },
+                      "drag": {
+                        "type": "number",
+                        "minimum": 0,
+                        "description": "Speed lost while sliding.",
+                        "markdownDescription": "Speed lost while sliding."
+                      },
+                      "expire_on_contact": {
+                        "type": "boolean",
+                        "description": "Remove the particle when it hits a block (drips, rain).",
+                        "markdownDescription": "Remove the particle when it hits a block (drips, rain)."
+                      }
+                    },
+                    "required": [
+                      "radius"
+                    ],
+                    "additionalProperties": false,
+                    "description": "Collide with world blocks. Blockbench's preview has no blocks, so collisions only show in game.",
+                    "markdownDescription": "Collide with world blocks. Blockbench's preview has no blocks, so collisions only show in game."
+                  },
+                  "components": {
+                    "type": "object",
+                    "additionalProperties": {},
+                    "description": "Raw Bedrock components merged over the built effect, keyed like minecraft:particle_motion_dynamic. Objects merge; null deletes a component or field. Use for anything the knobs do not cover.",
+                    "markdownDescription": "Raw Bedrock components merged over the built effect, keyed like minecraft:particle_motion_dynamic. Objects merge; null deletes a component or field. Use for anything the knobs do not cover."
+                  },
+                  "curves": {
+                    "type": "object",
+                    "additionalProperties": {},
+                    "description": "Raw Bedrock curves (variable.<name> keys), merged over the built effect.",
+                    "markdownDescription": "Raw Bedrock curves (variable.<name> keys), merged over the built effect."
+                  },
+                  "events": {
+                    "type": "object",
+                    "additionalProperties": {},
+                    "description": "Raw Bedrock events, merged over the built effect.",
+                    "markdownDescription": "Raw Bedrock events, merged over the built effect."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Knobs layered over the preset (or over a plain default effect). Units are blocks (16 model units) and seconds.",
+                "markdownDescription": "Knobs layered over the preset (or over a plain default effect). Units are blocks (16 model units) and seconds."
+              },
+              "raw": {
+                "type": "object",
+                "additionalProperties": {},
+                "description": "A complete Bedrock particle file (for example a Snowstorm export) instead of preset/design. Its identifier is replaced by `identifier`.",
+                "markdownDescription": "A complete Bedrock particle file (for example a Snowstorm export) instead of preset/design. Its identifier is replaced by `identifier`."
+              },
+              "texture_image": {
+                "type": "object",
+                "properties": {
+                  "texture": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Blockbench texture UUID or name to save as the particle texture (paint or generate it first).",
+                    "markdownDescription": "Blockbench texture UUID or name to save as the particle texture (paint or generate it first)."
+                  },
+                  "path": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Absolute path to a PNG file to copy.",
+                    "markdownDescription": "Absolute path to a PNG file to copy."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "File name under textures/particle/; defaults to the effect name.",
+                    "markdownDescription": "File name under textures/particle/; defaults to the effect name."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Custom texture for the effect. It is saved to <pack_root>/textures/particle/<name>.png and the effect's texture and texture_size are set from it (keep design.sprite unset).",
+                "markdownDescription": "Custom texture for the effect. It is saved to <pack_root>/textures/particle/<name>.png and the effect's texture and texture_size are set from it (keep design.sprite unset)."
+              },
+              "pack_root": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Absolute resource-pack-style folder that receives particles/<name>.json and textures/particle/*.png. Defaults to the pack of a Bedrock entity opened from a resource pack, else the saved project's folder.",
+                "markdownDescription": "Absolute resource-pack-style folder that receives particles/<name>.json and textures/particle/*.png. Defaults to the pack of a Bedrock entity opened from a resource pack, else the saved project's folder."
+              },
+              "overwrite": {
+                "type": "boolean",
+                "default": false,
+                "description": "Replace an existing effect file (and texture) with the same name.",
+                "markdownDescription": "Replace an existing effect file (and texture) with the same name."
+              }
+            },
+            "required": [
+              "identifier"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "update_particle_effect",
+      "title": "Update Particle Effect",
+      "description": "Changes an existing particle effect file with design knobs (only the components each knob owns are rewritten) or replaces it with raw JSON, validates it, saves it and refreshes the preview. Also loads an effect file from disk that Blockbench has not seen yet. Blockbench desktop only.",
+      "status": "experimental",
+      "category": "Particles",
+      "annotations": {
+        "destructiveHint": true,
+        "openWorldHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/update_particle_effect",
+        "definitions": {
+          "update_particle_effect": {
+            "type": "object",
+            "properties": {
+              "effect": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Particle identifier (mymod:smoke), effect name (smoke), or absolute path to the effect's .json file. A path that is not loaded yet is loaded.",
+                "markdownDescription": "Particle identifier (mymod:smoke), effect name (smoke), or absolute path to the effect's .json file. A path that is not loaded yet is loaded."
+              },
+              "design": {
+                "type": "object",
+                "properties": {
+                  "material": {
+                    "type": "string",
+                    "enum": [
+                      "particles_alpha",
+                      "particles_blend",
+                      "particles_add",
+                      "particles_opaque"
+                    ],
+                    "description": "particles_alpha: cutout, cheapest. particles_blend: soft translucency (smoke, glow). particles_add: additive light (fire, magic, sparks). particles_opaque: solid.",
+                    "markdownDescription": "particles_alpha: cutout, cheapest. particles_blend: soft translucency (smoke, glow). particles_add: additive light (fire, magic, sparks). particles_opaque: solid."
+                  },
+                  "sprite": {
+                    "type": "string",
+                    "enum": [
+                      "puff",
+                      "dot",
+                      "small_dot",
+                      "bubble",
+                      "flame",
+                      "ember",
+                      "note",
+                      "heart",
+                      "angry",
+                      "happy",
+                      "drop",
+                      "star",
+                      "glow",
+                      "spell",
+                      "crit",
+                      "spark",
+                      "twinkle",
+                      "sparkler",
+                      "fire",
+                      "soul",
+                      "campfire_smoke"
+                    ],
+                    "description": "Built-in sprite; sets the texture and UVs. See list_particle_presets for descriptions.",
+                    "markdownDescription": "Built-in sprite; sets the texture and UVs. See list_particle_presets for descriptions."
+                  },
+                  "texture": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Custom Bedrock texture path without .png, such as textures/particle/leaf. Overrides sprite.",
+                    "markdownDescription": "Custom Bedrock texture path without .png, such as textures/particle/leaf. Overrides sprite."
+                  },
+                  "texture_size": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": [
+                      {
+                        "type": "integer",
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "integer",
+                        "exclusiveMinimum": 0
+                      }
+                    ],
+                    "description": "Pixel size of the custom texture. Tools fill it from the PNG when they copy one.",
+                    "markdownDescription": "Pixel size of the custom texture. Tools fill it from the PNG when they copy one."
+                  },
+                  "flipbook": {
+                    "type": "object",
+                    "properties": {
+                      "frame_size": {
+                        "type": "array",
+                        "minItems": 2,
+                        "maxItems": 2,
+                        "items": [
+                          {
+                            "type": "integer",
+                            "exclusiveMinimum": 0
+                          },
+                          {
+                            "type": "integer",
+                            "exclusiveMinimum": 0
+                          }
+                        ],
+                        "description": "Pixel width and height of one frame.",
+                        "markdownDescription": "Pixel width and height of one frame."
+                      },
+                      "frames": {
+                        "type": "integer",
+                        "minimum": 2,
+                        "description": "Frame count.",
+                        "markdownDescription": "Frame count."
+                      },
+                      "axis": {
+                        "type": "string",
+                        "enum": [
+                          "vertical",
+                          "horizontal"
+                        ],
+                        "default": "vertical",
+                        "description": "Direction frames are stacked in the image; Blockbench flipbook textures are vertical.",
+                        "markdownDescription": "Direction frames are stacked in the image; Blockbench flipbook textures are vertical."
+                      },
+                      "fps": {
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                        "description": "Playback rate. Omit to stretch the frames over each particle's lifetime.",
+                        "markdownDescription": "Playback rate. Omit to stretch the frames over each particle's lifetime."
+                      },
+                      "loop": {
+                        "type": "boolean",
+                        "description": "Loop the frames when fps is set.",
+                        "markdownDescription": "Loop the frames when fps is set."
+                      }
+                    },
+                    "required": [
+                      "frame_size",
+                      "frames"
+                    ],
+                    "additionalProperties": false,
+                    "description": "Animate a custom texture as a sprite sheet.",
+                    "markdownDescription": "Animate a custom texture as a sprite sheet."
+                  },
+                  "rate": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Steady emission, particles per second. Mutually exclusive with burst.",
+                    "markdownDescription": "Steady emission, particles per second. Mutually exclusive with burst."
+                  },
+                  "burst": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "description": "Emit this many particles at once when the emitter starts. Mutually exclusive with rate.",
+                    "markdownDescription": "Emit this many particles at once when the emitter starts. Mutually exclusive with rate."
+                  },
+                  "max_particles": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "description": "Cap on live particles for a steady emitter.",
+                    "markdownDescription": "Cap on live particles for a steady emitter."
+                  },
+                  "looping": {
+                    "type": "boolean",
+                    "description": "Emitter restarts after duration (+ sleep_time). An existing effect keeps its mode; a new one loops for rate and runs once for burst. Emitters fired from animation keyframes should not loop in Bedrock.",
+                    "markdownDescription": "Emitter restarts after duration (+ sleep_time). An existing effect keeps its mode; a new one loops for rate and runs once for burst. Emitters fired from animation keyframes should not loop in Bedrock."
+                  },
+                  "duration": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Seconds the emitter is active per cycle. Loops default to 10: with no sleep_time the game emits continuously either way, and Blockbench's preview restarts a looping emitter every `duration` seconds, so keep it at least as long as the clip.",
+                    "markdownDescription": "Seconds the emitter is active per cycle. Loops default to 10: with no sleep_time the game emits continuously either way, and Blockbench's preview restarts a looping emitter every `duration` seconds, so keep it at least as long as the clip."
+                  },
+                  "sleep_time": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Pause between looping cycles, in seconds.",
+                    "markdownDescription": "Pause between looping cycles, in seconds."
+                  },
+                  "shape": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "point",
+                          "sphere",
+                          "box",
+                          "disc",
+                          "entity_aabb"
+                        ],
+                        "description": "point: one spot. sphere/disc: radius around the emitter. box: half_dimensions. entity_aabb: the entity's hitbox (in-game only; Blockbench previews it as a point).",
+                        "markdownDescription": "point: one spot. sphere/disc: radius around the emitter. box: half_dimensions. entity_aabb: the entity's hitbox (in-game only; Blockbench previews it as a point)."
+                      },
+                      "offset": {
+                        "type": "array",
+                        "minItems": 3,
+                        "maxItems": 3,
+                        "items": [
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            ]
+                          },
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            ]
+                          },
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            ]
+                          }
+                        ],
+                        "description": "Spawn center offset from the emitter, in blocks.",
+                        "markdownDescription": "Spawn center offset from the emitter, in blocks."
+                      },
+                      "radius": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        ],
+                        "description": "Sphere or disc radius in blocks.",
+                        "markdownDescription": "Sphere or disc radius in blocks."
+                      },
+                      "half_dimensions": {
+                        "type": "array",
+                        "minItems": 3,
+                        "maxItems": 3,
+                        "items": [
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            ]
+                          },
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            ]
+                          },
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            ]
+                          }
+                        ],
+                        "description": "Box half extents in blocks.",
+                        "markdownDescription": "Box half extents in blocks."
+                      },
+                      "plane_normal": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "x",
+                              "y",
+                              "z"
+                            ]
+                          },
+                          {
+                            "type": "array",
+                            "minItems": 3,
+                            "maxItems": 3,
+                            "items": [
+                              {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                ]
+                              },
+                              {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                ]
+                              },
+                              {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ],
+                        "description": "Disc facing; y (the default) lays it flat.",
+                        "markdownDescription": "Disc facing; y (the default) lays it flat."
+                      },
+                      "surface_only": {
+                        "type": "boolean",
+                        "description": "Spawn on the surface/rim instead of throughout the volume.",
+                        "markdownDescription": "Spawn on the surface/rim instead of throughout the volume."
+                      }
+                    },
+                    "required": [
+                      "type"
+                    ],
+                    "additionalProperties": false,
+                    "description": "Emitter shape.",
+                    "markdownDescription": "Emitter shape."
+                  },
+                  "direction": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "outwards",
+                          "inwards"
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "minItems": 3,
+                        "maxItems": 3,
+                        "items": [
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            ]
+                          },
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            ]
+                          },
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ],
+                    "description": "Initial direction: away from or toward the shape center, or a vector such as [0, 1, 0] (up). Molang allowed, e.g. ['math.random(-0.2,0.2)', 1, 0].",
+                    "markdownDescription": "Initial direction: away from or toward the shape center, or a vector such as [0, 1, 0] (up). Molang allowed, e.g. ['math.random(-0.2,0.2)', 1, 0]."
+                  },
+                  "local_space": {
+                    "type": "boolean",
+                    "description": "Particles move with the emitter (auras, rings on a moving bone). False leaves them behind (smoke, trails).",
+                    "markdownDescription": "Particles move with the emitter (auras, rings on a moving bone). False leaves them behind (smoke, trails)."
+                  },
+                  "lifetime": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "array",
+                        "minItems": 2,
+                        "maxItems": 2,
+                        "items": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    ],
+                    "description": "Particle lifetime in seconds; [min, max] picks a random value per particle.",
+                    "markdownDescription": "Particle lifetime in seconds; [min, max] picks a random value per particle."
+                  },
+                  "speed": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "array",
+                        "minItems": 2,
+                        "maxItems": 2,
+                        "items": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    ],
+                    "description": "Initial speed in blocks per second; [min, max] randomizes it.",
+                    "markdownDescription": "Initial speed in blocks per second; [min, max] randomizes it."
+                  },
+                  "acceleration": {
+                    "type": "array",
+                    "minItems": 3,
+                    "maxItems": 3,
+                    "items": [
+                      {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        ]
+                      },
+                      {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        ]
+                      },
+                      {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        ]
+                      }
+                    ],
+                    "description": "Blocks per second squared, e.g. [0, -9.8, 0] for gravity or [0, 0.5, 0] for rising smoke.",
+                    "markdownDescription": "Blocks per second squared, e.g. [0, -9.8, 0] for gravity or [0, 0.5, 0] for rising smoke."
+                  },
+                  "drag": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Linear drag coefficient; 1-3 slows bursts naturally.",
+                    "markdownDescription": "Linear drag coefficient; 1-3 slows bursts naturally."
+                  },
+                  "size": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "array",
+                        "minItems": 2,
+                        "maxItems": 2,
+                        "items": [
+                          {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          {
+                            "type": "number",
+                            "minimum": 0
+                          }
+                        ]
+                      }
+                    ],
+                    "description": "Billboard half-width in blocks (Bedrock sizes are half extents: 0.5 spans a whole block), or [start, end] to grow or shrink over life. Vanilla smoke is 0.1.",
+                    "markdownDescription": "Billboard half-width in blocks (Bedrock sizes are half extents: 0.5 spans a whole block), or [start, end] to grow or shrink over life. Vanilla smoke is 0.1."
+                  },
+                  "size_variation": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Random size spread per particle, 0-1 (0.3 means +/-15%).",
+                    "markdownDescription": "Random size spread per particle, 0-1 (0.3 means +/-15%)."
+                  },
+                  "spin": {
+                    "type": "object",
+                    "properties": {
+                      "initial": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "array",
+                            "minItems": 2,
+                            "maxItems": 2,
+                            "items": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "number"
+                              }
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        ]
+                      },
+                      "rate": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "array",
+                            "minItems": 2,
+                            "maxItems": 2,
+                            "items": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "number"
+                              }
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        ]
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Billboard rotation in degrees and degrees per second.",
+                    "markdownDescription": "Billboard rotation in degrees and degrees per second."
+                  },
+                  "color": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$",
+                        "errorMessage": {
+                          "pattern": "Use #RRGGBB or #RRGGBBAA."
+                        }
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$",
+                          "errorMessage": {
+                            "pattern": "Use #RRGGBB or #RRGGBBAA."
+                          }
+                        },
+                        "minItems": 2,
+                        "maxItems": 8
+                      }
+                    ],
+                    "description": "Tint as #RRGGBB/#RRGGBBAA, or 2-8 colors spread evenly over the particle's life. White keeps a sprite's own colors.",
+                    "markdownDescription": "Tint as #RRGGBB/#RRGGBBAA, or 2-8 colors spread evenly over the particle's life. White keeps a sprite's own colors."
+                  },
+                  "fade_out": {
+                    "type": "boolean",
+                    "description": "true fades alpha to zero at the end of life; false makes the end opaque again. Without color it adjusts the current tint. Needs particles_blend or particles_add to look smooth.",
+                    "markdownDescription": "true fades alpha to zero at the end of life; false makes the end opaque again. Without color it adjusts the current tint. Needs particles_blend or particles_add to look smooth."
+                  },
+                  "facing": {
+                    "type": "string",
+                    "enum": [
+                      "lookat_xyz",
+                      "lookat_y",
+                      "rotate_xyz",
+                      "rotate_y",
+                      "direction_x",
+                      "direction_y",
+                      "direction_z",
+                      "lookat_direction",
+                      "emitter_transform_xy",
+                      "emitter_transform_xz",
+                      "emitter_transform_yz"
+                    ],
+                    "description": "Billboard orientation. lookat_xyz faces the camera; lookat_y stays upright; direction_* and lookat_direction stretch along velocity (sparks, rain).",
+                    "markdownDescription": "Billboard orientation. lookat_xyz faces the camera; lookat_y stays upright; direction_* and lookat_direction stretch along velocity (sparks, rain)."
+                  },
+                  "lighting": {
+                    "type": "boolean",
+                    "description": "Shade the particle by world light. Leave off for glowing effects.",
+                    "markdownDescription": "Shade the particle by world light. Leave off for glowing effects."
+                  },
+                  "collision": {
+                    "type": "object",
+                    "properties": {
+                      "radius": {
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                        "maximum": 0.5,
+                        "description": "Collision radius in blocks (Bedrock allows up to 0.5).",
+                        "markdownDescription": "Collision radius in blocks (Bedrock allows up to 0.5)."
+                      },
+                      "bounciness": {
+                        "type": "number",
+                        "minimum": 0,
+                        "description": "Coefficient of restitution; 0 stops dead, 0.5 bounces.",
+                        "markdownDescription": "Coefficient of restitution; 0 stops dead, 0.5 bounces."
+                      },
+                      "drag": {
+                        "type": "number",
+                        "minimum": 0,
+                        "description": "Speed lost while sliding.",
+                        "markdownDescription": "Speed lost while sliding."
+                      },
+                      "expire_on_contact": {
+                        "type": "boolean",
+                        "description": "Remove the particle when it hits a block (drips, rain).",
+                        "markdownDescription": "Remove the particle when it hits a block (drips, rain)."
+                      }
+                    },
+                    "required": [
+                      "radius"
+                    ],
+                    "additionalProperties": false,
+                    "description": "Collide with world blocks. Blockbench's preview has no blocks, so collisions only show in game.",
+                    "markdownDescription": "Collide with world blocks. Blockbench's preview has no blocks, so collisions only show in game."
+                  },
+                  "components": {
+                    "type": "object",
+                    "additionalProperties": {},
+                    "description": "Raw Bedrock components merged over the built effect, keyed like minecraft:particle_motion_dynamic. Objects merge; null deletes a component or field. Use for anything the knobs do not cover.",
+                    "markdownDescription": "Raw Bedrock components merged over the built effect, keyed like minecraft:particle_motion_dynamic. Objects merge; null deletes a component or field. Use for anything the knobs do not cover."
+                  },
+                  "curves": {
+                    "type": "object",
+                    "additionalProperties": {},
+                    "description": "Raw Bedrock curves (variable.<name> keys), merged over the built effect.",
+                    "markdownDescription": "Raw Bedrock curves (variable.<name> keys), merged over the built effect."
+                  },
+                  "events": {
+                    "type": "object",
+                    "additionalProperties": {},
+                    "description": "Raw Bedrock events, merged over the built effect.",
+                    "markdownDescription": "Raw Bedrock events, merged over the built effect."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Knobs to change. Only the components a knob owns are rewritten; hand-written parts of the file stay.",
+                "markdownDescription": "Knobs to change. Only the components a knob owns are rewritten; hand-written parts of the file stay."
+              },
+              "raw": {
+                "type": "object",
+                "additionalProperties": {},
+                "description": "Replace the whole file with this Bedrock particle JSON. The effect keeps its current identifier, so keyframes and the client entity still match.",
+                "markdownDescription": "Replace the whole file with this Bedrock particle JSON. The effect keeps its current identifier, so keyframes and the client entity still match."
+              },
+              "texture_image": {
+                "type": "object",
+                "properties": {
+                  "texture": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Blockbench texture UUID or name to save as the particle texture (paint or generate it first).",
+                    "markdownDescription": "Blockbench texture UUID or name to save as the particle texture (paint or generate it first)."
+                  },
+                  "path": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Absolute path to a PNG file to copy.",
+                    "markdownDescription": "Absolute path to a PNG file to copy."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "File name under textures/particle/; defaults to the effect name.",
+                    "markdownDescription": "File name under textures/particle/; defaults to the effect name."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Custom texture for the effect. It is saved to <pack_root>/textures/particle/<name>.png and the effect's texture and texture_size are set from it (keep design.sprite unset).",
+                "markdownDescription": "Custom texture for the effect. It is saved to <pack_root>/textures/particle/<name>.png and the effect's texture and texture_size are set from it (keep design.sprite unset)."
+              },
+              "overwrite": {
+                "type": "boolean",
+                "default": false,
+                "description": "Replace a texture PNG that already exists with different content (another effect may use it).",
+                "markdownDescription": "Replace a texture PNG that already exists with different content (another effect may use it)."
+              }
+            },
+            "required": [
+              "effect"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "list_particle_effects",
+      "title": "List Particle Effects",
+      "description": "Lists particle effects loaded in Blockbench with their file, summary, texture status and validation warnings, every particle keyframe that uses them, keyframes that have no preview file or point at missing locators, and the client-entity particle_effects map a Bedrock pack needs.",
+      "status": "experimental",
+      "category": "Particles",
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/list_particle_effects",
+        "definitions": {
+          "list_particle_effects": {
+            "type": "object",
+            "properties": {
+              "include_json": {
+                "type": "boolean",
+                "default": false,
+                "description": "Include each effect's full JSON.",
+                "markdownDescription": "Include each effect's full JSON."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "manage_particle_keyframes",
+      "title": "Manage Particle Keyframes",
+      "description": "Adds, removes or lists particle keyframes on an animation's Effects track. A keyframe spawns an effect at a time, optionally at a locator; Blockbench previews it in Animate mode (set_mode animate, then animation_timeline set_time and capture a screenshot). Keyframes export with Bedrock and GeckoLib animations. One undo step.",
+      "status": "experimental",
+      "category": "Particles",
+      "annotations": {
+        "destructiveHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/manage_particle_keyframes",
+        "definitions": {
+          "manage_particle_keyframes": {
+            "type": "object",
+            "properties": {
+              "animation_id": {
+                "type": "string",
+                "description": "Animation UUID or name. If not provided, uses current animation.",
+                "markdownDescription": "Animation UUID or name. If not provided, uses current animation."
+              },
+              "action": {
+                "type": "string",
+                "enum": [
+                  "add",
+                  "remove",
+                  "list"
+                ],
+                "description": "add particle keyframes, remove them by time, or list them.",
+                "markdownDescription": "add particle keyframes, remove them by time, or list them."
+              },
+              "keyframes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "time": {
+                      "type": "number",
+                      "minimum": 0,
+                      "description": "Seconds from the start of the animation.",
+                      "markdownDescription": "Seconds from the start of the animation."
+                    },
+                    "effect": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Effect to spawn: identifier, effect name or JSON path of a loaded effect. For GeckoLib, a name your mod's particle handler understands also works (without a preview).",
+                      "markdownDescription": "Effect to spawn: identifier, effect name or JSON path of a loaded effect. For GeckoLib, a name your mod's particle handler understands also works (without a preview)."
+                    },
+                    "effect_name": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9_.]+$",
+                      "description": "Name written to the keyframe and used in the client entity's particle_effects map; defaults to the effect's short name.",
+                      "markdownDescription": "Name written to the keyframe and used in the client entity's particle_effects map; defaults to the effect's short name."
+                    },
+                    "locator": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Locator the effect spawns at and follows. Omit to spawn at the entity origin.",
+                      "markdownDescription": "Locator the effect spawns at and follows. Omit to spawn at the entity origin."
+                    },
+                    "pre_effect_script": {
+                      "type": "string",
+                      "description": "Molang run before the emitter starts, for variables such as variable.color = 1;",
+                      "markdownDescription": "Molang run before the emitter starts, for variables such as variable.color = 1;"
+                    },
+                    "bind_to_actor": {
+                      "type": "boolean",
+                      "default": true,
+                      "description": "Bedrock: keep the emitter attached to the entity. False leaves it in the world where it spawned.",
+                      "markdownDescription": "Bedrock: keep the emitter attached to the entity. False leaves it in the world where it spawned."
+                    }
+                  },
+                  "required": [
+                    "time",
+                    "effect"
+                  ],
+                  "additionalProperties": false
+                },
+                "maxItems": 200,
+                "description": "Keyframes for add. A keyframe at an existing particle time joins that keyframe as another effect.",
+                "markdownDescription": "Keyframes for add. A keyframe at an existing particle time joins that keyframe as another effect."
+              },
+              "times": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "maxItems": 200,
+                "description": "Times (seconds) to remove for remove; omit to remove every particle keyframe.",
+                "markdownDescription": "Times (seconds) to remove for remove; omit to remove every particle keyframe."
+              },
+              "effect_filter": {
+                "type": "string",
+                "minLength": 1,
+                "description": "For remove: only effects with this name, identifier or file.",
+                "markdownDescription": "For remove: only effects with this name, identifier or file."
+              }
+            },
+            "required": [
+              "action"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "add_locator",
+      "title": "Add Locator",
+      "description": "Adds a locator: a named point on a bone where particle effects (and sounds) spawn and which they follow as the bone animates. Exported as a Bedrock bone locator. Requires a format with locators (Bedrock Entity, GeckoLib, Generic Model). One undo step.",
+      "status": "experimental",
+      "category": "Particles",
+      "annotations": {
+        "destructiveHint": false
+      },
+      "parameters": {
+        "$ref": "#/definitions/add_locator",
+        "definitions": {
+          "add_locator": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_]+$",
+                "description": "Unique locator name; particle keyframes refer to it.",
+                "markdownDescription": "Unique locator name; particle keyframes refer to it."
+              },
+              "parent": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Bone/group name or UUID the locator follows. Omit for the model root.",
+                "markdownDescription": "Bone/group name or UUID the locator follows. Omit for the model root."
+              },
+              "position": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 3,
+                "maxItems": 3,
+                "description": "Absolute position in model units (16 per block), like a cube corner.",
+                "markdownDescription": "Absolute position in model units (16 per block), like a cube corner."
+              },
+              "rotation": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 3,
+                "maxItems": 3,
+                "description": "Degrees; orients effects whose shapes or directions use local space (formats with rotatable locators).",
+                "markdownDescription": "Degrees; orients effects whose shapes or directions use local space (formats with rotatable locators)."
+              },
+              "ignore_inherited_scale": {
+                "type": "boolean",
+                "description": "Keep effect size when the parent bone scales.",
+                "markdownDescription": "Keep effect size when the parent bone scales."
+              }
+            },
+            "required": [
+              "name",
+              "position"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "export_particle_pack",
+      "title": "Export Particle Pack",
+      "description": "Delivers particle effects to a Bedrock resource pack: writes particles/<name>.json and copies custom textures to textures/particle/, then returns the particle_effects map to paste into the client entity so animation keyframe names resolve. Defaults to every effect the project's keyframes use. Skips identical files; refuses to overwrite different ones unless overwrite is true. Blockbench desktop only.",
+      "status": "experimental",
+      "category": "Particles",
+      "annotations": {
+        "destructiveHint": true,
+        "openWorldHint": true
+      },
+      "parameters": {
+        "$ref": "#/definitions/export_particle_pack",
+        "definitions": {
+          "export_particle_pack": {
+            "type": "object",
+            "properties": {
+              "destination": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Absolute path to the resource pack root (the folder containing manifest.json).",
+                "markdownDescription": "Absolute path to the resource pack root (the folder containing manifest.json)."
+              },
+              "effects": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Particle identifier (mymod:smoke), effect name (smoke), or absolute path to the effect's .json file. A path that is not loaded yet is loaded.",
+                  "markdownDescription": "Particle identifier (mymod:smoke), effect name (smoke), or absolute path to the effect's .json file. A path that is not loaded yet is loaded."
+                },
+                "description": "Effects to deliver. Defaults to every effect used by particle keyframes in the project.",
+                "markdownDescription": "Effects to deliver. Defaults to every effect used by particle keyframes in the project."
+              },
+              "overwrite": {
+                "type": "boolean",
+                "default": false,
+                "description": "Replace files that exist with different content. Identical files are always skipped.",
+                "markdownDescription": "Replace files that exist with different content. Identical files are always skipped."
+              }
+            },
+            "required": [
+              "destination"
             ],
             "additionalProperties": false
           }
