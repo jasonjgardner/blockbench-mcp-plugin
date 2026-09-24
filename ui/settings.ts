@@ -108,5 +108,8 @@ export function settingsTeardown(options: ISettingsTeardownOptions = {}) {
     }
     setting.delete();
   });
-  settings.length = 0;
+
+  if (!options.keepValues) {
+    settings.length = 0;
+  }
 }
