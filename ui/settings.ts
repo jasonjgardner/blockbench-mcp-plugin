@@ -6,6 +6,10 @@ const settings: Setting[] = [];
 export function settingsSetup() {
   const category = "general";
 
+  // Objects kept by an earlier `keepValues` teardown are superseded by the ones created below.
+  // Forget them: `Setting.delete()` works by id, so deleting a stale one later would remove the new one.
+  settings.length = 0;
+
   settings.push(
     new Setting("mcp_instructions", {
       name: tl("mcp.settings.instructions_name"),
@@ -96,17 +100,22 @@ export interface ISettingsTeardownOptions {
  * `keepValues` the current values are written to `Settings.stored`, which the `Setting` objects that
  * `settingsSetup()` re-creates read from, and the old objects stay registered so the next save still
  * includes them. Uninstalling deletes them for real.
+ *
+ * Blockbench runs `onunload` and then `onuninstall` on the same instance when uninstalling, so a
+ * `keepValues` teardown must leave the objects tracked for the plain teardown that follows. A reload
+ * does not accumulate stale objects because `settingsSetup()` forgets them before creating new ones.
  */
 export function settingsTeardown(options: ISettingsTeardownOptions = {}) {
+  // blockbench-types declares `stored` as Setting records, but at runtime it is `{ value }` per id.
+  const stored = Settings.stored as Record<string, { value: unknown }>;
+
   settings.forEach((setting) => {
     if (options.keepValues) {
-      // blockbench-types declares `stored` as Setting records, but at runtime it is `{ value }` per id.
-      (Settings.stored as Record<string, { value: unknown }>)[setting.id] = {
-        value: setting.master_value,
-      };
+      stored[setting.id] = { value: setting.master_value };
       return;
     }
     setting.delete();
+    delete stored[setting.id];
   });
 
   if (!options.keepValues) {

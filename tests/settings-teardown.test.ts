@@ -65,16 +65,29 @@ describe("settingsTeardown", () => {
     expect(stored).toEqual({});
   });
 
-  test("forgets torn-down settings so a later teardown does not touch them again", () => {
+  test("uninstall (onunload keeping values, then onuninstall) deletes the settings and their stored values", () => {
     settingsSetup();
     const registered = [...TestSetting.all.values()];
     settingsTeardown({ keepValues: true });
-    stored = {};
-    Object.assign(Settings, { stored });
 
     settingsTeardown();
 
+    expect(registered.every((setting) => setting.deleted)).toBe(true);
+    expect(TestSetting.all.size).toBe(0);
     expect(stored).toEqual({});
-    expect(registered.every((setting) => !setting.deleted)).toBe(true);
+  });
+
+  test("a reload does not leave stale settings that a later uninstall would delete by id", () => {
+    settingsSetup();
+    const stale = [...TestSetting.all.values()];
+    settingsTeardown({ keepValues: true });
+    settingsSetup();
+    const current = [...TestSetting.all.values()];
+
+    settingsTeardown();
+
+    expect(stale.every((setting) => !setting.deleted)).toBe(true);
+    expect(current.every((setting) => setting.deleted)).toBe(true);
+    expect(TestSetting.all.size).toBe(0);
   });
 });
