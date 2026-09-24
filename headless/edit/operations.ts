@@ -19,6 +19,7 @@ import {
   type IBBModel,
   type ICube,
   type ICubeFace,
+  isMesh,
   type IGroup,
   type IKeyframe,
   isCube,
@@ -33,6 +34,9 @@ import {
 } from "../document/schema";
 import { ancestorsOf, detachNode, groupRef, indexModel, insertNode, resolveNode, subtreeIds } from "../document/tree";
 import { boxUvSize, computeBoxUv, defaultFaceUv } from "../geometry/box-uv";
+import { addLocatorOp, applyAddLocator, applyRemoveParticleKeyframe, applySetParticleKeyframe, removeParticleKeyframeOp, setParticleKeyframeOp } from "./particle-operations";
+import { addMeshOp, addMeshPrimitiveOp, assignMeshTexture, editMeshOp, mapMeshUvOp, MESH_HANDLERS } from "./mesh-operations";
+import { findAnimation, freshUuid } from "./refs";
 
 const nodeRef = z.string().min(1).describe("UUID or exact name.");
 const parentRef = z.string().min(1).nullable().optional().describe("Parent group UUID or name; null or omitted places the node at the root.");
@@ -144,9 +148,10 @@ export const updateTextureOp = z.object({
 /** Assigns a texture to cube faces. */
 export const assignTextureOp = z.object({
   op: z.literal("assign_texture"),
-  targets: z.array(nodeRef).min(1).describe("Cubes, or groups (every cube inside is assigned)."),
+  targets: z.array(nodeRef).min(1).describe("Cubes, meshes, or groups (every cube and mesh inside is assigned)."),
   texture: textureRef.nullable().describe("null disables the faces."),
-  faces: z.array(cubeFaceNameSchema).optional().describe("Defaults to all six faces."),
+  faces: z.array(cubeFaceNameSchema).optional().describe("Cube faces; defaults to all six."),
+  mesh_faces: z.array(z.string().min(1)).optional().describe("Mesh face keys; defaults to every face of each mesh."),
 });
 
 /** Adds an animation clip. */
@@ -206,6 +211,13 @@ export const operationSchema = z.discriminatedUnion("op", [
   setKeyframeOp,
   removeKeyframeOp,
   setModelPropertiesOp,
+  addLocatorOp,
+  setParticleKeyframeOp,
+  removeParticleKeyframeOp,
+  addMeshOp,
+  addMeshPrimitiveOp,
+  editMeshOp,
+  mapMeshUvOp,
 ]);
 
 /** One parsed edit operation. */
@@ -232,18 +244,7 @@ export function resolveTexture(doc: IBBModel, ref: string | number): number {
   throw new Error(`No texture named or identified "${ref}".`);
 }
 
-/**
- * Returns `requested` when no group, element, texture or animation uses it yet,
- * or a new random UUID when none was requested.
- *
- * @throws Error when `requested` is already taken; Blockbench misloads duplicate UUIDs.
- */
-export function freshUuid(doc: IBBModel, requested: string | undefined): string {
-  if (requested === undefined) return crypto.randomUUID();
-  const taken = [doc.groups, doc.elements, doc.textures, doc.animations ?? [], doc.texture_groups ?? []].some((list) => list.some((entry) => entry.uuid === requested));
-  if (taken) throw new Error(`UUID ${requested} is already used in this model.`);
-  return requested;
-}
+export { freshUuid };
 
 /** Resolves a face's texture: explicit null disables the face, an explicit reference wins, otherwise the cube-wide texture. */
 function faceTexture(doc: IBBModel, input: string | number | null | undefined, fallback: number | undefined): number | null | undefined {
@@ -555,21 +556,15 @@ function applyAssignTexture(doc: IBBModel, op: z.infer<typeof assignTextureOp>):
     }),
   );
   const elements = doc.elements.map((element) => {
-    if (!targets.has(element.uuid) || !isCube(element)) return element;
+    if (!targets.has(element.uuid)) return element;
+    if (isMesh(element)) return assignMeshTexture(element, texture, op.mesh_faces);
+    if (!isCube(element)) return element;
     const updated = Object.fromEntries(
       Object.entries(element.faces).map(([face, data]) => [face, faces.includes(face as CubeFaceName) ? { ...data, texture } : data]),
     );
     return { ...element, faces: updated };
   });
   return [{ ...doc, elements }, { op: op.op, detail: `${targets.size} element(s)` }];
-}
-
-function findAnimation(doc: IBBModel, ref: string): IAnimation {
-  const matches = (doc.animations ?? []).filter((animation) => animation.uuid === ref || animation.name === ref);
-  const [only] = matches;
-  if (matches.length === 1 && only) return only;
-  if (matches.length > 1) throw new Error(`"${ref}" matches ${matches.length} animations; pass a UUID.`);
-  throw new Error(`No animation named or identified "${ref}".`);
 }
 
 function applyAddAnimation(doc: IBBModel, op: z.infer<typeof addAnimationOp>): [IBBModel, IOperationResult] {
@@ -663,6 +658,10 @@ const HANDLERS: { [K in Operation["op"]]: Handler<K> } = {
   set_keyframe: applySetKeyframe,
   remove_keyframe: applyRemoveKeyframe,
   set_model_properties: applySetModelProperties,
+  add_locator: applyAddLocator,
+  set_particle_keyframe: applySetParticleKeyframe,
+  remove_particle_keyframe: applyRemoveParticleKeyframe,
+  ...MESH_HANDLERS,
 };
 
 /**

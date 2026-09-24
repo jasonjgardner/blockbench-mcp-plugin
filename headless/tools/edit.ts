@@ -11,6 +11,8 @@
 
 import { z } from "zod";
 import { VERSION } from "@/lib/constants";
+import { webAppField } from "../app/web-link";
+import { enforceFormat } from "../edit/format-guard";
 import { applyOperations, operationSchema, stampAiUsage } from "../edit/operations";
 import { decodePngDataUrl, pngDataUrl, pngSize } from "../document/png";
 import { bbmodelSchema, type IBBModel, PBR_CHANNELS } from "../document/schema";
@@ -61,7 +63,7 @@ const createTool = defineTool({
   async execute({ file, format, name, box_uv, resolution, overwrite }, context) {
     const doc = stamp(emptyModel(format, name, box_uv ?? BOX_UV_FORMATS.has(format), resolution), context);
     const { path, revision } = await context.store.create(file, doc, overwrite);
-    return { path, revision, format, box_uv: doc.meta.box_uv, created_by: `blockbench-mcp-headless ${VERSION}` };
+    return { path, revision, format, box_uv: doc.meta.box_uv, created_by: `blockbench-mcp-headless ${VERSION}`, ...(await webAppField(doc, path, context.webApp)) };
   },
 });
 
@@ -76,13 +78,22 @@ const OPERATIONS_HELP = [
   "add_material {name, color_value?, mer_value?, subsurface_value?} (a PBR material; its textures fill the color, normal or height, and mer channels);",
   "update_material {target, name?, color_value?, mer_value?, subsurface_value?};",
   "update_texture {target, name?, source?, width?, height?, material?, channel?, wrap_mode?, render_mode?} (material null removes it from its material);",
-  "assign_texture {targets, texture, faces?};",
+  "assign_texture {targets, texture, faces?, mesh_faces?} (cubes and meshes);",
   "add_animation {name, length, loop, snapping};",
   "remove_animation {animation};",
   "set_keyframe {animation, bone, channel, time, value, interpolation} (replaces a key at the same channel and time);",
   "remove_keyframe {animation, bone, channel, time};",
-  "set_model_properties {name?, model_identifier?, resolution?}.",
+  "set_model_properties {name?, model_identifier?, resolution?};",
+  "add_locator {name, parent?, position, rotation?, ignore_inherited_scale?} (a named point particle effects spawn at; position is absolute model units);",
+  "set_particle_keyframe {animation, time, effect, file?, locator?, pre_effect_script?, bind_to_actor?} (file is the particle JSON path relative to the .bbmodel, from bbmodel_particle_effect; replaces the same effect at the same time);",
+  "remove_particle_keyframe {animation, time, effect?};",
+  "add_mesh {name, vertices (key map or [x,y,z] list, relative to origin), faces [{vertices (3-4 keys or indices), uv?, texture?}], origin?, rotation?, parent?, texture?} (faces without uv get Blockbench's Auto UV);",
+  "add_mesh_primitive {shape: cuboid|beveled_cuboid|pyramid|plane|circle|cylinder|tube|cone|sphere|icosphere|octahedron|dodecahedron|torus, diameter?, height?, sides?, align_edges?, detail?, minor_diameter?, minor_sides?, edge_size?, name?, origin?, rotation?, parent?, texture?} (Blockbench's Add Mesh dialog, same geometry and UVs);",
+  "edit_mesh {target, actions: [set_vertices {vertices} | move_vertices {keys?, offset} | delete_vertices {keys} | transform {keys?, translate?, rotate?, scale?, pivot?} | add_faces {faces} | delete_faces {faces} | flip_faces {faces?} | merge_vertices {distance?, keys?, in_center?} | extrude_faces {faces, distance, direction?, even_extend?} | subdivide {faces?, cuts?} | loop_cut {face, direction?, cuts?, offset?, spacing?}]} (applied in order);",
+  "map_mesh_uv {target, faces?, mode: auto|project_x|project_y|project_z|explicit, uv?, scale?, texture?}.",
+  "Meshes are only allowed in the free (Generic) format.",
   "Nodes, textures and animations are addressed by UUID or exact name. Coordinates are absolute model units; rotations are degrees applied Z·Y·X about the origin.",
+  "Format rules: a batch is refused when the nodes it adds or changes break the model format's limits, the way Blockbench would (meshes only in the free format; java_block cubes within -16..32 with rotations the model's java_block_version allows; no group rotation in java_block; box UV and integer sizes where forced). Softer problems come back as format_warnings.",
 ].join(" ");
 
 const editTool = defineTool({
@@ -98,9 +109,18 @@ const editTool = defineTool({
   async execute({ file, expected_revision, operations }, context) {
     const written = await context.store.update(file, expected_revision, ({ doc }) => {
       const { doc: edited, results } = applyOperations(doc, operations);
-      return { doc: stamp(edited, context), result: results };
+      const warnings = enforceFormat(doc, edited);
+      const stamped = stamp(edited, context);
+      return { doc: stamped, result: { results, doc: stamped, warnings } };
     });
-    return { path: written.path, revision: written.revision, results: written.result, notes: written.notes };
+    return {
+      path: written.path,
+      revision: written.revision,
+      results: written.result.results,
+      notes: written.notes,
+      ...(written.result.warnings.length > 0 ? { format_warnings: written.result.warnings } : {}),
+      ...(await webAppField(written.result.doc, written.path, context.webApp)),
+    };
   },
 });
 
@@ -134,9 +154,16 @@ const addTextureTool = defineTool({
     ]);
     const written = await context.store.update(file, expected_revision, ({ doc }) => {
       const { doc: edited, results } = applyOperations(doc, operations);
-      return { doc: stamp(edited, context), result: results };
+      const stamped = stamp(edited, context);
+      return { doc: stamped, result: { results, doc: stamped } };
     });
-    return { path: written.path, revision: written.revision, texture: { uuid, name: textureName, width, height }, results: written.result };
+    return {
+      path: written.path,
+      revision: written.revision,
+      texture: { uuid, name: textureName, width, height },
+      results: written.result.results,
+      ...(await webAppField(written.result.doc, written.path, context.webApp)),
+    };
   },
 });
 

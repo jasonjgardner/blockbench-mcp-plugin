@@ -30,6 +30,7 @@
     ],
     "exclude": [
         "node_modules",
-        "dist"
+        "dist",
+        "headless/render/engine"
     ]
 }

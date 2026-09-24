@@ -1,7 +1,8 @@
 /**
  * Live smoke test for the headless server: launches it over stdio exactly as an
  * MCP client would, builds and validates a model, and renders it with the real
- * bb-render (needs Node 23.6+, a WebGPU-capable GPU, and a built bb-render).
+ * built-in render engine (needs Node 23.6+, npm and a WebGPU-capable GPU; the first
+ * run installs the engine's packages into the per-user cache folder).
  *
  * ```sh
  * bun run test:headless:live            # writes to a temporary folder

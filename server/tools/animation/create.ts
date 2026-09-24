@@ -1,6 +1,7 @@
 /// <reference types="blockbench-types" />
 import type { z } from "zod";
 import { createTool } from "@/lib/factories";
+import { shortNameOf } from "@/lib/particles/build";
 import { findGroupOrThrow } from "@/lib/util";
 import { runUndoableAnimationEdit } from "@/lib/animation-undo";
 import { animationToolDocs } from "./docs";
@@ -90,14 +91,30 @@ function addBoneKeyframes(animator: BoneAnimator, data: BoneKeyframeInput): void
   });
 }
 
+/**
+ * Path of a loaded particle effect named by `effect` (identifier, short name or
+ * path), so the keyframe previews like one added by manage_particle_keyframes.
+ * Deliberately simpler than the particle tools' lookup: it needs no native
+ * `path` module and never throws, so create_animation keeps working (without a
+ * preview) when a name is ambiguous or unknown.
+ */
+function loadedParticleFile(effect: string): string | undefined {
+  const loaded = (Animator as unknown as { particle_effects?: Record<string, { config?: { identifier?: string } }> }).particle_effects ?? {};
+  return Object.entries(loaded).find(([path, entry]) => {
+    const identifier = entry.config?.identifier ?? "";
+    return path === effect || identifier === effect || (identifier !== "" && shortNameOf(identifier) === effect);
+  })?.[0];
+}
+
 /** Adds an effects animator carrying particle keyframes, when any were requested. */
 function addParticleKeyframes(animation: BBAnimation, particles: IParticleKeyframe[]): void {
   if (!particles.length) return;
   const effects = new EffectAnimator(animation);
   animation.animators.effects = effects;
-  particles.forEach(({ time, effect }) => effects.addKeyframe({
-    time, channel: "particle", data_points: [{ effect }],
-  }));
+  particles.forEach(({ time, effect }) => {
+    const file = loadedParticleFile(effect);
+    effects.addKeyframe({ time, channel: "particle", data_points: [{ effect, ...(file ? { file } : {}) }] });
+  });
 }
 
 /** Populates a new animation with validated bone and particle keyframes. */

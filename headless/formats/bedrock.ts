@@ -10,8 +10,11 @@
  * - Per-face `up`/`down` UVs are stored flipped (origin at the far corner, negative size).
  * - Root-level elements are wrapped in a generated `bb_main` bone.
  *
- * Not ported: locators, null objects and texture meshes (listed in `skipped`),
- * display transforms, and the export offset option.
+ * - Locators and null objects become the bone's `locators` map; null objects get
+ *   a `_null_` prefix and never rotate.
+ *
+ * Not ported: texture meshes (listed in `skipped`), display transforms, and the
+ * export offset option.
  *
  * @module
  */
@@ -33,13 +36,46 @@ export interface IBedrockCompileOptions {
 /** Compiled geometry plus notes on what was left out. */
 export interface IBedrockCompileResult {
   geometry: Record<string, unknown>;
-  /** Names of elements that are not cubes and were not exported. */
+  /** Names of elements that are neither cubes nor locators and were not exported. */
   skipped: string[];
 }
 
 type Json = Record<string, unknown>;
 
 const negX = (v: Vec3): Vec3 => [-v[0], v[1], v[2]];
+
+/** Element types Bedrock writes into a bone's `locators` map. */
+const LOCATOR_TYPES: ReadonlySet<string> = new Set(["locator", "null_object"]);
+
+const vec3Of = (value: unknown): Vec3 | undefined =>
+  Array.isArray(value) && value.length === 3 && value.every((entry) => typeof entry === "number") ? [value[0], value[1], value[2]] : undefined;
+
+/**
+ * Locators and null objects among a bone's direct children → its `locators` map,
+ * as Blockbench's `compileGroup` writes them: a bare offset, or an object when a
+ * locator is rotated or ignores inherited scale.
+ */
+function compileLocators(children: readonly OutlinerNode[], index: IModelIndex): Json {
+  const entries = children
+    .filter((child): child is string => typeof child === "string")
+    .flatMap((id): [string, unknown][] => {
+      const element = index.elements.get(id);
+      if (!element || !LOCATOR_TYPES.has(element.type) || element.export === false) return [];
+      const isNull = element.type === "null_object";
+      const key = isNull ? `_null_${element.name}` : element.name;
+      const offset = negX(vec3Of((element as Json).position) ?? [0, 0, 0]);
+      const rotation = vec3Of((element as Json).rotation) ?? [0, 0, 0];
+      const ignoreScale = (element as Json).ignore_inherited_scale === true;
+      const rotated = !isNull && rotation.some((value) => value !== 0);
+      if (!rotated && !ignoreScale) return [[key, offset]];
+      return [[key, {
+        offset,
+        ...(isNull ? {} : { rotation: [-rotation[0], -rotation[1], rotation[2]] }),
+        ...(ignoreScale ? { ignore_inherited_scale: true } : {}),
+      }]];
+    });
+  return Object.fromEntries(entries);
+}
 
 /** Cube → Bedrock cube template. */
 function compileCube(cube: ICube, boneMirror: boolean, projectBoxUv: boolean): Json {
@@ -129,7 +165,7 @@ export function compileBedrockGeometry(doc: IBBModel, options: IBedrockCompileOp
   const skipNonCubes = (children: readonly OutlinerNode[]): void => {
     children.filter((child): child is string => typeof child === "string").forEach((id) => {
       const element = index.elements.get(id);
-      if (element && !isCube(element) && element.export !== false) skipped.push(element.name || id);
+      if (element && !isCube(element) && !LOCATOR_TYPES.has(element.type) && element.export !== false) skipped.push(element.name || id);
     });
   };
   const cubesIn = (children: readonly OutlinerNode[], boneMirror: boolean): Json[] =>
@@ -142,8 +178,9 @@ export function compileBedrockGeometry(doc: IBBModel, options: IBedrockCompileOp
 
   if (looseElements.length > 0) {
     const cubes = cubesIn(looseElements, false);
+    const locators = compileLocators(looseElements, index);
     skipNonCubes(looseElements);
-    bones.push({ name: mainName, pivot: [0, 0, 0], ...(cubes.length ? { cubes } : {}) });
+    bones.push({ name: mainName, pivot: [0, 0, 0], ...(cubes.length ? { cubes } : {}), ...(Object.keys(locators).length ? { locators } : {}) });
   }
 
   const visit = (node: OutlinerNode, parentName: string | undefined): void => {
@@ -157,6 +194,7 @@ export function compileBedrockGeometry(doc: IBBModel, options: IBedrockCompileOp
       const boneMirror = group.mirror_uv === true && doc.meta.box_uv;
       const rotated = group.rotation.some((value) => value !== 0);
       const cubes = cubesIn(node.children, boneMirror);
+      const locators = compileLocators(node.children, index);
       skipNonCubes(node.children);
       bones.push({
         name: group.name,
@@ -168,6 +206,7 @@ export function compileBedrockGeometry(doc: IBBModel, options: IBedrockCompileOp
         ...(boneMirror ? { mirror: true } : {}),
         ...(typeof group.material === "string" && group.material ? { material: group.material } : {}),
         ...(cubes.length ? { cubes } : {}),
+        ...(Object.keys(locators).length ? { locators } : {}),
       });
     }
     node.children.forEach((child) => visit(child, group.name));

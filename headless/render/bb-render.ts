@@ -1,20 +1,19 @@
 /**
- * Renders `.bbmodel` files through bb-render, the headless three.js WebGPU
- * renderer in the blockbench-mcp-project repository (`scripts/bb-render`).
+ * Renders `.bbmodel` files through the render engine in `./engine`, a port of the core of bb-render
+ * (a headless three.js WebGPU renderer).
  *
- * bb-render runs on Node, not Bun: Bun segfaults inside Dawn's `dawn.node`
- * addon. So this module spawns `node <bb-render>/dist/cli.js` as a child
- * process per render. That also sidesteps Dawn's one-GPU-instance-per-process
- * rule, and a semaphore caps how many renders share the GPU at once.
+ * The engine runs on Node, not Bun: Bun segfaults inside Dawn's `dawn.node` addon. So this module
+ * spawns `node cli.mjs` as a child process per render. That also sidesteps Dawn's
+ * one-GPU-instance-per-process rule, and a semaphore caps how many renders share the GPU at once.
+ * `cli.mjs` and its packages are prepared on first use by {@link prepareRenderRuntime}.
  *
- * Location, in order of precedence: `--bb-render` CLI flag, the `BB_RENDER_CLI`
- * environment variable, `$BLOCKBENCH_PROJECT_ROOT/scripts/bb-render/dist/cli.js`,
- * then the sibling checkout `../blockbench-mcp-project/blockbench-mcp-project`.
+ * An explicit `cli` (the `--bb-render` flag or `BB_RENDER_CLI`) bypasses that and runs any
+ * compatible external bb-render build instead.
  *
  * @module
  */
 
-import { join, resolve } from "node:path";
+import { prepareRenderRuntime } from "./runtime";
 
 /** Camera views bb-render understands (its `CAMERA_VIEWS`). */
 export const RENDER_VIEWS = ["front", "back", "left", "right", "three-quarter", "iso", "top"] as const;
@@ -28,16 +27,22 @@ export const RENDER_PRESETS = ["showcase", "turntable", "icon", "sprite-sheet-fr
 /** One preset name. */
 export type RenderPreset = (typeof RENDER_PRESETS)[number];
 
-/** How to reach bb-render. */
+/** How to reach the renderer. */
 export interface IRendererConfig {
-  /** Path to `bb-render/dist/cli.js`, or `undefined` when none was found. */
-  cli: string | undefined;
-  /** Node executable (bb-render needs Node 23.6+). */
+  /** Explicit path to a bb-render-compatible `cli.js`/`cli.mjs`; when set, nothing is installed. */
+  cli?: string | undefined;
+  /** Node executable (the engine needs Node 23.6+). */
   node: string;
   /** Renders allowed to run at once. */
   concurrency: number;
   /** Per-render timeout in milliseconds. */
   timeoutMs: number;
+  /** Cache folder for the installed runtime; defaults to the per-user cache. */
+  home?: string | undefined;
+  /** Replaces {@link prepareRenderRuntime}; resolves to the CLI path. Used by tests. */
+  prepare?: (() => Promise<string>) | undefined;
+  /** Receives progress lines while the runtime installs. */
+  log?: ((message: string) => void) | undefined;
 }
 
 /** One still-frame render request. */
@@ -62,24 +67,6 @@ export interface IRenderOutcome {
   output: string;
   milliseconds: number;
   log: string;
-}
-
-/**
- * Finds bb-render's CLI.
- *
- * @param explicit - Path from the `--bb-render` flag.
- * @param repoRoots - Candidate roots of this repository (source and bundled layouts differ), for the sibling-checkout default.
- */
-export async function locateBbRender(explicit: string | undefined, repoRoots: readonly string[]): Promise<string | undefined> {
-  const projectRoot = Bun.env.BLOCKBENCH_PROJECT_ROOT;
-  const candidates = [
-    explicit,
-    Bun.env.BB_RENDER_CLI,
-    projectRoot ? join(projectRoot, "scripts", "bb-render", "dist", "cli.js") : undefined,
-    ...repoRoots.map((repoRoot) => resolve(repoRoot, "..", "blockbench-mcp-project", "blockbench-mcp-project", "scripts", "bb-render", "dist", "cli.js")),
-  ].filter((candidate): candidate is string => typeof candidate === "string" && candidate.length > 0);
-  const checks = await Promise.all(candidates.map(async (candidate) => ({ candidate, exists: await Bun.file(candidate).exists() })));
-  return checks.find((check) => check.exists)?.candidate;
 }
 
 /** Limits concurrent async tasks. */
@@ -143,38 +130,44 @@ export function buildRenderArgs(request: IRenderRequest): string[] {
   ];
 }
 
-/** Spawns bb-render processes. */
+/** Spawns render processes. */
 export class BbRenderer {
   private readonly semaphore: Semaphore;
+  private cliPromise: Promise<string> | undefined;
 
   constructor(readonly config: IRendererConfig) {
     this.semaphore = new Semaphore(Math.max(1, config.concurrency));
   }
 
-  /** Whether bb-render was found. */
-  get available(): boolean {
-    return this.config.cli !== undefined;
+  /** Resolves the CLI path once: the explicit override, else the prepared runtime. A failed preparation is retried on the next render. */
+  private resolveCli(): Promise<string> {
+    if (this.config.cli) return Promise.resolve(this.config.cli);
+    const pending = this.cliPromise ?? (this.config.prepare ?? (() => prepareRenderRuntime({ home: this.config.home, log: this.config.log })))();
+    this.cliPromise = pending;
+    pending.catch(() => {
+      if (this.cliPromise === pending) this.cliPromise = undefined;
+    });
+    return pending;
   }
 
   /**
    * Renders one image.
    *
-   * @throws Error when bb-render is missing, times out, or exits non-zero (with its output).
+   * @throws Error when the runtime cannot be prepared, the render times out, or the process exits non-zero (with its output).
    */
   async render(request: IRenderRequest): Promise<IRenderOutcome> {
-    const cli = this.config.cli;
-    if (!cli) {
-      throw new Error(
-        "bb-render was not found. Build it (cd scripts/bb-render && npm install in blockbench-mcp-project), then set BB_RENDER_CLI or pass --bb-render <path to dist/cli.js>.",
-      );
-    }
+    const cli = await this.resolveCli().catch((error: unknown) => {
+      throw new Error(`The render engine is not available: ${error instanceof Error ? error.message : String(error)}`);
+    });
     return this.semaphore.run(async () => {
       const started = performance.now();
       const child = Bun.spawn([this.config.node, cli, ...buildRenderArgs(request)], { stdout: "pipe", stderr: "pipe", timeout: this.config.timeoutMs, killSignal: "SIGKILL" });
       const [stdout, stderr, exitCode] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
       const log = `${stdout}${stderr}`.trim();
-      if (child.signalCode) throw new Error(`bb-render was stopped (${child.signalCode}) after ${Math.round(performance.now() - started)} ms.\n${log}`);
-      if (exitCode !== 0) throw new Error(`bb-render exited with code ${exitCode}.\n${log}`);
+      if (child.signalCode) throw new Error(`The renderer was stopped (${child.signalCode}) after ${Math.round(performance.now() - started)} ms.
+${log}`);
+      if (exitCode !== 0) throw new Error(`The renderer exited with code ${exitCode}.
+${log}`);
       return { output: request.output, milliseconds: Math.round(performance.now() - started), log };
     });
   }

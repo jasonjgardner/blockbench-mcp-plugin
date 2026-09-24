@@ -50,9 +50,9 @@ export const createAnimationParameters = z.object({
     )
     .describe("Keyframes keyed by existing bone/group name. Values use Blockbench editor coordinates; rotations are degrees."),
   particle_effects: z
-    .record(z.string().describe("Effect name"))
+    .record(z.string().describe("Effect name; a particle effect loaded with create_particle_effect is attached so Blockbench previews it"))
     .optional()
-    .describe("Particle effects with timestamps as keys"),
+    .describe("Particle effects with timestamps (seconds) as keys, spawned at the entity origin. Use manage_particle_keyframes for locators, scripts and more options."),
 });
 
 /**

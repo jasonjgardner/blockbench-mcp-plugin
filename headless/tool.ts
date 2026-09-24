@@ -14,6 +14,8 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
+import type { IDesktopOptions } from "./app/desktop";
+import type { IWebAppOptions } from "./app/web-link";
 import type { ModelStore } from "./document/store";
 import type { BbRenderer } from "./render/bb-render";
 
@@ -27,6 +29,10 @@ export interface IHeadlessContext {
   scratchDir: string;
   /** Name the connected MCP client reported during `initialize`. */
   clientName(): string;
+  /** How write results link to the Blockbench web app. */
+  webApp: IWebAppOptions;
+  /** How to start the Blockbench desktop app. */
+  desktop: IDesktopOptions;
 }
 
 /** A tool ready to register on any server. */
@@ -46,6 +52,8 @@ export interface IHeadlessToolSpec<S extends z.ZodRawShape> {
   readOnly: boolean;
   /** Deletes or overwrites user data. */
   destructive?: boolean;
+  /** Reaches outside the workspace files, such as starting another program. */
+  openWorld?: boolean;
   execute(args: z.infer<z.ZodObject<S>>, context: IHeadlessContext): Promise<CallToolResult | object>;
 }
 
@@ -88,7 +96,7 @@ export function defineTool<S extends z.ZodRawShape>(spec: IHeadlessToolSpec<S>):
           title: spec.title,
           description: spec.description,
           inputSchema: spec.parameters,
-          annotations: { title: spec.title, readOnlyHint: spec.readOnly, destructiveHint: spec.destructive ?? false, openWorldHint: false },
+          annotations: { title: spec.title, readOnlyHint: spec.readOnly, destructiveHint: spec.destructive ?? false, openWorldHint: spec.openWorld ?? false },
         },
         async (raw: unknown): Promise<CallToolResult> => {
           try {

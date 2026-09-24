@@ -20,7 +20,7 @@ bunx @modelcontextprotocol/inspector  # Test MCP tools locally
 bun run headless --root <dir>   # Headless .bbmodel MCP server over stdio (no Blockbench)
 bun run build:headless          # Bundle it to dist/headless/blockbench-mcp-headless.js
 bun run test:headless           # Unit + in-memory MCP tests for headless/
-bun run test:headless:live      # Stdio + real bb-render renders (needs Node 23.6+, GPU)
+bun run test:headless:live      # Stdio + real renders (needs Node 23.6+, npm, GPU; first run installs the engine's packages)
 ```
 
 Output goes to `dist/mcp.js`. Load in Blockbench via File > Plugins > Load Plugin from File.
@@ -43,6 +43,7 @@ lib/
   zodObjects.ts       # Reusable Zod schemas
   util.ts             # Shared utilities
   constants.ts        # VERSION and other constants
+  particles/          # Bedrock particle core shared by plugin and headless: design schema, presets, builder, validator, pack planner
   sessions.ts         # Session management
 ui/
   index.ts            # Panel UI
@@ -62,9 +63,13 @@ headless/             # Standalone Bun MCP server that edits .bbmodel files with
   document/           # Zod .bbmodel schema, 4.x<->5.0 conversion, store (sandbox, lock, revisions)
   geometry/           # ZYX transforms, world bounds, box UV, animation pose sampler
   gates/              # Geometry/animation validation gates + defect injectors (self-test)
-  formats/            # Bedrock .geo.json compiler (port of Blockbench's codec)
-  edit/operations.ts  # Pure batch edit operations used by bbmodel_edit
-  render/             # bb-render child-process bridge (Node, WebGPU)
+  formats/            # Codecs ported from Blockbench: Bedrock .geo.json, Java block/item (java-block*), modded entity Java; rules.ts = per-format capabilities + checkElements
+  mesh/               # Pure mesh library: Add Mesh primitives, editing (merge, extrude, loop cut, subdivide), Auto UV (ports of Blockbench)
+  edit/operations.ts  # Pure batch edit operations used by bbmodel_edit (particle ops in edit/particle-operations.ts, mesh ops in edit/mesh-operations.ts, format guard in edit/format-guard.ts)
+  render/             # Render bridge (bb-render.ts spawns Node) + runtime.ts (installs/bundles the engine on first use)
+    engine/           # Node-run still renderer, a trimmed bb-render port: three, three-blockbench, Dawn; own png codec
+  package.json        # Dependencies of render/engine only; installed into a cache folder, never the plugin's node_modules
+  app/                # Web-app loaddata links (tiers + launcher pages) and desktop app launcher
   tools/              # Tool definitions by domain
 docs/
   api.json            # Generated: machine-readable API documentation
@@ -121,7 +126,7 @@ After adding a tool: import the `toolDocs` in `build/docs-manifest.ts`, add to `
 
 **Documentation Generation**: Run `bun run docs` to regenerate `docs/api.json` and `docs/index.html` from Zod schemas. The doc system uses `build/docs-manifest.ts` (imports tool schemas, defines prompt/resource specs inline) and `build/docs.ts` (converts via `zod-to-json-schema`, renders HTML with Tailwind).
 
-**Headless package**: `headless/` must never touch Blockbench globals. It may import pure `lib/` modules (`block-grid`, `geckolib-validate`, `constants`, `ai-disclosure` constants). Its tools use `defineTool()` from `headless/tool.ts`, not `createTool()`. Keep ports of Blockbench logic (box UV, Molang inversion, legacy conversion, Bedrock compile) faithful and cite the source function. Rendering goes through bb-render in a Node child process because Bun cannot load Dawn.
+**Headless package**: `headless/` must never touch Blockbench globals. It may import pure `lib/` modules (`block-grid`, `geckolib-validate`, `constants`, `ai-disclosure` constants). Its tools use `defineTool()` from `headless/tool.ts`, not `createTool()`. Keep ports of Blockbench logic (box UV, Molang inversion, legacy conversion, Bedrock compile) faithful and cite the source function. Rendering goes through `render/engine` in a Node child process because Bun cannot load Dawn. The engine's packages live in `headless/package.json` and are installed lazily by `render/runtime.ts` into `BB_RENDER_HOME` (default per-user cache), then the engine is bundled with `Bun.build` into `cli.mjs` there, because Node will not strip types from files under `node_modules` (where `npx` unpacks this repo). `render/engine` is excluded from the root tsconfig; keep it free of `@/` imports and Bun APIs, and keep it pixel-identical to bb-render when porting fixes. Write tools return a `web_app` field built by `headless/app/web-link.ts`; its encoding follows Blockbench's parser in `js/web.ts` (one `decodeURIComponent`, split on `&`, first `=`), so keep `&` and line separators out of `loaddata` and keep `app/web-link.test.ts`'s parser replica in sync if Blockbench changes it. Share `web_app` links with the user in replies.
 
 ## Code Style
 

@@ -526,28 +526,26 @@ export function registerArmatureTools() {
         );
       }
 
-      Undo.initEdit({ outliner: true, elements: [] });
-
       const armature = new Armature({
         name,
         visibility,
         locked,
       });
-      armature.addTo(Outliner.root as any);
-      armature.isOpen = true;
-      armature.createUniqueName();
-      armature.init();
+      const bones = add_initial_bone ? [new ArmatureBone({ name: "bone" })] : [];
+      const elements: OutlinerElement[] = [armature, ...bones];
 
-      const elements: OutlinerElement[] = [armature];
-
-      if (add_initial_bone) {
-        const bone = new ArmatureBone({ name: "bone" });
-        bone.addTo(armature);
-        bone.init();
-        elements.push(bone);
-      }
-
-      Undo.finishEdit("Agent added armature", { outliner: true, elements });
+      runUndoableEdit({ outliner: true, elements: [] }, "Agent added armature", () => {
+        // addTo() resolves the project root from the "root" keyword; the
+        // Outliner.root array has no `children` or `parent` and makes it throw.
+        armature.addTo("root");
+        armature.isOpen = true;
+        armature.createUniqueName();
+        armature.init();
+        bones.forEach((bone) => {
+          bone.addTo(armature);
+          bone.init();
+        });
+      }, { outliner: true, elements });
       Canvas.updateAll();
 
       return JSON.stringify(

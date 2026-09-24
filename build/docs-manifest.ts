@@ -13,6 +13,7 @@ import { knifeToolDocs } from "@/server/tools/knife";
 import { meshToolDocs } from "@/server/tools/mesh";
 import { meshInspectionToolDocs } from "@/server/tools/mesh-inspection";
 import { paintToolDocs } from "@/server/tools/paint";
+import { particleToolDocs } from "@/server/tools/particle";
 import { performanceToolDocs } from "@/server/tools/performance";
 import { projectToolDocs } from "@/server/tools/project";
 import { textureToolDocs } from "@/server/tools/texture";
@@ -46,6 +47,7 @@ export const toolManifest: ICategoryGroup[] = [
   { category: "Material Instances", tools: materialInstanceToolDocs },
   { category: "Mesh Editing", tools: [...meshToolDocs, ...meshInspectionToolDocs] },
   { category: "Paint Tools", tools: paintToolDocs },
+  { category: "Particles", tools: particleToolDocs },
   { category: "Performance", tools: performanceToolDocs },
   { category: "Project", tools: projectToolDocs },
   { category: "Textures", tools: textureToolDocs },

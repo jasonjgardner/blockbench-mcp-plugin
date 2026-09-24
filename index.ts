@@ -143,7 +143,6 @@ BBPlugin.register("mcp", {
     teardownOffscreenViews();
 
     uiTeardown();
-    settingsTeardown();
   },
 
   oninstall() {

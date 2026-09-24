@@ -17,7 +17,7 @@ interface ISession {
   json<T = Record<string, unknown>>(name: string, args: Record<string, unknown>): Promise<T>;
 }
 
-async function connect(root: string, clientName: string, renderer = new BbRenderer({ cli: undefined, node: "node", concurrency: 1, timeoutMs: 1000 })): Promise<ISession> {
+async function connect(root: string, clientName: string, renderer = new BbRenderer({ node: "node", concurrency: 1, timeoutMs: 1000, prepare: () => Promise.reject(new Error("runtime disabled in tests")) })): Promise<ISession> {
   const store = new ModelStore({ roots: [root] });
   const server = createHeadlessServer((mcp) => ({
     store,
@@ -25,6 +25,9 @@ async function connect(root: string, clientName: string, renderer = new BbRender
     scratchDir: join(root, "renders"),
     aiDisclosure: true,
     clientName: () => mcp.server.getClientVersion()?.name ?? "unknown",
+    webApp: { enabled: true, baseUrl: "https://web.blockbench.net/", inlineMax: 8000, browserMax: 2_000_000, launcherDir: join(root, "renders", "web-app") },
+    // A harmless stand-in for Blockbench: the test runtime itself.
+    desktop: { executable: process.execPath, mcpUrl: "http://127.0.0.1:9/bb-mcp" },
   }));
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: clientName, version: "1.0.0" });
@@ -126,12 +129,12 @@ describe("headless MCP server", () => {
     expect(invalid.isError).toBe(true);
   });
 
-  test("render tools explain how to install bb-render when it is missing", async () => {
+  test("render tools report why the render engine is unavailable", async () => {
     const session = await connect(root, "renderer");
     await session.json("bbmodel_create", { file: "r.bbmodel" });
     const result = await session.call("bbmodel_render", { file: "r.bbmodel" });
     expect(result.isError).toBe(true);
-    expect(result.content[0]?.type === "text" ? result.content[0].text : "").toContain("bb-render was not found");
+    expect(result.content[0]?.type === "text" ? result.content[0].text : "").toContain("The render engine is not available: runtime disabled in tests");
   });
 
   test("a render never replaces an existing workspace PNG unless overwrite is set", async () => {
@@ -142,6 +145,116 @@ describe("headless MCP server", () => {
     expect(refused.content[0]?.type === "text" ? refused.content[0].text : "").toContain("already exists");
     const tools = await session.client.listTools();
     expect(tools.tools.find((tool) => tool.name === "bbmodel_render")?.annotations?.readOnlyHint).toBe(false);
+  });
+
+  test("write results link to the web app, and the link carries the model as written", async () => {
+    const session = await connect(root, "linker");
+    const created = await session.json<{ revision: string; web_app: { url: string } }>("bbmodel_create", { file: "box.bbmodel", name: "box" });
+    expect(created.web_app.url.startsWith("https://web.blockbench.net/#loadtype=json&loadname=box.bbmodel&loaddata=")).toBe(true);
+    const edited = await session.json<{ web_app: { url: string } }>("bbmodel_edit", {
+      file: "box.bbmodel",
+      expected_revision: created.revision,
+      operations: [{ op: "add_cube", name: "fish & chips", from: [0, 0, 0], to: [4, 4, 4] }],
+    });
+    // Blockbench's web.ts: one decodeURIComponent over the fragment, split on &, split at the first =.
+    const query = decodeURIComponent(new URL(edited.web_app.url).hash.substring(1));
+    const loaddata = query.split("&").map((part) => part.split(/=\s*(.+)/)).find(([key]) => key === "loaddata")?.[1] ?? "";
+    const onDisk = JSON.parse(await Bun.file(join(root, "box.bbmodel")).text()) as { elements: unknown[] };
+    expect((JSON.parse(loaddata) as { elements: unknown[] }).elements).toEqual(onDisk.elements);
+
+    const textured = await session.json<{ web_app: { url?: string } }>("bbmodel_add_texture", { file: "box.bbmodel", image: ONE_PIXEL_PNG, name: "paint", assign_to: ["fish & chips"] });
+    expect(decodeURIComponent(textured.web_app.url ?? "")).toContain("data:image/png;base64");
+
+    const geometry = await session.json<{ web_app: { url: string } }>("bbmodel_export_bedrock_geometry", { file: "box.bbmodel" });
+    expect(geometry.web_app.url).toContain("loadname=box.geo.json");
+    const exported = await session.json<{ path: string; web_app: { url: string } }>("bbmodel_export_bedrock_geometry", { file: "box.bbmodel", output: "out/box.geo.json" });
+    expect(exported.web_app.url).toContain("loadname=box.geo.json");
+    expect(await Bun.file(exported.path).exists()).toBe(true);
+    const legacy = await session.json<{ web_app: { url: string } }>("bbmodel_convert_legacy", { file: "box.bbmodel", output: "box.v4.bbmodel" });
+    expect(legacy.web_app.url).toContain("loadname=box.v4.bbmodel");
+  });
+
+  test("bbmodel_web_url makes tiered links on demand", async () => {
+    const session = await connect(root, "linker");
+    const { revision } = await session.json<{ revision: string }>("bbmodel_create", { file: "big.bbmodel" });
+    await session.json("bbmodel_edit", {
+      file: "big.bbmodel",
+      expected_revision: revision,
+      operations: Array.from({ length: 60 }, (_, i) => ({ op: "add_cube", name: `c${i}`, from: [i, 0, 0], to: [i + 1, 1, 1] })),
+    });
+    const short = await session.json<{ web_app: { url?: string; launcher?: { path: string } } }>("bbmodel_web_url", { file: "big.bbmodel", inline_max: 500 });
+    expect(short.web_app.url).toBeUndefined();
+    expect(await Bun.file(short.web_app.launcher?.path ?? "").exists()).toBe(true);
+    const full = await session.json<{ web_app: { url?: string } }>("bbmodel_web_url", { file: "big.bbmodel", inline_max: 200_000 });
+    expect(full.web_app.url).toBeDefined();
+  });
+
+  test("meshes are built in free models and refused where the format has none", async () => {
+    const session = await connect(root, "mesher");
+    const free = await session.json<{ revision: string }>("bbmodel_create", { file: "free.bbmodel", format: "free" });
+    const built = await session.json<{ results: { uuid?: string }[] }>("bbmodel_edit", {
+      file: "free.bbmodel",
+      expected_revision: free.revision,
+      operations: [
+        { op: "add_texture", name: "paint", source: ONE_PIXEL_PNG, width: 1, height: 1 },
+        { op: "add_mesh_primitive", shape: "cylinder", name: "pipe", sides: 8 },
+        { op: "edit_mesh", target: "pipe", actions: [{ action: "move_vertices", offset: [0, 4, 0] }] },
+        { op: "assign_texture", targets: ["pipe"], texture: "paint" },
+        { op: "add_mesh", name: "tri", vertices: [[0, 0, 0], [8, 0, 0], [0, 8, 0]], faces: [{ vertices: [0, 1, 2] }] },
+      ],
+    });
+    expect(built.results).toHaveLength(5);
+    const saved = JSON.parse(await Bun.file(join(root, "free.bbmodel")).text()) as { elements: { type: string; name: string; faces: Record<string, { texture?: number }> }[] };
+    const pipe = saved.elements.find((element) => element.name === "pipe");
+    expect(pipe?.type).toBe("mesh");
+    expect(Object.values(pipe?.faces ?? {}).every((face) => face.texture === 0)).toBe(true);
+
+    const bedrock = await session.json<{ revision: string }>("bbmodel_create", { file: "entity.bbmodel", format: "bedrock" });
+    const refused = await session.call("bbmodel_edit", { file: "entity.bbmodel", expected_revision: bedrock.revision, operations: [{ op: "add_mesh_primitive", shape: "sphere" }] });
+    expect(refused.isError).toBe(true);
+    expect(refused.content[0]?.type === "text" ? refused.content[0].text : "").toContain("nothing was written");
+  });
+
+  test("java_block models refuse rotations Java cannot hold, and round-trip through Java model JSON", async () => {
+    const session = await connect(root, "java");
+    const created = await session.json<{ revision: string }>("bbmodel_create", { file: "lamp.bbmodel", format: "java_block" });
+    const refused = await session.call("bbmodel_edit", {
+      file: "lamp.bbmodel",
+      expected_revision: created.revision,
+      operations: [{ op: "add_cube", name: "far", from: [0, 0, 0], to: [48, 4, 4] }],
+    });
+    expect(refused.isError).toBe(true);
+    await session.json("bbmodel_edit", {
+      file: "lamp.bbmodel",
+      operations: [
+        { op: "add_cube", name: "base", from: [4, 0, 4], to: [12, 2, 12] },
+        { op: "add_cube", name: "arm", from: [7, 2, 7], to: [9, 12, 9], rotation: [0, 0, 22.5], origin: [8, 2, 8] },
+      ],
+    });
+    const exported = await session.json<{ path: string; notes: string[] }>("bbmodel_export_java_block", { file: "lamp.bbmodel", output: "pack/assets/demo/models/block/lamp.json" });
+    const json = JSON.parse(await Bun.file(exported.path).text()) as { elements: unknown[] };
+    expect(json.elements).toHaveLength(2);
+    const imported = await session.json<{ counts: { cubes: number } }>("bbmodel_import_java_block", { model: "pack/assets/demo/models/block/lamp.json", output: "lamp_again.bbmodel" });
+    expect(imported.counts.cubes).toBe(2);
+
+    const entity = await session.json<{ revision: string }>("bbmodel_create", { file: "mob.bbmodel", format: "modded_entity" });
+    await session.json("bbmodel_edit", { file: "mob.bbmodel", expected_revision: entity.revision, operations: [{ op: "add_group", name: "body", origin: [0, 12, 0] }, { op: "add_cube", name: "torso", from: [-4, 12, -2], to: [4, 24, 2], parent: "body" }] });
+    const java = await session.json<{ code: string; class_name: string }>("bbmodel_export_modded_entity", { file: "mob.bbmodel", template: "1.17" });
+    expect(java.code).toContain("class ");
+    expect(java.code).toContain("body");
+  });
+
+  test("blockbench_launch starts the configured app and refuses files outside the workspace", async () => {
+    const session = await connect(root, "launcher");
+    const { tools } = await session.client.listTools();
+    expect(tools.find((tool) => tool.name === "blockbench_launch")?.annotations).toMatchObject({ readOnlyHint: false, openWorldHint: true });
+    const launched = await session.json<{ launched: boolean; command: string[]; pid: number }>("blockbench_launch", {});
+    expect(launched).toMatchObject({ launched: true, command: [process.execPath] });
+    expect(launched.pid).toBeGreaterThan(0);
+    const outside = await session.call("blockbench_launch", { file: "../../elsewhere/model.bbmodel" });
+    expect(outside.isError).toBe(true);
+    const missing = await session.call("blockbench_launch", { file: "nope.bbmodel" });
+    expect(missing.content[0]?.type === "text" ? missing.content[0].text : "").toContain("File not found");
   });
 });
 

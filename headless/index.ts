@@ -18,8 +18,10 @@ import { parseArgs } from "node:util";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { UNKNOWN_AGENT } from "@/lib/ai-disclosure";
 import { VERSION } from "@/lib/constants";
+import { DEFAULT_DESKTOP_MCP_URL } from "./app/desktop";
+import { DEFAULT_BROWSER_MAX, DEFAULT_INLINE_MAX, DEFAULT_WEB_APP_URL, normalizeWebAppUrl } from "./app/web-link";
 import { ModelStore } from "./document/store";
-import { BbRenderer, locateBbRender } from "./render/bb-render";
+import { BbRenderer } from "./render/bb-render";
 import { createHeadlessServer, HEADLESS_SERVER_NAME, HEADLESS_TOOLS } from "./server";
 
 const HELP = `${HEADLESS_SERVER_NAME} ${VERSION}
@@ -29,13 +31,23 @@ Speaks MCP over stdio.
 
 Options:
   --root <dir>              Workspace directory the server may read and write (required, repeatable)
-  --bb-render <cli.js>      Path to bb-render's dist/cli.js (default: $BB_RENDER_CLI, then the sibling
-                            blockbench-mcp-project checkout)
-  --node <path>             Node 23.6+ executable used to run bb-render (default: node)
+  --render-home <dir>       Where the render engine's Node packages are installed on first render
+                            (default: $BB_RENDER_HOME, then the per-user cache folder)
+  --bb-render <cli.js>      Use an external bb-render dist/cli.js instead of the built-in engine
+                            (default: $BB_RENDER_CLI)
+  --node <path>             Node 23.6+ executable used to run the renderer (default: node)
   --render-concurrency <n>  Renders allowed at once (default: 2)
   --render-timeout <ms>     Per-render timeout (default: 120000)
   --scratch <dir>           Where renders go when no output path is given (default: OS temp)
   --no-ai-disclosure        Do not stamp ai_used / ai_agents on written models
+  --blockbench <path>       Blockbench desktop executable (or .app) for blockbench_launch (default:
+                            $BLOCKBENCH_PATH, blockbench on PATH, then the standard install folders)
+  --blockbench-mcp-url <u>  Desktop plugin MCP endpoint polled by blockbench_launch (default:
+                            http://localhost:3000/bb-mcp)
+  --web-app-url <url>       Blockbench web app for web_app links (default: https://web.blockbench.net/)
+  --web-url-inline-max <n>  Longest web-app URL returned inline, in characters (default: 8000)
+  --web-url-max <n>         Longest URL a web-app launcher page is written for (default: 2000000)
+  --no-web-links            Leave web_app links out of write results (bbmodel_web_url still works)
   --list-tools              Print tool names and exit
   --help                    Show this help
 `;
@@ -44,11 +56,18 @@ const { values } = parseArgs({
   options: {
     root: { type: "string", multiple: true },
     "bb-render": { type: "string" },
+    "render-home": { type: "string" },
     node: { type: "string" },
     "render-concurrency": { type: "string" },
     "render-timeout": { type: "string" },
     scratch: { type: "string" },
     "no-ai-disclosure": { type: "boolean", default: false },
+    blockbench: { type: "string" },
+    "blockbench-mcp-url": { type: "string" },
+    "web-app-url": { type: "string" },
+    "web-url-inline-max": { type: "string" },
+    "web-url-max": { type: "string" },
+    "no-web-links": { type: "boolean", default: false },
     "list-tools": { type: "boolean", default: false },
     help: { type: "boolean", default: false },
   },
@@ -75,13 +94,15 @@ async function main(): Promise<void> {
   // MCP clients often start servers in the home directory, so the sandbox is never implied.
   if (!values.root || values.root.length === 0) throw new Error("Pass --root <dir> for each folder the server may read and write. See --help.");
   const roots = values.root.map((root) => resolve(root));
-  // Source runs from headless/, the bundle from dist/headless/.
-  const cli = await locateBbRender(values["bb-render"], [resolve(import.meta.dir, ".."), resolve(import.meta.dir, "..", "..")]);
+  const cli = values["bb-render"] ?? Bun.env.BB_RENDER_CLI;
   const renderer = new BbRenderer({
     cli,
     node: values.node ?? "node",
     concurrency: positiveInt(values["render-concurrency"], 2, "--render-concurrency"),
     timeoutMs: positiveInt(values["render-timeout"], 120_000, "--render-timeout"),
+    home: values["render-home"] ? resolve(values["render-home"]) : undefined,
+    log: (message) => process.stderr.write(`${message}
+`),
   });
   const store = new ModelStore({ roots });
   const scratchDir = values.scratch ? resolve(values.scratch) : join(tmpdir(), HEADLESS_SERVER_NAME);
@@ -91,9 +112,17 @@ async function main(): Promise<void> {
     scratchDir,
     aiDisclosure: !values["no-ai-disclosure"],
     clientName: () => mcp.server.getClientVersion()?.name ?? UNKNOWN_AGENT,
+    webApp: {
+      enabled: !values["no-web-links"],
+      baseUrl: normalizeWebAppUrl(values["web-app-url"] ?? DEFAULT_WEB_APP_URL),
+      inlineMax: positiveInt(values["web-url-inline-max"], DEFAULT_INLINE_MAX, "--web-url-inline-max"),
+      browserMax: positiveInt(values["web-url-max"], DEFAULT_BROWSER_MAX, "--web-url-max"),
+      launcherDir: join(scratchDir, "web-app"),
+    },
+    desktop: { executable: values.blockbench, mcpUrl: values["blockbench-mcp-url"] ?? DEFAULT_DESKTOP_MCP_URL },
   }));
   await server.connect(new StdioServerTransport());
-  process.stderr.write(`${HEADLESS_SERVER_NAME} ${VERSION} ready. Roots: ${roots.join(", ")}. bb-render: ${cli ?? "not found (render tools will report how to install it)"}\n`);
+  process.stderr.write(`${HEADLESS_SERVER_NAME} ${VERSION} ready. Roots: ${roots.join(", ")}. Renderer: ${cli ?? "built-in engine (installs its packages on first render)"}\n`);
 }
 
 main().catch((error: unknown) => {
