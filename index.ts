@@ -32,7 +32,7 @@ BBPlugin.register("mcp", {
   version: VERSION,
   title: "MCP Server",
   author: "Jason J. Gardner",
-  contributors: ["jasonjgardner", "brokestar233", "nhjydywd"],
+  contributors: ["jasonjgardner", "brokestar233", "nhjydywd", "djayfresh"],
   description: "Create an MCP server inside Blockbench.",
   tags: ["MCP", "AI"],
   website: "https://jasonjgardner.github.io/blockbench-mcp-plugin/",
