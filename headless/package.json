@@ -1,0 +1,16 @@
+{
+  "name": "blockbench-mcp-headless-render",
+  "version": "1.9.0",
+  "private": true,
+  "description": "Node-side dependencies of the headless render engine (headless/render/engine). Installed on first render into a cache folder, never into the plugin's own node_modules.",
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "engines": {
+    "node": ">=23.6"
+  },
+  "dependencies": {
+    "@rendergl/headless-three-webgpu": "0.2.0",
+    "three": "~0.184.0",
+    "three-blockbench": "0.1.0"
+  }
+}

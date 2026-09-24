@@ -1,6 +1,6 @@
 {
   "name": "blockbench-mcp",
-  "version": "1.8.1",
+  "version": "1.9.0",
   "description": "Blockbench MCP server plugin",
   "keywords": [
     "Blockbench",
@@ -17,6 +17,8 @@
     "benchmark:typecheck": "tsc --project benchmarks/tsconfig.json",
     "benchmark:report": "bun run benchmarks/report.ts",
     "test": "bun test",
+    "test:headless": "bun test headless",
+    "test:headless:live": "bun run headless/live-smoke.ts",
     "test:live": "bun run tests/live/mcp-identity-smoke.ts",
     "test:inspection:live": "bun run tests/live/inspection-smoke.ts",
     "test:actions:live": "bun run tests/live/action-wrappers-smoke.ts",
@@ -24,10 +26,13 @@
     "test:animation:live": "bun run tests/live/animation-smoke.ts",
     "release:smoke": "bun run build/desktop-smoke.ts",
     "release:verify": "bun run build/verify-desktop.ts",
+    "release:tag": "bun run build/release-tag.ts",
     "prompts:build": "bun run ./build/generate-manifest.ts",
     "dev": "bun run prompts:build && bun run ./build --sourcemap",
     "dev:watch": "bun run prompts:build && bun run dev --watch",
     "build": "bun run prompts:build && bun run ./build --minify",
+    "headless": "bun run headless/index.ts",
+    "build:headless": "bun build headless/index.ts --target bun --outfile dist/headless/blockbench-mcp-headless.js",
     "docs:build": "bun run ./build/docs.ts",
     "docs:serve": "bun run docs/index.html",
     "docs": "bun run prompts:build && bun run docs:build && bun run docs:serve",
@@ -35,7 +40,8 @@
   },
   "dependencies": {
     "zod": "^3.25.76",
-    "@modelcontextprotocol/sdk": "^1.25.3"
+    "@modelcontextprotocol/sdk": "^1.25.3",
+    "bun": "^1.3.8"
   },
   "devDependencies": {
     "@types/bun": "^1.3.8",
@@ -44,5 +50,8 @@
     "tinycolor2": "^1.6.0",
     "typescript": "^5.9.3",
     "zod-to-json-schema": "^3.25.1"
+  },
+  "bin": {
+    "blockbench-mcp-headless": "bin/blockbench-mcp-headless.mjs"
   }
 }

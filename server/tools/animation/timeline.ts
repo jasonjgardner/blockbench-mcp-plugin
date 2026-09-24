@@ -48,7 +48,12 @@ const TIMELINE_HANDLERS: Record<TimelineAction, (request: ITimelineRequest) => s
   }),
   set_time: (request) => runPlayback(request, () => {
     Modes.options.animate.select();
-    if (request.input.time !== undefined) Timeline.setTime(request.input.time);
+    if (request.input.time === undefined) return;
+    Timeline.setTime(request.input.time);
+    // A particle emitter created by the first pass cannot simulate until its material exists,
+    // so a second pass makes screenshots taken right after set_time show the particles.
+    Animator.preview();
+    Animator.preview();
   }),
   set_length: setAnimationLength,
   set_fps: (request) => runTimelineEdit(request, (animation, { fps }) => {

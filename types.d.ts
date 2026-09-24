@@ -7,6 +7,8 @@ export interface IMCPTool {
   description: string;
   enabled: boolean;
   status: StatusType;
+  /** Owning plugin id for tools contributed by another Blockbench plugin; absent for built-in tools. */
+  plugin?: string;
 }
 
 export interface IMCPPrompt {

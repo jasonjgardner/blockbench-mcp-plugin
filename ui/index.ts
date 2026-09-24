@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { IMCPTool, IMCPPrompt, IMCPResource } from "@/types";
 import { VERSION } from "@/lib/constants";
 import { AI_USAGE_CHANGED } from "@/lib/ai-disclosure";
+import { TOOL_REGISTRY_CHANGED } from "@/lib/factories";
 import { statusBarSetup, statusBarTeardown } from "@/ui/statusBar";
 import { sessionManager, type ISession } from "@/lib/sessions";
 import { openToolTestDialog } from "@/ui/toolTestDialog";
@@ -106,7 +107,15 @@ export function uiSetup({
         // Listen for override changes to refresh badge state
         const handler = () => vm.$forceUpdate();
         document.addEventListener(PROMPT_OVERRIDE_CHANGED, handler);
-        overrideListener = () => document.removeEventListener(PROMPT_OVERRIDE_CHANGED, handler);
+        // Other plugins add and remove tools after mount; `tools` is a snapshot array, so re-read the registry.
+        const registryHandler = () => {
+          vm.tools = Object.values(tools);
+        };
+        document.addEventListener(TOOL_REGISTRY_CHANGED, registryHandler);
+        overrideListener = () => {
+          document.removeEventListener(PROMPT_OVERRIDE_CHANGED, handler);
+          document.removeEventListener(TOOL_REGISTRY_CHANGED, registryHandler);
+        };
 
         // The AI badge is a native bar item; re-evaluate its condition when the project or stamp changes.
         const events = Blockbench as unknown as IHostEvents;
@@ -155,7 +164,7 @@ export function uiSetup({
         promptsFilter: { search: "" } as ISectionFilter,
       }),
       computed: {
-        filteredTools(): Array<{ name: string; description: string; enabled: boolean; status: string }> {
+        filteredTools(): Array<{ name: string; description: string; enabled: boolean; status: string; plugin?: string }> {
           // @ts-ignore - Vue component context
           const { tools, toolsFilter, showExperimental } = this;
           const searchLower = toolsFilter.search.toLowerCase();

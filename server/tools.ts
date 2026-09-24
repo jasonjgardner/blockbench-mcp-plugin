@@ -17,6 +17,7 @@ import { registerMeshTools } from "@/server/tools/mesh";
 import { registerMeshInspectionTools } from "@/server/tools/mesh-inspection";
 import { registerModeTools } from "@/server/tools/modes";
 import { registerPaintTools } from "@/server/tools/paint";
+import { registerParticleTools } from "@/server/tools/particle";
 import { registerPerformanceTools } from "@/server/tools/performance";
 import { registerProjectTools } from "@/server/tools/project";
 import { registerTextureTools } from "@/server/tools/texture";
@@ -55,6 +56,7 @@ const registrationFunctions = [
   registerMeshInspectionTools,
   registerModeTools,
   registerPaintTools,
+  registerParticleTools,
   registerPerformanceTools,
   registerProjectTools,
   registerTextureTools,

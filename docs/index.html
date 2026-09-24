@@ -11,14 +11,14 @@
     <nav class="sidebar">
       <div class="sidebar-brand">
         <h1>Blockbench MCP</h1>
-        <p>v1.8.1 — API Reference</p>
+        <p>v1.9.0 — API Reference</p>
       </div>
 
       <input id="search" type="text" placeholder="Search tools..." class="search-input" />
 
       <div class="nav-group">
         <p class="nav-heading">Overview</p>
-        <a href="#tools" class="nav-link">Tools <span class="count">(140)</span></a>
+        <a href="#tools" class="nav-link">Tools <span class="count">(147)</span></a>
         <a href="#prompts" class="nav-link">Prompts <span class="count">(6)</span></a>
         <a href="#resources" class="nav-link">Resources <span class="count">(13)</span></a>
       </div>
@@ -38,6 +38,7 @@
         <a href="#cat-material-instances" class="nav-link">Material Instances <span class="count">(5)</span></a>
         <a href="#cat-mesh-editing" class="nav-link">Mesh Editing <span class="count">(15)</span></a>
         <a href="#cat-paint-tools" class="nav-link">Paint Tools <span class="count">(12)</span></a>
+        <a href="#cat-particles" class="nav-link">Particles <span class="count">(7)</span></a>
         <a href="#cat-performance" class="nav-link">Performance <span class="count">(1)</span></a>
         <a href="#cat-project" class="nav-link">Project <span class="count">(2)</span></a>
         <a href="#cat-textures" class="nav-link">Textures <span class="count">(14)</span></a>
@@ -51,9 +52,9 @@
     <main class="main">
       <header class="page-header">
         <h1>Blockbench MCP Plugin</h1>
-        <p class="subtitle">API Reference — v1.8.1</p>
+        <p class="subtitle">API Reference — v1.9.0</p>
         <nav class="stats">
-          <a href="#tools"><strong>140</strong> tools (44 stable, 96 experimental)</a>
+          <a href="#tools"><strong>147</strong> tools (44 stable, 103 experimental)</a>
           <a href="#prompts"><strong>6</strong> prompts</a>
           <a href="#resources"><strong>13</strong> resources</a>
         </nav>
@@ -682,7 +683,7 @@
       <td class="col-name">particle_effects</td>
       <td class="col-type">Record&lt;string, string&gt;</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Particle effects with timestamps as keys</td>
+      <td class="col-desc">Particle effects with timestamps (seconds) as keys, spawned at the entity origin. Use manage_particle_keyframes for locators, scripts and more options.</td>
     </tr></tbody>
     </table>
       </div>
@@ -3984,6 +3985,312 @@
       </div>
     </div>
         </section>
+<section id="cat-particles" class="category-section">
+          <h3 class="category-title">Particles</h3>
+          <div id="tool-list_particle_presets" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">list_particle_presets</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">List Particle Presets</p>
+      <p class="card-desc">Lists particle effect presets (smoke, fire, sparks, magic, glow, snow, drip, ...), built-in sprites and textures, materials and facing modes. Every preset uses a texture that ships with Minecraft and Blockbench, so it previews and runs with no image file. Read this before create_particle_effect.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">include_designs</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Include each preset's design knobs, useful as a template for custom effects. <span class="param-meta">(default: <code>true</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-create_particle_effect" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">create_particle_effect</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-openworld">open-world</span>
+        </div>
+      </div>
+      <p class="card-title">Create Particle Effect</p>
+      <p class="card-desc">Creates a Bedrock particle effect (the Snowstorm format Blockbench, Minecraft Bedrock and GeckoLib use) from a preset plus design knobs, or from raw JSON. Writes &lt;pack_root&gt;/particles/&lt;name&gt;.json (and an optional custom texture to textures/particle/), validates it, and loads it into Blockbench's particle preview. Then place it with manage_particle_keyframes, usually at a locator from add_locator. Refuses invalid effects and existing files unless overwrite is true. Blockbench desktop only.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">identifier</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Particle identifier, lowercase namespace:name (for example mymod:chimney_smoke). Do not use the minecraft namespace for new effects.</td>
+    </tr><tr>
+      <td class="col-name">preset</td>
+      <td class="col-type">&quot;smoke&quot; | &quot;campfire_smoke&quot; | &quot;fire&quot; | &quot;flame&quot; | &quot;embers&quot; | &quot;sparks&quot; | &quot;magic&quot; | &quot;sparkle&quot; | &quot;glow&quot; | &quot;dust&quot; | &quot;snow&quot; | &quot;drip&quot; | &quot;bubbles&quot; | &quot;hearts&quot; | &quot;poof&quot; | &quot;soul&quot; | &quot;portal&quot; | &quot;steam&quot; | &quot;electric&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Starting point; list_particle_presets describes each. design knobs override it.</td>
+    </tr><tr>
+      <td class="col-name">design</td>
+      <td class="col-type">object</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Knobs layered over the preset (or over a plain default effect). Units are blocks (16 model units) and seconds.</td>
+    </tr><tr>
+      <td class="col-name">raw</td>
+      <td class="col-type">Record&lt;string, unknown&gt;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">A complete Bedrock particle file (for example a Snowstorm export) instead of preset/design. Its identifier is replaced by `identifier`.</td>
+    </tr><tr>
+      <td class="col-name">texture_image</td>
+      <td class="col-type">object</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Custom texture for the effect. It is saved to &lt;pack_root&gt;/textures/particle/&lt;name&gt;.png and the effect's texture and texture_size are set from it (keep design.sprite unset).</td>
+    </tr><tr>
+      <td class="col-name">pack_root</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Absolute resource-pack-style folder that receives particles/&lt;name&gt;.json and textures/particle/*.png. Defaults to the pack of a Bedrock entity opened from a resource pack, else the saved project's folder. <span class="param-meta">[minLength: 1]</span></td>
+    </tr><tr>
+      <td class="col-name">overwrite</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Replace an existing effect file (and texture) with the same name. <span class="param-meta">(default: <code>false</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-update_particle_effect" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">update_particle_effect</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span><span class="badge badge-openworld">open-world</span>
+        </div>
+      </div>
+      <p class="card-title">Update Particle Effect</p>
+      <p class="card-desc">Changes an existing particle effect file with design knobs (only the components each knob owns are rewritten) or replaces it with raw JSON, validates it, saves it and refreshes the preview. Also loads an effect file from disk that Blockbench has not seen yet. Blockbench desktop only.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">effect</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Particle identifier (mymod:smoke), effect name (smoke), or absolute path to the effect's .json file. A path that is not loaded yet is loaded. <span class="param-meta">[minLength: 1]</span></td>
+    </tr><tr>
+      <td class="col-name">design</td>
+      <td class="col-type">object</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Knobs to change. Only the components a knob owns are rewritten; hand-written parts of the file stay.</td>
+    </tr><tr>
+      <td class="col-name">raw</td>
+      <td class="col-type">Record&lt;string, unknown&gt;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Replace the whole file with this Bedrock particle JSON. The effect keeps its current identifier, so keyframes and the client entity still match.</td>
+    </tr><tr>
+      <td class="col-name">texture_image</td>
+      <td class="col-type">object</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Custom texture for the effect. It is saved to &lt;pack_root&gt;/textures/particle/&lt;name&gt;.png and the effect's texture and texture_size are set from it (keep design.sprite unset).</td>
+    </tr><tr>
+      <td class="col-name">overwrite</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Replace a texture PNG that already exists with different content (another effect may use it). <span class="param-meta">(default: <code>false</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-list_particle_effects" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">list_particle_effects</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-readonly">read-only</span>
+        </div>
+      </div>
+      <p class="card-title">List Particle Effects</p>
+      <p class="card-desc">Lists particle effects loaded in Blockbench with their file, summary, texture status and validation warnings, every particle keyframe that uses them, keyframes that have no preview file or point at missing locators, and the client-entity particle_effects map a Bedrock pack needs.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">include_json</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Include each effect's full JSON. <span class="param-meta">(default: <code>false</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-manage_particle_keyframes" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">manage_particle_keyframes</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span>
+        </div>
+      </div>
+      <p class="card-title">Manage Particle Keyframes</p>
+      <p class="card-desc">Adds, removes or lists particle keyframes on an animation's Effects track. A keyframe spawns an effect at a time, optionally at a locator; Blockbench previews it in Animate mode (set_mode animate, then animation_timeline set_time and capture a screenshot). Keyframes export with Bedrock and GeckoLib animations. One undo step.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">animation_id</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Animation UUID or name. If not provided, uses current animation.</td>
+    </tr><tr>
+      <td class="col-name">action</td>
+      <td class="col-type">&quot;add&quot; | &quot;remove&quot; | &quot;list&quot;</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">add particle keyframes, remove them by time, or list them.</td>
+    </tr><tr>
+      <td class="col-name">keyframes</td>
+      <td class="col-type">object[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Keyframes for add. A keyframe at an existing particle time joins that keyframe as another effect. <span class="param-meta">[maxItems: 200]</span></td>
+    </tr><tr>
+      <td class="col-name">times</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Times (seconds) to remove for remove; omit to remove every particle keyframe. <span class="param-meta">[maxItems: 200]</span></td>
+    </tr><tr>
+      <td class="col-name">effect_filter</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">For remove: only effects with this name, identifier or file. <span class="param-meta">[minLength: 1]</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-add_locator" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">add_locator</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          
+        </div>
+      </div>
+      <p class="card-title">Add Locator</p>
+      <p class="card-desc">Adds a locator: a named point on a bone where particle effects (and sounds) spawn and which they follow as the bone animates. Exported as a Bedrock bone locator. Requires a format with locators (Bedrock Entity, GeckoLib, Generic Model). One undo step.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">name</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Unique locator name; particle keyframes refer to it.</td>
+    </tr><tr>
+      <td class="col-name">parent</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Bone/group name or UUID the locator follows. Omit for the model root. <span class="param-meta">[minLength: 1]</span></td>
+    </tr><tr>
+      <td class="col-name">position</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Absolute position in model units (16 per block), like a cube corner. <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
+    </tr><tr>
+      <td class="col-name">rotation</td>
+      <td class="col-type">number[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Degrees; orients effects whose shapes or directions use local space (formats with rotatable locators). <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
+    </tr><tr>
+      <td class="col-name">ignore_inherited_scale</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Keep effect size when the parent bone scales.</td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+<div id="tool-export_particle_pack" class="card tool-card">
+      <div class="card-header">
+        <h3 class="card-name">export_particle_pack</h3>
+        <div class="card-badges">
+          <span class="badge badge-experimental">experimental</span>
+          <span class="badge badge-destructive">destructive</span><span class="badge badge-openworld">open-world</span>
+        </div>
+      </div>
+      <p class="card-title">Export Particle Pack</p>
+      <p class="card-desc">Delivers particle effects to a Bedrock resource pack: writes particles/&lt;name&gt;.json and copies custom textures to textures/particle/, then returns the particle_effects map to paste into the client entity so animation keyframe names resolve. Defaults to every effect the project's keyframes use. Skips identical files; refuses to overwrite different ones unless overwrite is true. Blockbench desktop only.</p>
+      <div class="overflow-x">
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">destination</td>
+      <td class="col-type">string</td>
+      <td><span class="param-required">required</span></td>
+      <td class="col-desc">Absolute path to the resource pack root (the folder containing manifest.json). <span class="param-meta">[minLength: 1]</span></td>
+    </tr><tr>
+      <td class="col-name">effects</td>
+      <td class="col-type">string[]</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Effects to deliver. Defaults to every effect used by particle keyframes in the project.</td>
+    </tr><tr>
+      <td class="col-name">overwrite</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Replace files that exist with different content. Identical files are always skipped. <span class="param-meta">(default: <code>false</code>)</span></td>
+    </tr></tbody>
+    </table>
+      </div>
+    </div>
+        </section>
 <section id="cat-performance" class="category-section">
           <h3 class="category-title">Performance</h3>
           <div id="tool-get_average_fps" class="card tool-card">
@@ -5924,7 +6231,7 @@
       </section>
 
       <footer class="page-footer">
-        Generated 2026-09-20T22:04:59.296Z from Zod schemas
+        Generated 2026-09-24T19:41:09.491Z from Zod schemas
       </footer>
     </main>
   </div>

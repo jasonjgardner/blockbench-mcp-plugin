@@ -36,6 +36,38 @@ export interface INamedItem {
   name?: string | null;
 }
 
+/** How long a sibling slug tally stays valid, so one listing's `map()` shares it while later edits are seen. */
+const SLUG_COUNT_TTL_MS = 250;
+
+interface ISlugCounts {
+  at: number;
+  counts: Map<string, number>;
+}
+
+const slugCountCache = new WeakMap<readonly INamedItem[], ISlugCounts>();
+
+/**
+ * Tallies the slug of every sibling once per listing instead of once per item.
+ *
+ * Callers build a resource list with `siblings.map(item => makeResourceId(item, siblings))`,
+ * which made every listing quadratic: the editor-state refresh runs it once a
+ * second, and a 600-node project spent over a second per tick slugifying. The
+ * tally is cached on the array identity and expires after `SLUG_COUNT_TTL_MS`,
+ * so a live array such as `Cube.all` still reflects renames on the next tick.
+ */
+function countSiblingSlugs(siblings: readonly INamedItem[]): Map<string, number> {
+  const cached = slugCountCache.get(siblings);
+  const now = Date.now();
+  if (cached && now - cached.at < SLUG_COUNT_TTL_MS) return cached.counts;
+  const counts = siblings.reduce((map, sibling) => {
+    const slug = slugify(sibling.name);
+    if (!slug) return map;
+    return map.set(slug, (map.get(slug) ?? 0) + 1);
+  }, new Map<string, number>());
+  slugCountCache.set(siblings, { at: now, counts });
+  return counts;
+}
+
 /**
  * Builds a human-readable ID fragment for a resource item.
  *
@@ -54,10 +86,7 @@ export function makeResourceId(
   const slug = slugify(item.name);
   if (!slug) return item.uuid;
 
-  const collisionCount = siblings.reduce(
-    (count, sibling) => (slugify(sibling.name) === slug ? count + 1 : count),
-    0
-  );
+  const collisionCount = countSiblingSlugs(siblings).get(slug) ?? 0;
 
   if (collisionCount <= 1) {
     return slug;
