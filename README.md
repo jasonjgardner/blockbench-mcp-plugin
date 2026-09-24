@@ -2,6 +2,14 @@
 
 <img width="2554" height="1390" alt="Blockbench MCP Plugin screenshot" src="https://github.com/user-attachments/assets/fc897c9c-e4be-403d-803b-e981047a4575" />
 
+<details>
+  <summary>Demo Reel</summary>
+
+  https://github.com/user-attachments/assets/c67d0dd8-ee50-40ba-b308-a84a21772901
+
+> All scenes, models, and textures created through Blockbench MCP plugin using agent skills. (Rendered in Blender)
+</details>
+
 [![skills.sh](https://skills.sh/b/jasonjgardner/blockbench-mcp-project)](https://skills.sh/jasonjgardner/blockbench-mcp-project)
 
 ## Plugin Installation
