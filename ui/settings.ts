@@ -81,8 +81,32 @@ export function settingsSetup() {
   );
 }
 
-export function settingsTeardown() {
+/** Options for {@link settingsTeardown}. */
+export interface ISettingsTeardownOptions {
+  /** Keep the stored values so a reload (`onunload` + `onload`) does not reset them to defaults. */
+  keepValues?: boolean;
+}
+
+/**
+ * Remove the plugin's settings from the Settings dialog.
+ *
+ * Blockbench saves settings by iterating the live `Setting` objects, so `delete()` on unload drops
+ * every user-changed value (e.g. `mcp_port`) and defaults come back on the next launch. URL-installed
+ * plugins are unloaded and reloaded on every start, so this hit everyone who changed the port. With
+ * `keepValues` the current values are written to `Settings.stored`, which the `Setting` objects that
+ * `settingsSetup()` re-creates read from, and the old objects stay registered so the next save still
+ * includes them. Uninstalling deletes them for real.
+ */
+export function settingsTeardown(options: ISettingsTeardownOptions = {}) {
   settings.forEach((setting) => {
+    if (options.keepValues) {
+      // blockbench-types declares `stored` as Setting records, but at runtime it is `{ value }` per id.
+      (Settings.stored as Record<string, { value: unknown }>)[setting.id] = {
+        value: setting.master_value,
+      };
+      return;
+    }
     setting.delete();
   });
+  settings.length = 0;
 }
