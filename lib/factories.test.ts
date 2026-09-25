@@ -233,6 +233,39 @@ describe.each<RegistrationMode>(["initial", "session"])("%s registration", (mode
     expect(getAllToolDefinitions().create_texture?.inputSchema.name?.safeParse("mark").success).toBe(true);
   });
 
+  test("publishes Copilot-compatible input schemas", async () => {
+    const vector = z.array(z.number()).length(3);
+    const tuple = z.tuple([z.number(), z.number(), z.number(), z.number()]);
+    createTool("copilot_schema", {
+      description: "Publish a portable schema.",
+      parameters: z.object({
+        position: vector,
+        rotation: vector,
+        color: tuple,
+        options: z.record(z.unknown()),
+      }),
+      execute: async () => "published",
+    });
+    const client = await connectClient(mode);
+    const inputSchema = (await client.listTools()).tools[0]?.inputSchema;
+
+    expect(inputSchema).toMatchObject({
+      type: "object",
+      properties: {
+        position: { type: "array", items: { type: "number" } },
+        rotation: { type: "array", items: { type: "number" } },
+        color: {
+          type: "array",
+          items: { anyOf: [{ type: "number" }, { type: "number" }, { type: "number" }, { type: "number" }] },
+        },
+        options: { type: "object", additionalProperties: true },
+      },
+    });
+    expect(JSON.stringify(inputSchema)).not.toContain("$ref");
+    expect(JSON.stringify(inputSchema)).not.toContain('"items":[');
+    expect(JSON.stringify(inputSchema)).not.toContain('"additionalProperties":{}');
+  });
+
   test("rejects every texture cross-field refinement before execution", async () => {
     const execute = mock(async () => "created");
     createTool("create_texture", {
