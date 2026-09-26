@@ -236,12 +236,18 @@ describe.each<RegistrationMode>(["initial", "session"])("%s registration", (mode
   test("publishes Copilot-compatible input schemas", async () => {
     const vector = z.array(z.number()).length(3);
     const tuple = z.tuple([z.number(), z.number(), z.number(), z.number()]);
+    const heterogeneousTuple = z.tuple([z.string(), z.number(), z.boolean()]);
+    const emptyTuple = z.tuple([]);
+    const restTuple = z.tuple([z.string()]).rest(z.boolean());
     createTool("copilot_schema", {
       description: "Publish a portable schema.",
       parameters: z.object({
         position: vector,
         rotation: vector,
         color: tuple,
+        settings: heterogeneousTuple,
+        empty: emptyTuple,
+        rest: restTuple,
         options: z.record(z.unknown()),
       }),
       execute: async () => "published",
@@ -250,19 +256,26 @@ describe.each<RegistrationMode>(["initial", "session"])("%s registration", (mode
     const inputSchema = (await client.listTools()).tools[0]?.inputSchema;
 
     expect(inputSchema).toMatchObject({
+      $schema: "https://json-schema.org/draft/2020-12/schema",
       type: "object",
       properties: {
         position: { type: "array", items: { type: "number" } },
         rotation: { type: "array", items: { type: "number" } },
         color: {
           type: "array",
-          items: { anyOf: [{ type: "number" }, { type: "number" }, { type: "number" }, { type: "number" }] },
+          prefixItems: [{ type: "number" }, { type: "number" }, { type: "number" }, { type: "number" }],
         },
+        settings: { type: "array", prefixItems: [{ type: "string" }, { type: "number" }, { type: "boolean" }] },
+        empty: { type: "array", maxItems: 0 },
+        rest: { type: "array", prefixItems: [{ type: "string" }], items: { type: "boolean" } },
         options: { type: "object", additionalProperties: true },
       },
     });
     expect(JSON.stringify(inputSchema)).not.toContain("$ref");
     expect(JSON.stringify(inputSchema)).not.toContain('"items":[');
+    expect(JSON.stringify(inputSchema)).not.toContain('"anyOf":[]');
+    expect(JSON.stringify(inputSchema)).not.toContain('"additionalItems"');
+    expect(JSON.stringify(inputSchema)).not.toContain('"definitions"');
     expect(JSON.stringify(inputSchema)).not.toContain('"additionalProperties":{}');
   });
 

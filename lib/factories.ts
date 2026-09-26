@@ -234,20 +234,43 @@ function normalizePublishedSchema(value: unknown): unknown {
   const normalized = Object.fromEntries(
     Object.entries(value).map(([key, child]) => [key, normalizePublishedSchema(child)]),
   );
-  const items = normalized.items;
+  const ref = normalized.$ref;
+  const { additionalItems, definitions, ...unmappedSchema } = normalized;
+  const schema: Record<string, unknown> = {
+    ...unmappedSchema,
+    ...(typeof ref === "string" && ref.startsWith("#/definitions/") && {
+      $ref: ref.replace("#/definitions/", "#/$defs/"),
+    }),
+  };
+  const migratedDefinitions = isRecord(definitions) ? { $defs: definitions } : {};
+  const items = schema.items;
   if (Array.isArray(items)) {
+    const { items: _items, ...tupleSchema } = schema;
+    if (items.length === 0) {
+      return {
+        ...tupleSchema,
+        ...migratedDefinitions,
+        ...(additionalItems !== undefined && { items: additionalItems }),
+      };
+    }
     return {
-      ...normalized,
-      items: { anyOf: items },
+      ...tupleSchema,
+      prefixItems: items,
+      ...migratedDefinitions,
+      ...(additionalItems !== undefined && { items: additionalItems }),
     };
   }
-  if (isRecord(normalized.additionalProperties) && Object.keys(normalized.additionalProperties).length === 0) {
+  if (isRecord(schema.additionalProperties) && Object.keys(schema.additionalProperties).length === 0) {
     return {
-      ...normalized,
+      ...schema,
+      ...migratedDefinitions,
       additionalProperties: true,
     };
   }
-  return normalized;
+  return {
+    ...schema,
+    ...migratedDefinitions,
+  };
 }
 
 function publishedInputSchema(schema: z.ZodType): Record<string, unknown> {
@@ -256,8 +279,12 @@ function publishedInputSchema(schema: z.ZodType): Record<string, unknown> {
     $refStrategy: "none",
     pipeStrategy: "input",
     strictUnions: true,
+    target: "jsonSchema2019-09",
   });
-  return normalizePublishedSchema(jsonSchema) as Record<string, unknown>;
+  return {
+    ...normalizePublishedSchema(jsonSchema) as Record<string, unknown>,
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+  };
 }
 
 function installSchemaPublishingHandler(server: McpServer): void {
