@@ -2,7 +2,10 @@
 	"servers": {
 		"blockbench": {
 			"url": "http://localhost:3000/bb-mcp",
-			"type": "http"
+			"type": "http",
+			"dev": {
+				"watch": "src/**/*.ts",
+			}
 		},
 		"bbmodel": {
 			"command": "bunx",
