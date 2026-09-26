@@ -2,7 +2,8 @@ import { z } from "zod";
 import type { IMCPTool, IMCPPrompt, IMCPResource, StatusType } from "@/types";
 import { getServer } from "@/server/server";
 import { ResourceTemplate, type McpServer, type RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { ListToolsRequestSchema, type CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { zodToJsonSchema } from "zod-to-json-schema";
 import type { ToolCondition } from "@/server/tool-conditions";
 import { withResourceErrors } from "@/lib/resourceErrors";
 import { resolveAgentName, trackToolWrites } from "@/lib/ai-disclosure";
@@ -215,6 +216,93 @@ export function createTool<T extends z.ZodType>(
 
 /** Each SDK handle must remain registered so a later state change can re-enable it. */
 const serverTools = new Map<McpServer, Map<string, RegisteredTool>>();
+const schemaPublishingServers = new WeakSet<McpServer>();
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Produces the constrained JSON Schema subset accepted by GitHub Copilot.
+ * Runtime tool calls continue through the full Zod parser, so tuple constraints
+ * and unconstrained value types remain enforced by the server.
+ */
+function normalizePublishedSchema(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(normalizePublishedSchema);
+  if (!isRecord(value)) return value;
+
+  const normalized = Object.fromEntries(
+    Object.entries(value).map(([key, child]) => [key, normalizePublishedSchema(child)]),
+  );
+  const ref = normalized.$ref;
+  const { additionalItems, definitions, ...unmappedSchema } = normalized;
+  const schema: Record<string, unknown> = {
+    ...unmappedSchema,
+    ...(typeof ref === "string" && ref.startsWith("#/definitions/") && {
+      $ref: ref.replace("#/definitions/", "#/$defs/"),
+    }),
+  };
+  const migratedDefinitions = isRecord(definitions) ? { $defs: definitions } : {};
+  const items = schema.items;
+  if (Array.isArray(items)) {
+    const { items: _items, ...tupleSchema } = schema;
+    if (items.length === 0) {
+      return {
+        ...tupleSchema,
+        ...migratedDefinitions,
+        ...(additionalItems !== undefined && { items: additionalItems }),
+      };
+    }
+    return {
+      ...tupleSchema,
+      prefixItems: items,
+      ...migratedDefinitions,
+      ...(additionalItems !== undefined && { items: additionalItems }),
+    };
+  }
+  if (isRecord(schema.additionalProperties) && Object.keys(schema.additionalProperties).length === 0) {
+    return {
+      ...schema,
+      ...migratedDefinitions,
+      additionalProperties: true,
+    };
+  }
+  return {
+    ...schema,
+    ...migratedDefinitions,
+  };
+}
+
+function publishedInputSchema(schema: z.ZodType): Record<string, unknown> {
+  // @ts-ignore zod-to-json-schema's recursive generic type is too deep for the full tool catalog.
+  const jsonSchema = zodToJsonSchema(schema, {
+    $refStrategy: "none",
+    pipeStrategy: "input",
+    strictUnions: true,
+    target: "jsonSchema2019-09",
+  });
+  return {
+    ...normalizePublishedSchema(jsonSchema) as Record<string, unknown>,
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+  };
+}
+
+function installSchemaPublishingHandler(server: McpServer): void {
+  if (schemaPublishingServers.has(server)) return;
+  schemaPublishingServers.add(server);
+  server.server.setRequestHandler(ListToolsRequestSchema, () => ({
+    tools: Object.entries(toolDefinitions)
+      .filter(([name]) => isToolAvailable(name))
+      .map(([name, definition]) => ({
+        name,
+        title: definition.title,
+        description: definition.description,
+        inputSchema: publishedInputSchema(definition.parameterSchema),
+        annotations: definition.annotations,
+        execution: { taskSupport: "forbidden" as const },
+      })),
+  }));
+}
 
 /**
  * Resolve the configured preference and native Blockbench condition against the
@@ -284,6 +372,7 @@ function registerToolOnServer(server: McpServer, name: string, definition: ITool
     return result;
   });
   registrations.set(name, registration);
+  installSchemaPublishingHandler(server);
   if (!isToolAvailable(name)) registration.disable();
 }
 
