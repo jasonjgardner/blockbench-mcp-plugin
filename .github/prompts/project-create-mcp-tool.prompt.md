@@ -1,7 +1,7 @@
 ---
-mode: agent
+agent: agent
 description: This is a Blockbench plugin that integrates with the Model Context Protocol (MCP) to allow AI models to interact with Blockbench (JannisX11/blockbench) through commands or directly execute JavaScript code in its context.
-tools: ['githubRepo', 'get_commit', 'get_file_contents', 'list_branches', 'search_code', 'search_repositories', 'blockbench']
+tools: ['web/githubRepo', 'github/get_commit', 'github/get_file_contents', 'github/list_branches', 'github/search_code', 'github/search_repositories', 'blockbench/*']
 ---
 
 # Project Overview

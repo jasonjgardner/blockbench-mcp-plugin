@@ -3,6 +3,14 @@
 		"blockbench": {
 			"url": "http://localhost:3000/bb-mcp",
 			"type": "http"
+		},
+		"bbmodel": {
+			"command": "bunx",
+			"args": [
+				"github:jasonjgardner/blockbench-mcp-plugin",
+				"--root",
+				"./artifacts"
+			]
 		}
 	},
 	"inputs": []

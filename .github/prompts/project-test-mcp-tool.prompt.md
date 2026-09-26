@@ -1,7 +1,7 @@
 ---
-mode: agent
+agent: agent
 description: Test newly created MCP tools in the Blockbench MCP plugin.
-tools: ['changes', 'codebase', 'fetch', 'problems', 'runCommands', 'search', 'searchResults', 'terminalLastCommand', 'terminalSelection', 'usages', 'search_code', 'search_repositories', 'blockbench', 'websearch']
+tools: ['search/codebase', 'web/fetch', 'read/problems', 'vscodeTasks/problems', 'execute/getTerminalOutput', 'execute/runInTerminal', 'read/terminalLastCommand', 'read/terminalSelection', 'search', 'read/terminalLastCommand', 'read/terminalSelection', 'search/usages', 'vscodeGeneral/usages', 'github/search_code', 'github/search_repositories', 'blockbench/*']
 ---
 
 # Project Overview
