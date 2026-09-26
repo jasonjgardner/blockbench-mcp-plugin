@@ -263,11 +263,13 @@ describe.each<RegistrationMode>(["initial", "session"])("%s registration", (mode
         rotation: { type: "array", items: { type: "number" } },
         color: {
           type: "array",
+          minItems: 4,
+          maxItems: 4,
           prefixItems: [{ type: "number" }, { type: "number" }, { type: "number" }, { type: "number" }],
         },
-        settings: { type: "array", prefixItems: [{ type: "string" }, { type: "number" }, { type: "boolean" }] },
-        empty: { type: "array", maxItems: 0 },
-        rest: { type: "array", prefixItems: [{ type: "string" }], items: { type: "boolean" } },
+        settings: { type: "array", minItems: 3, maxItems: 3, prefixItems: [{ type: "string" }, { type: "number" }, { type: "boolean" }] },
+        empty: { type: "array", minItems: 0, maxItems: 0 },
+        rest: { type: "array", minItems: 1, prefixItems: [{ type: "string" }], items: { type: "boolean" } },
         options: { type: "object", additionalProperties: true },
       },
     });
