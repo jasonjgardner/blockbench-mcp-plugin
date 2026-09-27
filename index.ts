@@ -18,6 +18,7 @@ import { setupMaterialUndoRefresh, teardownMaterialUndoRefresh } from "@/lib/mat
 import { setupAnimationUndoRestore, teardownAnimationUndoRestore } from "@/lib/animation-undo";
 import { setupEditorStateSync, teardownEditorStateSync } from "@/lib/editor-state";
 import { setupAiDisclosure, teardownAiDisclosure } from "@/lib/ai-disclosure";
+import { setupSketchfabTags, teardownSketchfabTags } from "@/lib/sketchfab-tags";
 import { setupScratchpadMode, teardownScratchpadMode } from "@/lib/scratchpad-mode";
 import { installPluginApi, uninstallPluginApi } from "@/lib/plugin-api";
 import { teardownOffscreenViews } from "@/lib/views";
@@ -62,6 +63,7 @@ BBPlugin.register("mcp", {
 
     settingsSetup();
     setupAiDisclosure();
+    setupSketchfabTags();
     setupScratchpadMode();
     setupMaterialUndoRefresh();
     setupAnimationUndoRestore();
@@ -120,6 +122,7 @@ BBPlugin.register("mcp", {
     uninstallPluginApi();
     teardownScratchpadMode();
     teardownAiDisclosure();
+    teardownSketchfabTags();
     teardownEditorStateSync();
     teardownMaterialUndoRefresh();
     teardownAnimationUndoRestore();
