@@ -1,5 +1,6 @@
 {
     "recommendations": [
-        "bierner.comment-tagged-templates"
+        "bierner.comment-tagged-templates",
+        "esbenp.prettier-vscode"
     ]
 }
