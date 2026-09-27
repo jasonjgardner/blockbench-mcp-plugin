@@ -244,6 +244,7 @@ describe.each<RegistrationMode>(["initial", "session"])("%s registration", (mode
       parameters: z.object({
         position: vector,
         rotation: vector,
+        interval: z.number().positive(),
         color: tuple,
         settings: heterogeneousTuple,
         empty: emptyTuple,
@@ -261,6 +262,7 @@ describe.each<RegistrationMode>(["initial", "session"])("%s registration", (mode
       properties: {
         position: { type: "array", items: { type: "number" } },
         rotation: { type: "array", items: { type: "number" } },
+        interval: { type: "number", exclusiveMinimum: 0 },
         color: {
           type: "array",
           minItems: 4,

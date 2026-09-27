@@ -279,7 +279,7 @@ function publishedInputSchema(schema: z.ZodType): Record<string, unknown> {
     $refStrategy: "none",
     pipeStrategy: "input",
     strictUnions: true,
-    target: "jsonSchema2019-09",
+    target: "jsonSchema7",
   });
   return {
     ...normalizePublishedSchema(jsonSchema) as Record<string, unknown>,
