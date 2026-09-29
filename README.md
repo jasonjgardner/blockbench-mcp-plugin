@@ -166,3 +166,9 @@ See [headless/README.md](headless/README.md) for client configuration, the tool 
 ## Plugin Development
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed instructions on setting up the development environment and how to add new tools, resources, and prompts.
+
+## Security
+
+The desktop plugin's HTTP server listens on this computer only (`127.0.0.1` and `::1`) by default, so `http://localhost:3000/bb-mcp` works whether a client resolves `localhost` to IPv4 or IPv6. Requests with a non-loopback `Origin` or `Host` header get `403 Forbidden`, which keeps web pages, including DNS rebinding attacks, from driving Blockbench through your browser.
+
+To accept connections from other computers (for example a client inside WSL2 without mirrored networking, a VM, or another machine), set **Settings** > **General** > **MCP Server Host** to `0.0.0.0` or `::` and reload the plugin. The server has no authentication: anyone who can reach the port can call every tool, including `risky_eval`. Only do this on a trusted network and keep your firewall rules restrictive.

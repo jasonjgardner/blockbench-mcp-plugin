@@ -29,6 +29,14 @@ export function settingsSetup() {
       category,
       icon: "numbers",
     }),
+    new Setting("mcp_host", {
+      name: tl("mcp.settings.host_name"),
+      description: tl("mcp.settings.host_desc"),
+      type: "text",
+      value: "localhost",
+      category,
+      icon: "lan",
+    }),
     new Setting("mcp_endpoint", {
       name: tl("mcp.settings.endpoint_name"),
       description: tl("mcp.settings.endpoint_desc"),

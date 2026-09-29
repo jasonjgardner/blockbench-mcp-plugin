@@ -25,7 +25,7 @@ import type { NetServer, SessionTransports } from "@/server/net";
 import createNetServer from "@/server/net";
 import { getIcon } from "@/macros/getIcon" with { type: "macro" };
 
-let httpServer: NetServer | null = null;
+let httpServers: NetServer[] = [];
 let sessionTransports: SessionTransports | null = null;
 
 BBPlugin.register("mcp", {
@@ -90,9 +90,10 @@ BBPlugin.register("mcp", {
       Settings.get("mcp_sse_heartbeat"),
       15
     );
-    [httpServer, sessionTransports] = createNetServer(net, {
+    [httpServers, sessionTransports] = createNetServer(net, {
       port: Number(Settings.get("mcp_port") || 3000),
       endpoint: String(Settings.get("mcp_endpoint") || "/bb-mcp"),
+      host: String(Settings.get("mcp_host") ?? ""),
       keepAlive: {
         sseHeartbeatIntervalMs: Math.max(0, sseHeartbeatSec) * 1000,
       },
@@ -123,11 +124,11 @@ BBPlugin.register("mcp", {
     teardownEditorStateSync();
     teardownMaterialUndoRefresh();
     teardownAnimationUndoRestore();
-    // Close HTTP server
-    if (httpServer) {
-      httpServer.close();
-      httpServer = null;
+    // Close HTTP servers (one per listen address)
+    for (const server of httpServers) {
+      server.close();
     }
+    httpServers = [];
 
     // Close all session transports
     const values = Array.from(sessionTransports?.values() ?? []);
