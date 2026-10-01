@@ -6,7 +6,7 @@ import { findGroupOrThrow } from "@/lib/util";
 import { runUndoableAnimationEdit } from "@/lib/animation-undo";
 import { animationToolDocs } from "./docs";
 import { createAnimationParameters } from "./schemas";
-import { TRANSFORM_CHANNELS, applyKeyframeValues, getAnimationClass, requireBoneAnimator } from "./shared";
+import { TRANSFORM_CHANNELS, applyKeyframeValues, fitSnappingToKeyframes, getAnimationClass, requireBoneAnimator } from "./shared";
 
 type CreateAnimationInput = z.infer<typeof createAnimationParameters>;
 type BoneKeyframeInput = CreateAnimationInput["bones"][string][number];
@@ -142,7 +142,7 @@ export function registerCreateAnimationTool(): void {
         }
         const validated = validateAnimationInput(input);
         const animations: BBAnimation[] = [];
-        const animation = runUndoableAnimationEdit({ animations }, "Create animation", () => {
+        const { animation, grid } = runUndoableAnimationEdit({ animations }, "Create animation", () => {
           const AnimationClass = getAnimationClass();
           const created = new AnimationClass({
             name: `animation.${input.name}`, loop: input.loop ? "loop" : "once",
@@ -151,11 +151,19 @@ export function registerCreateAnimationTool(): void {
           animations.push(created);
           created.add(false);
           buildAnimationKeyframes(created, validated);
+          // Inside the edit, so Undo/Redo restore the fitted grid with the keys.
+          const fitted = fitSnappingToKeyframes(created);
           created.select();
           Animator.preview();
-          return created;
+          return { animation: created, grid: fitted };
         });
-        return JSON.stringify({ uuid: animation.uuid, name: animation.name, length: animation.length, loop: animation.loop, bones: validated.targets.length });
+        return JSON.stringify({
+          uuid: animation.uuid, name: animation.name, length: animation.length, loop: animation.loop, bones: validated.targets.length,
+          snapping: grid.snapping,
+          ...(grid.off_grid_times.length
+            ? { warning: `Key times ${grid.off_grid_times.join(", ")} do not fit any grid from 10 to 100 fps; export will round them to 1/${grid.snapping} s.` }
+            : {}),
+        });
       },
     },
     animationToolDocs[0].status

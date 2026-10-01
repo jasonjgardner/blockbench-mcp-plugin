@@ -21,9 +21,23 @@ interface IPasteEntry {
 /** Plugin-local detached data; never stores live frame, animator, or mutable handle references. */
 let clipboard: IClipboard | undefined;
 
+/**
+ * Keyframe fields the GeckoLib plugin registers (`easing`, `easingArgs`),
+ * missing from blockbench-types. Without them a pasted key loses its easing.
+ */
+function copyEasing(frame: BBKeyframe): Record<string, unknown> {
+  const easing: unknown = Reflect.get(frame, "easing");
+  const easingArgs: unknown = Reflect.get(frame, "easingArgs");
+  return {
+    ...(typeof easing === "string" ? { easing } : {}),
+    ...(Array.isArray(easingArgs) ? { easingArgs: structuredClone(easingArgs) } : {}),
+  };
+}
+
 /** Snapshot native datapoints and interpolation metadata so expressions and pre/post values survive copying. */
 function copyFrame(frame: BBKeyframe): KeyframeOptions {
   return {
+    ...copyEasing(frame),
     time: frame.time,
     channel: frame.channel,
     interpolation: frame.interpolation,
