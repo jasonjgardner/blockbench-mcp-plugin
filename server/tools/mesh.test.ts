@@ -45,6 +45,7 @@ let initializationFailure = false;
 // vertices, face winding, selection map, and before/after undo snapshot contract.
 class TestFace {
   vertices: string[];
+  uv: Record<string, [number, number]> = {};
   texture: string | false = false;
   constructor(readonly mesh: TestMesh, data: { vertices: string[] }) {
     this.vertices = data.vertices;
@@ -307,5 +308,17 @@ describe("mesh creation", () => {
     await executeText("select_mesh_elements", { mesh_id: mesh.uuid, mode: "vertex", elements: ["9999"] });
     await executeText("select_mesh_elements", { mesh_id: mesh.uuid, mode: "vertex", action: "add", elements: ["9998"] });
     expect(mesh.getSelectedVertices()).toEqual(["9999", "9998"]);
+  });
+});
+
+describe("mesh editing tools", () => {
+  test("merge_mesh_vertices leaves each face with distinct vertex keys", async () => {
+    await executeText("place_mesh", { elements: [{ name: "seam", vertices: [[0, 0, 0], [0, 0, 0], [2, 2, 0], [0, 2, 0]], faces: [[0, 1, 2, 3]] }] });
+    const mesh = TestMesh.all[0];
+    expect(await executeText("merge_mesh_vertices", { mesh_id: mesh.uuid, selected_only: false })).toBe('Merged 1 vertices in mesh "seam"');
+    const [face] = Object.values(mesh.faces);
+    expect(face.vertices).toHaveLength(3);
+    expect(new Set(face.vertices).size).toBe(3);
+    expect(Object.keys(mesh.vertices)).toHaveLength(3);
   });
 });

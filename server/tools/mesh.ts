@@ -14,7 +14,7 @@ import {
 } from "@/lib/zodObjects";
 import { MAX_SUBDIVISION_CUTS, STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
 import { getProjectTexture, getMeshOrSelected, findMeshOrThrow } from "@/lib/util";
-import { deleteMeshSelection, extrudeMeshFaces, subdivideMeshFaces } from "@/lib/mesh-editing";
+import { deleteMeshSelection, extrudeMeshFaces, mergeMeshVertices, subdivideMeshFaces } from "@/lib/mesh-editing";
 import {
   addCylinderGeometry,
   addIndexedGeometry,
@@ -372,7 +372,7 @@ export const meshToolDocs: IToolSpec[] = [
     name: "merge_mesh_vertices",
     condition: { project: true, features: ["meshes"] },
     description:
-      "Merges vertices that are within a specified distance of each other.",
+      "Merges vertices that are within a specified distance of each other, in one undo entry. Each face keeps a surviving vertex once; faces the merge collapses (fewer than three vertices left) are removed.",
     annotations: {
       title: "Merge Mesh Vertices",
       destructiveHint: true,
@@ -745,69 +745,9 @@ export function registerMeshTools(): void {
     ...meshToolDocs[7],
     async execute({ mesh_id, threshold, selected_only }) {
       const mesh = findMeshOrThrow(mesh_id);
-
-      Undo.initEdit({
-        elements: [mesh],
-      });
-
-      const verticesToCheck = selected_only
-        ? mesh.getSelectedVertices()
-        : Object.keys(mesh.vertices);
-
-      let mergedCount = 0;
-      const mergeMap: Record<string, string> = {};
-
-      // Find vertices to merge
-      for (let i = 0; i < verticesToCheck.length; i++) {
-        const vkey1 = verticesToCheck[i];
-        if (mergeMap[vkey1]) continue;
-
-        for (let j = i + 1; j < verticesToCheck.length; j++) {
-          const vkey2 = verticesToCheck[j];
-          if (mergeMap[vkey2]) continue;
-
-          const v1 = mesh.vertices[vkey1];
-          const v2 = mesh.vertices[vkey2];
-          const distance = Math.sqrt(
-            (v1[0] - v2[0]) ** 2 + (v1[1] - v2[1]) ** 2 + (v1[2] - v2[2]) ** 2
-          );
-
-          if (distance <= threshold) {
-            mergeMap[vkey2] = vkey1;
-            mergedCount++;
-          }
-        }
-      }
-
-      // Apply merges
-      Object.entries(mergeMap).forEach(([oldKey, newKey]) => {
-        // Update faces
-        for (const fkey in mesh.faces) {
-          const face = mesh.faces[fkey];
-          const index = face.vertices.indexOf(oldKey);
-          if (index !== -1) {
-            face.vertices[index] = newKey;
-            face.uv[newKey] = face.uv[oldKey] || [0, 0];
-            delete face.uv[oldKey];
-          }
-        }
-        // Remove merged vertex
-        delete mesh.vertices[oldKey];
-      });
-
-      mesh.preview_controller.updateGeometry(mesh);
-
-      Undo.finishEdit("Merge mesh vertices");
-      Canvas.updateView({
-        elements: [mesh],
-        element_aspects: {
-          geometry: true,
-          uv: true,
-          faces: true,
-        },
-      });
-
-      return `Merged ${mergedCount} vertices in mesh "${mesh.name}"`;
+      const { merged_vertices, removed_faces } = mergeMeshVertices(mesh, threshold, selected_only);
+      const removed = removed_faces ? `; removed ${removed_faces} collapsed face${removed_faces === 1 ? "" : "s"}` : "";
+      return `Merged ${merged_vertices} vertices in mesh "${mesh.name}"${removed}`;
     },
   }, meshToolDocs[7].status);
 
