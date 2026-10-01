@@ -66,10 +66,42 @@ function getStatusText (status: number): string {
     403: 'Forbidden',
     404: 'Not Found',
     405: 'Method Not Allowed',
+    406: 'Not Acceptable',
     409: 'Conflict',
-    500: 'Internal Server Error'
+    413: 'Payload Too Large',
+    415: 'Unsupported Media Type',
+    500: 'Internal Server Error',
+    501: 'Not Implemented'
   }
   return texts[status] || 'Unknown'
+}
+
+/** Largest request body accepted; larger requests are refused before being buffered. */
+const MAX_BODY_BYTES = 16 * 1024 * 1024
+
+/**
+ * Validates the framing headers of one request. `Content-Length` must be
+ * plain digits: `parseInt` accepts "x" (NaN) and negative values, which made
+ * the parser answer the same request forever and freeze Blockbench. Chunked
+ * bodies are not decoded by this parser, so they are refused instead of being
+ * read as a second request.
+ *
+ * @returns The body length, or the status and reason to refuse with.
+ */
+export function readBodyLength (headers: Record<string, string>): { length: number } | { status: number, reason: string } {
+  if (headers['transfer-encoding'] !== undefined) {
+    return { status: 501, reason: 'Transfer-Encoding is not supported; send a Content-Length body' }
+  }
+  const raw = headers['content-length']
+  if (raw === undefined || raw === '') return { length: 0 }
+  if (!/^\d+$/.test(raw)) {
+    return { status: 400, reason: `Invalid Content-Length "${raw.slice(0, 32)}"` }
+  }
+  const length = Number(raw)
+  if (length > MAX_BODY_BYTES) {
+    return { status: 413, reason: `Body of ${length} bytes exceeds the ${MAX_BODY_BYTES}-byte limit` }
+  }
+  return { length }
 }
 
 /**
@@ -246,9 +278,26 @@ export default function createNetServer (
           }
         }
 
-        // Calculate body boundaries
+        // Calculate body boundaries; malformed framing closes the connection
         const bodyStart = headerEnd + 4
-        const contentLength = parseInt(headers['content-length'] || '0', 10)
+        const framing = readBodyLength(headers)
+        if ('status' in framing) {
+          console.warn(`[MCP] Rejected request: ${framing.reason}`)
+          buffer = Buffer.alloc(0)
+          sendResponse(
+            socket,
+            framing.status,
+            { 'content-type': 'application/json' },
+            JSON.stringify({
+              jsonrpc: '2.0',
+              error: { code: -32600, message: framing.reason },
+              id: null
+            }),
+            'close'
+          )
+          return
+        }
+        const contentLength = framing.length
         const requestEnd = bodyStart + contentLength
 
         // Wait for complete request body
@@ -509,6 +558,15 @@ export default function createNetServer (
                   }, heartbeatMs)
                 : null
 
+              // A dropped connection must cancel the stream: the SDK only
+              // frees a session's single GET stream on cancel, so a reader left
+              // pending makes every reconnect fail with 409 and silently drops
+              // list_changed notifications for the rest of the session.
+              const cancelStream = (): void => {
+                reader.cancel().catch(() => undefined)
+              }
+              socket.once('close', cancelStream)
+
               try {
                 while (true) {
                   // Check socket is still writable before each chunk
@@ -524,7 +582,9 @@ export default function createNetServer (
               } catch (streamError) {
                 console.error('[MCP] SSE stream error:', streamError)
               } finally {
+                socket.off('close', cancelStream)
                 if (heartbeat) clearInterval(heartbeat)
+                cancelStream()
                 socketEnded = true
                 socket.end()
               }
@@ -643,7 +703,21 @@ export default function createNetServer (
   // One listener per address. Without a host, Node would listen on every
   // interface and let other computers on the network drive Blockbench.
   const httpServers = listenPlan.hosts.map((listenHost) => {
-    const httpServer = createServer(onConnection)
+    // `close()` only stops new connections; open keep-alive sockets would keep
+    // running this (possibly unloaded) code. Track them and destroy them on close.
+    const openSockets = new Set<Socket>()
+    const httpServer = createServer((socket: Socket) => {
+      openSockets.add(socket)
+      socket.once('close', () => openSockets.delete(socket))
+      onConnection(socket)
+    })
+    const closeListener = httpServer.close.bind(httpServer)
+    httpServer.close = ((callback?: (err?: Error) => void) => {
+      closeListener(callback)
+      for (const socket of openSockets) socket.destroy()
+      openSockets.clear()
+      return httpServer
+    }) as typeof httpServer.close
 
     httpServer.on('error', (err: NodeJS.ErrnoException) => {
       // IPv6 may be disabled; the 127.0.0.1 listener still serves `localhost`.
