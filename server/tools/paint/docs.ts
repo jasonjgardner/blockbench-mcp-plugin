@@ -63,10 +63,11 @@ export const paintToolDocs: IToolSpec[] = [
     name: "color_picker_tool",
     condition: { project: true, features: ["paint_mode"], method: () => Texture.all.length > 0 },
     description:
-      "Picks colors from textures and sets them as the active color.",
+      "Picks a texture pixel's color and makes it the primary or secondary color, like Blockbench's color picker. It does not edit the texture, but it changes the active colors, selects the texture, and depending on Blockbench's settings can set the brush opacity or switch the active paint tool.",
     annotations: {
       title: "Color Picker Tool",
-      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
     },
     parameters: colorPickerToolParameters,
     status: STATUS_EXPERIMENTAL,

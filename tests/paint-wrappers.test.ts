@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, expect, test } from "bun:test";
-import { registerPaintTools } from "@/server/tools/paint";
+import { paintToolDocs, registerPaintTools } from "@/server/tools/paint";
 import { required } from "@/tests/helpers/assertions";
 import { useGlobals } from "@/tests/helpers/globals";
 import { evaluateHostCondition } from "@/tests/helpers/condition-host";
@@ -314,4 +314,10 @@ test("texture-coordinate strokes discard stale viewport face restrictions", asyn
   expect(pixels).not.toEqual(["original"]);
   expect(painter.current).toEqual({});
   expect(undo.history).toHaveLength(1);
+});
+
+test("color_picker_tool is not advertised as read-only, since it changes the active colors and tool", () => {
+  const picker = required(paintToolDocs.find(doc => doc.name === "color_picker_tool"), "color_picker_tool spec");
+  expect(picker.annotations).toMatchObject({ destructiveHint: false });
+  expect(picker.annotations?.readOnlyHint).not.toBe(true);
 });
