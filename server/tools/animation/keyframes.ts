@@ -6,6 +6,7 @@ import { runUndoableAnimationEdit } from "@/lib/animation-undo";
 import { animationToolDocs } from "./docs";
 import { manageKeyframesParameters } from "./schemas";
 import {
+  fitSnappingToKeyframes,
   KEYFRAME_TIME_EPSILON,
   applyKeyframeValues,
   findAnimationOrSelected,
@@ -35,7 +36,7 @@ interface IKeyframeEdit {
 const KEYFRAME_EDITORS: Record<KeyframeEditAction, (edit: IKeyframeEdit) => void> = {
   create: ({ animator, channel, data, existing }) => {
     existing?.remove();
-    writeKeyframeData(animator.addKeyframe({ time: data.time, channel, interpolation: data.interpolation, data_points: [{}] }), data);
+    writeKeyframeData(animator.addKeyframe({ time: data.time, channel, interpolation: data.interpolation ?? "linear", data_points: [{}] }), data);
   },
   delete: ({ existing }) => {
     existing?.remove();
@@ -115,13 +116,19 @@ export function registerManageKeyframesTool(): void {
           return `Selected ${matches.length} keyframes for ${bone_name}.${channel}`;
         }
 
-        runUndoableAnimationEdit({ animations: [animation] }, `${action} keyframes`, () => {
+        const grid = runUndoableAnimationEdit({ animations: [animation] }, `${action} keyframes`, () => {
           const animator = requireBoneAnimator(animation, group);
           keyframes.forEach((data, index) => KEYFRAME_EDITORS[action]({ animator, channel, data, existing: matches[index] }));
           animation.setLength();
+          // Inside the edit, so Undo/Redo restore the fitted grid with the keys.
+          const fitted = action === "delete" ? null : fitSnappingToKeyframes(animation);
           Animator.preview();
+          return fitted;
         });
-        return `Successfully performed ${action} on ${keyframes.length} keyframes for ${bone_name}.${channel}`;
+        const warning = grid && grid.off_grid_times.length
+          ? ` Warning: key times ${grid.off_grid_times.join(", ")} do not fit any grid from 10 to 100 fps; export will round them to 1/${grid.snapping} s.`
+          : "";
+        return `Successfully performed ${action} on ${keyframes.length} keyframes for ${bone_name}.${channel}${warning}`;
       },
     },
     animationToolDocs[1].status

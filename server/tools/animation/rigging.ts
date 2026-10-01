@@ -5,11 +5,12 @@ import { createTool } from "@/lib/factories";
 import { findGroupOrThrow } from "@/lib/util";
 import { createGroupWithUndo } from "@/lib/group-creation";
 import { runUndoableEdit } from "@/lib/undo";
+import { runUndoableAnimationEdit } from "@/lib/animation-undo";
 import { ancestorsOf, resetClipbenchDuplicateMap } from "@/lib/cube-knife";
 import { vector3Schema } from "@/lib/zodObjects";
 import { animationToolDocs } from "./docs";
 import { boneRiggingParameters } from "./schemas";
-import { toVector3 } from "./shared";
+import { getAnimationClass, toVector3 } from "./shared";
 
 type BoneRiggingInput = z.infer<typeof boneRiggingParameters>;
 type BoneData = BoneRiggingInput["bone_data"];
@@ -271,57 +272,168 @@ function createNullObject(input: SetIkControllerInput, plan: IIkPlan, tracked: O
 // ============================================================================
 
 /**
- * Outliner edits for existing bones, run inside the shared bone-rigging undo
- * entry. Each resolves `bone_data.name` and returns the tool's result message.
+ * One outliner edit for an existing bone, planned before Undo starts: the
+ * aspects that let Undo rebuild everything the edit touches, and the change,
+ * which returns the tool's result message.
  */
-const BONE_EDITORS: Record<BoneEditAction, (boneData: BoneData) => string> = {
-  parent: (boneData) => {
-    const child = findGroupOrThrow(boneData.name);
-    const parent = boneData.parent
-      ? Group.all.find((g) => g.name === boneData.parent)
-      : "root";
-    child.addTo(parent);
-    return `Parented "${boneData.name}" to "${boneData.parent || "root"}"`;
-  },
+interface IBoneEdit {
+  aspects: UndoAspects;
+  /** Aspects snapshotted after the edit, when removed nodes must drop out of them. */
+  finishAspects?: UndoAspects;
+  /** Animations whose animators the edit removes; they are snapshotted in full so Undo brings the keyframes back. */
+  animations?: BBAnimation[];
+  apply: () => string;
+}
+
+/** Outliner reference meaning the project's top level. */
+const ROOT_PARENT = "root";
+
+/** A bone and its descendants, split the way Blockbench's Undo tracks them. */
+function boneSubtree(bone: Group): { groups: Group[]; elements: OutlinerElement[] } {
+  const groups: Group[] = [bone];
+  const elements: OutlinerElement[] = [];
+  bone.forEachChild((child: OutlinerNode) => {
+    if (child instanceof Group) groups.push(child);
+    else if (child instanceof OutlinerElement) elements.push(child);
+  });
+  return { groups, elements };
+}
+
+/**
+ * Resolves the parent action's target: a bone UUID, then a unique bone name.
+ * Omitting it, or `root` when no bone has that name, means the project root.
+ */
+function resolveParentBone(reference: string | undefined): Group | typeof ROOT_PARENT {
+  if (!reference) return ROOT_PARENT;
+  if (reference === ROOT_PARENT && !Group.all.some((group) => group.uuid === reference || group.name === reference)) return ROOT_PARENT;
+  return resolveNode(reference, Group.all, "Parent bone");
+}
+
+function planParent(boneData: BoneData): IBoneEdit {
+  const child = findGroupOrThrow(boneData.name);
+  const parent = resolveParentBone(boneData.parent);
+  if (parent !== ROOT_PARENT && (parent === child || parent.isChildOf(child, Infinity))) {
+    throw new Error(`Cannot parent "${child.name}" to "${parent.name}": a bone cannot be placed inside itself or its own descendants.`);
+  }
+  return {
+    aspects: { outliner: true },
+    apply: () => {
+      child.addTo(parent);
+      if (child.parent !== parent) throw new Error("The current format does not allow the requested parent.");
+      return `Parented "${child.name}" to "${parent === ROOT_PARENT ? ROOT_PARENT : parent.name}"`;
+    },
+  };
+}
+
+/**
+ * Undo can only rebuild what the "before" snapshot holds, so the bone's
+ * descendants are listed, as Blockbench's Delete does. `Group.remove` also
+ * deletes the animators of every removed node in every animation, so those
+ * animations are snapshotted too: all of them that animate any node of the
+ * subtree, where Blockbench's own `Group.remove(true)` only checks the bone.
+ */
+function planDelete(boneData: BoneData): IBoneEdit {
+  const bone = findGroupOrThrow(boneData.name);
+  const { groups, elements } = boneSubtree(bone);
+  const removed = new Set([...groups, ...elements].map((node) => node.uuid));
+  const animations = (getAnimationClass().all ?? []).filter((animation) =>
+    Object.keys(animation.animators ?? {}).some((uuid) => removed.has(uuid)));
+  return {
+    aspects: { elements, groups, outliner: true },
+    finishAspects: { elements: [], groups: [], outliner: true },
+    animations,
+    apply: () => {
+      bone.remove();
+      return `Deleted bone "${boneData.name}" with ${groups.length - 1} child bone(s) and ${elements.length} element(s)`;
+    },
+  };
+}
+
+/** Group properties only reach Undo through the groups aspect; the outliner aspect holds just the hierarchy. */
+function planGroupEdit(boneData: BoneData, edit: (bone: Group) => string): IBoneEdit {
+  const bone = findGroupOrThrow(boneData.name);
+  return { aspects: { groups: [bone], outliner: true }, apply: () => edit(bone) };
+}
+
+/** Element types flip through their own `flip(axis, center)`, as Blockbench's Flip action calls them. */
+interface IFlippableElement {
+  flip(axis: number, center: number, skipUV?: boolean): unknown;
+}
+
+function isFlippable(element: OutlinerElement): element is OutlinerElement & IFlippableElement {
+  return typeof Reflect.get(element, "flip") === "function";
+}
+
+/**
+ * Flips one copied bone like Blockbench's Flip action does in bone-rig formats
+ * (`mirrorSelected`): the pivot mirrors on the axis, the rotation on the other
+ * two axes flips sign, and left/right names swap when the swapped name is free.
+ */
+function flipBone(group: Group, axis: number): void {
+  [0, 1, 2].forEach((index) => {
+    if (index === axis) group.origin[index] *= -1;
+    else group.rotation[index] *= -1;
+  });
+  const originalName: unknown = Reflect.get(group.temp_data ?? {}, "old_name");
+  flipNameOnAxis(group, axis, (name: string) => !Group.all.some((other) => other.name === name), originalName);
+}
+
+/**
+ * Creates the mirror image of a bone: Blockbench's Duplicate followed by its
+ * Flip action on the copy, so the copied bones, cubes, meshes, locators and null
+ * objects all mirror across the plane through the model origin (the grid center).
+ * The copies are tracked for Undo, which removes them again.
+ */
+function planMirror(boneData: BoneData): IBoneEdit {
+  const bone = findGroupOrThrow(boneData.name);
+  const axisName = boneData.mirror_axis ?? "x";
+  const axis = AXIS_INDEX[axisName];
+  const fixed = boneSubtree(bone).elements.find((element) => !isFlippable(element));
+  if (fixed) throw new Error(`"${fixed.name}" cannot be mirrored: its element type has no flip.`);
+  const groups: Group[] = [];
+  const elements: OutlinerElement[] = [];
+  return {
+    aspects: { elements, groups, outliner: true },
+    apply: () => {
+      const copy = bone.duplicate();
+      resetClipbenchDuplicateMap();
+      const created = boneSubtree(copy);
+      // Undo re-reads these arrays when the edit finishes, so the copies land in its "after" snapshot.
+      groups.push(...created.groups);
+      elements.push(...created.elements);
+      created.groups.forEach((group) => flipBone(group, axis));
+      const center = Format.centered_grid ? 0 : 8;
+      created.elements.filter(isFlippable).forEach((element) => element.flip(axis, center, false));
+      return `Mirrored bone "${bone.name}" across the ${axisName} axis as "${copy.name}" (${copy.uuid})`;
+    },
+  };
+}
+
+/** Plans the outliner edits for existing bones; each resolves `bone_data.name` and validates before Undo starts. */
+const BONE_EDITORS: Record<BoneEditAction, (boneData: BoneData) => IBoneEdit> = {
+  parent: planParent,
   unparent: (boneData) => {
-    findGroupOrThrow(boneData.name).addTo("root");
-    return `Unparented "${boneData.name}"`;
-  },
-  delete: (boneData) => {
-    findGroupOrThrow(boneData.name).remove();
-    return `Deleted bone "${boneData.name}"`;
-  },
-  rename: (boneData) => {
     const bone = findGroupOrThrow(boneData.name);
+    return {
+      aspects: { outliner: true },
+      apply: () => {
+        bone.addTo(ROOT_PARENT);
+        return `Unparented "${boneData.name}"`;
+      },
+    };
+  },
+  delete: planDelete,
+  rename: (boneData) => planGroupEdit(boneData, (bone) => {
     const newName = boneData.children?.[0] || "new_name";
     bone.name = newName;
     return `Renamed bone to "${newName}"`;
-  },
-  set_pivot: (boneData) => {
-    const bone = findGroupOrThrow(boneData.name);
+  }),
+  set_pivot: (boneData) => planGroupEdit(boneData, (bone) => {
     if (boneData.origin) bone.origin = toVector3(boneData.origin);
     return `Set pivot point for "${boneData.name}"`;
-  },
-  mirror: mirrorBone,
+  }),
+  mirror: planMirror,
 };
-
-/** Swaps the first left/right marker in a bone name, or appends `_mirrored`. */
-function mirroredBoneName(name: string): string {
-  if (name.includes("left")) return name.replace("left", "right");
-  if (name.includes("right")) return name.replace("right", "left");
-  return name + "_mirrored";
-}
-
-/** Duplicates a bone with its pivot negated on the mirror axis (default `x`). */
-function mirrorBone(boneData: BoneData): string {
-  const bone = findGroupOrThrow(boneData.name);
-  const axis = boneData.mirror_axis || "x";
-  const mirroredBone = bone.duplicate();
-  resetClipbenchDuplicateMap();
-  mirroredBone.origin[AXIS_INDEX[axis]] *= -1;
-  mirroredBone.name = mirroredBoneName(bone.name);
-  return `Mirrored bone "${boneData.name}" across ${axis} axis`;
-}
 
 /**
  * Legacy `set_ik` / `create` IK flags, translated to Blockbench's real IK model.
@@ -363,11 +475,24 @@ function disableIkFor(bone: Group): string {
 }
 
 /**
+ * `create` resolves its parent through createGroupWithUndo: UUID first, then
+ * name, and `root` is the project root. A name several bones share would
+ * silently pick the first one, so it is refused here, as the parent action does.
+ */
+function assertUnambiguousParent(reference: string | undefined): void {
+  if (!reference || reference === ROOT_PARENT || Group.all.some((group) => group.uuid === reference)) return;
+  if (Group.all.filter((group) => group.name === reference).length > 1) {
+    throw new Error(`Parent bone name "${reference}" is ambiguous. Use its UUID.`);
+  }
+}
+
+/**
  * Creates a bone with its own validated, reversible edit. When `ik_enabled` is
  * set, IK is configured afterwards as a second history entry via
  * {@link applyLegacyIk}.
  */
 function createBone(boneData: BoneData): string {
+  assertUnambiguousParent(boneData.parent);
   const group = createGroupWithUndo({
     name: boneData.name,
     origin: boneData.origin ? toVector3(boneData.origin) : [0, 0, 0],
@@ -392,13 +517,16 @@ export function registerBoneRiggingTool(): void {
         if (action === "create") return createBone(bone_data);
         if (action === "set_ik") return applyLegacyIk(bone_data);
 
-        Undo.initEdit({
-          outliner: true,
-          elements: [],
-          groups: [],
-        });
-        const result = BONE_EDITORS[action](bone_data);
-        Undo.finishEdit(`Bone rigging: ${action}`);
+        const edit = BONE_EDITORS[action](bone_data);
+        const label = `Bone rigging: ${action}`;
+        const result = edit.animations?.length
+          ? runUndoableAnimationEdit(
+            { ...edit.aspects, animations: edit.animations },
+            label,
+            edit.apply,
+            edit.finishAspects && { ...edit.finishAspects, animations: edit.animations }
+          )
+          : runUndoableEdit(edit.aspects, label, edit.apply, edit.finishAspects);
         Canvas.updateAll();
 
         return result;

@@ -201,6 +201,25 @@ export function compileGeckolibGeometry(): unknown {
   }
 }
 
+/**
+ * Serializes export content the way Blockbench's own geometry and animation
+ * exports do: with its global `autoStringify`, i.e. `compileJSON` using the
+ * user's JSON indentation, minify and final-newline settings, numbers rounded
+ * to five decimals and short arrays kept on one line. Outside Blockbench, where
+ * that global is missing, falls back to two-space JSON.
+ *
+ * @param value - Compiled export document.
+ * @returns The file text.
+ */
+export function stringifyLikeBlockbench(value: unknown): string {
+  const autoStringify: unknown = Reflect.get(globalThis, "autoStringify");
+  if (typeof autoStringify === "function") {
+    const text: unknown = autoStringify(value);
+    if (typeof text === "string") return text;
+  }
+  return JSON.stringify(value, null, 2);
+}
+
 /** Compiled animation content and the host API that produced it. */
 export interface IGeckolibAnimationCompile {
   content: unknown;

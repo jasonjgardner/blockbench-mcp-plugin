@@ -131,8 +131,12 @@ const exportDeliveryFields = {
     .string()
     .optional()
     .describe(
-      "Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode."
+      "Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode. Fails if the file exists unless overwrite is true."
     ),
+  overwrite: z
+    .boolean()
+    .default(false)
+    .describe("Replace an existing file at path. Defaults to false so a re-export never silently replaces a reference file."),
   max_content_length: z
     .number()
     .int()
@@ -155,5 +159,17 @@ export const geckolibExportAnimationsParameters = z.object({
     .describe("Animation UUIDs or names to include. Omit to export every animation in the project."),
 });
 
+/** A model resource location (optionally namespaced), or an empty string for no parent. */
+const DISPLAY_PARENT_PATTERN = /^(?:(?:[a-z0-9_.-]+:)?[a-z0-9_./-]+)?$/;
+
 /** Parameters for exporting GeckoLib display settings. */
-export const geckolibExportDisplayParameters = z.object({ ...exportDeliveryFields });
+export const geckolibExportDisplayParameters = z.object({
+  ...exportDeliveryFields,
+  parent: z
+    .string()
+    .regex(DISPLAY_PARENT_PATTERN, "Use a model resource location such as minecraft:item/handheld, or an empty string for no parent.")
+    .optional()
+    .describe(
+      "Parent model to write, compile mode only. Omit to keep the project's parent, which the GeckoLib plugin sets to builtin/entity for Item models and uses as its default, so files match the plugin's own export. Minecraft Java 1.21.4 and later have no builtin/entity model (the result then carries a warning): when targeting them, pass another parent such as minecraft:item/handheld, or an empty string to write none."
+    ),
+});

@@ -26,6 +26,7 @@ import {
   getGeckolibModid,
   getGeckolibPluginVersion,
   getProjectBoneNames,
+  stringifyLikeBlockbench,
   type IGeckolibKeyframe,
 } from "@/lib/geckolib";
 import {
@@ -37,7 +38,7 @@ import {
   normalizeEasingArgs,
   reverseEasing,
 } from "@/lib/geckolib-easing";
-import { buildGeckolibDisplaySettings } from "@/lib/geckolib-display";
+import { buildGeckolibDisplaySettings, isRemovedBuiltinEntityParent, resolveDisplayParent } from "@/lib/geckolib-display";
 import {
   summarizeDiagnostics,
   validateGeckolibAnimations,
@@ -45,6 +46,7 @@ import {
   type IGeckolibDiagnostic,
 } from "@/lib/geckolib-validate";
 import { findGroupOrThrow } from "@/lib/util";
+import { writeExportFile } from "@/lib/export-file";
 import { runUndoableAnimationEdit } from "@/lib/animation-undo";
 import { KEYFRAME_TIME_EPSILON, TRANSFORM_CHANNELS, findAnimationOrSelected, getAnimationClass } from "./animation/shared";
 import {
@@ -248,6 +250,7 @@ function assertEasingApplies(targets: readonly IEasingTarget[], convert: boolean
 interface IExportDelivery {
   mode: "compile" | "dialog";
   path?: string;
+  overwrite: boolean;
   max_content_length: number;
 }
 
@@ -261,8 +264,10 @@ interface IExportAction {
  *
  * `Action.trigger()` re-checks the action's own condition and returns `false`
  * when it is not met, which is the authoritative availability answer.
+ *
+ * @param extra - Additional metadata merged into the result, such as warnings.
  */
-function triggerPluginExport(actionId: string, label: string): string {
+function triggerPluginExport(actionId: string, label: string, extra: Record<string, unknown> = {}): string {
   // @ts-ignore - BarItems is a Blockbench global
   const registry = typeof BarItems === "undefined" ? undefined : (BarItems as unknown as Record<string, IExportAction | undefined>);
   const action = registry?.[actionId];
@@ -281,20 +286,16 @@ function triggerPluginExport(actionId: string, label: string): string {
     action: actionId,
     triggered: true,
     note: "Blockbench opened its native save dialog. The user must choose a location; this tool does not wait for that and returns no content.",
+    ...extra,
   });
 }
 
-/** Writes export content to disk through Blockbench's permission-checked fs access. */
-function writeExportFile(path: string, content: string, label: string): string {
-  // @ts-ignore - requireNativeModule is a Blockbench global
-  const fs = requireNativeModule("fs", {
-    message: `MCP ${label} requested write access to save to ${path}`,
-  });
-  if (!fs) {
-    throw new Error("File system access was denied. Omit `path` to receive the content in the response instead.");
-  }
-  fs.writeFileSync(path, content);
-  return path;
+/** Explains a `builtin/entity` parent, which the display file would name but Minecraft Java 1.21.4 and later lack. */
+function displayParentWarnings(parent: string): string[] {
+  if (!isRemovedBuiltinEntityParent(parent)) return [];
+  return [
+    `The parent "${parent}" does not exist in Minecraft Java 1.21.4 and later: the game reports a missing model and falls back to its missing model, so display contexts this file does not define get no transform. Pass parent (for example "minecraft:item/handheld", or "" for none) when targeting those versions; keep builtin/entity for 1.21.3 and older.`,
+  ];
 }
 
 /**
@@ -303,19 +304,19 @@ function writeExportFile(path: string, content: string, label: string): string {
  *
  * @param label - Tool name used in permission prompts and messages.
  * @param delivery - Requested mode, path and content budget.
- * @param build - Compiles the content; only called in compile mode.
+ * @param build - Compiles and serializes the file text, formatted like the
+ *   native export it stands in for; only called in compile mode.
  * @param extra - Additional metadata merged into the result, such as the host
  *   API the content came from.
  */
 function deliverExport(
   label: string,
   delivery: IExportDelivery,
-  build: () => unknown,
+  build: () => string,
   extra: Record<string, unknown> = {}
 ): string {
-  const compiled = build();
-  const content = typeof compiled === "string" ? compiled : JSON.stringify(compiled, null, 2);
-  const wrote_to_path = delivery.path ? writeExportFile(delivery.path, content, label) : null;
+  const content = build();
+  const wrote_to_path = delivery.path ? writeExportFile(delivery.path, content, delivery.overwrite, label) : null;
   const omitted = delivery.max_content_length === 0;
   const truncated = !omitted && content.length > delivery.max_content_length;
   return JSON.stringify({
@@ -629,10 +630,14 @@ function registerExportTools(): void {
     {
       ...geckolibToolDocs[7],
       parameters: geckolibExportModelParameters,
-      async execute({ mode, path, max_content_length }) {
+      async execute({ mode, path, overwrite, max_content_length }) {
         assertGeckolibFormat();
         if (mode === "dialog") return triggerPluginExport("export_geckolib_model", "model export");
-        return deliverExport(geckolibToolDocs[7].name, { mode, path, max_content_length }, compileGeckolibGeometry);
+        return deliverExport(
+          geckolibToolDocs[7].name,
+          { mode, path, overwrite, max_content_length },
+          () => stringifyLikeBlockbench(compileGeckolibGeometry())
+        );
       },
     },
     geckolibToolDocs[7].status
@@ -643,7 +648,7 @@ function registerExportTools(): void {
     {
       ...geckolibToolDocs[8],
       parameters: geckolibExportAnimationsParameters,
-      async execute({ mode, path, max_content_length, animation_ids }) {
+      async execute({ mode, path, overwrite, max_content_length, animation_ids }) {
         assertGeckolibFormat();
         if (mode === "dialog") return triggerPluginExport("export_geckolib_animations", "animation export");
         const animations = resolveAnimations(animation_ids);
@@ -651,8 +656,8 @@ function registerExportTools(): void {
         const compiled = compileGeckolibAnimationFile(animations);
         return deliverExport(
           geckolibToolDocs[8].name,
-          { mode, path, max_content_length },
-          () => compiled.content,
+          { mode, path, overwrite, max_content_length },
+          () => stringifyLikeBlockbench(compiled.content),
           {
             compiled_via: compiled.via,
             animations: animations.map((animation) => animation.name),
@@ -673,19 +678,27 @@ function registerExportTools(): void {
     {
       ...geckolibToolDocs[9],
       parameters: geckolibExportDisplayParameters,
-      async execute({ mode, path, max_content_length }) {
+      async execute({ mode, path, overwrite, max_content_length, parent }) {
         assertGeckolibFormat();
-        if (mode === "dialog") return triggerPluginExport("export_geckolib_display", "display settings export");
         const project = requireProject();
+        if (mode === "dialog") {
+          if (parent !== undefined) {
+            throw new Error("parent only applies to mode='compile'; the plugin's own display export always writes the project's parent.");
+          }
+          const warnings = displayParentWarnings(resolveDisplayParent(project));
+          return triggerPluginExport("export_geckolib_display", "display settings export", warnings.length ? { warnings } : {});
+        }
         const modelType = getGeckolibModelType();
         const shipsDisplaySettings =
           modelType === "Item" ||
           modelType === "Block" ||
           Object.keys(project.display_settings ?? {}).length > 0;
+        const warnings = displayParentWarnings(resolveDisplayParent(project, parent));
         return deliverExport(
           geckolibToolDocs[9].name,
-          { mode, path, max_content_length },
-          () => buildGeckolibDisplaySettings(project),
+          { mode, path, overwrite, max_content_length },
+          // The plugin's own display export writes JSON.stringify(settings, null, 2), not autoStringify.
+          () => JSON.stringify(buildGeckolibDisplaySettings(project, parent), null, 2),
           {
             model_type: modelType,
             ...(shipsDisplaySettings
@@ -693,6 +706,7 @@ function registerExportTools(): void {
               : {
                 note: `The plugin only offers this export for Item and Block models or projects with display transforms; this project is ${modelType ?? "of an unset type"} and has none, so the content is a bare parent model.`,
               }),
+            ...(warnings.length ? { warnings } : {}),
           }
         );
       },

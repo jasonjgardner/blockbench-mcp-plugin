@@ -6,7 +6,7 @@ import { findGroupOrThrow } from "@/lib/util";
 import { runUndoableAnimationEdit } from "@/lib/animation-undo";
 import { animationToolDocs } from "./docs";
 import { createAnimationParameters } from "./schemas";
-import { TRANSFORM_CHANNELS, applyKeyframeValues, getAnimationClass, requireBoneAnimator } from "./shared";
+import { TRANSFORM_CHANNELS, applyKeyframeValues, fitSnappingToKeyframes, getAnimationClass, requireBoneAnimator } from "./shared";
 
 type CreateAnimationInput = z.infer<typeof createAnimationParameters>;
 type BoneKeyframeInput = CreateAnimationInput["bones"][string][number];
@@ -117,6 +117,14 @@ function addParticleKeyframes(animation: BBAnimation, particles: IParticleKeyfra
   });
 }
 
+/** Prefix of animation names in Bedrock and GeckoLib animation files. */
+const ANIMATION_NAME_PREFIX = "animation.";
+
+/** Adds the `animation.` prefix unless the requested name already carries it. */
+function prefixedAnimationName(name: string): string {
+  return name.startsWith(ANIMATION_NAME_PREFIX) ? name : `${ANIMATION_NAME_PREFIX}${name}`;
+}
+
 /** Populates a new animation with validated bone and particle keyframes. */
 function buildAnimationKeyframes(animation: BBAnimation, { targets, particles }: IValidatedAnimationInput): void {
   targets.forEach(({ group, keyframes }) => {
@@ -142,20 +150,28 @@ export function registerCreateAnimationTool(): void {
         }
         const validated = validateAnimationInput(input);
         const animations: BBAnimation[] = [];
-        const animation = runUndoableAnimationEdit({ animations }, "Create animation", () => {
+        const { animation, grid } = runUndoableAnimationEdit({ animations }, "Create animation", () => {
           const AnimationClass = getAnimationClass();
           const created = new AnimationClass({
-            name: `animation.${input.name}`, loop: input.loop ? "loop" : "once",
+            name: prefixedAnimationName(input.name), loop: input.loop ? "loop" : "once",
             length: input.animation_length ?? validated.latestTime,
           });
           animations.push(created);
           created.add(false);
           buildAnimationKeyframes(created, validated);
+          // Inside the edit, so Undo/Redo restore the fitted grid with the keys.
+          const fitted = fitSnappingToKeyframes(created);
           created.select();
           Animator.preview();
-          return created;
+          return { animation: created, grid: fitted };
         });
-        return JSON.stringify({ uuid: animation.uuid, name: animation.name, length: animation.length, loop: animation.loop, bones: validated.targets.length });
+        return JSON.stringify({
+          uuid: animation.uuid, name: animation.name, length: animation.length, loop: animation.loop, bones: validated.targets.length,
+          snapping: grid.snapping,
+          ...(grid.off_grid_times.length
+            ? { warning: `Key times ${grid.off_grid_times.join(", ")} do not fit any grid from 10 to 100 fps; export will round them to 1/${grid.snapping} s.` }
+            : {}),
+        });
       },
     },
     animationToolDocs[0].status

@@ -1,4 +1,33 @@
 /// <reference types="blockbench-types" />
+import { isGeckolibFormat, type IGeckolibKeyframe } from "@/lib/geckolib";
+
+/** A keyframe's GeckoLib easing fields, detached from the keyframe. */
+export interface IGeckolibEasing {
+  easing: string | undefined;
+  easingArgs: number[] | undefined;
+}
+
+/**
+ * Reads the `easing`/`easingArgs` the GeckoLib plugin adds to keyframes, which
+ * blockbench-types omit; both are undefined outside GeckoLib projects.
+ */
+export function readGeckolibEasing(frame: BBKeyframe): IGeckolibEasing {
+  const easing: unknown = Reflect.get(frame, "easing");
+  const easingArgs: unknown = Reflect.get(frame, "easingArgs");
+  return {
+    easing: typeof easing === "string" ? easing : undefined,
+    easingArgs: Array.isArray(easingArgs) ? structuredClone(easingArgs) : undefined,
+  };
+}
+
+/** Keys carrying a GeckoLib easing in a GeckoLib project; empty in every other format. */
+export function geckolibEasedFrames(frames: readonly BBKeyframe[]): IGeckolibKeyframe[] {
+  if (!isGeckolibFormat()) return [];
+  return frames.filter((frame): frame is IGeckolibKeyframe => {
+    const { easing, easingArgs } = readGeckolibEasing(frame);
+    return easing !== undefined || easingArgs !== undefined;
+  });
+}
 
 /**
  * Transform channels a bone animator stores keyframes for, in the order
@@ -12,6 +41,33 @@ export const TRANSFORM_CHANNELS = ["position", "rotation", "scale"] as const;
  * Blockbench stores, while staying far below one frame at the maximum FPS.
  */
 export const KEYFRAME_TIME_EPSILON = 0.001;
+
+/**
+ * Fits the animation's timeline grid (`snapping`, frames per second) to its
+ * keyframes. Export writes every key time rounded to 1/snapping seconds and a
+ * new Animation starts at the `animation_snap` setting (24), so 0.05 s would be
+ * exported as 0.0417 s. Blockbench's own importers call
+ * `calculateSnappingFromKeyframes` for the same reason.
+ *
+ * @returns The grid in frames per second and the key times it cannot hold
+ *   (only when no grid from 10 to 100 fps fits every key).
+ */
+export function fitSnappingToKeyframes(animation: BBAnimation): { snapping: number | null; off_grid_times: number[] } {
+  const calculate: unknown = Reflect.get(animation, "calculateSnappingFromKeyframes");
+  if (typeof calculate === "function") calculate.call(animation);
+  const snapping: unknown = Reflect.get(animation, "snapping");
+  const grid = typeof snapping === "number" && snapping > 0 ? snapping : null;
+  const offGrid = new Set<number>();
+  if (grid !== null) {
+    for (const animator of Object.values(animation.animators)) {
+      for (const keyframe of animator.keyframes) {
+        const frames = keyframe.time * grid;
+        if (Math.abs(frames - Math.round(frames)) > 0.01) offGrid.add(keyframe.time);
+      }
+    }
+  }
+  return { snapping: grid, off_grid_times: [...offGrid].sort((a, b) => a - b) };
+}
 
 /**
  * Returns Blockbench's runtime `Animation` class with its real static API.

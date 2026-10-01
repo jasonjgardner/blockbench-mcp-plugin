@@ -194,6 +194,7 @@ useGlobals(() => ({
   },
   DisplayMode: { slots: {} },
   settings: {},
+  autoStringify: undefined,
 }));
 
 /** Parses a tool's JSON string result. */
@@ -470,9 +471,18 @@ test("reverse groups by animator, so two bones sharing a name do not merge", asy
   expect(twin.rotation.map((frame) => frame.easing)).toEqual([undefined, undefined]);
 });
 
+test("reversing easing twice is not an inverse: each call shifts the easings one key later", async () => {
+  frames[1].easing = "easeInQuad";
+  await call("geckolib_reverse_keyframe_easing", { bone_name: "body", channel: "rotation" });
+  expect(frames.map((frame) => frame.easing)).toEqual([undefined, undefined, "easeOutQuad"]);
+  await call("geckolib_reverse_keyframe_easing", { bone_name: "body", channel: "rotation" });
+  // The second call moves the easing past the last key, so it is lost rather than restored.
+  expect(frames.map((frame) => frame.easing)).toEqual([undefined, undefined, undefined]);
+});
+
 test("validation reports project and compiled-animation findings with check IDs", async () => {
   // @ts-ignore - the host project double stands in for the Blockbench global
-  Project.geckolib_modid = "";
+  Project.geckolib_modid = "My_Mod";
   const result = await call("geckolib_validate_model", {});
   expect(result).toMatchObject({ valid: false, errors: 1, warnings: 1 });
   const diagnostics = result.diagnostics as { check_id: string; severity: string }[];
@@ -533,11 +543,43 @@ test("dialog mode hands off to the plugin's own export action", async () => {
   await expect(tools.call("geckolib_export_display", { mode: "dialog" })).rejects.toThrow("action is unavailable");
 });
 
+test("geometry and animation exports use Blockbench's autoStringify formatting; display keeps the plugin's two-space JSON", async () => {
+  // Stand-in for compileJSON with tab indentation and a final newline, as Blockbench's defaults write.
+  Object.assign(globalThis, { autoStringify: (value: unknown) => `${JSON.stringify(value, null, "\t")}\n` });
+  const model = await call("geckolib_export_model");
+  expect(model.content).toBe(`${JSON.stringify({ "minecraft:geometry": [{ bones: [{ name: "body" }] }] }, null, "\t")}\n`);
+  const animations = await call("geckolib_export_animations");
+  expect(animations.content).toBe(`${JSON.stringify({ ...compiledAnimations, geckolib_format_version: 2 }, null, "\t")}\n`);
+  const display = await call("geckolib_export_display");
+  expect(display.content).toBe(JSON.stringify({ parent: "builtin/entity", texture_size: [64, 64] }, null, 2));
+});
+
 test("display settings compile the Java model envelope, flagging a model type that ships none", async () => {
   const result = await call("geckolib_export_display", {});
   expect(result.model_type).toBe("Entity");
   expect(result.note).toContain("Item and Block models");
   expect(JSON.parse(result.content as string)).toEqual({ parent: "builtin/entity", texture_size: [64, 64] });
+  // The plugin's default parent is kept for compatibility, but Minecraft Java 1.21.4 and later have no such model.
+  expect(result.warnings).toEqual([expect.stringContaining("does not exist in Minecraft Java 1.21.4 and later")]);
+});
+
+test("the display parent can be chosen or omitted, and a valid one carries no warning", async () => {
+  const handheld = await call("geckolib_export_display", { parent: "minecraft:item/handheld" });
+  expect(JSON.parse(handheld.content as string).parent).toBe("minecraft:item/handheld");
+  expect(handheld.warnings).toBeUndefined();
+
+  const none = await call("geckolib_export_display", { parent: "" });
+  expect(JSON.parse(none.content as string)).toEqual({ texture_size: [64, 64] });
+
+  // @ts-ignore - the host project double stands in for the Blockbench global
+  Project.parent = "minecraft:builtin/entity";
+  const projectParent = await call("geckolib_export_display", {});
+  expect(projectParent.warnings).toHaveLength(1);
+
+  await expect(tools.call("geckolib_export_display", { parent: "Not A Model" })).rejects.toThrow();
+  await expect(tools.call("geckolib_export_display", { mode: "dialog", parent: "minecraft:item/handheld" })).rejects.toThrow(
+    "parent only applies to mode='compile'"
+  );
 });
 
 test("an Item model's display export carries no caveat", async () => {

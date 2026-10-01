@@ -451,8 +451,7 @@ export const keyframeDataSchema = z.object({
     .describe("Values: [x,y,z] for position/rotation, number for uniform scale."),
   interpolation: interpolationEnum
     .optional()
-    .default("linear")
-    .describe("Interpolation type for the keyframe."),
+    .describe("Interpolation type for the keyframe. New keyframes default to linear; edits keep the current interpolation when omitted."),
   bezier_handles: z
     .object({
       left_time: z.number().optional(),
