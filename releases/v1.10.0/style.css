@@ -1,0 +1,411 @@
+@import "https://unpkg.com/open-props";
+
+/* ============================================================================
+   Semantic tokens — flip in dark mode via system preference
+   ============================================================================ */
+
+:root {
+  --surface-1: var(--gray-1);
+  --surface-2: var(--gray-0);
+  --surface-3: var(--gray-2);
+  --text-1: var(--gray-9);
+  --text-2: var(--gray-7);
+  --text-3: var(--gray-5);
+  --border-1: var(--gray-3);
+  --border-2: var(--gray-4);
+  --link: var(--blue-7);
+  --mono-text: var(--blue-8);
+
+  --badge-stable-bg: var(--green-2);
+  --badge-stable-fg: var(--green-9);
+  --badge-experimental-bg: var(--yellow-2);
+  --badge-experimental-fg: var(--yellow-9);
+  --badge-destructive-bg: var(--red-2);
+  --badge-destructive-fg: var(--red-9);
+  --badge-readonly-bg: var(--blue-2);
+  --badge-readonly-fg: var(--blue-9);
+  --badge-openworld-bg: var(--purple-2);
+  --badge-openworld-fg: var(--purple-9);
+  --required-fg: var(--red-7);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface-1: var(--gray-9);
+    --surface-2: var(--gray-8);
+    --surface-3: var(--gray-7);
+    --text-1: var(--gray-1);
+    --text-2: var(--gray-3);
+    --text-3: var(--gray-5);
+    --border-1: var(--gray-7);
+    --border-2: var(--gray-6);
+    --link: var(--blue-4);
+    --mono-text: var(--blue-4);
+
+    --badge-stable-bg: var(--green-9);
+    --badge-stable-fg: var(--green-3);
+    --badge-experimental-bg: var(--yellow-9);
+    --badge-experimental-fg: var(--yellow-3);
+    --badge-destructive-bg: var(--red-9);
+    --badge-destructive-fg: var(--red-3);
+    --badge-readonly-bg: var(--blue-9);
+    --badge-readonly-fg: var(--blue-3);
+    --badge-openworld-bg: var(--purple-9);
+    --badge-openworld-fg: var(--purple-3);
+    --required-fg: var(--red-4);
+  }
+}
+
+/* ============================================================================
+   Base
+   ============================================================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+}
+
+html {
+  font-size: 112.5%;
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-2);
+  line-height: var(--font-lineheight-3);
+  color: var(--text-1);
+  background: var(--surface-1);
+  min-height: 100vh;
+}
+
+code {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-0);
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* ============================================================================
+   Layout
+   ============================================================================ */
+
+.layout {
+  display: flex;
+}
+
+.sidebar {
+  display: none;
+  width: 16rem;
+  flex-shrink: 0;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  overflow-y: auto;
+  border-right: 1px solid var(--border-1);
+  background: var(--surface-2);
+  padding: var(--size-3);
+}
+
+@media (min-width: 64rem) {
+  .sidebar { display: block; }
+}
+
+.main {
+  flex: 1;
+  max-width: 56rem;
+  margin-inline: auto;
+  padding: var(--size-5) var(--size-4);
+}
+
+/* ============================================================================
+   Sidebar
+   ============================================================================ */
+
+.sidebar-brand {
+  margin-bottom: var(--size-4);
+}
+
+.sidebar-brand h1 {
+  font-size: var(--font-size-2);
+  font-weight: var(--font-weight-7);
+}
+
+.sidebar-brand p {
+  font-size: var(--font-size-00);
+  color: var(--text-3);
+}
+
+.nav-heading {
+  font-size: var(--font-size-00);
+  font-weight: var(--font-weight-6);
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: var(--font-letterspacing-3);
+  margin-bottom: var(--size-1);
+}
+
+.nav-group {
+  margin-bottom: var(--size-3);
+}
+
+.nav-link {
+  display: block;
+  padding: var(--size-1) var(--size-2);
+  font-size: var(--font-size-0);
+  color: var(--text-2);
+  border-radius: var(--radius-2);
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.nav-link:hover,
+.nav-link:focus {
+  color: var(--text-1);
+  background-color: var(--surface-3);
+  text-decoration: none;
+}
+
+.nav-link .count {
+  color: var(--text-3);
+}
+
+.search-input {
+  width: 100%;
+  padding: var(--size-1) var(--size-2);
+  font-size: var(--font-size-0);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-2);
+  background: var(--surface-1);
+  color: var(--text-1);
+  margin-bottom: var(--size-3);
+}
+
+.search-input::placeholder {
+  color: var(--text-3);
+}
+
+.search-input:focus {
+  outline: 2px solid var(--link);
+  outline-offset: -1px;
+}
+
+/* ============================================================================
+   Header
+   ============================================================================ */
+
+.page-header {
+  margin-bottom: var(--size-5);
+}
+
+.page-header h1 {
+  font-size: var(--font-size-5);
+  font-weight: var(--font-weight-8);
+  margin-bottom: var(--size-1);
+}
+
+.page-header .subtitle {
+  color: var(--text-2);
+  margin-bottom: var(--size-3);
+}
+
+.stats {
+  display: flex;
+  gap: var(--size-3);
+  font-size: var(--font-size-0);
+  color: var(--text-2);
+}
+
+.stats a {
+  color: var(--text-2);
+}
+
+.stats a:hover {
+  color: var(--link);
+}
+
+/* ============================================================================
+   Sections
+   ============================================================================ */
+
+.doc-section {
+  margin-bottom: var(--size-8);
+}
+
+.section-title {
+  font-size: var(--font-size-4);
+  font-weight: var(--font-weight-7);
+  padding-bottom: var(--size-1);
+  border-bottom: 2px solid var(--border-2);
+  margin-bottom: var(--size-5);
+}
+
+.category-section {
+  margin-bottom: var(--size-5);
+}
+
+.category-title {
+  font-size: var(--font-size-3);
+  font-weight: var(--font-weight-7);
+  padding-bottom: var(--size-1);
+  border-bottom: 1px solid var(--border-1);
+  margin-bottom: var(--size-3);
+}
+
+/* ============================================================================
+   Cards — shared by tools, prompts, resources
+   ============================================================================ */
+
+.card {
+  background: var(--surface-2);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-2);
+  padding: var(--size-4);
+  margin-bottom: var(--size-3);
+  box-shadow: var(--shadow-1);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--size-1);
+}
+
+.card-name {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-2);
+  font-weight: var(--font-weight-6);
+}
+
+.card-badges {
+  display: flex;
+  gap: var(--size-1);
+}
+
+.card-title {
+  font-size: var(--font-size-0);
+  color: var(--text-3);
+  margin-bottom: var(--size-1);
+}
+
+.card-desc {
+  font-size: var(--font-size-0);
+  color: var(--text-2);
+  margin-bottom: var(--size-3);
+}
+
+.card .overflow-x {
+  overflow-x: auto;
+}
+
+.uri-template {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-0);
+  color: var(--link);
+  margin-bottom: var(--size-1);
+}
+
+/* ============================================================================
+   Badges
+   ============================================================================ */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--size-1) var(--size-2);
+  border-radius: var(--radius-2);
+  font-size: var(--font-size-00);
+  font-weight: var(--font-weight-6);
+  line-height: 1.5;
+  cursor: default;
+  user-select: none;
+}
+
+.badge-stable     { background: var(--badge-stable-bg);       color: var(--badge-stable-fg); }
+.badge-experimental { background: var(--badge-experimental-bg); color: var(--badge-experimental-fg); }
+.badge-destructive { background: var(--badge-destructive-bg);  color: var(--badge-destructive-fg); }
+.badge-readonly   { background: var(--badge-readonly-bg);      color: var(--badge-readonly-fg); }
+.badge-openworld  { background: var(--badge-openworld-bg);     color: var(--badge-openworld-fg); }
+
+/* ============================================================================
+   Parameter tables
+   ============================================================================ */
+
+.param-table {
+  width: 100%;
+  text-align: left;
+  border-collapse: collapse;
+}
+
+.param-table th {
+  padding: var(--size-1) var(--size-2);
+  font-size: var(--font-size-00);
+  font-weight: var(--font-weight-6);
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: var(--font-letterspacing-3);
+  border-bottom: 2px solid var(--border-2);
+}
+
+.param-table td {
+  padding: var(--size-1) var(--size-2);
+  font-size: var(--font-size-0);
+  border-bottom: 1px solid var(--border-1);
+  vertical-align: top;
+}
+
+.param-table .col-name {
+  font-family: var(--font-mono);
+  color: var(--mono-text);
+}
+
+.param-table .col-type {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-00);
+  color: var(--text-3);
+}
+
+.param-table .col-desc {
+  color: var(--text-2);
+}
+
+.param-required {
+  color: var(--required-fg);
+  font-weight: var(--font-weight-6);
+}
+
+.param-optional {
+  color: var(--text-3);
+}
+
+.param-meta {
+  color: var(--text-3);
+}
+
+.empty-params {
+  font-size: var(--font-size-0);
+  color: var(--text-3);
+  font-style: italic;
+}
+
+/* ============================================================================
+   Footer
+   ============================================================================ */
+
+.page-footer {
+  text-align: center;
+  font-size: var(--font-size-00);
+  color: var(--text-3);
+  padding: var(--size-5) 0;
+  border-top: 1px solid var(--border-1);
+}
