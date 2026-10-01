@@ -38,7 +38,7 @@ import {
   normalizeEasingArgs,
   reverseEasing,
 } from "@/lib/geckolib-easing";
-import { buildGeckolibDisplaySettings } from "@/lib/geckolib-display";
+import { buildGeckolibDisplaySettings, isRemovedBuiltinEntityParent, resolveDisplayParent } from "@/lib/geckolib-display";
 import {
   summarizeDiagnostics,
   validateGeckolibAnimations,
@@ -264,8 +264,10 @@ interface IExportAction {
  *
  * `Action.trigger()` re-checks the action's own condition and returns `false`
  * when it is not met, which is the authoritative availability answer.
+ *
+ * @param extra - Additional metadata merged into the result, such as warnings.
  */
-function triggerPluginExport(actionId: string, label: string): string {
+function triggerPluginExport(actionId: string, label: string, extra: Record<string, unknown> = {}): string {
   // @ts-ignore - BarItems is a Blockbench global
   const registry = typeof BarItems === "undefined" ? undefined : (BarItems as unknown as Record<string, IExportAction | undefined>);
   const action = registry?.[actionId];
@@ -284,7 +286,16 @@ function triggerPluginExport(actionId: string, label: string): string {
     action: actionId,
     triggered: true,
     note: "Blockbench opened its native save dialog. The user must choose a location; this tool does not wait for that and returns no content.",
+    ...extra,
   });
+}
+
+/** Explains a `builtin/entity` parent, which the display file would name but Minecraft Java 1.21.4 and later lack. */
+function displayParentWarnings(parent: string): string[] {
+  if (!isRemovedBuiltinEntityParent(parent)) return [];
+  return [
+    `The parent "${parent}" does not exist in Minecraft Java 1.21.4 and later: the game reports a missing model and falls back to its missing model, so display contexts this file does not define get no transform. Pass parent (for example "minecraft:item/handheld", or "" for none) when targeting those versions; keep builtin/entity for 1.21.3 and older.`,
+  ];
 }
 
 /**
@@ -667,20 +678,27 @@ function registerExportTools(): void {
     {
       ...geckolibToolDocs[9],
       parameters: geckolibExportDisplayParameters,
-      async execute({ mode, path, overwrite, max_content_length }) {
+      async execute({ mode, path, overwrite, max_content_length, parent }) {
         assertGeckolibFormat();
-        if (mode === "dialog") return triggerPluginExport("export_geckolib_display", "display settings export");
         const project = requireProject();
+        if (mode === "dialog") {
+          if (parent !== undefined) {
+            throw new Error("parent only applies to mode='compile'; the plugin's own display export always writes the project's parent.");
+          }
+          const warnings = displayParentWarnings(resolveDisplayParent(project));
+          return triggerPluginExport("export_geckolib_display", "display settings export", warnings.length ? { warnings } : {});
+        }
         const modelType = getGeckolibModelType();
         const shipsDisplaySettings =
           modelType === "Item" ||
           modelType === "Block" ||
           Object.keys(project.display_settings ?? {}).length > 0;
+        const warnings = displayParentWarnings(resolveDisplayParent(project, parent));
         return deliverExport(
           geckolibToolDocs[9].name,
           { mode, path, overwrite, max_content_length },
           // The plugin's own display export writes JSON.stringify(settings, null, 2), not autoStringify.
-          () => JSON.stringify(buildGeckolibDisplaySettings(project), null, 2),
+          () => JSON.stringify(buildGeckolibDisplaySettings(project, parent), null, 2),
           {
             model_type: modelType,
             ...(shipsDisplaySettings
@@ -688,6 +706,7 @@ function registerExportTools(): void {
               : {
                 note: `The plugin only offers this export for Item and Block models or projects with display transforms; this project is ${modelType ?? "of an unset type"} and has none, so the content is a bare parent model.`,
               }),
+            ...(warnings.length ? { warnings } : {}),
           }
         );
       },

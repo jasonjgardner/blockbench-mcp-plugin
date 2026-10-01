@@ -559,6 +559,27 @@ test("display settings compile the Java model envelope, flagging a model type th
   expect(result.model_type).toBe("Entity");
   expect(result.note).toContain("Item and Block models");
   expect(JSON.parse(result.content as string)).toEqual({ parent: "builtin/entity", texture_size: [64, 64] });
+  // The plugin's default parent is kept for compatibility, but Minecraft Java 1.21.4 and later have no such model.
+  expect(result.warnings).toEqual([expect.stringContaining("does not exist in Minecraft Java 1.21.4 and later")]);
+});
+
+test("the display parent can be chosen or omitted, and a valid one carries no warning", async () => {
+  const handheld = await call("geckolib_export_display", { parent: "minecraft:item/handheld" });
+  expect(JSON.parse(handheld.content as string).parent).toBe("minecraft:item/handheld");
+  expect(handheld.warnings).toBeUndefined();
+
+  const none = await call("geckolib_export_display", { parent: "" });
+  expect(JSON.parse(none.content as string)).toEqual({ texture_size: [64, 64] });
+
+  // @ts-ignore - the host project double stands in for the Blockbench global
+  Project.parent = "minecraft:builtin/entity";
+  const projectParent = await call("geckolib_export_display", {});
+  expect(projectParent.warnings).toHaveLength(1);
+
+  await expect(tools.call("geckolib_export_display", { parent: "Not A Model" })).rejects.toThrow();
+  await expect(tools.call("geckolib_export_display", { mode: "dialog", parent: "minecraft:item/handheld" })).rejects.toThrow(
+    "parent only applies to mode='compile'"
+  );
 });
 
 test("an Item model's display export carries no caveat", async () => {

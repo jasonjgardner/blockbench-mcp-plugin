@@ -122,7 +122,7 @@ export const geckolibToolDocs: IToolSpec[] = [
     name: "geckolib_export_display",
     condition: GECKOLIB_CONDITION,
     description:
-      "Builds the Java item/block display-settings JSON for GeckoLib Item and Block models: parent model, texture size, GUI light, per-perspective display transforms and the namespaced particle texture. The text is two-space JSON, as the plugin's own display export writes it. Reports when the active model type would not normally ship one. Set mode='dialog' to trigger the plugin's own display export action instead.",
+      "Builds the Java item/block display-settings JSON for GeckoLib Item and Block models: parent model, texture size, GUI light, per-perspective display transforms and the namespaced particle texture. The text is two-space JSON, as the plugin's own display export writes it. The parent defaults to the plugin's builtin/entity, which Minecraft Java 1.21.4 and later no longer have; the result then warns, and parent picks another. Reports when the active model type would not normally ship one. Set mode='dialog' to trigger the plugin's own display export action instead.",
     annotations: { title: "Export GeckoLib Display Settings", destructiveHint: true, openWorldHint: true },
     parameters: geckolibExportDisplayParameters,
     status: STATUS_EXPERIMENTAL,

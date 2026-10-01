@@ -159,5 +159,17 @@ export const geckolibExportAnimationsParameters = z.object({
     .describe("Animation UUIDs or names to include. Omit to export every animation in the project."),
 });
 
+/** A model resource location (optionally namespaced), or an empty string for no parent. */
+const DISPLAY_PARENT_PATTERN = /^(?:(?:[a-z0-9_.-]+:)?[a-z0-9_./-]+)?$/;
+
 /** Parameters for exporting GeckoLib display settings. */
-export const geckolibExportDisplayParameters = z.object({ ...exportDeliveryFields });
+export const geckolibExportDisplayParameters = z.object({
+  ...exportDeliveryFields,
+  parent: z
+    .string()
+    .regex(DISPLAY_PARENT_PATTERN, "Use a model resource location such as minecraft:item/handheld, or an empty string for no parent.")
+    .optional()
+    .describe(
+      "Parent model to write, compile mode only. Omit to keep the project's parent, which the GeckoLib plugin sets to builtin/entity for Item models and uses as its default, so files match the plugin's own export. Minecraft Java 1.21.4 and later have no builtin/entity model (the result then carries a warning): when targeting them, pass another parent such as minecraft:item/handheld, or an empty string to write none."
+    ),
+});
