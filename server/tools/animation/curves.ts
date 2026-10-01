@@ -6,7 +6,7 @@ import { isGeckolibFormat } from "@/lib/geckolib";
 import { findGroupOrThrow } from "@/lib/util";
 import { animationToolDocs } from "./docs";
 import { animationGraphEditorParameters } from "./schemas";
-import { findAnimationOrSelected } from "./shared";
+import { findAnimationOrSelected, geckolibEasedFrames } from "./shared";
 
 type GraphEditorInput = z.infer<typeof animationGraphEditorParameters>;
 type CurveAction = GraphEditorInput["action"];
@@ -23,6 +23,12 @@ interface INormalizedCurve {
   outgoing: ControlPoint;
   /** Handle entering the segment's last key, measured from the segment start. */
   incoming: ControlPoint;
+}
+
+/** A validated curve edit, applied inside the Undo transaction, and a note for the result. */
+interface ICurvePlan {
+  apply: () => void;
+  note: string;
 }
 
 /** Native handle arrays staged for one key; only edited axes differ from the current values. */
@@ -102,15 +108,30 @@ function assertCurveApplies(action: CurveAction, channel: string, animator: Gene
   }
 }
 
-/** Plans a key-wide interpolation change, which Blockbench stores once per key for every axis. */
-function planInterpolation(frames: BBKeyframe[], axis: GraphEditorInput["axis"], action: KeyWideAction): () => void {
+/**
+ * Plans a key-wide interpolation change, which Blockbench stores once per key
+ * for every axis. GeckoLib reads no easing on smooth (catmullrom) keys, so
+ * smoothing clears their easings in the same edit instead of leaving the
+ * plugin to drop them silently on the next frame.
+ */
+function planInterpolation(frames: BBKeyframe[], axis: GraphEditorInput["axis"], action: KeyWideAction): ICurvePlan {
   if (axis !== "all") {
     throw new Error(`${action} changes the key-wide interpolation, which covers every axis; use axis "all".`);
   }
   const interpolation = KEY_WIDE_INTERPOLATION[action];
-  return () => frames.forEach(frame => {
-    frame.interpolation = interpolation;
-  });
+  const eased = action === "smooth" ? geckolibEasedFrames(frames) : [];
+  return {
+    apply: () => {
+      frames.forEach(frame => {
+        frame.interpolation = interpolation;
+      });
+      eased.forEach(frame => {
+        frame.easing = undefined;
+        frame.easingArgs = undefined;
+      });
+    },
+    note: eased.length ? ` Cleared the GeckoLib easing of ${eased.length} keyframe(s): GeckoLib ignores easings on smooth (catmullrom) keys.` : "",
+  };
 }
 
 /** Resolves the normalized curve for an easing preset or a validated custom curve. */
@@ -193,22 +214,25 @@ function handlesMirror(plan: IHandlePlan): boolean {
 }
 
 /** Plans a Bezier easing on the requested axes, preserving the other axes' handles. */
-function planBezier(frames: BBKeyframe[], input: GraphEditorInput, action: BezierAction): () => void {
+function planBezier(frames: BBKeyframe[], input: GraphEditorInput, action: BezierAction): ICurvePlan {
   const curve = resolveCurve(action, input.custom_curve);
   assertBezierKeys(frames, input.axis);
   const plans = planHandles(frames, input.axis === "all" ? AXES : [input.axis], curve);
-  return () => plans.forEach(plan => {
-    const { frame } = plan;
-    frame.interpolation = "bezier";
-    [0, 1, 2].forEach(slot => {
-      frame.bezier_left_time[slot] = plan.left_time[slot];
-      frame.bezier_left_value[slot] = plan.left_value[slot];
-      frame.bezier_right_time[slot] = plan.right_time[slot];
-      frame.bezier_right_value[slot] = plan.right_value[slot];
-    });
-    // Linked handles are mirrored by the graph editor on the next drag, which would undo this curve.
-    if (!handlesMirror(plan)) frame.bezier_linked = false;
-  });
+  return {
+    apply: () => plans.forEach(plan => {
+      const { frame } = plan;
+      frame.interpolation = "bezier";
+      [0, 1, 2].forEach(slot => {
+        frame.bezier_left_time[slot] = plan.left_time[slot];
+        frame.bezier_left_value[slot] = plan.left_value[slot];
+        frame.bezier_right_time[slot] = plan.right_time[slot];
+        frame.bezier_right_value[slot] = plan.right_value[slot];
+      });
+      // Linked handles are mirrored by the graph editor on the next drag, which would undo this curve.
+      if (!handlesMirror(plan)) frame.bezier_linked = false;
+    }),
+    note: "",
+  };
 }
 
 /**
@@ -233,18 +257,19 @@ export function registerAnimationGraphEditorTool(): void {
         if (!animator || !channelFrames.length) throw new Error(`No keyframes found for ${bone_name}.${channel}.`);
         const frames = selectKeyframes(channelFrames, keyframe_range, `${bone_name}.${channel}`);
         assertCurveApplies(action, channel, animator);
-        const mutate = isBezierAction(action) ? planBezier(frames, input, action) : planInterpolation(frames, axis, action);
+        const plan = isBezierAction(action) ? planBezier(frames, input, action) : planInterpolation(frames, axis, action);
 
         runUndoableAnimationEdit({ animations: [animation] }, `Graph editor: ${action}`, () => {
-          mutate();
+          plan.apply();
           Animator.preview();
         });
         updateKeyframeSelection();
 
         const axes = axis === "all" ? AXES.join(", ") : axis;
-        return isBezierAction(action)
+        const summary = isBezierAction(action)
           ? `Applied ${action} to ${frames.length - 1} segment(s) between ${frames.length} keyframes of ${bone_name}.${channel} (axes: ${axes}).`
           : `Set ${KEY_WIDE_INTERPOLATION[action]} interpolation on ${frames.length} keyframes of ${bone_name}.${channel}.`;
+        return `${summary}${plan.note}`;
       },
     },
     animationToolDocs[2].status

@@ -10,6 +10,8 @@ type Channel = "rotation" | "position" | "scale";
 interface IFrameState {
   time: number;
   interpolation: string;
+  easing?: string;
+  easingArgs?: number[];
   bezier_linked: boolean;
   bezier_left_time: Vector;
   bezier_left_value: Vector;
@@ -26,6 +28,9 @@ const bone = { uuid: "head-id", name: "head" };
 
 class TestFrame {
   interpolation = "linear";
+  /** GeckoLib plugin field, present only on keys that carry an easing. */
+  easing?: string;
+  easingArgs?: number[];
   bezier_linked = true;
   bezier_left_time: Vector = [-0.1, -0.1, -0.1];
   bezier_left_value: Vector = [0, 0, 0];
@@ -40,7 +45,8 @@ class TestFrame {
   }
   state(): IFrameState {
     return {
-      time: this.time, interpolation: this.interpolation, bezier_linked: this.bezier_linked,
+      time: this.time, interpolation: this.interpolation, easing: this.easing, easingArgs: this.easingArgs && [...this.easingArgs],
+      bezier_linked: this.bezier_linked,
       bezier_left_time: [...this.bezier_left_time], bezier_left_value: [...this.bezier_left_value],
       bezier_right_time: [...this.bezier_right_time], bezier_right_value: [...this.bezier_right_value],
     };
@@ -48,6 +54,8 @@ class TestFrame {
   load(state: IFrameState): void {
     this.time = state.time;
     this.interpolation = state.interpolation;
+    this.easing = state.easing;
+    this.easingArgs = state.easingArgs && [...state.easingArgs];
     this.bezier_linked = state.bezier_linked;
     this.bezier_left_time = [...state.bezier_left_time];
     this.bezier_left_value = [...state.bezier_left_value];
@@ -240,5 +248,23 @@ describe("curves the preview or export would drop", () => {
     expect(undo.starts).toBe(0);
     await call({ action: "smooth" });
     expect(keys.map(frame => frame.interpolation)).toEqual(["catmullrom", "catmullrom", "catmullrom"]);
+  });
+
+  test("smoothing GeckoLib keys clears their easings in the same undoable edit and says so", async () => {
+    const keys = addKeys();
+    format.id = "geckolib_model";
+    keys[1].easing = "easeInQuad";
+    keys[2].easing = "easeOutBack";
+    keys[2].easingArgs = [2];
+    const before = snapshot();
+    const result = String(await call({ action: "smooth" }));
+    expect(keys.map(frame => [frame.easing, frame.easingArgs])).toEqual([[undefined, undefined], [undefined, undefined], [undefined, undefined]]);
+    expect(result).toContain("Cleared the GeckoLib easing of 2 keyframe(s)");
+    undo.undo();
+    expect(snapshot()).toEqual(before);
+    // Linear keys keep their easing: GeckoLib applies easings to linear segments.
+    format.id = "geckolib_model";
+    await call({ action: "linear" });
+    expect(keys[1].easing).toBe("easeInQuad");
   });
 });

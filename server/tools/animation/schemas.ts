@@ -90,7 +90,7 @@ export const animationGraphEditorParameters = z.object({
       "stepped",
       "custom",
     ])
-    .describe("Curve modification. linear, stepped and smooth set the key-wide interpolation (linear, step, catmullrom). ease_in, ease_out and ease_in_out apply the CSS cubic-bezier curves of the same name to every segment between the selected keys; custom applies custom_curve. Easing/custom require at least two distinct chronological numeric single-data-point keys. Smooth and Bezier rotation edits are unavailable when native quaternion interpolation would ignore them. GeckoLib models reject stepped (the GeckoLib plugin switches step keys back to linear) and the Bezier actions (GeckoLib has no Bezier interpolation); use geckolib_set_keyframe_easing there."),
+    .describe("Curve modification. linear, stepped and smooth set the key-wide interpolation (linear, step, catmullrom). ease_in, ease_out and ease_in_out apply the CSS cubic-bezier curves of the same name to every segment between the selected keys; custom applies custom_curve. Easing/custom require at least two distinct chronological numeric single-data-point keys. Smooth and Bezier rotation edits are unavailable when native quaternion interpolation would ignore them. GeckoLib models reject stepped (the GeckoLib plugin switches step keys back to linear) and the Bezier actions (GeckoLib has no Bezier interpolation); use geckolib_set_keyframe_easing there. In GeckoLib models smooth also clears the easings of the keys it changes, since GeckoLib ignores easings on catmullrom keys."),
   keyframe_range: timeRangeSchema
     .optional()
     .describe(
