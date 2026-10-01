@@ -203,7 +203,7 @@ export const elementToolDocs: IToolSpec[] = [
     name: "duplicate_element",
     condition: { project: true, features: ["edit_mode"] },
     description:
-      "Duplicates any outliner element or group (with its children) by ID or name using Blockbench's native duplicate, so every property, face UV, texture and mesh vertex key is preserved. Mesh copies inherit their armature bone vertex weights. Optionally offsets the copy and assigns a new name. Selection is left unchanged.",
+      "Duplicates any outliner element or group (with its children) by ID or name using Blockbench's native duplicate, so every property, face UV, texture and mesh vertex key is preserved. Mesh copies inherit their armature bone vertex weights, and copied IK null objects point at the copied bones when their chain was duplicated with them. Optionally offsets the copy and assigns a new name. Selection is left unchanged.",
     annotations: { title: "Duplicate Element", destructiveHint: true },
     parameters: duplicateElementParameters,
     status: STATUS_EXPERIMENTAL,
@@ -473,9 +473,34 @@ function copyVertexWeights(pairs: [OutlinerNode, OutlinerNode][], bones: Armatur
   }));
 }
 
+/** NullObject properties that name another node by UUID; `ik_pole` exists since Blockbench 5.2. */
+const IK_REFERENCE_KEYS = ["ik_target", "ik_source", "ik_pole"] as const;
+
+/**
+ * Points the IK references of copied null objects at the copies of the nodes
+ * they name. `duplicate()` copies the UUIDs verbatim, so a duplicated limb rig
+ * would otherwise drive the original limb. Blockbench's own element Duplicate
+ * remaps the same properties for the elements it copied (through
+ * `Clipbench.duplicate_map`); here every node of the copied subtree counts,
+ * groups included. References to nodes outside the copy are kept.
+ */
+function remapIkReferences(pairs: [OutlinerNode, OutlinerNode][]): void {
+  if (typeof NullObject === "undefined") return;
+  const copies = new Map(pairs.map(([original, copy]) => [original.uuid, copy.uuid]));
+  pairs.forEach(([, copy]) => {
+    if (!(copy instanceof NullObject)) return;
+    IK_REFERENCE_KEYS.forEach((key) => {
+      const reference: unknown = Reflect.get(copy, key);
+      const remapped = typeof reference === "string" ? copies.get(reference) : undefined;
+      if (remapped !== undefined) Reflect.set(copy, key, remapped);
+    });
+  });
+}
+
 /**
  * Duplicates `node` (and its subtree) with Blockbench's own `duplicate()` in one
- * undoable edit, then offsets, renames, and carries mesh vertex weights over.
+ * undoable edit, then offsets, renames, remaps IK references to the copied
+ * nodes, and carries mesh vertex weights over.
  * The live selection is restored afterwards, and `Clipbench.duplicate_map` is
  * reset because only the native Duplicate action clears it.
  *
@@ -497,6 +522,7 @@ function duplicateNode(node: DuplicableNode, offset: ArrayVector3, name: string 
       const pairs = pairSubtrees(node, copy);
       elements.push(...pairs.map(([, created]) => created).filter((created): created is OutlinerElement => created instanceof OutlinerElement));
       groups.push(...pairs.map(([, created]) => created).filter((created): created is Group => created instanceof Group));
+      remapIkReferences(pairs);
       if (offset.some((value) => value !== 0)) offsetSubtree(copy, offset);
       if (name !== undefined) copy.name = name;
       if (copy instanceof Group && formatUsesBoneRig()) copy.createUniqueName();

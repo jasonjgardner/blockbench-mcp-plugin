@@ -434,3 +434,43 @@ describe("select_all_of_type", () => {
     expect(project.mesh_selection[mesh.uuid]).toBeUndefined();
   });
 });
+
+describe("duplicate_element", () => {
+  /** The only node named `name` other than `original`. */
+  const copyOf = <T extends HostNode>(original: T, pool: readonly HostNode[]): T => {
+    const copies = pool.filter((node): node is T => node !== original && node.name === original.name && node.constructor === original.constructor);
+    if (copies.length !== 1) throw new Error(`Expected one copy of "${original.name}", found ${copies.length}.`);
+    return copies[0];
+  };
+
+  test("a copied IK controller drives the copied chain and keeps references outside the copy", async () => {
+    const leg = new HostGroup("leg").init();
+    const thigh = new HostGroup("thigh").init().addTo(leg);
+    const foot = new HostGroup("foot").init().addTo(thigh);
+    const pole = new HostGroup("knee_pole").init();
+    const controller = new HostNullObject("foot_ik").init().addTo(leg);
+    Object.assign(controller, { ik_target: foot.uuid, ik_source: thigh.uuid, ik_pole: pole.uuid });
+
+    await tools.call("duplicate_element", { id: leg.uuid, offset: [4, 0, 0] });
+    const [thighCopy, footCopy] = [copyOf(thigh, groups), copyOf(foot, groups)];
+    const controllerCopy = copyOf(controller, elements);
+    expect(controllerCopy).toMatchObject({ ik_target: footCopy.uuid, ik_source: thighCopy.uuid, ik_pole: pole.uuid });
+    expect(controller).toMatchObject({ ik_target: foot.uuid, ik_source: thigh.uuid, ik_pole: pole.uuid });
+
+    // The remap is part of the recorded edit, so Undo removes the copies and Redo brings the remapped controller back.
+    undo.undo();
+    expect(elements).toEqual([controller]);
+    expect(groups).toEqual([leg, thigh, foot, pole]);
+    undo.redo();
+    expect(copyOf(controller, elements)).toMatchObject({ uuid: controllerCopy.uuid, ik_target: footCopy.uuid, ik_source: thighCopy.uuid });
+  });
+
+  test("a controller duplicated on its own keeps driving the original chain", async () => {
+    const arm = new HostGroup("arm").init();
+    const hand = new HostGroup("hand").init().addTo(arm);
+    const controller = new HostNullObject("hand_ik").init();
+    Object.assign(controller, { ik_target: hand.uuid, ik_source: arm.uuid });
+    await tools.call("duplicate_element", { id: controller.uuid });
+    expect(copyOf(controller, elements)).toMatchObject({ ik_target: hand.uuid, ik_source: arm.uuid });
+  });
+});
