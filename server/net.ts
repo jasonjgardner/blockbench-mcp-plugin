@@ -1,5 +1,5 @@
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
-import { EmptyResultSchema } from '@modelcontextprotocol/sdk/types.js'
+import { EmptyResultSchema, type RequestId } from '@modelcontextprotocol/sdk/types.js'
 import type { Server as NetServer, Socket } from 'node:net'
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
@@ -51,10 +51,16 @@ const DEFAULT_KEEP_ALIVE: IKeepAliveConfig = {
   httpKeepAliveTimeoutSec: 75    // matches typical browser/proxy defaults
 }
 
-export type SessionTransports = Map<
-  string,
-  { transport: WebStandardStreamableHTTPServerTransport; server: McpServer }
->
+interface ISessionEntry {
+  transport: WebStandardStreamableHTTPServerTransport
+  server: McpServer
+  /** Set once the transport closes (DELETE, inactivity timeout, unload). */
+  closed: boolean
+  /** Requests waiting for a response; each is answered when the transport closes first. */
+  waiting: Set<() => void>
+}
+
+export type SessionTransports = Map<string, ISessionEntry>
 
 function getStatusText (status: number): string {
   const texts: Record<number, string> = {
@@ -105,6 +111,67 @@ export function readBodyLength (headers: Record<string, string>): { length: numb
     return { status: 413, reason: `Body of ${length} bytes exceeds the ${MAX_BODY_BYTES}-byte limit` }
   }
   return { length }
+}
+
+/** JSON-RPC error code for a request the client cancelled (LSP's RequestCancelled; MCP defines none). */
+const REQUEST_CANCELLED = -32800
+
+/**
+ * Answers a request whose handler the SDK aborted on `notifications/cancelled`.
+ * MCP says a receiver SHOULD NOT answer a cancelled request, and the SDK sends
+ * nothing; but in JSON response mode the POST that carried the request stays
+ * open until every request in it is answered, so it would never close and its
+ * stream mapping would stay in the transport. The error closes the exchange;
+ * the client that cancelled ignores it. Only aborted handlers get here: the SDK
+ * ignores some cancellations (a falsy `requestId` such as 0, a malformed
+ * `reason`), and a request that already answered keeps its result.
+ */
+function answerCancelled (server: McpServer, requestId: RequestId): void {
+  server.server.transport
+    ?.send({
+      jsonrpc: '2.0',
+      id: requestId,
+      error: { code: REQUEST_CANCELLED, message: 'Request cancelled by the client' }
+    })
+    .catch(() => undefined)
+}
+
+/** Marks `session` closed and releases its waiting requests when the transport closes. */
+function trackClose (session: ISessionEntry): void {
+  const onclose = session.transport.onclose
+  session.transport.onclose = () => {
+    onclose?.()
+    session.closed = true
+    for (const release of session.waiting) release()
+    session.waiting.clear()
+  }
+}
+
+/** Answer for a request whose session closed before the transport produced a response. */
+function sessionClosedResponse (): Response {
+  return new Response(
+    JSON.stringify({
+      jsonrpc: '2.0',
+      error: { code: -32001, message: 'Session closed before the request completed. Please reinitialize.' },
+      id: null
+    }),
+    { status: 404, headers: { 'content-type': 'application/json' } }
+  )
+}
+
+/**
+ * Waits for the transport's answer to a POST. A JSON response waits for every
+ * answer, and the SDK never resolves it once the transport closes (DELETE from
+ * another connection, inactivity timeout), so the POST is answered instead of
+ * hanging.
+ */
+function awaitPostResponse (session: ISessionEntry, pending: Promise<Response>): Promise<Response> {
+  if (session.closed) return Promise.resolve(sessionClosedResponse())
+  return new Promise((resolve, reject) => {
+    const release = (): void => resolve(sessionClosedResponse())
+    session.waiting.add(release)
+    pending.then(resolve, reject).finally(() => session.waiting.delete(release))
+  })
 }
 
 /**
@@ -464,22 +531,18 @@ export default function createNetServer (
           // No session yet and this is an initialize request: create a new
           // session with its own server and transport
           if (!session) {
-            const sessionServer = createMcpServer()
+            const sessionServer = createMcpServer({
+              onRequestCancelled: (requestId) => answerCancelled(sessionServer, requestId)
+            })
 
             // Register all tools, resources, and prompts on this session's server
             registerToolsOnServer(sessionServer)
             registerResourcesOnServer(sessionServer)
             registerPromptsOnServer(sessionServer)
 
-            // Filled in below before handleRequest runs; onsessioninitialized
-            // (fired during handleRequest) closes over this object, which
-            // avoids a shared temporary map key that concurrent initialize
-            // requests could clobber.
-            const newSession = { server: sessionServer } as {
-              transport: WebStandardStreamableHTTPServerTransport
-              server: McpServer
-            }
-
+            // onsessioninitialized (fired during handleRequest) closes over
+            // `newSession`, created right below, which avoids a shared
+            // temporary map key that concurrent initialize requests could clobber.
             const transport = new WebStandardStreamableHTTPServerTransport({
               sessionIdGenerator: () => crypto.randomUUID(),
               enableJsonResponse: true,
@@ -514,10 +577,11 @@ export default function createNetServer (
               }
             })
 
+            const newSession: ISessionEntry = { transport, server: sessionServer, closed: false, waiting: new Set() }
+
             // Connect this session's server to its transport
             await sessionServer.connect(transport)
-
-            newSession.transport = transport
+            trackClose(newSession)
             session = newSession
           }
 
@@ -528,7 +592,8 @@ export default function createNetServer (
 
           // Let the transport handle the MCP protocol
           refreshToolAvailability()
-          const webResponse = await session.transport.handleRequest(webRequest)
+          const pending = session.transport.handleRequest(webRequest)
+          const webResponse = method === 'POST' ? await awaitPostResponse(session, pending) : await pending
 
           // Convert Web Standard Response to HTTP
           const responseHeaders: Record<string, string> = {}

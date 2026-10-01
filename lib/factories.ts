@@ -79,6 +79,8 @@ export interface IToolContext {
   reportProgress: (progress: { progress: number; total: number }) => void;
   /** MCP session issuing the call; resolves the client name credited by AI usage disclosure. */
   sessionId?: string;
+  /** Aborted when the client cancels the call; tools that wait (fetches, timers) should stop. */
+  signal?: AbortSignal;
 }
 
 /** Plain text convenience result or a complete SDK result, including resource content and errors. */
@@ -190,6 +192,7 @@ export function createTool<T extends z.ZodType>(
       if (!isToolAvailable(name)) {
         throw new Error(`Tool "${name}" is unavailable in the current Blockbench project, format, mode, or selection. Refresh tools/list before retrying.`);
       }
+      if (context?.signal?.aborted) throw new Error(`Tool "${name}" was cancelled before it started.`);
       try {
         // Calls from MCP sessions stamp the project they write to (see lib/ai-disclosure);
         // the plugin panel's own test dialog passes no session and is not AI usage.
@@ -359,7 +362,7 @@ function registerToolOnServer(server: McpServer, name: string, definition: ITool
   const register = server.registerTool.bind(server) as unknown as (
     toolName: string,
     config: { title: string; description: string; inputSchema: z.ZodType; annotations?: IToolAnnotations },
-    callback: (args: Record<string, unknown>, extra?: { sessionId?: string }) => Promise<CallToolResult>
+    callback: (args: Record<string, unknown>, extra?: { sessionId?: string; signal?: AbortSignal }) => Promise<CallToolResult>
   ) => RegisteredTool;
   const registration = register(name, {
     title: definition.title,
@@ -367,7 +370,7 @@ function registerToolOnServer(server: McpServer, name: string, definition: ITool
     inputSchema: definition.parameterSchema,
     annotations: definition.annotations,
   }, async (args, extra) => {
-    const result = await definition.execute(args, { reportProgress: () => {}, sessionId: extra?.sessionId });
+    const result = await definition.execute(args, { reportProgress: () => {}, sessionId: extra?.sessionId, signal: extra?.signal });
     if (typeof result === "string") return { content: [{ type: "text", text: result }] };
     return result;
   });

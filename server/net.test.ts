@@ -142,24 +142,33 @@ function toolCall(id: number, name: string): string {
 interface IWaitingTool {
   /** Resolves once the tool is running. */
   readonly started: Promise<void>;
+  /** Cancellation signal the tool received. */
+  signal?: AbortSignal;
   /** Lets the tool finish with the text "released". */
   release(): void;
 }
 
-/** Registers, for one test, a tool that runs until `release()` is called. */
+/** Registers, for one test, a tool that runs until `release()` is called or its signal aborts. */
 function registerWaitingTool(name: string): IWaitingTool {
   let markStarted: () => void = () => {};
   const started = new Promise<void>((resolve) => { markStarted = resolve; });
   const state: IWaitingTool = { release: () => {}, started };
   createTool(name, {
-    description: "Waits until released.",
+    description: "Waits until released or cancelled.",
     parameters: z.object({}),
-    execute: () => new Promise((resolve) => {
+    execute: (_args, context) => new Promise((resolve) => {
+      state.signal = context?.signal;
       state.release = () => resolve("released");
+      context?.signal?.addEventListener("abort", () => resolve("cancelled"));
       markStarted();
     }),
   });
   return state;
+}
+
+/** A notifications/cancelled body. */
+function cancellation(params: Record<string, unknown>): string {
+  return JSON.stringify({ jsonrpc: "2.0", method: "notifications/cancelled", params });
 }
 
 describe("createNetServer listen addresses", () => {
@@ -243,6 +252,105 @@ describe("createNetServer connections", () => {
       expect(ready?.body).toBe('{"ready":true}');
     } finally {
       removeTool("net_test_wait_pipelined");
+    }
+  });
+});
+
+describe("createNetServer pending calls", () => {
+  test("answers a cancelled call with -32800 and aborts the tool's signal", async () => {
+    const tool = registerWaitingTool("net_test_cancel");
+    try {
+      const [server] = await start("127.0.0.1");
+      const port = portOf(server);
+      const sessionId = await initialize(port);
+      const call = request(port, mcpPost(port, sessionId), toolCall(7, "net_test_cancel"));
+      await tool.started;
+
+      const cancel = await request(port, mcpPost(port, sessionId), cancellation({ requestId: 7, reason: "test" }));
+      expect(cancel.status).toBe(202);
+
+      const answered = await call;
+      expect(answered.status).toBe(200);
+      expect(JSON.parse(answered.body)).toMatchObject({ id: 7, error: { code: -32800 } });
+      expect(tool.signal?.aborted).toBe(true);
+    } finally {
+      removeTool("net_test_cancel");
+    }
+  });
+
+  test.each([
+    ["requestId 0, which the SDK ignores", 0, { requestId: 0 }],
+    ["a malformed reason, which the SDK rejects", 9, { requestId: 9, reason: 123 }],
+  ])("a cancellation the SDK does not act on (%s) leaves the call to answer normally", async (_label, id, params) => {
+    const tool = registerWaitingTool("net_test_not_cancelled");
+    try {
+      const [server] = await start("127.0.0.1");
+      const port = portOf(server);
+      const sessionId = await initialize(port);
+      const connection = rawConnection(port);
+      connection.socket.write(rawRequest([...mcpPost(port, sessionId), "Connection: close"], toolCall(id, "net_test_not_cancelled")));
+      await tool.started;
+
+      expect((await request(port, mcpPost(port, sessionId), cancellation(params))).status).toBe(202);
+      await Bun.sleep(50);
+      expect(connection.received()).toBe("");
+      expect(tool.signal?.aborted).toBe(false);
+
+      tool.release();
+      await connection.closed;
+      expect(JSON.parse(splitResponses(connection.received())[0]?.body ?? "")).toMatchObject({
+        id,
+        result: { content: [{ type: "text", text: "released" }] },
+      });
+    } finally {
+      removeTool("net_test_not_cancelled");
+    }
+  });
+
+  test("a batch keeps the result of a call that finished before its cancellation", async () => {
+    const tool = registerWaitingTool("net_test_batch_wait");
+    createTool("net_test_batch_quick", { description: "Answers at once.", parameters: z.object({}), execute: async () => "quick" });
+    try {
+      const [server] = await start("127.0.0.1");
+      const port = portOf(server);
+      const sessionId = await initialize(port);
+      const call = request(port, mcpPost(port, sessionId), `[${toolCall(21, "net_test_batch_quick")},${toolCall(22, "net_test_batch_wait")}]`);
+      await tool.started;
+      // The quick call has answered; its result waits in the transport for the rest of the batch.
+      await Bun.sleep(20);
+
+      expect((await request(port, mcpPost(port, sessionId), cancellation({ requestId: 21 }))).status).toBe(202);
+      expect((await request(port, mcpPost(port, sessionId), cancellation({ requestId: 22 }))).status).toBe(202);
+
+      expect(JSON.parse((await call).body)).toEqual([
+        expect.objectContaining({ id: 21, result: expect.objectContaining({ content: [{ type: "text", text: "quick" }] }) }),
+        expect.objectContaining({ id: 22, error: expect.objectContaining({ code: -32800 }) }),
+      ]);
+    } finally {
+      removeTool("net_test_batch_wait");
+      removeTool("net_test_batch_quick");
+    }
+  });
+
+  test("deleting a session with a pending call aborts the call and answers its POST", async () => {
+    const tool = registerWaitingTool("net_test_wait_delete");
+    try {
+      const [server] = await start("127.0.0.1");
+      const port = portOf(server);
+      const sessionId = await initialize(port);
+      const call = request(port, mcpPost(port, sessionId), toolCall(8, "net_test_wait_delete"));
+      await tool.started;
+
+      const deleted = await request(port, ["DELETE /bb-mcp HTTP/1.1", `Host: 127.0.0.1:${port}`, `Mcp-Session-Id: ${sessionId}`]);
+      expect(deleted.status).toBe(200);
+
+      const answered = await call;
+      expect(answered.status).toBe(404);
+      expect(answered.body).toContain("Session closed before the request completed");
+      expect(tool.signal?.aborted).toBe(true);
+    } finally {
+      tool.release();
+      removeTool("net_test_wait_delete");
     }
   });
 });
