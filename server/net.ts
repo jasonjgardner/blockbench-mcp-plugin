@@ -10,6 +10,7 @@ import {
 } from '@/lib/factories'
 import { createServer as createMcpServer } from '@/server/server'
 import { sessionManager, type ISessionConfig } from '@/lib/sessions'
+import { checkRequest, formatHostForUrl, resolveListenPlan } from '@/server/net-security'
 
 export type { NetServer }
 
@@ -62,6 +63,7 @@ function getStatusText (status: number): string {
     202: 'Accepted',
     204: 'No Content',
     400: 'Bad Request',
+    403: 'Forbidden',
     404: 'Not Found',
     405: 'Method Not Allowed',
     409: 'Conflict',
@@ -98,18 +100,21 @@ export default function createNetServer (
   {
     port,
     endpoint,
+    host,
     keepAlive = DEFAULT_KEEP_ALIVE,
     sessionConfig
   }: {
     endpoint: string
     port: number
+    /** `mcp_host` setting; empty or `localhost` listens on 127.0.0.1 and ::1 only. */
     host?: string
     keepAlive?: Partial<IKeepAliveConfig>
     sessionConfig?: Partial<ISessionConfig>
   }
-): [NetServer, SessionTransports] {
+): [NetServer[], SessionTransports] {
   const sessionTransports: SessionTransports = new Map()
   const keepAliveConfig = { ...DEFAULT_KEEP_ALIVE, ...keepAlive }
+  const listenPlan = resolveListenPlan(host)
 
   // Apply session configuration if provided
   if (sessionConfig) {
@@ -156,7 +161,7 @@ export default function createNetServer (
     }
   })
 
-  const httpServer = createServer((socket: Socket) => {
+  const onConnection = (socket: Socket): void => {
     let buffer = Buffer.alloc(0)
     let socketEnded = false
 
@@ -251,6 +256,25 @@ export default function createNetServer (
 
         const body = buffer.subarray(bodyStart, requestEnd).toString()
         buffer = buffer.subarray(requestEnd)
+
+        // Refuse requests another website could send through the user's browser
+        // (cross-origin pages and DNS rebinding) before any routing happens.
+        const check = checkRequest(headers, listenPlan)
+        if (!check.allowed) {
+          console.warn(`[MCP] Rejected request: ${check.reason}`)
+          sendResponse(
+            socket,
+            403,
+            { 'content-type': 'application/json' },
+            JSON.stringify({
+              jsonrpc: '2.0',
+              error: { code: -32000, message: `Forbidden: ${check.reason}` },
+              id: null
+            }),
+            headers['connection']
+          )
+          continue
+        }
 
         // Build Web Standard Request
         const url = `http://localhost:${port}${path}`
@@ -614,16 +638,44 @@ export default function createNetServer (
 
       return true
     }
+  }
+
+  // One listener per address. Without a host, Node would listen on every
+  // interface and let other computers on the network drive Blockbench.
+  const httpServers = listenPlan.hosts.map((listenHost) => {
+    const httpServer = createServer(onConnection)
+
+    httpServer.on('error', (err: NodeJS.ErrnoException) => {
+      // IPv6 may be disabled; the 127.0.0.1 listener still serves `localhost`.
+      const ipv6LoopbackUnavailable =
+        listenPlan.hosts.length > 1 &&
+        listenHost === '::1' &&
+        (err.code === 'EADDRNOTAVAIL' || err.code === 'EAFNOSUPPORT')
+      if (ipv6LoopbackUnavailable) {
+        console.warn('[MCP] IPv6 loopback (::1) unavailable; listening on 127.0.0.1 only')
+        return
+      }
+      console.error('[MCP] Server error:', err)
+      Blockbench.showQuickMessage(`MCP Server error: ${err.message}`, 3000)
+    })
+
+    httpServer.listen(port, listenHost, () => {
+      const bound = httpServer.address()
+      const boundPort = typeof bound === 'object' && bound ? bound.port : port
+      console.log(
+        `[MCP] Server listening on http://${formatHostForUrl(listenHost)}:${boundPort}${endpoint}`
+      )
+    })
+
+    return httpServer
   })
 
-  httpServer.listen(port, () => {
-    console.log(`[MCP] Server listening on http://localhost:${port}${endpoint}`)
-  })
+  if (!listenPlan.loopbackOnly) {
+    console.warn(
+      `[MCP] mcp_host is "${host}": other computers can connect. ` +
+        `Anyone who can reach port ${port} can control Blockbench.`
+    )
+  }
 
-  httpServer.on('error', (err: Error) => {
-    console.error('[MCP] Server error:', err)
-    Blockbench.showQuickMessage(`MCP Server error: ${err.message}`, 3000)
-  })
-
-  return [httpServer, sessionTransports]
+  return [httpServers, sessionTransports]
 }
