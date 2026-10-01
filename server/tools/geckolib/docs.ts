@@ -86,7 +86,7 @@ export const geckolibToolDocs: IToolSpec[] = [
     name: "geckolib_reverse_keyframe_easing",
     condition: GECKOLIB_CONDITION,
     description:
-      "Mirrors easing directions the way GeckoLib's own reverse-keyframes handler does: each easeIn becomes easeOut and back, the easings shift one keyframe later in time, and the first keyframe of each channel is cleared. Use after reversing keyframe values.",
+      "Reverses and shifts easings the way the GeckoLib plugin's handler for Blockbench's Reverse Keyframes action does: each easeIn becomes easeOut and back, every easing moves to the next later keyframe, and the first keyframe of each channel loses its easing. Use it only after keyframe times were reversed by something that left the easings in place, such as times rewritten with manage_keyframes. Do not use it after the native Reverse Keyframes action or batch_keyframe_operations reverse: with the GeckoLib plugin loaded, both already adjust the easings, so this tool would shift them a second time. It is not its own inverse; use undo to revert it.",
     annotations: { title: "Reverse GeckoLib Keyframe Easing", destructiveHint: false },
     parameters: geckolibReverseKeyframeEasingParameters,
     status: STATUS_EXPERIMENTAL,

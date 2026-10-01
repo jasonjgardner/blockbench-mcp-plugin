@@ -470,6 +470,15 @@ test("reverse groups by animator, so two bones sharing a name do not merge", asy
   expect(twin.rotation.map((frame) => frame.easing)).toEqual([undefined, undefined]);
 });
 
+test("reversing easing twice is not an inverse: each call shifts the easings one key later", async () => {
+  frames[1].easing = "easeInQuad";
+  await call("geckolib_reverse_keyframe_easing", { bone_name: "body", channel: "rotation" });
+  expect(frames.map((frame) => frame.easing)).toEqual([undefined, undefined, "easeOutQuad"]);
+  await call("geckolib_reverse_keyframe_easing", { bone_name: "body", channel: "rotation" });
+  // The second call moves the easing past the last key, so it is lost rather than restored.
+  expect(frames.map((frame) => frame.easing)).toEqual([undefined, undefined, undefined]);
+});
+
 test("validation reports project and compiled-animation findings with check IDs", async () => {
   // @ts-ignore - the host project double stands in for the Blockbench global
   Project.geckolib_modid = "My_Mod";
