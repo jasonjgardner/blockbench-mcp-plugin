@@ -2,13 +2,35 @@
 import type { z } from "zod";
 import { createTool } from "@/lib/factories";
 import { runUndoableAnimationEdit } from "@/lib/animation-undo";
+import type { IGeckolibKeyframe } from "@/lib/geckolib";
+import { reverseEasing } from "@/lib/geckolib-easing";
 import { animationToolDocs } from "./docs";
 import { batchKeyframeOperationsParameters } from "./schemas";
-import { KEYFRAME_TIME_EPSILON, TRANSFORM_CHANNELS, applyKeyframeValues, findAnimationOrSelected } from "./shared";
+import {
+  KEYFRAME_TIME_EPSILON,
+  TRANSFORM_CHANNELS,
+  applyKeyframeValues,
+  findAnimationOrSelected,
+  geckolibEasedFrames,
+  readGeckolibEasing,
+} from "./shared";
 
 type Input = z.infer<typeof batchKeyframeOperationsParameters>;
 type Parameters = NonNullable<Input["parameters"]>;
 type Mutation = () => void;
+
+/** A staged operation and the notes its result reports. */
+interface IBatchPlan {
+  apply: Mutation;
+  notes: string[];
+}
+
+/** GeckoLib easing fields staged for one keyframe. */
+interface IEasingEdit {
+  frame: IGeckolibKeyframe;
+  easing: string | undefined;
+  easingArgs: number[] | undefined;
+}
 
 /** Bounds synchronous sampling so tiny intervals cannot hang the editor. */
 const MAX_BAKED_KEYFRAMES = 10000;
@@ -89,11 +111,79 @@ function planOffset(frames: BBKeyframe[], parameters: Parameters): Mutation {
   return () => { times?.(); values?.(); };
 }
 
-function planScale(frames: BBKeyframe[], parameters: Parameters): Mutation {
+function writeEasing({ frame, easing, easingArgs }: IEasingEdit): void {
+  frame.easing = easing;
+  frame.easingArgs = easingArgs;
+}
+
+/** Stages removing the GeckoLib easing of keys whose incoming segment the operation replaces. */
+function planEasingRemoval(frames: readonly BBKeyframe[], reason: string): IBatchPlan {
+  const edits = geckolibEasedFrames(frames).map((frame): IEasingEdit => ({ frame, easing: undefined, easingArgs: undefined }));
+  return {
+    apply: () => edits.forEach(writeEasing),
+    notes: edits.length ? [`Cleared the GeckoLib easing of ${edits.length} keyframe(s): ${reason}.`] : [],
+  };
+}
+
+/**
+ * Stages GeckoLib easings for keys whose order reverses, like the GeckoLib
+ * plugin's handler for Blockbench's Reverse Keyframes action. An easing shapes
+ * the segment arriving at its key, so each easing flips direction (easeIn and
+ * easeOut swap) and moves to the key that now ends the same segment; the
+ * earliest key of each channel loses its easing.
+ */
+function planReversedEasings(frames: readonly BBKeyframe[], timeFor: (frame: BBKeyframe) => number): IBatchPlan {
+  if (!geckolibEasedFrames(frames).length) return { apply: () => undefined, notes: [] };
+  const edits = [...Map.groupBy(frames, frame => frame.animator)].flatMap(([, animatorFrames]) =>
+    [...Map.groupBy(animatorFrames, frame => frame.channel)].flatMap(([, channelFrames]) => {
+      const ordered: IGeckolibKeyframe[] = channelFrames.toSorted((a, b) => timeFor(a) - timeFor(b));
+      return ordered.map((frame, index): IEasingEdit => {
+        if (index === 0) return { frame, easing: undefined, easingArgs: undefined };
+        const source = readGeckolibEasing(ordered[index - 1]);
+        return { frame, easing: reverseEasing(source.easing), easingArgs: source.easingArgs };
+      });
+    }));
+  return {
+    apply: () => edits.forEach(writeEasing),
+    notes: ["GeckoLib easings were reversed and moved to the key each segment now arrives at, as the GeckoLib plugin does."],
+  };
+}
+
+/** The per-key part of Blockbench's Reverse Keyframes action: pre/post values and Bezier handles swap sides. */
+function reverseKeyframeContent(frame: BBKeyframe): void {
+  if (frame.transform && frame.data_points.length > 1) frame.data_points.reverse();
+  if (frame.interpolation !== "bezier") return;
+  const rightTime = [...frame.bezier_right_time];
+  const rightValue = [...frame.bezier_right_value];
+  [0, 1, 2].forEach(slot => {
+    frame.bezier_right_time[slot] = -frame.bezier_left_time[slot];
+    frame.bezier_right_value[slot] = frame.bezier_left_value[slot];
+    frame.bezier_left_time[slot] = -rightTime[slot];
+    frame.bezier_left_value[slot] = rightValue[slot];
+  });
+}
+
+/** Reverses the order of keys like the native Reverse Keyframes action, including GeckoLib easings. */
+function planReversal(frames: BBKeyframe[], timeFor: (frame: BBKeyframe) => number): IBatchPlan {
+  const retime = planTimes(frames, timeFor);
+  const easings = planReversedEasings(frames, timeFor);
+  return {
+    apply: () => {
+      retime();
+      frames.forEach(reverseKeyframeContent);
+      easings.apply();
+    },
+    notes: easings.notes,
+  };
+}
+
+/** A negative factor also reverses key order, so it is handled like reverse. */
+function planScale(frames: BBKeyframe[], parameters: Parameters): IBatchPlan {
   const factor = parameters.scale_factor;
   if (factor === undefined) throw new Error("Scale requires scale_factor.");
   const pivot = parameters.scale_pivot ?? 0;
-  return planTimes(frames, frame => pivot + (frame.time - pivot) * factor);
+  const timeFor = (frame: BBKeyframe): number => pivot + (frame.time - pivot) * factor;
+  return factor < 0 ? planReversal(frames, timeFor) : { apply: planTimes(frames, timeFor), notes: [] };
 }
 
 function planMirror(frames: BBKeyframe[], parameters: Parameters): Mutation {
@@ -126,8 +216,25 @@ function sampleTimes(selected: BBKeyframe[], channelFrames: BBKeyframe[], interv
   return [...new Set([...grid, end, ...original])].toSorted((a, b) => a - b);
 }
 
-/** Samples original curves before any insertion, restoring the playhead on every exit. */
-function planBake(frames: BBKeyframe[], animation: BBAnimation, parameters: Parameters): Mutation {
+/** Smoothing switches keys to catmullrom, where GeckoLib reads no easing, so their easings are cleared in the same edit. */
+function planSmooth(frames: BBKeyframe[]): IBatchPlan {
+  frames.forEach(numericValues);
+  const easings = planEasingRemoval(frames, "GeckoLib ignores easings on smooth (catmullrom) keys");
+  return {
+    apply: () => {
+      frames.forEach(frame => { frame.interpolation = "catmullrom"; });
+      easings.apply();
+    },
+    notes: easings.notes,
+  };
+}
+
+/**
+ * Samples original curves before any insertion, restoring the playhead on every exit.
+ * GeckoLib easings shape the samples, so keys inside a baked span lose theirs;
+ * the first key of each span keeps the easing of the segment arriving from before it.
+ */
+function planBake(frames: BBKeyframe[], animation: BBAnimation, parameters: Parameters): IBatchPlan {
   const interval = parameters.bake_interval ?? 1 / animation.snapping;
   if (!Number.isFinite(interval) || interval < KEYFRAME_TIME_EPSILON) throw new Error(`bake_interval must be at least ${KEYFRAME_TIME_EPSILON} seconds.`);
   const groups = [...Map.groupBy(frames, frame => frame.animator)].flatMap(([animator, selected]) =>
@@ -157,29 +264,38 @@ function planBake(frames: BBKeyframe[], animation: BBAnimation, parameters: Para
   } finally {
     Timeline.time = originalTime;
   }
-  return () => {
-    samples.forEach(({ animator, channel, time, values, existing }) => {
-      const frame = existing ?? animator.addKeyframe({ channel, time, interpolation: "linear", data_points: [{}] });
-      if (!frame) throw new Error("The animator could not create a baked keyframe.");
-      applyKeyframeValues(frame, values);
-      frame.interpolation = "linear";
-    });
+  const inside = plans.flatMap(({ channelFrames, times }) => channelFrames.filter(frame =>
+    frame.time > times[0] + KEYFRAME_TIME_EPSILON && frame.time < (times.at(-1) ?? 0) + KEYFRAME_TIME_EPSILON));
+  const easings = planEasingRemoval(inside, "the baked samples already follow the eased curve");
+  return {
+    apply: () => {
+      samples.forEach(({ animator, channel, time, values, existing }) => {
+        const frame = existing ?? animator.addKeyframe({ channel, time, interpolation: "linear", data_points: [{}] });
+        if (!frame) throw new Error("The animator could not create a baked keyframe.");
+        applyKeyframeValues(frame, values);
+        frame.interpolation = "linear";
+      });
+      easings.apply();
+    },
+    notes: easings.notes,
   };
 }
 
-const planners: Record<Input["operation"], (frames: BBKeyframe[], animation: BBAnimation, parameters: Parameters) => Mutation> = {
-  offset: (frames, _animation, parameters) => planOffset(frames, parameters),
+/** Wraps a plan that reports nothing beyond the operation itself. */
+function silent(apply: Mutation): IBatchPlan {
+  return { apply, notes: [] };
+}
+
+const planners: Record<Input["operation"], (frames: BBKeyframe[], animation: BBAnimation, parameters: Parameters) => IBatchPlan> = {
+  offset: (frames, _animation, parameters) => silent(planOffset(frames, parameters)),
   scale: (frames, _animation, parameters) => planScale(frames, parameters),
   reverse: frames => {
     const times = frames.map(frame => frame.time);
     const sum = Math.min(...times) + Math.max(...times);
-    return planTimes(frames, frame => sum - frame.time);
+    return planReversal(frames, frame => sum - frame.time);
   },
-  mirror: (frames, _animation, parameters) => planMirror(frames, parameters),
-  smooth: frames => {
-    frames.forEach(numericValues);
-    return () => { frames.forEach(frame => { frame.interpolation = "catmullrom"; }); };
-  },
+  mirror: (frames, _animation, parameters) => silent(planMirror(frames, parameters)),
+  smooth: planSmooth,
   bake: planBake,
 };
 
@@ -198,13 +314,13 @@ export function registerBatchKeyframeOperationsTool(): void {
       if (!animation) throw new Error("No animation selected.");
       const frames = selectFrames(animation, input);
       if (!frames.length) throw new Error("No keyframes found matching selection criteria.");
-      const mutate = planners[input.operation](frames, animation, input.parameters ?? {});
+      const plan = planners[input.operation](frames, animation, input.parameters ?? {});
       runUndoableAnimationEdit({ animations: [animation] }, `Batch keyframe operation: ${input.operation}`, () => {
-        mutate();
+        plan.apply();
         animation.setLength();
         Animator.preview();
       });
-      return `Performed ${input.operation} on ${frames.length} keyframes`;
+      return [`Performed ${input.operation} on ${frames.length} keyframes.`, ...plan.notes].join(" ");
     },
   }, animationToolDocs[5].status);
 }

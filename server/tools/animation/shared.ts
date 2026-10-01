@@ -1,4 +1,33 @@
 /// <reference types="blockbench-types" />
+import { isGeckolibFormat, type IGeckolibKeyframe } from "@/lib/geckolib";
+
+/** A keyframe's GeckoLib easing fields, detached from the keyframe. */
+export interface IGeckolibEasing {
+  easing: string | undefined;
+  easingArgs: number[] | undefined;
+}
+
+/**
+ * Reads the `easing`/`easingArgs` the GeckoLib plugin adds to keyframes, which
+ * blockbench-types omit; both are undefined outside GeckoLib projects.
+ */
+export function readGeckolibEasing(frame: BBKeyframe): IGeckolibEasing {
+  const easing: unknown = Reflect.get(frame, "easing");
+  const easingArgs: unknown = Reflect.get(frame, "easingArgs");
+  return {
+    easing: typeof easing === "string" ? easing : undefined,
+    easingArgs: Array.isArray(easingArgs) ? structuredClone(easingArgs) : undefined,
+  };
+}
+
+/** Keys carrying a GeckoLib easing in a GeckoLib project; empty in every other format. */
+export function geckolibEasedFrames(frames: readonly BBKeyframe[]): IGeckolibKeyframe[] {
+  if (!isGeckolibFormat()) return [];
+  return frames.filter((frame): frame is IGeckolibKeyframe => {
+    const { easing, easingArgs } = readGeckolibEasing(frame);
+    return easing !== undefined || easingArgs !== undefined;
+  });
+}
 
 /**
  * Transform channels a bone animator stores keyframes for, in the order

@@ -11,6 +11,12 @@ interface IFrameData {
   data_points: Record<string, unknown>[];
   values?: (number | string)[];
   uniform?: boolean;
+  easing?: string;
+  easingArgs?: number[];
+  bezier_left_time?: Vector;
+  bezier_left_value?: Vector;
+  bezier_right_time?: Vector;
+  bezier_right_value?: Vector;
 }
 interface ISnapshot {
   length: number;
@@ -19,6 +25,7 @@ interface ISnapshot {
 
 let fixture: IToolFixture;
 let animation: TestAnimation;
+let format: { id: string };
 let failPreview: boolean;
 let failCreation: boolean;
 let failSample: boolean;
@@ -32,6 +39,13 @@ class TestFrame {
   channel: string;
   interpolation: string;
   uniform: boolean;
+  /** GeckoLib plugin fields, present only on keys that carry an easing. */
+  easing?: string;
+  easingArgs?: number[];
+  bezier_left_time: Vector;
+  bezier_left_value: Vector;
+  bezier_right_time: Vector;
+  bezier_right_value: Vector;
   constructor(readonly animator: TestAnimator, data: IFrameData) {
     this.time = data.time;
     this.channel = data.channel;
@@ -39,7 +53,14 @@ class TestFrame {
     this.data_points = structuredClone(data.data_points);
     this.values = [...data.values ?? [0, 0, 0]];
     this.uniform = data.uniform ?? false;
+    this.easing = data.easing;
+    this.easingArgs = data.easingArgs && [...data.easingArgs];
+    this.bezier_left_time = [...data.bezier_left_time ?? [-0.1, -0.1, -0.1]];
+    this.bezier_left_value = [...data.bezier_left_value ?? [0, 0, 0]];
+    this.bezier_right_time = [...data.bezier_right_time ?? [0.1, 0.1, 0.1]];
+    this.bezier_right_value = [...data.bezier_right_value ?? [0, 0, 0]];
   }
+  get transform(): boolean { return ["rotation", "position", "scale"].includes(this.channel); }
   getArray(): (number | string)[] { return [...this.values]; }
   set(axis: "x" | "y" | "z", value: number): void {
     if (this.uniform) { this.values.fill(value); return; }
@@ -79,6 +100,9 @@ function snapshot(): ISnapshot {
     frames: Object.fromEntries(Object.entries(animation.animators).map(([name, animator]) => [name, animator.keyframes.map(frame => ({
       time: frame.time, channel: frame.channel, values: [...frame.values], interpolation: frame.interpolation,
       uniform: frame.uniform, data_points: structuredClone(frame.data_points),
+      easing: frame.easing, easingArgs: frame.easingArgs && [...frame.easingArgs],
+      bezier_left_time: [...frame.bezier_left_time], bezier_left_value: [...frame.bezier_left_value],
+      bezier_right_time: [...frame.bezier_right_time], bezier_right_value: [...frame.bezier_right_value],
     }))])),
   };
 }
@@ -105,6 +129,7 @@ beforeAll(async () => {
 });
 beforeEach(() => {
   animation = new TestAnimation();
+  format = { id: "bedrock" };
   timeline.time = 0.7;
   timeline.selected = [];
   timeline.keyframes = [];
@@ -117,6 +142,7 @@ beforeEach(() => {
 useGlobals(() => ({
   Animation: { all: [animation], selected: animation },
   Animator: { preview() { if (failPreview) throw new Error("Preview failed"); } },
+  Format: format,
   Timeline: timeline,
   Undo: undo,
 }));
@@ -251,5 +277,96 @@ describe("bounded native numeric baking", () => {
     await expect(call("bake", { bake_interval: 0.5 })).rejects.toThrow();
     expect(snapshot()).toEqual(before);
     expect(undo.starts).toBe(0);
+  });
+});
+
+describe("native reversal and GeckoLib easings", () => {
+  /** Three rotation keys with GeckoLib easings on the segments arriving at 0.5 s and 1 s. */
+  function easedKeys(): TestFrame[] {
+    const keys = [add(0, [0, 0, 0]), add(0.5, [1, 1, 1]), add(1, [2, 2, 2])];
+    keys[1].easing = "easeInQuad";
+    keys[2].easing = "easeOutBack";
+    keys[2].easingArgs = [2];
+    return keys;
+  }
+
+  test("reverse flips and shifts GeckoLib easings like the plugin's Reverse Keyframes handler, reversibly", async () => {
+    format.id = "geckolib_model";
+    const [first, middle, last] = easedKeys();
+    timeline.selected = [first, middle, last];
+    const before = snapshot();
+    const result = await call("reverse");
+    expect([first.time, middle.time, last.time]).toEqual([1, 0.5, 0]);
+    // Easings shape the segment arriving at a key, so each one moves to the key that now ends its segment.
+    expect([last.easing, middle.easing, first.easing]).toEqual([undefined, "easeInBack", "easeOutQuad"]);
+    expect([last.easingArgs, middle.easingArgs, first.easingArgs]).toEqual([undefined, [2], undefined]);
+    expect(String(result)).toContain("GeckoLib easings were reversed");
+    const after = snapshot();
+    undo.undo();
+    expect(snapshot()).toEqual(before);
+    undo.redo();
+    expect(snapshot()).toEqual(after);
+  });
+
+  test("reverse swaps pre/post values and Bezier handles like the native action", async () => {
+    const pre = add(0);
+    pre.data_points.splice(0, 1, { x: 1 }, { x: 2 });
+    const curved = add(1);
+    curved.interpolation = "bezier";
+    curved.bezier_left_time = [-0.2, -0.3, -0.4];
+    curved.bezier_left_value = [1, 2, 3];
+    curved.bezier_right_time = [0.5, 0.6, 0.7];
+    curved.bezier_right_value = [4, 5, 6];
+    timeline.selected = [pre, curved];
+    await call("reverse");
+    expect(pre.data_points).toEqual([{ x: 2 }, { x: 1 }]);
+    expect(curved.bezier_left_time).toEqual([-0.5, -0.6, -0.7]);
+    expect(curved.bezier_left_value).toEqual([4, 5, 6]);
+    expect(curved.bezier_right_time).toEqual([0.2, 0.3, 0.4]);
+    expect(curved.bezier_right_value).toEqual([1, 2, 3]);
+  });
+
+  test("a negative scale factor reverses key order and easings too", async () => {
+    format.id = "geckolib_model";
+    const [first, middle, last] = easedKeys();
+    timeline.selected = [first, middle, last];
+    await call("scale", { scale_factor: -2, scale_pivot: 1 });
+    expect([first.time, middle.time, last.time]).toEqual([3, 2, 1]);
+    expect([last.easing, middle.easing, first.easing]).toEqual([undefined, "easeInBack", "easeOutQuad"]);
+  });
+
+  test("smooth clears GeckoLib easings inside the same undoable edit and says so", async () => {
+    format.id = "geckolib_model";
+    const keys = easedKeys();
+    timeline.selected = keys;
+    const before = snapshot();
+    const result = await call("smooth");
+    expect(keys.map(frame => [frame.interpolation, frame.easing, frame.easingArgs])).toEqual([
+      ["catmullrom", undefined, undefined], ["catmullrom", undefined, undefined], ["catmullrom", undefined, undefined],
+    ]);
+    expect(String(result)).toContain("Cleared the GeckoLib easing of 2 keyframe(s)");
+    undo.undo();
+    expect(snapshot()).toEqual(before);
+  });
+
+  test("bake clears easings inside the baked span and keeps the easing arriving at its first key", async () => {
+    format.id = "geckolib_model";
+    const [first, , last] = easedKeys();
+    first.easing = "easeInSine";
+    const outside = add(3);
+    outside.easing = "easeOutSine";
+    timeline.selected = [first, last];
+    const result = await call("bake", { bake_interval: 0.25 });
+    const eased = animation.animators.visible.keyframes.filter(frame => frame.easing).map(frame => [frame.time, frame.easing]);
+    expect(eased).toEqual([[0, "easeInSine"], [3, "easeOutSine"]]);
+    expect(String(result)).toContain("Cleared the GeckoLib easing of 2 keyframe(s)");
+  });
+
+  test("other formats leave easing fields untouched", async () => {
+    const keys = easedKeys();
+    timeline.selected = keys;
+    const result = await call("reverse");
+    expect(keys.map(frame => frame.easing)).toEqual([undefined, "easeInQuad", "easeOutBack"]);
+    expect(String(result)).toBe("Performed reverse on 3 keyframes.");
   });
 });

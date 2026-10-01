@@ -85,7 +85,7 @@ export const animationToolDocs: IToolSpec[] = [
   {
     name: "batch_keyframe_operations",
     condition: { project: true, features: ["animation_mode"] },
-    description: "Edits keyframes in the active animation atomically; all includes hidden animators. Numeric value edits use native transform values. Bake samples continuous numeric curves within selected channel spans, caps output at 10000 samples, and restores the playhead. Expressions, step/pre-post curves and effect channels require native baking.",
+    description: "Edits keyframes in the active animation atomically; all includes hidden animators. Numeric value edits use native transform values. Reverse follows the native Reverse Keyframes action, including the GeckoLib plugin's easing adjustment. Bake samples continuous numeric curves within selected channel spans, caps output at 10000 samples, and restores the playhead. Expressions, step/pre-post curves and effect channels require native baking. Smooth and bake clear GeckoLib easings they replace and report it.",
     annotations: {
       title: "Batch Keyframe Operations",
       destructiveHint: true,

@@ -230,7 +230,7 @@ export const batchKeyframeOperationsParameters = z.object({
     .describe("Pattern-based selection."),
   operation: z
     .enum(["offset", "scale", "reverse", "mirror", "smooth", "bake"])
-    .describe("Operation to perform on keyframes."),
+    .describe("Operation to perform on keyframes. reverse works like Blockbench's Reverse Keyframes action: times flip within the selection, pre/post values and Bezier handles swap, and GeckoLib easings flip direction and move to the key their segment now arrives at, as the GeckoLib plugin does. smooth and bake clear the GeckoLib easings they replace and report it."),
   parameters: z
     .object({
       offset_time: z.number().finite().optional().describe("Time offset to apply; resulting keyframes must remain between 0 and 10000 seconds."),
@@ -239,7 +239,7 @@ export const batchKeyframeOperationsParameters = z.object({
         .number()
         .finite()
         .optional()
-        .describe("Scale factor for keyframe times around scale_pivot. Does not scale values; zero is accepted only when it creates no timestamp collisions."),
+        .describe("Scale factor for keyframe times around scale_pivot. Does not scale values; zero is accepted only when it creates no timestamp collisions. A negative factor also reverses the keys like reverse."),
       scale_pivot: z
         .number()
         .finite()
