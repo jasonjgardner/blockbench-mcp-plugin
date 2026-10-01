@@ -1,6 +1,6 @@
 {
-  "version": "1.9.3",
-  "generatedAt": "2026-10-01T02:39:55.671Z",
+  "version": "1.10.0",
+  "generatedAt": "2026-10-01T22:40:53.841Z",
   "tools": [
     {
       "name": "place_cube",
@@ -6060,8 +6060,9 @@
               },
               "radius": {
                 "type": "number",
-                "description": "Radius for expand/contract/feather operations.",
-                "markdownDescription": "Radius for expand/contract/feather operations."
+                "maximum": 64,
+                "description": "Radius in pixels for expand/contract operations (at most 64).",
+                "markdownDescription": "Radius in pixels for expand/contract operations (at most 64)."
               },
               "mode": {
                 "type": "string",
