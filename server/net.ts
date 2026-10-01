@@ -79,6 +79,9 @@ function getStatusText (status: number): string {
 /** Largest request body accepted; larger requests are refused before being buffered. */
 const MAX_BODY_BYTES = 16 * 1024 * 1024
 
+/** Bytes a connection may queue while its current request is answered: about one more request. */
+const MAX_QUEUED_BYTES = MAX_BODY_BYTES + 64 * 1024
+
 /**
  * Validates the framing headers of one request. `Content-Length` must be
  * plain digits: `parseInt` accepts "x" (NaN) and negative values, which made
@@ -196,6 +199,8 @@ export default function createNetServer (
   const onConnection = (socket: Socket): void => {
     let buffer = Buffer.alloc(0)
     let socketEnded = false
+    /** `processHttpRequests` is running; it reads bytes that arrive meanwhile once its request is answered. */
+    let processing = false
 
     // Configure TCP keep-alive for connection health
     if (keepAliveConfig.enabled) {
@@ -218,6 +223,14 @@ export default function createNetServer (
     socket.on('data', (chunk: Buffer) => {
       if (socketEnded) return
       buffer = Buffer.concat([buffer, chunk])
+      // One loop per connection: a request that arrives while another is still
+      // being answered (HTTP pipelining) must wait, or a second loop would
+      // answer it first and the responses would come out of order.
+      if (processing) {
+        if (buffer.length > MAX_QUEUED_BYTES) socket.destroy()
+        return
+      }
+      processing = true
       processHttpRequests().catch(err => {
         console.error('[MCP] Unhandled error in processHttpRequests:', err)
         // Try to send error response if socket is still writable
@@ -235,6 +248,8 @@ export default function createNetServer (
             socket.destroy()
           }
         }
+      }).finally(() => {
+        processing = false
       })
     })
 
