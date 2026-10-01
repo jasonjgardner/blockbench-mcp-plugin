@@ -381,6 +381,20 @@ export const cubeSchema = z.object({
     .optional()
     .default([0, 0, 0])
     .describe("Rotation of the cube."),
+  inflate: z
+    .number()
+    .finite()
+    .optional()
+    .describe("Grows the cube by this amount on every side without changing from/to."),
+  uv_offset: z
+    .array(z.number().finite())
+    .length(2)
+    .optional()
+    .describe("Box UV net offset [u, v]. Requires box UV."),
+  mirror_uv: z
+    .boolean()
+    .optional()
+    .describe("Mirror the box UV net. Requires box UV; for per-face mirroring, reverse the face rectangle endpoints."),
 });
 
 /**

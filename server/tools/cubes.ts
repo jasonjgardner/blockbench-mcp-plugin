@@ -88,12 +88,16 @@ function activeShadingFormat(): ICubeShadingFormat {
   };
 }
 
-/** A place_cube element: shared geometry plus optional shading fields. */
+/**
+ * A place_cube element: shared geometry plus optional shading fields. Strict, so
+ * an unknown key (a typo, or a property place_cube does not set) is an error
+ * instead of being dropped while the cube is created without it.
+ */
 const placeCubeElementSchema = cubeSchema.extend({
   shade: shadeSchema.optional(),
   shade_direction_override: shadeDirectionOverrideEnum.optional(),
   light_emission: lightEmissionSchema.optional(),
-});
+}).strict();
 
 /**
  * Creates a nonempty batch of cubes with optional texture and parent references.
@@ -198,7 +202,7 @@ export const cubeToolDocs: IToolSpec[] = [
     name: "place_cube",
     condition: { project: true, features: ["edit_mode"] },
     description:
-      "Creates cubes in one reversible edit. Texture and group are optional, allowing untextured blockouts. Explicit face targets never use the current UV selection; partial/custom faces require per-face UV support.",
+      "Creates cubes in one reversible edit. Texture and group are optional, allowing untextured blockouts. Explicit face targets never use the current UV selection; partial/custom faces require per-face UV support. Elements accept inflate, plus uv_offset and mirror_uv for box UV cubes; unknown element fields are rejected.",
     annotations: {
       title: "Place Cube",
       destructiveHint: true,
@@ -281,6 +285,14 @@ async function placeCubes({ elements, texture, faces, group }: PlaceCubeInput): 
   if (needsPerFace && Format.box_uv && !Format.optional_box_uv) {
     throw new Error("The current format only supports box UV. Custom UV rectangles and partial face texture assignments require per-face UV support.");
   }
+  // New cubes follow the project's UV mode unless per-face targets switch them off.
+  // uv_offset and mirror_uv only place the box UV net, so on per-face cubes only
+  // values that would change something are refused ([0, 0] and false are no-ops).
+  const boxUv = !needsPerFace && Boolean(Project.box_uv);
+  const boxNet = elements.find(element => element.mirror_uv === true || (element.uv_offset ?? []).some(value => value !== 0));
+  if (boxNet && !boxUv) {
+    throw new Error(`Cube "${boxNet.name}": uv_offset and mirror_uv place the box UV net, but these cubes use per-face UV${needsPerFace ? " because partial or custom faces were requested" : ""}. Omit them; for per-face mirroring, reverse the face rectangle endpoints.`);
+  }
   const hytale = isHytaleFormat();
   if (hytale) validateHytaleRectangles(elements, rectangles);
   const autouv = hytale || faces === true || (Array.isArray(faces) && rectangles.length === 0 && sides.length > 0);
@@ -297,6 +309,9 @@ async function placeCubes({ elements, texture, faces, group }: PlaceCubeInput): 
         to: element.to as [number, number, number],
         origin: element.origin as [number, number, number],
         rotation: element.rotation as [number, number, number],
+        ...(element.inflate !== undefined && { inflate: element.inflate }),
+        ...(element.uv_offset !== undefined && { uv_offset: [element.uv_offset[0], element.uv_offset[1]] as [number, number] }),
+        ...(element.mirror_uv !== undefined && { mirror_uv: element.mirror_uv }),
       });
       cubes.push(cube);
       if (needsPerFace) cube.box_uv = false;

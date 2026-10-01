@@ -21,6 +21,9 @@ interface ICubeData {
   rotation: number[];
   autouv: number;
   box_uv: boolean;
+  inflate: number;
+  uv_offset: number[];
+  mirror_uv: boolean;
   faces: Record<Side, IFaceData>;
 }
 /** Property snapshots own creation/deletion, while the outline only owns parenting. */
@@ -81,6 +84,9 @@ class HostCube {
   rotation = [0, 0, 0];
   autouv = 0;
   box_uv = project.box_uv;
+  inflate = 0;
+  uv_offset = [0, 0];
+  mirror_uv = false;
   faces: Record<Side, HostFace> = {
     north: new HostFace(), east: new HostFace(), south: new HostFace(),
     west: new HostFace(), up: new HostFace(), down: new HostFace(),
@@ -140,7 +146,7 @@ function cubeData(cube: HostCube): ICubeData {
   return {
     uuid: cube.uuid, name: cube.name, from: [...cube.from], to: [...cube.to],
     origin: [...cube.origin], rotation: [...cube.rotation], autouv: cube.autouv,
-    box_uv: cube.box_uv,
+    box_uv: cube.box_uv, inflate: cube.inflate, uv_offset: [...cube.uv_offset], mirror_uv: cube.mirror_uv,
     faces: Object.fromEntries(SIDES.map(side => [side, {
       uv: [...cube.faces[side].uv], texture: cube.faces[side].texture,
     }])) as Record<Side, IFaceData>,
@@ -450,4 +456,46 @@ test.each(["auto UV", "preview"])("modify_cube %s failure reverts every cube and
   expect(undo.pending).toBeUndefined();
   expect(undo.lastEdit).toBeUndefined();
   expect(undo.cancels).toBe(1);
+});
+
+test("inflate, uv_offset and mirror_uv reach box UV cubes and survive undo/redo", async () => {
+  project.box_uv = true;
+  format.box_uv = true;
+  format.optional_box_uv = true;
+  await tools.call("place_cube", { elements: [{ name: "Hat", from: [0, 0, 0], to: [8, 8, 8], inflate: 0.5, uv_offset: [32, 0], mirror_uv: true }] });
+  const cube = required(HostCube.all[0], "created cube");
+  expect(cube).toMatchObject({ box_uv: true, inflate: 0.5, uv_offset: [32, 0], mirror_uv: true });
+  const created = model();
+  undo.undo();
+  expect(HostCube.all).toEqual([]);
+  undo.redo();
+  expect(model()).toEqual(created);
+});
+
+test("inflate applies to per-face cubes too", async () => {
+  await tools.call("place_cube", { elements: [{ name: "Shell", inflate: 0.25 }] });
+  expect(required(HostCube.all[0], "created cube").inflate).toBe(0.25);
+});
+
+test.each([
+  { label: "a per-face project", setup: () => {}, faces: undefined },
+  { label: "partial faces in a box UV project", setup: () => { project.box_uv = true; format.box_uv = true; format.optional_box_uv = true; }, faces: ["up"] },
+])("uv_offset and mirror_uv are refused before Undo for $label", async ({ setup, faces }) => {
+  setup();
+  await expect(tools.call("place_cube", { elements: [{ name: "Arm", uv_offset: [16, 0] }], ...(faces && { faces }) })).rejects.toThrow('Cube "Arm": uv_offset and mirror_uv place the box UV net');
+  await expect(tools.call("place_cube", { elements: [{ name: "Arm", mirror_uv: true }], ...(faces && { faces }) })).rejects.toThrow("per-face UV");
+  expect(undo.starts).toBe(0);
+  expect(HostCube.all).toEqual([]);
+});
+
+test("no-op uv_offset and mirror_uv values are accepted on per-face cubes", async () => {
+  await tools.call("place_cube", { elements: [{ name: "Plain", uv_offset: [0, 0], mirror_uv: false }] });
+  expect(required(HostCube.all[0], "created cube")).toMatchObject({ box_uv: false, uv_offset: [0, 0], mirror_uv: false });
+});
+
+test("unknown element fields are rejected instead of silently dropped", async () => {
+  await expect(tools.call("place_cube", { elements: [{ name: "Typo", inflat: 0.5 }] })).rejects.toThrow("Unrecognized key");
+  await expect(tools.call("place_cube", { elements: [{ name: "Unsupported", box_uv: false }] })).rejects.toThrow("Unrecognized key");
+  expect(undo.starts).toBe(0);
+  expect(HostCube.all).toEqual([]);
 });
