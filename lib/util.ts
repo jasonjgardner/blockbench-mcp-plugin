@@ -186,20 +186,24 @@ export function findGroupOrThrow(name: string): Group {
 }
 
 /**
- * Finds a mesh by ID or name and throws an actionable error if not found.
+ * Finds a mesh by UUID, or by a unique name, and throws an actionable error if not found.
  * @param id - The UUID or name of the mesh to find
  * @returns The found Mesh
- * @throws Error with suggestion to use list_outline
+ * @throws Error with suggestion to use list_outline, or listing the UUIDs when the name is shared
  */
 export function findMeshOrThrow(id: string): Mesh {
-  // @ts-ignore - Mesh is globally available in Blockbench
-  const mesh = Mesh.all.find((m: Mesh) => m.uuid === id || m.name === id);
-  if (!mesh) {
-    throw new Error(
-      `Mesh "${id}" not found. Use the list_outline tool to see available meshes.`
-    );
+  // UUID first; a name must be unique, as in findElementOrThrow, or edits land on the wrong mesh.
+  const byUuid = Mesh.all.find((m: Mesh) => m.uuid === id);
+  if (byUuid) return byUuid;
+  const byName = Mesh.all.filter((m: Mesh) => m.name === id);
+  if (byName.length === 1) return byName[0];
+  if (byName.length > 1) {
+    const listed = byName.map((m: Mesh) => m.uuid).join(", ");
+    throw new Error(`Mesh name "${id}" matches ${byName.length} meshes (${listed}); pass the UUID of the one you mean.`);
   }
-  return mesh;
+  throw new Error(
+    `Mesh "${id}" not found. Use the list_outline tool to see available meshes.`
+  );
 }
 
 /**
