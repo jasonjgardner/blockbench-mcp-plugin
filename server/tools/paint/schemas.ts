@@ -30,8 +30,8 @@ import {
  */
 export const paintFillToolParameters = z.object({
   texture_id: textureIdOptionalSchema,
-  x: z.number().describe("X coordinate to start fill."),
-  y: z.number().describe("Y coordinate to start fill."),
+  x: z.number().finite().describe("Texture pixel X where the fill starts; must lie inside the texture except for 'selection' and 'selected_elements' fills, which ignore it."),
+  y: z.number().finite().describe("Texture pixel Y where the fill starts; must lie inside the texture except for 'selection' and 'selected_elements' fills, which ignore it."),
   color: hexColorSchema.describe("Fill color as hex string."),
   opacity: opacitySchema.describe("Fill opacity (0-255)."),
   tolerance: z

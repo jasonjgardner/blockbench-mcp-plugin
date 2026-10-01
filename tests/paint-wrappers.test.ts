@@ -61,9 +61,22 @@ function emptyPainterContext(): IPainterContext {
   return {};
 }
 
+/** A pixel layer: Blockbench's TextureLayer offset and canvas size. */
+class TestLayer {
+  constructor(readonly name: string, readonly offset: [number, number], readonly width: number, readonly height: number) {}
+}
+
 const texture = {
   name: "test",
   uuid: "texture",
+  width: 16,
+  height: 16,
+  display_height: 16,
+  layers_enabled: false,
+  activeLayer: undefined as TestLayer | undefined,
+  getUVWidth: (): number => 16,
+  getUVHeight: (): number => 16,
+  getActiveLayer(): TestLayer | undefined { return this.activeLayer; },
   select(): void {},
   edit(callback: (canvas: ICanvasStub) => void): void {
     undo.initEdit();
@@ -139,6 +152,8 @@ beforeEach(() => {
   painter.paint_stroke_canceled = false;
   painter.brushChanges = false;
   painter.current = emptyPainterContext();
+  texture.layers_enabled = false;
+  texture.activeLayer = undefined;
 });
 useGlobals(() => ({
   Condition: evaluateHostCondition,
@@ -150,7 +165,10 @@ useGlobals(() => ({
   Format: { paint_mode: true },
   Modes: { id: "paint" },
   Texture: { all: [texture], selected: texture },
+  TextureLayer: TestLayer,
   Undo: undo,
+  // Faces cover only the top-left 8x8 pixels, like a cube whose UV uses part of the texture.
+  UVEditor: { findFaceAtUV: (_texture: unknown, x: number, y: number) => (x < 8 && y < 8 ? { element: {}, faceKey: "north" } : null) },
 }));
 
 const defaults = { texture_id: "texture", x: 1, y: 1, color: "#ff0000", opacity: 255, start: { x: 1, y: 1 }, end: { x: 3, y: 3 } };
@@ -215,6 +233,37 @@ test.each([true, false])("paint_with_brush connect_strokes=%s controls intermedi
   expect(pixels).toEqual(connect ? ["original", "square:1,1", "square:2,1", "square:3,1", "square:4,1"] : ["original", "square:1,1", "square:4,1"]);
   expect(undo.history).toHaveLength(1);
   expect(undo.history[0].before).toEqual(["original"]);
+});
+
+test.each([
+  ["face", "outside the texture", { x: 100, y: 100 }, "outside texture"],
+  ["element", "outside the texture", { x: -1, y: 2 }, "outside texture"],
+  ["color", "outside the texture", { x: 16, y: 0 }, "outside texture"],
+  ["face", "on a pixel no face covers", { x: 12, y: 12 }, "No face"],
+  ["element", "on a pixel no face covers", { x: 3, y: 9 }, "No face"],
+])("a %s fill seeded %s is rejected before any stroke", async (fill_mode, _where, seed, message) => {
+  await expect(executeTool("paint_fill_tool", { ...defaults, ...seed, fill_mode })).rejects.toThrow(message);
+  expect(pixels).toEqual(["original"]);
+  expect(starts).toBe(0);
+  expect(undo.current_save).toBeUndefined();
+});
+
+test.each(["color", "color_connected"])("a %s fill seeded outside the active layer is rejected before any stroke", async fill_mode => {
+  // A 4x4 layer at (4, 4): the native fill would read the seed (1, 1) as transparent and recolor every transparent pixel.
+  texture.layers_enabled = true;
+  texture.activeLayer = new TestLayer("patch", [4, 4], 4, 4);
+  await expect(executeTool("paint_fill_tool", { ...defaults, x: 1, y: 1, fill_mode })).rejects.toThrow('outside the active layer "patch"');
+  expect(starts).toBe(0);
+  await executeTool("paint_fill_tool", { ...defaults, x: 5, y: 6, fill_mode });
+  // A face fill looks the face up in texture space, so the layer does not bound its seed.
+  await executeTool("paint_fill_tool", { ...defaults, x: 2, y: 3, fill_mode: "face" });
+  expect(undo.history).toHaveLength(2);
+});
+
+test("face fills inside a face and selection fills, which ignore the seed, still paint", async () => {
+  await executeTool("paint_fill_tool", { ...defaults, x: 2, y: 3, fill_mode: "face" });
+  await executeTool("paint_fill_tool", { ...defaults, x: 100, y: 100, fill_mode: "selection" });
+  expect(undo.history).toHaveLength(2);
 });
 
 test("unsupported nonzero fill tolerance is rejected before texture activation or Undo", async () => {

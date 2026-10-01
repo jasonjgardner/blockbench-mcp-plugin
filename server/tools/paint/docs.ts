@@ -29,7 +29,7 @@ export const paintToolDocs: IToolSpec[] = [
     name: "paint_fill_tool",
     condition: { project: true, features: ["paint_mode"], method: () => Texture.all.length > 0 && Boolean(BarItems.fill_tool) && Condition(BarItems.fill_tool.condition) },
     description:
-      "Uses the fill/bucket tool to fill areas with color. In 'face' and 'element' fill modes only the face or element whose UV area contains the given texture pixel is filled. Opacity is 0-255 regardless of Blockbench's opacity range setting.",
+      "Uses the fill/bucket tool to fill areas with color. In 'face' and 'element' fill modes only the face or element whose UV area contains the given texture pixel is filled, and a pixel no face covers is an error. Seeds outside the texture are rejected, and so are color and color_connected seeds outside the active layer, where the fill reads its seed color. Opacity is 0-255 regardless of Blockbench's opacity range setting.",
     annotations: {
       title: "Paint Fill Tool",
       destructiveHint: true,
