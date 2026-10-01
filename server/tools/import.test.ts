@@ -175,10 +175,24 @@ describe("readGeoJsonSource", () => {
       "\\\\?\\C:\\models\\robot.geo.json",
       "C:\\models\\COM1",
       "C:\\models\\nul.json",
+      "C:\\models\\COM1 .txt",
+      "C:\\models\\com1  ",
+      "C:\\models\\nul.",
+      "C:\\models\\CON:stream",
+      "C:\\models\\aux.geo.json:data",
     ];
     for (const input of refused) await expect(readGeoJsonSource(input)).rejects.toThrow("Expected inline GeoJSON");
     await expect(readGeoJsonSource("file://nas/share/robot.geo.json")).rejects.toThrow('not on "nas"');
     expect(reads).toEqual([]);
+  });
+
+  test("still reads files whose names only start like a device name", async () => {
+    for (const name of ["console.geo.json", "nullable.geo.json", "com10.geo.json", "auxiliary.geo.json"]) {
+      await readGeoJsonSource(join(tmpdir(), name));
+    }
+    expect(reads.map((read) => read.path)).toEqual(
+      ["console.geo.json", "nullable.geo.json", "com10.geo.json", "auxiliary.geo.json"].map((name) => join(tmpdir(), name)),
+    );
   });
 
   test("rejects relative paths and other schemes", async () => {

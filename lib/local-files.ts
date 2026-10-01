@@ -11,8 +11,12 @@
  * @module
  */
 
-/** Windows names that open a device in any folder, with or without an extension. */
-const RESERVED_DEVICE_NAME = /(^|[\\/])(con|prn|aux|nul|com[0-9¹²³]|lpt[0-9¹²³]|conin\$|conout\$)(\.[^\\/]*)?$/i;
+/**
+ * Windows names that open a device in any folder: with or without an extension, with trailing dots or spaces
+ * (Win32 strips them from the last component, so `COM1 .txt` and `nul.` are devices) and with an alternate data
+ * stream suffix (`CON:stream`).
+ */
+const RESERVED_DEVICE_NAME = /(^|[\\/])(con|prn|aux|nul|com[0-9¹²³]|lpt[0-9¹²³]|conin\$|conout\$)[ .]*(\.[^\\/]*)?(:[^\\/]*)?$/i;
 
 function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
