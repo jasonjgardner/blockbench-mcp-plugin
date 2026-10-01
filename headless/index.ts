@@ -38,7 +38,8 @@ Options:
   --node <path>             Node 23.6+ executable used to run the renderer (default: node)
   --render-concurrency <n>  Renders allowed at once (default: 2)
   --render-timeout <ms>     Per-render timeout (default: 120000)
-  --scratch <dir>           Where renders go when no output path is given (default: OS temp)
+  --scratch <dir>           Where renders go when no output path is given (default: a private
+                            folder in the OS temp directory, made on first use)
   --no-ai-disclosure        Do not stamp ai_used / ai_agents on written models
   --blockbench <path>       Blockbench desktop executable (or .app) for blockbench_launch (default:
                             $BLOCKBENCH_PATH, blockbench on PATH, then the standard install folders)
@@ -81,6 +82,14 @@ const positiveInt = (raw: string | undefined, fallback: number, flag: string): n
   throw new Error(`${flag} must be a positive integer, got "${raw}".`);
 };
 
+/**
+ * This process's scratch folder in the OS temp directory. It is created, owner-only, by the first
+ * render or launcher page, so idle servers leave nothing behind; the random name keeps another
+ * user of a shared temp directory (/tmp on Linux) from creating or linking it first, which a fixed
+ * name allowed.
+ */
+const privateScratchDir = (): string => join(tmpdir(), `${HEADLESS_SERVER_NAME}-${crypto.randomUUID()}`);
+
 /** Starts the stdio server. */
 async function main(): Promise<void> {
   if (values.help) {
@@ -105,7 +114,7 @@ async function main(): Promise<void> {
 `),
   });
   const store = new ModelStore({ roots });
-  const scratchDir = values.scratch ? resolve(values.scratch) : join(tmpdir(), HEADLESS_SERVER_NAME);
+  const scratchDir = values.scratch ? resolve(values.scratch) : privateScratchDir();
   const server = createHeadlessServer((mcp) => ({
     store,
     renderer,

@@ -25,7 +25,7 @@ export interface IHeadlessContext {
   renderer: BbRenderer;
   /** Stamp `ai_used`/`ai_agents` on written models. */
   aiDisclosure: boolean;
-  /** Directory for render output when the caller gives no path. */
+  /** Directory for render output when the caller gives no path; writers create it (owner-only) on first use. */
   scratchDir: string;
   /** Name the connected MCP client reported during `initialize`. */
   clientName(): string;

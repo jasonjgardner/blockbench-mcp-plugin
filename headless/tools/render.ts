@@ -26,7 +26,7 @@ async function outputPath(context: IHeadlessContext, file: string, label: string
     if (!overwrite && (await Bun.file(target).exists())) throw new Error(`${target} already exists; pass overwrite: true to replace it.`);
     return target;
   }
-  await mkdir(context.scratchDir, { recursive: true });
+  await mkdir(context.scratchDir, { recursive: true, mode: 0o700 });
   const stem = basename(file).replace(/\.bbmodel$/i, "");
   return join(context.scratchDir, `${stem}-${label}-${Date.now().toString(36)}.png`);
 }
