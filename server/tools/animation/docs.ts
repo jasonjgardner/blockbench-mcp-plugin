@@ -50,7 +50,7 @@ export const animationToolDocs: IToolSpec[] = [
     name: "animation_graph_editor",
     condition: { project: true, features: ["animation_mode"] },
     description:
-      "Edits a bone channel's interpolation or numeric Bezier easing in one reversible edit. Uses native per-axis handle arrays and chronological segment durations. Custom points are normalized time/value fractions. Partial-axis edits require existing Bezier keys; key-wide mode changes require all axes. Rejects curve edits ignored by quaternion rotation. Inspect neighboring segments after range edits.",
+      "Edits a bone channel's interpolation or numeric Bezier easing in one reversible edit. Uses native per-axis handle arrays and chronological segment durations. Custom points are normalized time/value fractions. Partial-axis edits require existing Bezier keys; key-wide mode changes require all axes. Rejects curve edits ignored by quaternion rotation, and step or Bezier curves in GeckoLib models (use geckolib_set_keyframe_easing). Inspect neighboring segments after range edits.",
     annotations: {
       title: "Animation Graph Editor",
       destructiveHint: true,
