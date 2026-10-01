@@ -26,6 +26,7 @@ import {
   getGeckolibModid,
   getGeckolibPluginVersion,
   getProjectBoneNames,
+  stringifyLikeBlockbench,
   type IGeckolibKeyframe,
 } from "@/lib/geckolib";
 import {
@@ -292,18 +293,18 @@ function triggerPluginExport(actionId: string, label: string): string {
  *
  * @param label - Tool name used in permission prompts and messages.
  * @param delivery - Requested mode, path and content budget.
- * @param build - Compiles the content; only called in compile mode.
+ * @param build - Compiles and serializes the file text, formatted like the
+ *   native export it stands in for; only called in compile mode.
  * @param extra - Additional metadata merged into the result, such as the host
  *   API the content came from.
  */
 function deliverExport(
   label: string,
   delivery: IExportDelivery,
-  build: () => unknown,
+  build: () => string,
   extra: Record<string, unknown> = {}
 ): string {
-  const compiled = build();
-  const content = typeof compiled === "string" ? compiled : JSON.stringify(compiled, null, 2);
+  const content = build();
   const wrote_to_path = delivery.path ? writeExportFile(delivery.path, content, delivery.overwrite, label) : null;
   const omitted = delivery.max_content_length === 0;
   const truncated = !omitted && content.length > delivery.max_content_length;
@@ -621,7 +622,11 @@ function registerExportTools(): void {
       async execute({ mode, path, overwrite, max_content_length }) {
         assertGeckolibFormat();
         if (mode === "dialog") return triggerPluginExport("export_geckolib_model", "model export");
-        return deliverExport(geckolibToolDocs[7].name, { mode, path, overwrite, max_content_length }, compileGeckolibGeometry);
+        return deliverExport(
+          geckolibToolDocs[7].name,
+          { mode, path, overwrite, max_content_length },
+          () => stringifyLikeBlockbench(compileGeckolibGeometry())
+        );
       },
     },
     geckolibToolDocs[7].status
@@ -641,7 +646,7 @@ function registerExportTools(): void {
         return deliverExport(
           geckolibToolDocs[8].name,
           { mode, path, overwrite, max_content_length },
-          () => compiled.content,
+          () => stringifyLikeBlockbench(compiled.content),
           {
             compiled_via: compiled.via,
             animations: animations.map((animation) => animation.name),
@@ -674,7 +679,8 @@ function registerExportTools(): void {
         return deliverExport(
           geckolibToolDocs[9].name,
           { mode, path, overwrite, max_content_length },
-          () => buildGeckolibDisplaySettings(project),
+          // The plugin's own display export writes JSON.stringify(settings, null, 2), not autoStringify.
+          () => JSON.stringify(buildGeckolibDisplaySettings(project), null, 2),
           {
             model_type: modelType,
             ...(shipsDisplaySettings

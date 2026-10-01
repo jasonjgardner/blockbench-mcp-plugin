@@ -104,7 +104,7 @@ export const geckolibToolDocs: IToolSpec[] = [
     name: "geckolib_export_model",
     condition: GECKOLIB_CONDITION,
     description:
-      "Compiles the GeckoLib geometry the plugin's model export produces, returning it as JSON and optionally writing it to a path. Set mode='dialog' to trigger the plugin's own export action and its save dialog instead.",
+      "Compiles the GeckoLib geometry the plugin's model export produces, returning it as JSON and optionally writing it to a path. The text is formatted like Blockbench's own export (its JSON indentation, minify and final-newline settings). Set mode='dialog' to trigger the plugin's own export action and its save dialog instead.",
     annotations: { title: "Export GeckoLib Model", destructiveHint: true, openWorldHint: true },
     parameters: geckolibExportModelParameters,
     status: STATUS_EXPERIMENTAL,
@@ -113,7 +113,7 @@ export const geckolibToolDocs: IToolSpec[] = [
     name: "geckolib_export_animations",
     condition: GECKOLIB_CONDITION,
     description:
-      "Compiles the project's animations into GeckoLib animation-file JSON, including the easing and easingArgs the plugin writes, and optionally writes it to a path. Reports which host API compiled it, since only the plugin-patched route stamps geckolib_format_version. Set mode='dialog' to trigger the plugin's own animation export action instead.",
+      "Compiles the project's animations into GeckoLib animation-file JSON, including the easing and easingArgs the plugin writes, and optionally writes it to a path. The text is formatted like Blockbench's own export (its JSON indentation, minify and final-newline settings). Reports which host API compiled it, since only the plugin-patched route stamps geckolib_format_version. Set mode='dialog' to trigger the plugin's own animation export action instead.",
     annotations: { title: "Export GeckoLib Animations", destructiveHint: true, openWorldHint: true },
     parameters: geckolibExportAnimationsParameters,
     status: STATUS_EXPERIMENTAL,
@@ -122,7 +122,7 @@ export const geckolibToolDocs: IToolSpec[] = [
     name: "geckolib_export_display",
     condition: GECKOLIB_CONDITION,
     description:
-      "Builds the Java item/block display-settings JSON for GeckoLib Item and Block models: parent model, texture size, GUI light, per-perspective display transforms and the namespaced particle texture. Reports when the active model type would not normally ship one. Set mode='dialog' to trigger the plugin's own display export action instead.",
+      "Builds the Java item/block display-settings JSON for GeckoLib Item and Block models: parent model, texture size, GUI light, per-perspective display transforms and the namespaced particle texture. The text is two-space JSON, as the plugin's own display export writes it. Reports when the active model type would not normally ship one. Set mode='dialog' to trigger the plugin's own display export action instead.",
     annotations: { title: "Export GeckoLib Display Settings", destructiveHint: true, openWorldHint: true },
     parameters: geckolibExportDisplayParameters,
     status: STATUS_EXPERIMENTAL,

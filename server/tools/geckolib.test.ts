@@ -194,6 +194,7 @@ useGlobals(() => ({
   },
   DisplayMode: { slots: {} },
   settings: {},
+  autoStringify: undefined,
 }));
 
 /** Parses a tool's JSON string result. */
@@ -540,6 +541,17 @@ test("dialog mode hands off to the plugin's own export action", async () => {
   await expect(tools.call("geckolib_export_model", { mode: "dialog" })).rejects.toThrow("refused");
 
   await expect(tools.call("geckolib_export_display", { mode: "dialog" })).rejects.toThrow("action is unavailable");
+});
+
+test("geometry and animation exports use Blockbench's autoStringify formatting; display keeps the plugin's two-space JSON", async () => {
+  // Stand-in for compileJSON with tab indentation and a final newline, as Blockbench's defaults write.
+  Object.assign(globalThis, { autoStringify: (value: unknown) => `${JSON.stringify(value, null, "\t")}\n` });
+  const model = await call("geckolib_export_model");
+  expect(model.content).toBe(`${JSON.stringify({ "minecraft:geometry": [{ bones: [{ name: "body" }] }] }, null, "\t")}\n`);
+  const animations = await call("geckolib_export_animations");
+  expect(animations.content).toBe(`${JSON.stringify({ ...compiledAnimations, geckolib_format_version: 2 }, null, "\t")}\n`);
+  const display = await call("geckolib_export_display");
+  expect(display.content).toBe(JSON.stringify({ parent: "builtin/entity", texture_size: [64, 64] }, null, 2));
 });
 
 test("display settings compile the Java model envelope, flagging a model type that ships none", async () => {
