@@ -67,21 +67,24 @@ export function alphaToOpacity(alpha: number): number {
   return Math.min(MAX_API_OPACITY, Math.max(0, Math.floor(alpha * 256)));
 }
 
+/** A 3-, 4-, 6- or 8-digit hex color, with or without the leading `#`. */
+const HEX_COLOR_PATTERN = /^#?([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+
 /**
- * Brush footprint `[width, height]` in texture pixels for a size and aspect
- * ratio, mirroring `Painter.getBrushDimensions` in Blockbench 5.2.
+ * Normalizes a hex brush color to lower-case `#rrggbb`: the short forms expand
+ * per digit (`#F00` is `#ff0000`, not `#f00000`) and an alpha part is dropped,
+ * as before, since Blockbench's color panel keeps no alpha and brush opacity is
+ * its own setting. Anything else, such as a color name, is returned unchanged
+ * for the color panel to parse.
  *
- * A negative aspect ratio narrows the width, a positive one narrows the
- * height; `0` keeps the brush square/round.
- *
- * @param size - Brush size in pixels.
- * @param aspectRatio - Aspect ratio between -16 and 16.
- * @returns `[width, height]`.
+ * @param color - Caller-supplied color.
+ * @returns `#rrggbb` for hex input, otherwise `color` itself.
  */
-export function brushDimensions(size: number, aspectRatio: number): [number, number] {
-  if (!aspectRatio) return [size, size];
-  const narrowed = Math.round(size / (Math.abs(aspectRatio) + 1));
-  return aspectRatio < 0 ? [narrowed, size] : [size, narrowed];
+export function normalizeHexColor(color: string): string {
+  const digits = HEX_COLOR_PATTERN.exec(color.trim())?.[1];
+  if (!digits) return color;
+  const rgb = digits.length <= 4 ? [...digits.slice(0, 3)].map(digit => digit + digit).join("") : digits.slice(0, 6);
+  return `#${rgb.toLowerCase()}`;
 }
 
 /** Translation-key prefix Blockbench uses for its built-in brush preset names. */

@@ -67,7 +67,7 @@ export const createTextureParameters = z
       .string()
       .optional()
       .describe(
-        "Name of the texture layer. Required if fill_color is set."
+        "Deprecated and ignored: textures are created without layers. Use texture_layer_management create_layer to add a named layer."
       ),
     pbr_channel: pbrChannelEnum
       .optional()
@@ -94,11 +94,6 @@ export const createTextureParameters = z
       "The 'data' and 'fill_color' properties cannot both be defined.",
     path: ["data", "fill_color"],
   })
-  .refine((params) => !(params.fill_color && !params.layer_name), {
-    message:
-      "The 'layer_name' property is required when 'fill_color' is set.",
-    path: ["layer_name", "fill_color"],
-  })
   .refine(
     ({ pbr_channel, group }) => (pbr_channel && group) || !pbr_channel,
     {
@@ -114,7 +109,7 @@ export const applyTextureParameters = z.object({
   texture: textureIdSchema.describe("ID or name of the texture to apply."),
   applyTo: z
     .enum(["all", "blank", "none"])
-    .describe("Apply texture to element or group.")
+    .describe("Faces that receive the texture: all (every face), blank (default; faces without a texture) or none (no face: the call only checks the element and texture and changes nothing).")
     .optional()
     .default("blank"),
 });
@@ -527,6 +522,9 @@ export function registerTextureTools(): void {
         throw new Error(
           `Element "${id}" resolved to no paintable cubes or meshes.`
         );
+      }
+      if (applyTo === "none") {
+        return `applyTo "none" changed no faces: texture "${projectTexture.name}" was not applied to the ${targets.length} element(s) scoped by "${id}" (${describeTargetKind(element)}).`;
       }
 
       applyTextureToTargets(projectTexture, targets, applyTo);

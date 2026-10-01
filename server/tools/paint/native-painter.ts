@@ -15,7 +15,8 @@ export interface INativePainter {
   brushChanges: boolean;
   current: { element?: unknown; face?: unknown; face_matrices?: unknown };
   startPaintTool(texture: Texture, x: number, y: number, uvTag: unknown, event: Record<string, unknown>): void;
-  movePaintTool(texture: Texture, x: number, y: number, event: Record<string, unknown>): void;
+  /** `newFace` makes Painter stamp at the point without drawing a line from the previous one. */
+  movePaintTool(texture: Texture, x: number, y: number, event: Record<string, unknown>, newFace?: boolean): void;
   useShapeTool(texture: Texture, x: number, y: number, event: Record<string, unknown>): void;
   useGradientTool(texture: Texture, x: number, y: number, event: Record<string, unknown>): void;
   stopPaintTool(): void;

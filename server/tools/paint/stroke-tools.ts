@@ -1,7 +1,7 @@
 /// <reference types="three" />
 /// <reference types="blockbench-types" />
 import { createTool } from "@/lib/factories";
-import { getAndActivateTexture, setBarItemValue } from "@/lib/util";
+import { getAndActivateTexture, getProjectTexture, setBarItemValue } from "@/lib/util";
 import { paintToolDocs } from "./docs";
 import {
   paintFillToolParameters,
@@ -12,6 +12,55 @@ import {
 } from "./schemas";
 import { nativePaintStroke, setCopyBrushSource, startTextureStroke } from "./native-painter";
 import { applyToolbarValues, brushOpacityForToolbar, ensurePaintableLayer } from "./runtime";
+
+/** Fill modes seeded at (x, y); selection and selected_elements fills ignore the coordinate. */
+const SEEDED_FILL_MODES: ReadonlySet<string> = new Set(["color", "color_connected", "face", "element"]);
+
+/** The texture a paint tool would activate, resolved like `getAndActivateTexture` but without selecting it. */
+function peekPaintTexture(textureId: string | undefined): Texture | undefined {
+  return (textureId ? getProjectTexture(textureId) : Texture.selected ?? Texture.getDefault()) ?? undefined;
+}
+
+/**
+ * Rejects fill seeds the native fill would misread, before anything changes.
+ * Outside the texture, a color fill matches every transparent pixel and a
+ * connected fill finds nothing. Face and element fills look the face up with
+ * `UVEditor.findFaceAtUV`, exactly as `Painter.useFilltool` does; when no face
+ * is hit, Blockbench fills the whole texture (or its selection) instead.
+ */
+function assertFillSeed(texture: Texture, x: number, y: number, fillMode: string): void {
+  if (!SEEDED_FILL_MODES.has(fillMode)) return;
+  if (x < 0 || y < 0 || x >= texture.width || y >= texture.height) {
+    throw new Error(`Fill seed (${x}, ${y}) lies outside texture "${texture.name}" (${texture.width}x${texture.height} pixels).`);
+  }
+  if (fillMode !== "face" && fillMode !== "element") return;
+  const findFaceAtUV: unknown = Reflect.get(UVEditor, "findFaceAtUV");
+  if (typeof findFaceAtUV !== "function") {
+    throw new Error(`fill_mode "${fillMode}" needs Blockbench 5.2 or newer, which can find the face at a texture pixel; this version would fill the whole texture.`);
+  }
+  const hit: unknown = findFaceAtUV.call(UVEditor, texture, x, y, texture.width / texture.getUVWidth(), texture.display_height / texture.getUVHeight());
+  if (!hit) {
+    throw new Error(`No face textured with "${texture.name}" covers pixel (${x}, ${y}), so a ${fillMode} fill has nothing to fill. Pick a pixel inside a face's UV area.`);
+  }
+}
+
+/**
+ * Color fills read the seed color from the active layer's canvas at the seed
+ * minus the layer offset (`Painter.useFilltool`). On a layer smaller than the
+ * texture, or offset from it, a seed outside the layer reads transparent, so a
+ * color fill would recolor every transparent pixel of the layer. Checked on the
+ * layer that will actually be painted, after `ensurePaintableLayer`.
+ */
+function assertSeedOnActiveLayer(texture: Texture, x: number, y: number, fillMode: string): void {
+  if (fillMode !== "color" && fillMode !== "color_connected") return;
+  if (!texture.layers_enabled) return;
+  const layer = texture.getActiveLayer();
+  if (!layer) return;
+  const [left, top] = layer.offset;
+  if (x < left || y < top || x >= left + layer.width || y >= top + layer.height) {
+    throw new Error(`Fill seed (${x}, ${y}) lies outside the active layer "${layer.name}" (${layer.width}x${layer.height} pixels at ${left}, ${top}), where a ${fillMode} fill reads its seed color. Select a layer that covers the pixel, or pick a pixel on this one.`);
+  }
+}
 
 /**
  * Registers `paint_fill_tool` (`paintToolDocs[0]`): a native bucket fill that
@@ -26,8 +75,11 @@ export function registerPaintFillTool(): void {
       parameters: paintFillToolParameters,
       async execute({ texture_id, x, y, color, opacity, tolerance, fill_mode, blend_mode }) {
         if (tolerance !== undefined && tolerance !== 0) throw new Error("Native fill supports exact color matching only. Omit tolerance or set it to 0; nonzero tolerance is unsupported.");
+        const target = peekPaintTexture(texture_id);
+        if (target) assertFillSeed(target, x, y, fill_mode);
         const texture = getAndActivateTexture(texture_id);
         ensurePaintableLayer(texture);
+        assertSeedOnActiveLayer(texture, x, y, fill_mode);
 
         // Select the tool first: slider values are stored per tool.
         // @ts-ignore

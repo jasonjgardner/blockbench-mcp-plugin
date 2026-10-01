@@ -293,12 +293,12 @@ describe.each<RegistrationMode>(["initial", "session"])("%s registration", (mode
     const client = await connectClient(mode);
     const cases = [
       {
-        args: { name: "invalid", fill_color: "#ffffff" },
-        error: "The 'layer_name' property is required",
+        args: { name: "invalid", data: "image.png", fill_color: "#ffffff" },
+        error: "The 'data' and 'fill_color' properties cannot both be defined",
       },
       {
-        args: { name: "invalid", data: "image.png", fill_color: "#ffffff", layer_name: "base" },
-        error: "The 'data' and 'fill_color' properties cannot both be defined",
+        args: { name: "invalid", uv_width: 32 },
+        error: "Supply both uv_width and uv_height",
       },
       {
         args: { name: "invalid", pbr_channel: "normal" },

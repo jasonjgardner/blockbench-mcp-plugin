@@ -111,7 +111,7 @@ async function invalidStateScenario(session: LiveSession): Promise<void> {
   session.check(invalid.isError, "invalid vertex index is rejected");
   session.check((await projectCounts(session)).meshes === 0, "invalid mesh creates no partial elements");
   session.check(JSON.stringify(await session.json("get_undo_stack")) === JSON.stringify(history), "invalid mesh leaves undo unchanged");
-  const invalidTexture = await session.attempt("create_texture", { name: "invalid texture", width: 16, height: 16, fill_color: "#ffffff" });
+  const invalidTexture = await session.attempt("create_texture", { name: "invalid texture", width: 16, height: 16, data: "invalid.png", fill_color: "#ffffff" });
   session.check(invalidTexture.isError, "texture cross-field refinement is enforced");
   session.check((await projectCounts(session)).textures === 0, "invalid texture leaves no state");
   await session.call("create_texture", { name: PORCELAIN, width: 16, height: 16, fill_color: "#f3f0e9", layer_name: "Base", render_sides: "front" });
