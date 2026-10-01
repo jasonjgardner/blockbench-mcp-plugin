@@ -204,7 +204,8 @@ createResource("nodes", {
     }
 
     const entries = Object.entries(Project.nodes_3d);
-    const direct = id ? Project.nodes_3d[id] : undefined;
+    // nodes_3d is a plain object: `constructor` or `__proto__` would otherwise resolve to an inherited value.
+    const direct = id && Object.prototype.hasOwnProperty.call(Project.nodes_3d, id) ? Project.nodes_3d[id] : undefined;
     const node = direct ?? findByResourceId(entries.map(([, candidate]) => candidate), id);
     const uuid = direct ? id : entries.find(([, candidate]) => candidate === node)?.[0];
 

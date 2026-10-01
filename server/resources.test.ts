@@ -182,6 +182,14 @@ describe("nodes resource", () => {
     return JSON.parse(content.text);
   }
 
+  test("does not resolve inherited object keys as node ids", async () => {
+    Reflect.set(globalThis, "Project", { nodes_3d: { "cube-1": sceneNode("cube-1", "cube") } });
+    Reflect.set(globalThis, "OutlinerNode", { uuids: {} });
+    for (const id of ["constructor", "__proto__", "toString"]) {
+      await expect(resources.call("nodes", { uri: `nodes://${id}`, id })).rejects.toMatchObject({ code: -32602 });
+    }
+  });
+
   test("returns each node as Blockbench saves it, plus its place in the outliner", async () => {
     Reflect.set(globalThis, "Project", {
       nodes_3d: { "cube-1": sceneNode("cube-1", "cube"), "group-1": sceneNode("group-1", "group"), "plugin-1": sceneNode("plugin-1", "plugin_box") },
