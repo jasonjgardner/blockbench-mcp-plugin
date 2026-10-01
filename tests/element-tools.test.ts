@@ -41,6 +41,8 @@ let roots: HostNode[] = [];
 let elements: HostElement[] = [];
 let groups: HostGroup[] = [];
 let selectedElements: HostElement[] = [];
+let multiSelected: HostGroup[] = [];
+let project: { mesh_selection: Record<string, unknown> } = { mesh_selection: {} };
 
 function siblingsOf(parent: HostParent): HostNode[] {
   return parent === "root" ? roots : parent.children;
@@ -51,8 +53,13 @@ class HostNode {
   uuid = `node-${++nextId}`;
   parent: HostParent = "root";
   selected = false;
+  locked = false;
   readonly type: string = "node";
   constructor(public name: string) {}
+  markAsSelected(): this {
+    this.selected = true;
+    return this;
+  }
   /** Property names saved by Undo besides uuid, name and type. */
   dataKeys(): readonly string[] {
     return [];
@@ -81,14 +88,14 @@ class HostNode {
   }
 }
 
-/** Blockbench's OutlinerElement: Shift-select toggles, markAsSelected only adds. */
+/** Blockbench's OutlinerElement: Shift-select toggles, markAsSelected only adds (and ignores `locked`). */
 class HostElement extends HostNode {
   init(): this {
     if (!elements.includes(this)) elements.push(this);
     if (!siblingsOf(this.parent).includes(this)) this.addTo(this.parent);
     return this;
   }
-  markAsSelected(): this {
+  override markAsSelected(): this {
     if (!selectedElements.includes(this)) selectedElements.push(this);
     this.selected = true;
     return this;
@@ -177,6 +184,9 @@ class HostGroup extends HostNode {
   static get all(): HostGroup[] {
     return groups;
   }
+  static get multi_selected(): HostGroup[] {
+    return multiSelected;
+  }
   override dataKeys(): readonly string[] {
     return ["origin", "rotation"];
   }
@@ -185,8 +195,18 @@ class HostGroup extends HostNode {
     if (!siblingsOf(this.parent).includes(this)) this.addTo(this.parent);
     return this;
   }
+  /** Like Blockbench's Group#multiSelect: skips a locked group, registers it and selects its contents. */
   multiSelect(): this {
+    if (this.locked) return this;
     this.selected = true;
+    if (!multiSelected.includes(this)) multiSelected.push(this);
+    this.children.forEach((child) => child.markAsSelected());
+    return this;
+  }
+  /** Like Blockbench's Group#markAsSelected: flags the group and its contents without registering it. */
+  override markAsSelected(): this {
+    this.selected = true;
+    this.children.forEach((child) => child.markAsSelected());
     return this;
   }
   createUniqueName(): void {}
@@ -292,6 +312,8 @@ beforeEach(() => {
   elements = [];
   groups = [];
   selectedElements = [];
+  multiSelected = [];
+  project = { mesh_selection: {} };
   HostArmatureBone.all = [];
   undo.reset();
 });
@@ -309,13 +331,17 @@ useGlobals(() => ({
   Group: HostGroup,
   NullObject: HostNullObject,
   ArmatureBone: HostArmatureBone,
-  Project: {},
+  Project: project,
   Undo: undo,
   Canvas: { updateAll() {} },
-  unselectAllElements() {
-    selectedElements.forEach((element) => { element.selected = false; });
-    selectedElements = [];
+  // Like Blockbench's (misc.js): exceptions stay selected and keep their mesh component selection.
+  unselectAllElements(exceptions: HostNode[] = []) {
+    selectedElements.filter((element) => !exceptions.includes(element)).forEach((element) => element.unselect());
     groups.forEach((group) => { group.selected = false; });
+    multiSelected = [];
+    Object.keys(project.mesh_selection).forEach((key) => {
+      if (!exceptions.some((node) => node.uuid === key)) delete project.mesh_selection[key];
+    });
   },
   updateSelection() {},
 }));
@@ -346,5 +372,65 @@ describe("find_elements_by_criteria", () => {
     const names: unknown[] = Array.isArray(found.matches) ? found.matches.map((match: unknown) => (isRecord(match) ? match.name : undefined)) : [];
     expect(found.count).toBe(matches.length);
     expect(names).toEqual([...matches]);
+  });
+});
+
+describe("select_all_of_type", () => {
+  /** UUIDs of every selected node: elements from the selection list, groups by their flag. */
+  const selection = (): string[] => [...selectedElements, ...groups.filter((group) => group.selected)].map((node) => node.uuid).toSorted();
+
+  test("replacing the selection selects exactly the elements of that type", async () => {
+    const first = new HostCube("first").init();
+    const second = new HostCube("second").init();
+    const controller = new HostNullObject("controller").init();
+    const folder = new HostGroup("folder").init();
+    first.markAsSelected();
+    controller.markAsSelected();
+    folder.multiSelect();
+    expect(await callJson("select_all_of_type", { type: "cube" })).toMatchObject({ type: "cube", selected: 2 });
+    expect(selection()).toEqual([first.uuid, second.uuid].toSorted());
+  });
+
+  test("adding to the selection keeps targets that were already selected", async () => {
+    const first = new HostCube("first").init();
+    const second = new HostCube("second").init();
+    const mesh = new HostMesh("mesh").init();
+    first.markAsSelected();
+    mesh.markAsSelected();
+    await callJson("select_all_of_type", { type: "cube", add_to_selection: true });
+    expect(selection()).toEqual([first.uuid, second.uuid, mesh.uuid].toSorted());
+  });
+
+  test("groups are selected through the native group selection, with their contents, scoped to a parent", async () => {
+    const body = new HostGroup("body").init();
+    const arm = new HostGroup("arm").init().addTo(body);
+    const hand = new HostCube("hand").init().addTo(arm);
+    const outside = new HostGroup("outside").init();
+    const cube = new HostCube("cube").init();
+    cube.markAsSelected();
+    outside.multiSelect();
+    expect(await callJson("select_all_of_type", { type: "group", parent_group: body.uuid })).toMatchObject({ selected: 1, parent_group: "body" });
+    expect(HostGroup.multi_selected).toEqual([arm]);
+    expect(selection()).toEqual([arm.uuid, hand.uuid].toSorted());
+    expect(outside.selected).toBe(false);
+  });
+
+  test("locked nodes are skipped, as in Blockbench's own Select All", async () => {
+    const open = new HostCube("open").init();
+    const locked = new HostCube("locked").init();
+    locked.locked = true;
+    expect(await callJson("select_all_of_type", { type: "cube" })).toMatchObject({ selected: 1, skipped_locked: 1 });
+    expect(selection()).toEqual([open.uuid]);
+  });
+
+  test("replacing the selection clears vertex/face selections only of meshes that end up deselected", async () => {
+    const mesh = new HostMesh("mesh").init();
+    new HostCube("cube").init();
+    mesh.markAsSelected();
+    project.mesh_selection[mesh.uuid] = { vertices: ["a"], edges: [], faces: [] };
+    await callJson("select_all_of_type", { type: "mesh" });
+    expect(project.mesh_selection[mesh.uuid]).toEqual({ vertices: ["a"], edges: [], faces: [] });
+    await callJson("select_all_of_type", { type: "cube" });
+    expect(project.mesh_selection[mesh.uuid]).toBeUndefined();
   });
 });

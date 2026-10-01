@@ -232,7 +232,7 @@ export const elementToolDocs: IToolSpec[] = [
     name: "select_all_of_type",
     condition: { project: true },
     description:
-      "Selects all elements of the given type (cube, mesh, or group) in the current project. Optionally restrict to descendants of a parent group, or add to (rather than replace) the current selection.",
+      "Selects all elements of the given type (cube, mesh, or group) in the current project. Optionally restrict to descendants of a parent group, or add to (rather than replace) the current selection. As in Blockbench, locked nodes are skipped and selecting a group also selects its contents.",
     annotations: {
       title: "Select All of Type",
       destructiveHint: true,
@@ -760,23 +760,19 @@ export function registerElementTools() {
         ? pool.filter((el) => isDescendantOf(el, parentScope))
         : pool;
 
-      if (!add_to_selection) {
-        // @ts-ignore - selected method available on element classes
-        Cube.all.forEach((c: Cube) => c.selected && c.unselect?.());
-        // @ts-ignore - selected method available on element classes
-        Mesh.all.forEach((m: Mesh) => m.selected && m.unselect?.());
-        Group.all.forEach((g: Group) => {
-          if (g.selected) g.selected = false;
-        });
-      }
+      // Locked nodes stay unselected, as in Blockbench's own Select All.
+      const selectable = targets.filter((el) => !el.locked);
 
-      for (const el of targets) {
-        if (el instanceof Group) {
-          el.selected = true;
-          continue;
-        }
-        // @ts-ignore - select method available on outliner elements
-        el.select?.({ shiftKey: true });
+      // Replace clears every other selection, including the vertex/face selections
+      // of meshes that are deselected; nodes being selected keep theirs, as with a click.
+      if (!add_to_selection) unselectAllElements(selectable);
+
+      // markAsSelected and Group.multiSelect only add to the selection (a Shift-style
+      // select() toggles, deselecting targets that were already selected). A selected
+      // group also selects its contents, as in Blockbench.
+      for (const el of selectable) {
+        if (el instanceof Group) el.multiSelect();
+        else el.markAsSelected();
       }
 
       updateSelection();
@@ -785,7 +781,8 @@ export function registerElementTools() {
       return JSON.stringify(
         {
           type,
-          selected: targets.length,
+          selected: selectable.length,
+          ...(selectable.length < targets.length && { skipped_locked: targets.length - selectable.length }),
           parent_group: parentScope?.name ?? null,
         },
         null,
