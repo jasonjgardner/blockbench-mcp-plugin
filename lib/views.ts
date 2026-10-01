@@ -15,6 +15,7 @@
  */
 import type { AnglePreset } from "blockbench-types/generated/preview/preview";
 import { ACTIVE_VIEW_ID, MAX_OFFSCREEN_VIEWS, NO_COPY_VIEW_ID, RESERVED_VIEW_IDS } from "@/lib/constants";
+import { sessionManager } from "@/lib/sessions";
 
 /**
  * Render targets an agent can address. A `viewport` is a Blockbench preview the
@@ -83,6 +84,8 @@ export interface ICreateOffscreenViewOptions {
    * user's active viewport; `"none"` keeps Blockbench's default angle.
    */
   copyFrom?: string;
+  /** MCP session creating the view; the view is disposed when that session ends. */
+  owner?: string;
 }
 
 /** Constructor options of `Preview`; blockbench-types keeps the options interface module-private. */
@@ -99,6 +102,8 @@ interface IOffscreenViewRecord {
   readonly antialias: boolean;
   /** Camera the agent last gave the view; re-applied before rendering when Blockbench changed it. */
   readonly camera: IViewCamera;
+  /** MCP session that created the view; `undefined` for views made outside a session (the panel's test dialog). */
+  readonly owner?: string;
 }
 
 /** Keeps plugin previews distinguishable from Blockbench's own entries in `Preview.all`. */
@@ -107,6 +112,8 @@ const PREVIEW_METHODS = ["render", "resize", "copyView", "loadAnglePreset", "del
 
 const offscreenViews = new Map<string, IOffscreenViewRecord>();
 let generatedViewCount = 0;
+/** Stops {@link setupOffscreenViewOwnership}'s session subscription. */
+let stopOwnershipTracking: (() => void) | undefined;
 
 function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -341,9 +348,38 @@ function resolveCopySource(copyFrom: string | undefined): Preview | undefined {
   return resolveView(copyFrom);
 }
 
-function disposeQuietly(preview: Preview): void {
+/** Calls `method` on `target` when both exist; the host objects are only partly typed. */
+function callIfPresent(target: unknown, method: string): unknown {
+  if (typeof target !== "object" || target === null) return undefined;
+  const fn: unknown = Reflect.get(target, method);
+  return typeof fn === "function" ? fn.call(target) : undefined;
+}
+
+/**
+ * Disposes a preview completely. In Blockbench 5.2, `Preview#delete` disposes
+ * the renderer, forces the WebGL context loss and removes the canvas, but does
+ * not dispose the orbit controls: their `keydown` listener on `window` (and,
+ * mid-drag, `mousemove`/`mouseup` on `document`) stays registered and keeps the
+ * preview reachable after it is deleted.
+ */
+function disposePreview(preview: Preview): void {
   try {
     if (typeof Reflect.get(preview, "delete") === "function") preview.delete();
+  } finally {
+    callIfPresent(Reflect.get(preview, "controls"), "dispose");
+    // On 5.2 the context is already lost and this is skipped. A host whose
+    // delete() leaves the context alive has it released here rather than at
+    // garbage collection, while Chromium caps the live contexts of a page.
+    const renderer: unknown = Reflect.get(preview, "renderer");
+    if (callIfPresent(callIfPresent(renderer, "getContext"), "isContextLost") !== true) {
+      callIfPresent(renderer, "forceContextLoss");
+    }
+  }
+}
+
+function disposeQuietly(preview: Preview): void {
+  try {
+    disposePreview(preview);
   } catch (error) {
     console.error("[MCP] Failed to dispose an offscreen preview:", error);
   }
@@ -405,6 +441,7 @@ export function createOffscreenView(options: ICreateOffscreenViewOptions): IView
     height: options.height,
     antialias: options.antialias,
     camera: describeCamera(preview),
+    owner: options.owner,
   });
   return describeView(preview);
 }
@@ -426,9 +463,9 @@ export function resizeOffscreenView(id: string, width: number, height: number): 
 }
 
 /**
- * Disposes an offscreen view, releasing its renderer and WebGL context. The
- * registry entry is removed even if Blockbench's disposal throws, so a
- * half-disposed preview is never reported as usable.
+ * Disposes an offscreen view, releasing its renderer, orbit-control listeners
+ * and WebGL context. The registry entry is removed even if Blockbench's
+ * disposal throws, so a half-disposed preview is never reported as usable.
  *
  * @param id - Offscreen view ID.
  * @throws {Error} When the view does not exist or disposal fails.
@@ -436,21 +473,54 @@ export function resizeOffscreenView(id: string, width: number, height: number): 
 export function deleteOffscreenView(id: string): void {
   const record = requireOffscreenView(id);
   try {
-    record.preview.delete();
+    disposePreview(record.preview);
   } finally {
     offscreenViews.delete(id);
   }
 }
 
-/** Disposes every offscreen view, continuing past failures; called when the plugin unloads. */
-export function teardownOffscreenViews(): void {
-  [...offscreenViews.keys()].forEach(id => {
+/** Disposes the views in `ids`, continuing past failures. */
+function deleteViewsQuietly(ids: string[]): void {
+  ids.forEach(id => {
     try {
       deleteOffscreenView(id);
     } catch (error) {
       console.error(`[MCP] Failed to dispose offscreen view "${id}":`, error);
     }
   });
+}
+
+/**
+ * Disposes the offscreen views whose owning MCP session is not among
+ * `liveSessionIds`. Views made outside a session are kept.
+ *
+ * @returns IDs of the disposed views.
+ */
+export function releaseOrphanedOffscreenViews(liveSessionIds: Iterable<string>): string[] {
+  const live = new Set(liveSessionIds);
+  const orphaned = [...offscreenViews.values()]
+    .filter(record => record.owner !== undefined && !live.has(record.owner))
+    .map(record => record.id);
+  deleteViewsQuietly(orphaned);
+  return orphaned;
+}
+
+/**
+ * Disposes offscreen views when the MCP session that created them ends, so an
+ * agent that disconnects without deleting its views does not keep WebGL
+ * contexts or slots under {@link MAX_OFFSCREEN_VIEWS}. Call once when the plugin loads.
+ */
+export function setupOffscreenViewOwnership(): void {
+  stopOwnershipTracking ??= sessionManager.subscribe(sessions => {
+    releaseOrphanedOffscreenViews(sessions.map(session => session.id));
+  });
+}
+
+/** Disposes every offscreen view, continuing past failures; called when the plugin unloads. */
+export function teardownOffscreenViews(): void {
+  stopOwnershipTracking?.();
+  stopOwnershipTracking = undefined;
+  deleteViewsQuietly([...offscreenViews.keys()]);
   generatedViewCount = 0;
 }
 

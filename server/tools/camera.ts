@@ -135,7 +135,7 @@ const setCameraAngleSpec: IToolSpec = {
 const createOffscreenViewSpec: IToolSpec = {
   name: "create_offscreen_view",
   description:
-    `Creates a private offscreen viewport that renders the current project without moving the user's camera. Use it with set_camera_angle and capture_screenshot (view: <id>) for multi-angle inspection. The camera starts where the user's is unless copy_view is "${NO_COPY_VIEW_ID}". Up to ${MAX_OFFSCREEN_VIEWS} views may exist at once; delete them with delete_offscreen_view when done.`,
+    `Creates a private offscreen viewport that renders the current project without moving the user's camera. Use it with set_camera_angle and capture_screenshot (view: <id>) for multi-angle inspection. The camera starts where the user's is unless copy_view is "${NO_COPY_VIEW_ID}". Up to ${MAX_OFFSCREEN_VIEWS} views may exist at once; delete them with delete_offscreen_view when done. Views still open when your MCP session ends are deleted.`,
   annotations: {
     title: "Create Offscreen View",
     idempotentHint: false,
@@ -222,8 +222,10 @@ export function registerCameraTools() {
 
   createTool(createOffscreenViewSpec.name, {
     ...createOffscreenViewSpec,
-    async execute({ id, width, height, antialias, copy_view }: CreateOffscreenViewArgs) {
-      return createJsonResult({ view: createOffscreenView({ id, width, height, antialias, copyFrom: copy_view }) });
+    async execute({ id, width, height, antialias, copy_view }: CreateOffscreenViewArgs, context) {
+      return createJsonResult({
+        view: createOffscreenView({ id, width, height, antialias, copyFrom: copy_view, owner: context?.sessionId }),
+      });
     },
   }, createOffscreenViewSpec.status);
 

@@ -8,11 +8,14 @@ import {
   getOffscreenViewCount,
   listViews,
   loadViewAngle,
+  releaseOrphanedOffscreenViews,
   renderViewToDataUrl,
   resizeOffscreenView,
   resolveView,
+  setupOffscreenViewOwnership,
   teardownOffscreenViews,
 } from "@/lib/views";
+import { sessionManager } from "@/lib/sessions";
 import { useGlobals } from "@/tests/helpers/globals";
 import { createPreviewHost, type IHostPreview, type IPreviewHost } from "@/tests/helpers/preview-host";
 
@@ -257,4 +260,52 @@ test("a render failure inside the gizmo-free callback surfaces as an error after
   };
   expect(() => renderViewToDataUrl(resolveView())).toThrow(/Failed to render/);
   expect(host.events.slice(-3)).toEqual(["gizmos:hidden", "gizmos:error", "gizmos:restored"]);
+});
+
+test("deleting a view also disposes the orbit controls that Preview#delete leaves registered", () => {
+  createOffscreenView({ ...size, id: "gone" });
+  const start = host.events.length;
+  deleteOffscreenView("gone");
+  expect(host.events.slice(start)).toEqual([
+    "delete:mcp_offscreen_gone",
+    "lose-context:mcp_offscreen_gone",
+    "dispose-controls:mcp_offscreen_gone",
+  ]);
+});
+
+test("a host whose Preview#delete keeps the WebGL context has it released on delete", () => {
+  createOffscreenView({ ...size, id: "kept" });
+  hostPreview("mcp_offscreen_kept").delete = () => {
+    host.events.push("delete:mcp_offscreen_kept");
+  };
+  const start = host.events.length;
+  deleteOffscreenView("kept");
+  expect(host.events.slice(start)).toEqual([
+    "delete:mcp_offscreen_kept",
+    "dispose-controls:mcp_offscreen_kept",
+    "lose-context:mcp_offscreen_kept",
+  ]);
+});
+
+test("views of ended sessions are released; live sessions' and session-less views stay", () => {
+  createOffscreenView({ ...size, id: "ended", owner: "session-a" });
+  createOffscreenView({ ...size, id: "live", owner: "session-b" });
+  createOffscreenView({ ...size, id: "panel" });
+  expect(releaseOrphanedOffscreenViews(["session-b"])).toEqual(["ended"]);
+  expect(listViews().filter(view => view.kind === "offscreen").map(view => view.id)).toEqual(["live", "panel"]);
+  expect(host.events).toContain("lose-context:mcp_offscreen_ended");
+});
+
+test("a session's views are disposed when the session manager removes it", () => {
+  setupOffscreenViewOwnership();
+  sessionManager.add("session-view-owner");
+  try {
+    createOffscreenView({ ...size, id: "owned", owner: "session-view-owner" });
+    createOffscreenView({ ...size, id: "kept" });
+  } finally {
+    sessionManager.remove("session-view-owner");
+  }
+  expect(getOffscreenViewCount()).toBe(1);
+  expect(() => resolveView("owned")).toThrow(/Unknown view/);
+  expect(canCreateOffscreenView()).toBe(true);
 });
