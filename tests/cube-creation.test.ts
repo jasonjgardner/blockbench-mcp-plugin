@@ -45,8 +45,34 @@ let refuseParent = false;
 let textureCalls: { cube: string; sides: Side[] | true | undefined }[] = [];
 let autoUvCalls: string[] = [];
 let autoUvInputs: Record<Side, number[]>[] = [];
-const format = { id: "free", box_uv: false, optional_box_uv: false };
+/** Geometry a size limiter test may override, as Blockbench's `cube_size_limiter.test(cube, values)` takes it. */
+interface ILimitValues {
+  from?: number[];
+  to?: number[];
+  inflate?: number;
+}
+/** The part of Blockbench's `Format.cube_size_limiter` the tools use. */
+interface ISizeLimiter {
+  coordinate_limits?: [number, number];
+  box_marker_size?: number[];
+  test(cube: HostCube, values?: ILimitValues): boolean;
+}
+/** Blockbench's Java block limiter test (js/formats/java/java_block.ts): from/to ± inflate within -16…32. */
+const javaBlockLimiter: ISizeLimiter = {
+  coordinate_limits: [-16, 32],
+  test(cube, values = {}) {
+    const from = values.from ?? cube.from;
+    const to = values.to ?? cube.to;
+    const inflate = values.inflate ?? cube.inflate;
+    return from.some((start, axis) => {
+      const end = to[axis] ?? start;
+      return end + inflate > 32 || end + inflate < -16 || start - inflate > 32 || start - inflate < -16;
+    });
+  },
+};
+const format: { id: string; box_uv: boolean; optional_box_uv: boolean; cube_size_limiter?: ISizeLimiter } = { id: "free", box_uv: false, optional_box_uv: false };
 const project = { box_uv: false, get textures(): HostTexture[] { return HostTexture.all; } };
+const settings = { deactivate_size_limit: { value: false } };
 
 class HostTexture {
   static all: HostTexture[] = [];
@@ -220,13 +246,15 @@ beforeEach(() => {
   format.id = "free";
   format.box_uv = false;
   format.optional_box_uv = false;
+  format.cube_size_limiter = undefined;
+  settings.deactivate_size_limit.value = false;
   project.box_uv = false;
   undo.reset();
 });
 useGlobals(() => ({
   Canvas: { updateAll() { if (failRefresh) throw new Error("Preview failed"); } },
   Cube: HostCube, Group: HostGroup, Texture: HostTexture, Format: format,
-  Project: project, Undo: nativeUndo,
+  Project: project, Undo: nativeUndo, settings,
 }));
 
 test("untextured batch blockout undo removes new cubes and redo restores UUIDs, geometry and parents", async () => {
@@ -498,4 +526,62 @@ test("unknown element fields are rejected instead of silently dropped", async ()
   await expect(tools.call("place_cube", { elements: [{ name: "Unsupported", box_uv: false }] })).rejects.toThrow("Unrecognized key");
   expect(undo.starts).toBe(0);
   expect(HostCube.all).toEqual([]);
+});
+
+test("place_cube refuses cubes the format's size limiter rejects and reverts the whole batch", async () => {
+  format.id = "java_block";
+  format.cube_size_limiter = javaBlockLimiter;
+  const before = model();
+  await expect(tools.call("place_cube", {
+    elements: [{ name: "near", to: [2, 2, 2] }, { name: "far", from: [40, 0, 0], to: [41, 1, 1] }],
+  })).rejects.toThrow('The java_block format\'s size limit refuses "far": every coordinate, including inflate, must stay within -16…32.');
+  expect(model()).toEqual(before);
+  expect(undo.pending).toBeUndefined();
+  expect(undo.lastEdit).toBeUndefined();
+  expect(undo.cancels).toBe(1);
+});
+
+test("place_cube accepts cubes inside the size limit and counts inflate", async () => {
+  format.id = "java_block";
+  format.cube_size_limiter = javaBlockLimiter;
+  await tools.call("place_cube", { elements: [{ name: "edge", from: [30, 0, 0], to: [32, 2, 2] }] });
+  await expect(tools.call("place_cube", { elements: [{ name: "puffy", from: [30, 0, 0], to: [32, 2, 2], inflate: 0.5 }] })).rejects.toThrow('refuses "puffy"');
+  expect(HostCube.all.map(cube => cube.name)).toEqual(["edge"]);
+});
+
+test("modify_cube refuses a new size the limiter rejects before Undo, and leaves other edits alone", async () => {
+  format.id = "java_block";
+  format.cube_size_limiter = javaBlockLimiter;
+  const inside = new HostCube({ name: "inside", from: [0, 0, 0], to: [4, 4, 4] }).init();
+  const outside = new HostCube({ name: "outside", from: [40, 0, 0], to: [41, 1, 1] }).init();
+  await expect(tools.call("modify_cube", { id: inside.uuid, to: [4, 40, 4] })).rejects.toThrow('refuses "inside"');
+  await expect(tools.call("modify_cube", { id: inside.uuid, inflate: 20 })).rejects.toThrow('refuses "inside"');
+  expect(undo.starts).toBe(0);
+  expect(inside.to).toEqual([4, 4, 4]);
+  // Renaming or rotating a cube that is already out of bounds is not a new size.
+  await tools.call("modify_cube", { id: outside.uuid, name: "renamed", rotation: [0, 45, 0] });
+  expect(outside).toMatchObject({ name: "renamed", rotation: [0, 45, 0] });
+});
+
+test("the Deactivate Size Limit setting lets geometry past the limit through", async () => {
+  format.id = "java_block";
+  format.cube_size_limiter = javaBlockLimiter;
+  settings.deactivate_size_limit.value = true;
+  await tools.call("place_cube", { elements: [{ name: "far", from: [40, 0, 0], to: [41, 1, 1] }] });
+  const far = required(HostCube.all[0], "created cube");
+  await tools.call("modify_cube", { id: far.uuid, to: [60, 1, 1] });
+  expect(far.to).toEqual([60, 1, 1]);
+});
+
+test("formats without a size limiter are unaffected", async () => {
+  await tools.call("place_cube", { elements: [{ name: "far", from: [400, 0, 0], to: [401, 1, 1] }] });
+  await tools.call("modify_cube", { id: required(HostCube.all[0], "created cube").uuid, to: [600, 1, 1] });
+  expect(HostCube.all[0]?.to).toEqual([600, 1, 1]);
+});
+
+test("a limiter without coordinate limits is described by its box size", async () => {
+  format.id = "bedrock_block";
+  format.cube_size_limiter = { box_marker_size: [30, 30, 30], test: () => true };
+  const cube = new HostCube({ name: "tower" }).init();
+  await expect(tools.call("modify_cube", { id: cube.uuid, to: [1, 40, 1] })).rejects.toThrow('The bedrock_block format\'s size limit refuses "tower": the model must fit in a 30×30×30 box.');
 });

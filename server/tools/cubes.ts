@@ -202,7 +202,7 @@ export const cubeToolDocs: IToolSpec[] = [
     name: "place_cube",
     condition: { project: true, features: ["edit_mode"] },
     description:
-      "Creates cubes in one reversible edit. Texture and group are optional, allowing untextured blockouts. Explicit face targets never use the current UV selection; partial/custom faces require per-face UV support. Elements accept inflate, plus uv_offset and mirror_uv for box UV cubes; unknown element fields are rejected.",
+      "Creates cubes in one reversible edit. Texture and group are optional, allowing untextured blockouts. Explicit face targets never use the current UV selection; partial/custom faces require per-face UV support. Elements accept inflate, plus uv_offset and mirror_uv for box UV cubes; unknown element fields are rejected. Cubes the format's size limiter rejects (for example Java Block elements outside -16…32) are refused and nothing is created, unless Blockbench's Deactivate Size Limit setting is on.",
     annotations: {
       title: "Place Cube",
       destructiveHint: true,
@@ -214,7 +214,7 @@ export const cubeToolDocs: IToolSpec[] = [
     name: "modify_cube",
     condition: { project: true, features: ["edit_mode"] },
     description:
-      "Modifies the cube with the given ID. Auto UV setting: saved as an integer, where 0 means disabled, 1 means enabled, and 2 means relative auto UV (cube position affects UV)",
+      "Modifies the cube with the given ID. Auto UV setting: saved as an integer, where 0 means disabled, 1 means enabled, and 2 means relative auto UV (cube position affects UV). A new from/to/inflate that the format's size limiter rejects (for example Java Block elements outside -16…32) is refused before anything changes, unless Blockbench's Deactivate Size Limit setting is on.",
     annotations: {
       title: "Modify Cube",
       destructiveHint: true,
@@ -249,6 +249,36 @@ function validateHytaleRectangles(elements: PlaceCubeInput["elements"], rectangl
       }
     });
   });
+}
+
+/** Blockbench's per-format cube size limiter. */
+type CubeSizeLimiter = NonNullable<ModelFormat["cube_size_limiter"]>;
+
+/**
+ * The active format's cube size limiter (Java block -16…32, Bedrock block
+ * 30×30×30), unless it is switched off with Blockbench's "Deactivate Size
+ * Limit" setting, which every native caller checks first.
+ */
+function activeSizeLimiter(): CubeSizeLimiter | undefined {
+  const limiter = Format.cube_size_limiter;
+  if (!limiter) return undefined;
+  const deactivated: unknown = typeof settings === "undefined" ? undefined : settings.deactivate_size_limit?.value;
+  return deactivated === true ? undefined : limiter;
+}
+
+/** The limiter's bounds for an error message. */
+function describeSizeLimit(limiter: CubeSizeLimiter): string {
+  const limits = limiter.coordinate_limits;
+  if (limits) return `every coordinate, including inflate, must stay within ${limits[0]}…${limits[1]}`;
+  const box: unknown = Reflect.get(limiter, "box_marker_size");
+  if (Array.isArray(box) && box.length === 3) return `the model must fit in a ${box.join("×")} box`;
+  return "the geometry exceeds the format's size limit";
+}
+
+/** Refusal naming the cubes Blockbench's own size limiter rejects. */
+function sizeLimitError(limiter: CubeSizeLimiter, names: string[]): Error {
+  const listed = names.map(name => `"${name}"`).join(", ");
+  return new Error(`The ${Format.id} format's size limit refuses ${listed}: ${describeSizeLimit(limiter)}. Move or shrink the geometry (Blockbench's "Deactivate Size Limit" setting turns this check off, at the risk of an invalid model).`);
 }
 
 /** Resolves an explicit parent without silently placing cubes at the root. */
@@ -326,6 +356,11 @@ async function placeCubes({ elements, texture, faces, group }: PlaceCubeInput): 
       });
     });
     Canvas.updateAll();
+    // Blockbench's own size limiter, run once the cubes are in the scene: the Bedrock block
+    // limiter measures them in world space. A refusal reverts the whole batch.
+    const limiter = activeSizeLimiter();
+    const refused = limiter ? cubes.filter(cube => limiter.test(cube)) : [];
+    if (limiter && refused.length) throw sizeLimitError(limiter, refused.map(cube => cube.name));
   });
   const notes = [...new Set(shading.flatMap(plan => plan.notes))];
   return JSON.stringify([...cubes.map(cube => `Added cube ${cube.name} with ID ${cube.uuid}`), ...notes]);
@@ -377,6 +412,14 @@ createTool(cubeToolDocs[1].name, {
     }
 
     const shading = planCubeShading({ shade, shade_direction_override, light_emission }, activeShadingFormat());
+    // A new size must pass Blockbench's own size limiter, as with its resize tools; other edits are not checked.
+    const limiter = from !== undefined || to !== undefined || inflate !== undefined ? activeSizeLimiter() : undefined;
+    const refused = limiter ? cubes.filter((cube) => limiter.test(cube, {
+      from: (from ?? cube.from) as ArrayVector3,
+      to: (to ?? cube.to) as ArrayVector3,
+      inflate: inflate ?? cube.inflate,
+    })) : [];
+    if (limiter && refused.length) throw sizeLimitError(limiter, refused.map((cube) => cube.name));
 
     // One transaction: a failure part-way (auto UV, preview refresh) reverts every cube instead of leaving the edit open.
     runUndoableEdit({ elements: [...cubes], outliner: true, collections: [] }, "Agent modified cubes", () => {
