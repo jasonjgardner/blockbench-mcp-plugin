@@ -100,6 +100,19 @@ useGlobals(() => ({
   updateSelection() {},
 }));
 
+test("applyTo none changes no face, not even on box-UV cubes or UV-selected faces", async () => {
+  // Blockbench's apply(false) would texture every face of the box-UV cube and the faces picked in the UV editor.
+  cubes[1].uvSelection = ["north"];
+  const before = snapshot();
+  const result = await tools.call("apply_texture", { id: "box", texture: "skin", applyTo: "none" });
+  await tools.call("apply_texture", { id: "faces", texture: "skin", applyTo: "none" });
+  expect(snapshot()).toEqual(before);
+  expect(String(result)).toContain('applyTo "none" changed no faces');
+  expect(undo.starts).toBe(0);
+  // It still checks its references.
+  await expect(tools.call("apply_texture", { id: "missing", texture: "skin", applyTo: "none" })).rejects.toThrow('Element "missing" not found');
+});
+
 test("applying a texture changes face assignments only and leaves the texture file unmodified", async () => {
   await tools.call("apply_texture", { id: "faces", texture: "skin", applyTo: "all" });
   expect(Object.values(snapshot().faces)).toEqual(FACES.map(() => "skin-uuid"));
