@@ -63,6 +63,21 @@ describe("headless MCP server", () => {
     expect(tools.find((tool) => tool.name === "bbmodel_edit")?.annotations?.readOnlyHint).toBe(false);
   });
 
+  test("annotations disclose destructive writes and the render engine's install", async () => {
+    const { client } = await connect(root, "lister");
+    const { tools } = await client.listTools();
+    const annotations = (name: string) => tools.find((tool) => tool.name === name)?.annotations;
+    // A tool that can replace existing files, or delete and replace model data, is destructive.
+    const overwriting = tools.filter((tool) => "overwrite" in (tool.inputSchema.properties ?? {})).map((tool) => tool.name);
+    expect(overwriting.length).toBeGreaterThan(5);
+    expect(overwriting.filter((name) => annotations(name)?.destructiveHint !== true)).toEqual([]);
+    expect(annotations("bbmodel_edit")).toMatchObject({ readOnlyHint: false, destructiveHint: true });
+    for (const name of ["bbmodel_render", "bbmodel_contact_sheet"]) {
+      expect(annotations(name)).toMatchObject({ readOnlyHint: false, openWorldHint: true });
+      expect(tools.find((tool) => tool.name === name)?.description).toContain("about 130 MB");
+    }
+  });
+
   test("create → edit → inspect → validate → export, end to end", async () => {
     const session = await connect(root, "builder-agent");
     const created = await session.json<{ revision: string }>("bbmodel_create", { file: "chair.bbmodel", format: "bedrock", name: "chair", resolution: { width: 32, height: 32 } });

@@ -22,6 +22,10 @@ const clipParams = {
   time: z.number().min(0).default(0).describe("Clip time in seconds."),
 };
 
+/** Side effect of the first render, stated so clients can ask before it happens (see `../render/runtime`). */
+const FIRST_RENDER_NOTE =
+  "The first render on a machine downloads and installs the render engine's packages with npm (three, three-blockbench and Dawn, about 130 MB) into a per-user cache folder; later renders reuse them.";
+
 async function outputPath(context: IHeadlessContext, file: string, label: string, explicit: string | undefined, overwrite = false): Promise<string> {
   if (explicit !== undefined) {
     const target = context.store.resolvePath(explicit, [".png"]);
@@ -41,8 +45,7 @@ async function imageContent(path: string): Promise<CallToolResult["content"][num
 const renderTool = defineTool({
   name: "bbmodel_render",
   title: "Render Model",
-  description:
-    "Renders a .bbmodel file to a PNG with bb-render (headless three.js WebGPU), without Blockbench. Returns the image and its path. Optionally poses the model at a time in an animation clip. Views are relative to the model's front (-Z).",
+  description: `Renders a .bbmodel file to a PNG with bb-render (headless three.js WebGPU), without Blockbench. Returns the image and its path. Optionally poses the model at a time in an animation clip. Views are relative to the model's front (-Z). ${FIRST_RENDER_NOTE}`,
   parameters: {
     file: fileParam,
     view: z.enum(RENDER_VIEWS).default("three-quarter"),
@@ -56,8 +59,11 @@ const renderTool = defineTool({
     overwrite: z.boolean().default(false).describe("Allow output to replace an existing PNG."),
     ...clipParams,
   },
-  // Not read-only: an explicit output path writes into the workspace.
+  // Not read-only: an explicit output path writes into the workspace, and may replace a PNG there.
   readOnly: false,
+  destructive: true,
+  // The first render installs packages from the npm registry.
+  openWorld: true,
   async execute(args, context) {
     const { path } = await context.store.read(args.file);
     const output = await outputPath(context, path, args.view, args.output, args.overwrite);
@@ -90,8 +96,7 @@ const DEFAULT_SHEET_VIEWS: RenderView[] = ["front", "right", "back", "left", "th
 const contactSheetTool = defineTool({
   name: "bbmodel_contact_sheet",
   title: "Render Contact Sheet",
-  description:
-    "Renders several named views of a .bbmodel (front, right, back, left, three-quarter, top by default) with identical settings and returns every image, labeled. Use it to review a model from all sides in one call, for example after bbmodel_validate. Flat lighting and an orthographic camera make faces easy to compare.",
+  description: `Renders several named views of a .bbmodel (front, right, back, left, three-quarter, top by default) with identical settings and returns every image, labeled. Use it to review a model from all sides in one call, for example after bbmodel_validate. Flat lighting and an orthographic camera make faces easy to compare. ${FIRST_RENDER_NOTE}`,
   parameters: {
     file: fileParam,
     views: z.array(z.enum(RENDER_VIEWS)).min(1).max(7).default(DEFAULT_SHEET_VIEWS),
@@ -100,7 +105,9 @@ const contactSheetTool = defineTool({
     lighting: z.enum(["studio", "outdoor", "flat"]).default("flat"),
     ...clipParams,
   },
-  readOnly: true,
+  // Not read-only: images are written to the scratch folder, and the first render installs packages from the npm registry.
+  readOnly: false,
+  openWorld: true,
   async execute(args, context) {
     const { path } = await context.store.read(args.file);
     const input = await writeRenderInput(context.store, path, context.scratchDir);

@@ -30,6 +30,7 @@ const legacyTool = defineTool({
     "Writes a copy of a .bbmodel in the 4.10 layout that Blockbench 4.x can open (a 5.0 file opens there as an empty scene). Mirrors Blockbench's Export Legacy Project: groups are inlined into the outliner and position/rotation X and rotation Y keyframes are negated.",
   parameters: { file: fileParam, output: outputParam.describe("Output .bbmodel path inside the workspace."), overwrite: z.boolean().default(false) },
   readOnly: false,
+  destructive: true,
   async execute({ file, output, overwrite }, { store, webApp }) {
     const { doc } = await store.read(file);
     const target = store.resolveModelPath(output);
@@ -52,6 +53,7 @@ const bedrockTool = defineTool({
     overwrite: z.boolean().default(false),
   },
   readOnly: false,
+  destructive: true,
   async execute({ file, output, identifier, visible_bounds, overwrite }, { store, webApp }) {
     const { doc, path: source } = await store.read(file);
     const { geometry, skipped } = compileBedrockGeometry(doc, { identifier, visibleBounds: visible_bounds });
@@ -78,6 +80,7 @@ const moddedEntityTool = defineTool({
     overwrite: z.boolean().default(false),
   },
   readOnly: false,
+  destructive: true,
   async execute({ file, template, output, model_name, entity_class, flip_y, overwrite }, { store }) {
     const { doc } = await store.read(file);
     const { code, className, notes } = compileModdedEntity(doc, { template, modelName: model_name, entityClass: entity_class, flipY: flip_y });
@@ -103,6 +106,7 @@ const javaExportTool = defineTool({
     overwrite: z.boolean().default(false),
   },
   readOnly: false,
+  destructive: true,
   async execute({ file, output, version, export_groups, export_pivots, credit, overwrite }, { store, webApp }) {
     const { doc, path: source } = await store.read(file);
     const { model, notes } = compileJavaBlockModel(doc, { version, exportGroups: export_groups, exportPivots: export_pivots, credit });
