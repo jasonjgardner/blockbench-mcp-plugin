@@ -383,4 +383,15 @@ describe("targeted UV and native action boundaries", () => {
     expect(undo.starts).toBe(0);
     expect(undo.finishes).toBe(0);
   });
+  test("code that ran but returned something without a JSON form is reported as executed", async () => {
+    const results = await Promise.all([
+      "(() => 1)",
+      "Symbol('id')",
+      "({ toJSON: () => undefined })",
+      "(() => { const cyclic = {}; cyclic.self = cyclic; return cyclic; })()",
+    ].map(code => executeTool("risky_eval", { code })));
+    for (const result of results) {
+      expect(result).toEqual(expect.stringMatching(/^\(Code executed successfully, but its result could not be converted to JSON: /));
+    }
+  });
 });
