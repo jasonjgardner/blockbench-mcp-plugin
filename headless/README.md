@@ -83,7 +83,7 @@ bun run headless/call.ts --root ./models bbmodel_edit @ops.json
 
 ## Behavior
 
-**Several agents on one file.** Every read returns a `revision`. Pass it as `expected_revision` when you write. If another agent changed the file in the meantime, the write is refused instead of silently overwriting their work. Writes go to a temporary file and are renamed into place, so readers never see half a file.
+**Several agents on one file.** Every read returns a `revision`. Pass it as `expected_revision` when you write. If another agent changed the file in the meantime, the write is refused instead of silently overwriting their work. Writes go to a temporary file and are renamed into place, so readers never see half a file. Writers wait for each other through a lock file, which another process takes over as abandoned after 30 s; if that happens to an edit that is still running, the edit is refused instead of overwriting the other process's work. Retry it, in smaller batches if needed. The takeover itself is not atomic, so two processes taking over the same abandoned lock at the same moment can still collide; the checks narrow that window but do not close it.
 
 **Format rules.** `bbmodel_edit` refuses a batch when the nodes it adds or changes break the model format's limits, the way Blockbench's editor would: meshes only in `free` models; `java_block` cubes inside -16..32 with the rotations their `java_block_version` allows and no group rotation; forced box UV and whole-number sizes where a format requires them. Nothing is written, and the error says how to fix each element. Softer problems come back as `format_warnings`. Files that already break a rule stay editable, because only touched nodes are checked.
 

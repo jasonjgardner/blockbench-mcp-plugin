@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { readFileSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,7 +9,7 @@ import { downgradeToV410, upgradeToV5 } from "./legacy";
 import { invertMolang } from "./molang";
 import { pngDataUrl, pngSize } from "./png";
 import { bbmodelSchema } from "./schema";
-import { ModelStore, parseModel, RevisionConflictError, serializeModel } from "./store";
+import { LockLostError, ModelStore, parseModel, readLockToken, RevisionConflictError, serializeModel } from "./store";
 
 describe("invertMolang (port of Blockbench js/util/molang.ts)", () => {
   test.each([
@@ -199,6 +200,92 @@ describe("ModelStore", () => {
     expect(added).toHaveLength(30);
     expect(await Bun.file(join(root, "race.bbmodel.lock")).exists()).toBe(false);
   }, 60_000);
+
+  test("an edit that outlives its lock is not written over the process that took the stale lock", async () => {
+    await store.create("race.bbmodel", creatureModel(), false);
+    const worker = join(root, "slow-worker.ts");
+    const started = join(root, "slow.started");
+    const resume = join(root, "slow.resume");
+    const storeModule = join(import.meta.dir, "store.ts").replaceAll("\\", "/");
+    const opsModule = join(import.meta.dir, "..", "edit", "operations.ts").replaceAll("\\", "/");
+    // The worker's edit blocks its event loop, like a huge mesh edit, until this process has taken
+    // over the stale lock and written; its lock goes stale after 0.3 s.
+    await Bun.write(
+      worker,
+      [
+        `import { existsSync, writeFileSync } from "node:fs";`,
+        `import { ModelStore } from "${storeModule}";`,
+        `import { applyOperations, operationSchema } from "${opsModule}";`,
+        "const [root, started, resume] = process.argv.slice(2);",
+        "const store = new ModelStore({ roots: [root] }, { staleMs: 300 });",
+        "const ops = operationSchema.array().parse([{ op: 'add_cube', name: 'slow', from: [0, 0, 0], to: [1, 1, 1] }]);",
+        "try {",
+        "  await store.update('race.bbmodel', undefined, ({ doc }) => {",
+        "    writeFileSync(started, '');",
+        "    const deadline = Date.now() + 20_000;",
+        "    while (!existsSync(resume) && Date.now() < deadline) Bun.sleepSync(10);",
+        "    return { doc: applyOperations(doc, ops).doc, result: null };",
+        "  });",
+        "  console.log('written');",
+        "} catch (error) {",
+        "  console.log(error instanceof Error ? error.name : String(error));",
+        "}",
+      ].join("\n"),
+    );
+    const slow = Bun.spawn([process.execPath, "run", worker, root, started, resume], { stdout: "pipe", stderr: "pipe" });
+    for (let waited = 0; waited < 10_000 && !(await Bun.file(started).exists()); waited += 10) await Bun.sleep(10);
+    const fast = new ModelStore({ roots: [root] }, { staleMs: 300 });
+    const ops = operationSchema.array().parse([{ op: "add_cube", name: "fast", from: [0, 0, 0], to: [1, 1, 1] }]);
+    await fast.update("race.bbmodel", undefined, ({ doc }) => ({ doc: applyOperations(doc, ops).doc, result: null }));
+    writeFileSync(resume, "");
+    expect(await slow.exited).toBe(0);
+    expect((await new Response(slow.stdout).text()).trim()).toBe("LockLostError");
+    const names = (await store.read("race.bbmodel")).doc.elements.map((element) => element.name);
+    expect(names).toContain("fast");
+    expect(names).not.toContain("slow");
+    expect(await Bun.file(join(root, "race.bbmodel.lock")).exists()).toBe(false);
+  }, 30_000);
+
+  test("a writer that lost its lock leaves the new owner's lock file as it is", async () => {
+    const { revision } = await store.create("a.bbmodel", creatureModel(), false);
+    const lockPath = join(root, "a.bbmodel.lock");
+    const takenAt = new Date(Date.now() - 60_000);
+    const edit = store.update("a.bbmodel", undefined, ({ doc }) => {
+      // What another process does once the lock looks stale.
+      writeFileSync(lockPath, "4242 another-owner\n");
+      utimesSync(lockPath, takenAt, takenAt);
+      return { doc: { ...doc, name: "late" }, result: null };
+    });
+    await expect(edit).rejects.toBeInstanceOf(LockLostError);
+    expect(readFileSync(lockPath, "utf8")).toBe("4242 another-owner\n");
+    // Neither deleted nor refreshed: a lock the other owner abandons must still go stale.
+    expect(Math.abs(statSync(lockPath).mtimeMs - takenAt.getTime())).toBeLessThan(2000);
+    expect((await store.read("a.bbmodel")).revision).toBe(revision);
+  });
+
+  test("the lock token read retries a file another program holds, and a missing file means not owned", async () => {
+    const error = (code: string) => Object.assign(new Error(code), { code });
+    let calls = 0;
+    const busyTwice = async () => {
+      calls += 1;
+      if (calls < 3) throw error("EBUSY");
+      return "token\n";
+    };
+    expect(await readLockToken("x.lock", busyTwice)).toBe("token\n");
+    expect(calls).toBe(3);
+    expect(await readLockToken("x.lock", async () => Promise.reject(error("ENOENT")))).toBeUndefined();
+    await expect(readLockToken("x.lock", async () => Promise.reject(error("EACCES")))).rejects.toThrow("EACCES");
+  });
+
+  test("an edit is not written when the file changed after it was read", async () => {
+    await store.create("a.bbmodel", creatureModel(), false);
+    const edit = store.update("a.bbmodel", undefined, ({ doc }) => {
+      writeFileSync(join(root, "a.bbmodel"), serializeModel({ ...doc, name: "other writer" }));
+      return { doc: { ...doc, name: "late" }, result: null };
+    });
+    await expect(edit).rejects.toBeInstanceOf(RevisionConflictError);
+    expect((await store.read("a.bbmodel")).doc.name).toBe("other writer");
+  });
 
   test("create, read and update round-trip with changing revisions", async () => {
     const created = await store.create("a.bbmodel", creatureModel(), false);
