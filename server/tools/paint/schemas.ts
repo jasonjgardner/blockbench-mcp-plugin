@@ -258,12 +258,12 @@ export const paintSettingsParameters = z.object({
 });
 
 /**
- * Input for `paint_with_brush`: stamps brush samples inside one `Texture.edit` transaction.
+ * Input for `paint_with_brush`: one native brush stroke through the given points.
  *
  * Shape: `{ texture_id?, coordinates: [{ x, y }, ...], brush_settings?, connect_strokes }`.
  * At least one coordinate is required. `connect_strokes` (default `true`)
- * interpolates samples no more than one texture pixel apart between
- * consecutive coordinates; `false` stamps only the given points.
+ * draws lines between consecutive coordinates like a dragged brush; `false`
+ * stamps only the given points. Either way the stroke is one undo entry.
  */
 export const paintWithBrushParameters = z.object({
   texture_id: textureIdOptionalSchema,
@@ -278,14 +278,17 @@ export const paintWithBrushParameters = z.object({
     .describe("Array of coordinates to paint at."),
   brush_settings: brushSettingsSchema
     .unwrap()
-    .extend({ aspect_ratio: brushAspectRatioSchema })
+    .extend({
+      aspect_ratio: brushAspectRatioSchema,
+      color: hexColorSchema.describe("Brush color as hex (#RGB or #RRGGBB, so #F00 is #FF0000; an alpha part is ignored) or a color name."),
+    })
     .optional()
-    .describe("Brush settings to apply. Opacity is 0-255; softness is a 0-100 percentage."),
+    .describe("Brush settings written to Blockbench's brush before painting. Opacity is 0-255; softness is a 0-100 percentage. Omitted settings keep the current brush."),
   connect_strokes: z
     .boolean()
     .optional()
     .default(true)
-    .describe("Whether to interpolate brush samples between coordinates, at no more than one texture pixel per step."),
+    .describe("Whether to draw lines between consecutive coordinates, like dragging the brush, as one undo entry. false stamps each coordinate on its own: still one undo entry on Blockbench 5.2 and later, one per coordinate on older versions."),
 });
 
 /**

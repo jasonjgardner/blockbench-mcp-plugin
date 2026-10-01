@@ -92,10 +92,6 @@ class FakeLayer extends FakeItem {
   setSize(): this {
     return this;
   }
-  /** Records the corner points a brush asked the layer to grow to. */
-  expandTo(...points: [number, number][]): void {
-    expansions.push(points);
-  }
   mergeDown(): void {
     const below = this.texture.layers[this.texture.layers.indexOf(this) - 1];
     if (!(below instanceof FakeLayer)) return;
@@ -210,35 +206,26 @@ let fixture: ReturnType<typeof buildTexture>;
 beforeEach(() => {
   undo.reset();
   stamps = [];
-  expansions = [];
   fixture = buildTexture();
 });
 
-/** Brush samples stamped by the Painter double, as `x,y` strings. */
+/** Stroke starts received by the Painter double, as `x,y` texture coordinates. */
 let stamps: string[] = [];
-
-/** Corner points passed to `expandTo` by the brush, one entry per call. */
-let expansions: [number, number][][] = [];
-
-/** Gives the fake texture the `edit` hook `paint_with_brush` calls. */
-function enableTextureEdit(): void {
-  Object.assign(texture, {
-    edit(callback: (canvas: { getContext(): object }) => void): void {
-      callback({ getContext: () => ({}) });
-    },
-  });
-}
 
 useGlobals(() => ({
   BARS: { updateConditions() {} },
-  BarItems: {},
+  BarItems: { brush_tool: { select() {} } },
   Canvas: { updateAll() {} },
   ColorPanel: { set() {} },
+  // Native stroke entry points paint_with_brush drives; this double records where strokes start.
   Painter: {
     current: {},
-    editSquare(_ctx: unknown, x: number, y: number): void {
+    brushChanges: false,
+    startPaintTool(_texture: unknown, x: number, y: number): void {
       stamps.push(`${x},${y}`);
     },
+    movePaintTool(): void {},
+    stopPaintTool(): void {},
   },
   Project: { get textures() { return [texture]; } },
   Texture: { get all() { return [texture]; }, get selected() { return texture; } },
@@ -374,7 +361,6 @@ describe("paint target with layer groups", () => {
     const empty = new FakeGroup({ name: "Empty" }, texture);
     texture.layers.unshift(empty);
     texture.selected_layer = empty;
-    enableTextureEdit();
     await tools.call("paint_with_brush", { texture_id: "texture", coordinates: [{ x: 2, y: 3 }] });
     expect(texture.selected_layer).toBe(fixture.top);
     expect(stamps).toEqual(["2,3"]);
@@ -386,15 +372,11 @@ describe("paint target with layer groups", () => {
     await expect(tools.call("paint_with_brush", { texture_id: "texture", coordinates: [{ x: 0, y: 0 }] })).rejects.toThrow("no pixel layer");
   });
 
-  test("paint_with_brush passes texture coordinates unshifted and grows the layer first", async () => {
-    // Painter.scanCanvas subtracts the layer offset itself; subtracting it here too would paint in the wrong place.
+  test("paint_with_brush passes texture coordinates unshifted to the native stroke", async () => {
+    // Painter subtracts the layer offset and grows the layer itself; doing either here too would paint in the wrong place.
     fixture.top.offset = [4, 4];
-    // Painter.edit publishes the active layer's offset here, as the real host does.
-    Object.assign((Reflect.get(globalThis, "Painter") as { current: object }).current, { offset: [4, 4] });
-    enableTextureEdit();
     await tools.call("paint_with_brush", { texture_id: "texture", coordinates: [{ x: 2, y: 3 }], brush_settings: { size: 2 } });
     expect(stamps).toEqual(["2,3"]);
-    expect(expansions).toEqual([[[1, 2], [4, 5]]]);
   });
 });
 
@@ -454,7 +436,6 @@ describe("texture_layer_management on a host without layer groups (Blockbench 5.
   });
 
   test("paint_with_brush paints the selected legacy layer", async () => {
-    enableTextureEdit();
     await tools.call("paint_with_brush", { texture_id: "texture", coordinates: [{ x: 1, y: 1 }] });
     expect(texture.selected_layer).toBe(legacy.top);
     expect(stamps).toEqual(["1,1"]);

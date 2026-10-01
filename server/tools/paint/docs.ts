@@ -109,7 +109,7 @@ export const paintToolDocs: IToolSpec[] = [
     name: "paint_with_brush",
     condition: { project: true, features: ["paint_mode"], method: () => Texture.all.length > 0 },
     description:
-      "Paints on textures using the brush tool with customizable settings (opacity 0-255, softness 0-100%, optional aspect ratio). Paints on the selected pixel layer; if a layer group is selected, a pixel layer inside it is used.",
+      "Paints with Blockbench's own brush tool, so blend mode, pixel-perfect drawing, lock alpha and mirror painting apply as when painting by hand. Given brush settings (opacity 0-255, softness 0-100%, hex or named color, shape, blend mode, aspect ratio) are set on the brush first; omitted ones keep the current brush. Paints on the selected pixel layer; if a layer group is selected, a pixel layer inside it is used.",
     annotations: {
       title: "Paint with Brush",
       destructiveHint: true,

@@ -222,7 +222,7 @@ async function brushScenario(session: LiveSession, paintedBitmap: string): Promi
   await session.call("paint_with_brush", connectedBrushStroke);
   const brushPixel = await session.json("risky_eval", { code: brushMiddlePixelCode });
   session.check(JSON.stringify(brushPixel.pixel) === "[0,255,0,255]", "connected brush samples paint the middle pixel between endpoints");
-  session.check(await undoIndex(session) === Number(beforeBrush) + 1, "connected brush owns one Texture.edit undo entry");
+  session.check(await undoIndex(session) === Number(beforeBrush) + 1, "connected brush is one native stroke with one undo entry");
   await session.call("undo");
   session.check(await textureBitmap(session) === paintedBitmap, "connected brush undo restores the original bitmap");
 }

@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import {
   alphaToOpacity,
-  brushDimensions,
   brushPresetAliases,
   fromOpacityRange,
   matchesBrushPreset,
+  normalizeHexColor,
   parseOpacityRange,
   shortBrushPresetName,
   toOpacityRange,
@@ -51,14 +51,21 @@ describe("opacity range conversion", () => {
   });
 });
 
-describe("brushDimensions", () => {
-  test("zero aspect ratio keeps the brush even", () => {
-    expect(brushDimensions(8, 0)).toEqual([8, 8]);
+describe("normalizeHexColor", () => {
+  test.each([
+    ["#F00", "#ff0000"],
+    ["#0a8", "#00aa88"],
+    ["12AbEf", "#12abef"],
+    [" #00FF00 ", "#00ff00"],
+    // Alpha parts are dropped, as before: the color panel keeps no alpha.
+    ["#F008", "#ff0000"],
+    ["#FF000080", "#ff0000"],
+  ])("%p becomes %p", (input, expected) => {
+    expect(normalizeHexColor(input)).toBe(expected);
   });
 
-  test("negative aspect ratio narrows the width, positive the height", () => {
-    expect(brushDimensions(9, -2)).toEqual([3, 9]);
-    expect(brushDimensions(9, 2)).toEqual([9, 3]);
+  test.each(["red", "rgb(255, 0, 0)", "#12345"])("%p is left for the color panel to parse", input => {
+    expect(normalizeHexColor(input)).toBe(input);
   });
 });
 
