@@ -6,6 +6,7 @@
 /// <reference types="three" />
 /// <reference types="blockbench-types" />
 import { VERSION } from "@/lib/constants";
+import { effectiveInstructions } from "@/lib/instructions";
 import { createServer } from "@/server/server";
 import { tools, prompts } from "@/server/tools";
 import { resources } from "@/server";
@@ -109,7 +110,7 @@ BBPlugin.register("mcp", {
       sessionConfig: {
         inactivityTimeoutMs: Math.max(1, sessionTimeoutMin) * 60 * 1000,
       },
-      instructions: () => String(Settings.get("mcp_instructions") ?? ""),
+      instructions: () => effectiveInstructions(Settings.get("mcp_instructions")),
     });
 
     // Built-in tools registered when @/server/tools was imported, so other

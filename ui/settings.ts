@@ -17,8 +17,8 @@ export function settingsSetup() {
       // https://github.com/punkpeye/fastmcp?tab=readme-ov-file#providing-instructions
       description: tl("mcp.settings.instructions_desc"),
       type: "text",
-      value:
-        "Generate simple, low-poly models for Minecraft inside Blockbench.",
+      // Sent to clients as server instructions; empty by default (see lib/instructions.ts).
+      value: "",
       category,
       icon: "psychology",
     }),
