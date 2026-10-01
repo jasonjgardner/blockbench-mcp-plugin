@@ -16,7 +16,8 @@
  *   a concurrent reader never sees a half-written model.
  *
  * The sandbox compares real paths (symlinks and junctions resolved), so a link
- * inside a root cannot lead outside it.
+ * inside a root cannot lead outside it. A link whose target is missing has no
+ * real path and is refused.
  *
  * @module
  */
@@ -76,12 +77,36 @@ const isInside = (root: string, target: string): boolean => {
   return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
 };
 
-/** Real path of `target`, resolving links in its nearest existing ancestor. */
+/** Whether `path` itself is a symbolic link or junction, without following it. */
+const isLink = (path: string): boolean => {
+  try {
+    return lstatSync(path).isSymbolicLink();
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Real path of `target`, resolving links in its nearest existing ancestor.
+ *
+ * @throws Error when `target` or an ancestor is a link whose target does not exist: it has no real
+ *   path to check, and a write through it would create that target wherever the link points.
+ */
 function realPathOf(target: string): string {
   if (existsSync(target)) return realpathSync.native(target);
+  if (isLink(target)) throw new Error(`Path ${target} is a symbolic link to a missing target; use the real file.`);
   const parent = dirname(target);
   if (parent === target) return target;
   return join(realPathOf(parent), basename(target));
+}
+
+/** Real path of a root, or undefined for a link to a missing folder: that root then matches nothing, and the others keep working. */
+function realRootOf(root: string): string | undefined {
+  try {
+    return realPathOf(root);
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -89,14 +114,14 @@ function realPathOf(target: string): string {
  *
  * @param input - Absolute path, or a path relative to the first root.
  * @param extensions - Allowed lowercase extensions such as `[".bbmodel"]`; empty allows any.
- * @throws Error for paths outside every root (after resolving symlinks), symlinked files, or a disallowed extension.
+ * @throws Error for paths outside every root (after resolving symlinks), symlinked files, links to missing targets, or a disallowed extension.
  */
 export function resolveWorkspacePath(workspace: IWorkspace, input: string, extensions: readonly string[] = []): string {
   const [firstRoot] = workspace.roots;
   if (!firstRoot) throw new Error("The headless server has no workspace root configured.");
   const absolute = resolve(firstRoot, input);
   const roots = workspace.roots.map((root) => resolve(root));
-  const realRoots = roots.map(realPathOf);
+  const realRoots = roots.flatMap((root) => realRootOf(root) ?? []);
   const allowed = roots.some((root) => isInside(root, absolute)) && realRoots.some((root) => isInside(root, realPathOf(absolute)));
   if (!allowed) throw new Error(`Path ${absolute} is outside the workspace roots: ${workspace.roots.join(", ")}.`);
   if (existsSync(absolute) && lstatSync(absolute).isSymbolicLink()) throw new Error(`Path ${absolute} is a symbolic link; use the real file.`);

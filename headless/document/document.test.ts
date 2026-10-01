@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtemp, rm, symlink } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { creatureModel } from "../test-fixtures";
@@ -130,6 +130,44 @@ describe("ModelStore", () => {
       await symlink(outside, join(root, "link"), process.platform === "win32" ? "junction" : "dir");
       expect(() => store.resolveModelPath("link/escape.bbmodel")).toThrow("outside the workspace");
       await expect(store.create("link/escape.bbmodel", creatureModel(), false)).rejects.toThrow("outside the workspace");
+    } finally {
+      await rm(outside, { recursive: true, force: true });
+    }
+  });
+
+  test("a link whose target is missing is refused, because a write through it would land outside the root", async () => {
+    const outside = await mkdtemp(join(tmpdir(), "bb-headless-outside-"));
+    try {
+      // A junction needs no privileges on Windows; deleting its target leaves it dangling.
+      await mkdir(join(outside, "gone"));
+      await symlink(join(outside, "gone"), join(root, "gone"), process.platform === "win32" ? "junction" : "dir");
+      await rm(join(outside, "gone"), { recursive: true });
+      expect(() => store.resolvePath("gone")).toThrow("symbolic link to a missing target");
+      expect(() => store.resolvePath("gone/effect.json", [".json"])).toThrow("symbolic link to a missing target");
+      expect(() => store.resolveModelPath("gone/model.bbmodel")).toThrow("symbolic link to a missing target");
+      // File links need privileges on Windows.
+      if (process.platform !== "win32") {
+        await symlink(join(outside, "planted.png"), join(root, "planted.png"));
+        expect(() => store.resolvePath("planted.png", [".png"])).toThrow("symbolic link to a missing target");
+      }
+    } finally {
+      await rm(outside, { recursive: true, force: true });
+    }
+  });
+
+  test("a root that links to a missing folder matches nothing and leaves the other roots working", async () => {
+    const outside = await mkdtemp(join(tmpdir(), "bb-headless-outside-"));
+    try {
+      await mkdir(join(outside, "gone"));
+      const broken = join(outside, "second-root");
+      await symlink(join(outside, "gone"), broken, process.platform === "win32" ? "junction" : "dir");
+      await rm(join(outside, "gone"), { recursive: true });
+      const brokenLast = new ModelStore({ roots: [root, broken] });
+      expect(brokenLast.resolveModelPath("a.bbmodel")).toBe(join(root, "a.bbmodel"));
+      expect(() => brokenLast.resolvePath(join(broken, "effect.json"))).toThrow("symbolic link to a missing target");
+      const brokenFirst = new ModelStore({ roots: [broken, root] });
+      expect(brokenFirst.resolveModelPath(join(root, "a.bbmodel"))).toBe(join(root, "a.bbmodel"));
+      expect(() => brokenFirst.resolveModelPath("a.bbmodel")).toThrow("symbolic link to a missing target");
     } finally {
       await rm(outside, { recursive: true, force: true });
     }
