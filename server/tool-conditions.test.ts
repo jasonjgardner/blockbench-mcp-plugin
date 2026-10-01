@@ -11,6 +11,7 @@ import { displayToolDocs } from "@/server/tools/display";
 import { exportToolDocs } from "@/server/tools/export";
 import { historyToolDocs } from "@/server/tools/history";
 import { hytaleToolDocs } from "@/server/tools/hytale";
+import { importToolDocs } from "@/server/tools/import";
 import { knifeToolDocs } from "@/server/tools/knife";
 import { materialInstanceToolDocs } from "@/server/tools/material-instances";
 import { meshToolDocs } from "@/server/tools/mesh";
@@ -23,7 +24,7 @@ import { useGlobals } from "@/tests/helpers/globals";
 const specs = [
   ...animationToolDocs, ...armatureToolDocs, ...cameraToolDocs,
   ...capabilityToolDocs, ...cubeToolDocs, ...cubeUvToolDocs, ...displayToolDocs, ...exportToolDocs,
-  ...historyToolDocs, ...hytaleToolDocs, ...knifeToolDocs, ...materialInstanceToolDocs,
+  ...historyToolDocs, ...hytaleToolDocs, ...importToolDocs, ...knifeToolDocs, ...materialInstanceToolDocs,
   ...meshToolDocs, ...paintToolDocs, ...projectToolDocs, ...textureToolDocs,
   ...uiToolDocs,
 ];
@@ -48,6 +49,7 @@ useGlobals(() => ({
   Condition: evaluateHostCondition,
   // Settings > General values; none stored means every toggle keeps its default.
   Settings: { get: () => undefined },
+  Codecs: { bedrock: { parseGeometry() {} } },
 }));
 
 /** Evaluates a named public specification using the same native entry point as the factory. */
@@ -117,6 +119,14 @@ describe("native tool availability contracts", () => {
     ["capture_app_screenshot", "save_material_config", "import_texture_set", "emulate_clicks"]
       .forEach(name => expect(available(name)).toBe(false));
     expect(available("knife_tool")).toBe(false);
+  });
+
+  test("from_geo_json needs a format with bones and the Bedrock geometry parser", () => {
+    expect(available("from_geo_json")).toBe(true);
+    Object.assign(globalThis, { Format: { id: "java_block", edit_mode: true, paint_mode: true, display_mode: true } });
+    expect(available("from_geo_json")).toBe(false);
+    Object.assign(globalThis, { Format: { ...genericFormat }, Codecs: { bedrock: {} } });
+    expect(available("from_geo_json")).toBe(false);
   });
 
   test("risky_eval follows its setting and stays published when none is stored", () => {

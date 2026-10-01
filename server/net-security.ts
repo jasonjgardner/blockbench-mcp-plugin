@@ -33,6 +33,29 @@ export function isLoopbackHostname(hostname: string): boolean {
 }
 
 /**
+ * Whether a URL hostname names this computer or a private or local network, which a tool must
+ * not fetch for a client: loopback, 0.0.0.0/8, RFC 1918, carrier-grade NAT, link-local (cloud
+ * metadata endpoints), multicast and reserved IPv4; IPv6 forms starting with `::` (unspecified,
+ * loopback, IPv4-mapped), unique-local, link-local, site-local and multicast; names under
+ * `.localhost`, `.local`, `.lan`, `.internal` and `.home.arpa`, and single-label names that the
+ * local network resolves. The URL parser has already normalized IPv4 spellings such as
+ * `2130706433`. A public name that resolves to a private address is not detected here.
+ */
+export function isLocalNetworkHostname(hostname: string): boolean {
+  const host = stripBrackets(hostname.trim().toLowerCase()).replace(/\.$/, "");
+  if (isLoopbackHostname(host)) return true;
+  const ipv4 = /^(\d{1,3})\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/.exec(host);
+  if (ipv4) {
+    const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];
+    return a === 0 || a === 10 || a >= 224 || (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+  }
+  // fc00::/7 unique-local, fe80::/10 link-local, fec0::/10 site-local, ff00::/8 multicast.
+  if (host.includes(":")) return host.startsWith("::") || /^(f[cd]|fe[89a-f]|ff)/.test(host);
+  return !host.includes(".") || /\.(localhost|local|lan|internal|home\.arpa)$/.test(host);
+}
+
+/**
  * Resolves the `mcp_host` setting. Empty or `localhost` (the default) listens on both loopback
  * addresses so `http://localhost:<port>` works whichever address the client resolves first.
  * Any other value is used as given, e.g. `0.0.0.0` or `::` to accept remote connections on purpose.
