@@ -5,6 +5,7 @@ import { createTool, type IToolSpec } from "@/lib/factories";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
 import { getProjectFileResource } from "@/lib/projectResources";
 import { createEmbeddedExport } from "@/lib/tool-results";
+import { writeExportFile } from "@/lib/export-file";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { ToolCondition } from "@/server/tool-conditions";
 
@@ -37,8 +38,13 @@ export const exportModelParameters = z.object({
     .string()
     .optional()
     .describe(
-      "Absolute filesystem path to write the compiled model to. Requires user permission (Blockbench v5.0+ prompts for 'fs' access). If omitted, content is returned in the response only."
+      "Absolute filesystem path to write the compiled model to. Requires user permission (Blockbench v5.0+ prompts for 'fs' access). If omitted, content is returned in the response only. Fails if the file exists unless overwrite is true."
     ),
+  overwrite: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe("Replace an existing file at path. Defaults to false so an export never silently replaces another file."),
   max_content_length: z
     .number()
     .int()
@@ -74,7 +80,8 @@ export const exportToolDocs: IToolSpec[] = [
     condition: { project: true },
     annotations: {
       title: "Export Model",
-      destructiveHint: false,
+      // Writing to `path` can replace a file (with overwrite: true).
+      destructiveHint: true,
       openWorldHint: true,
     },
     parameters: exportModelParameters,
@@ -176,7 +183,7 @@ export function registerExportTools(): void {
 
   createTool(exportToolDocs[1].name, {
     ...exportToolDocs[1],
-    async execute({ codec_id, options, path, max_content_length, result_format }): Promise<CallToolResult> {
+    async execute({ codec_id, options, path, overwrite, max_content_length, result_format }): Promise<CallToolResult> {
       if (!Project) {
         throw new Error(
           "No project is open. Use `create_project` or open a project first."
@@ -260,20 +267,9 @@ export function registerExportTools(): void {
         : Buffer.byteLength(text ?? "", "utf8");
       const encoding: "utf-8" | "base64" = binaryBuffer ? "base64" : "utf-8";
 
-      let wrote_to_path: string | null = null;
-      if (path) {
-        // @ts-ignore - requireNativeModule is a Blockbench global
-        const fs = requireNativeModule("fs", {
-          message: `MCP export_model requested write access to save model to ${path}`,
-        });
-        if (!fs) {
-          throw new Error(
-            "File system access was denied. Unable to write to path. You can omit `path` to retrieve the content in the response."
-          );
-        }
-        fs.writeFileSync(path, binaryBuffer ?? (text ?? ""));
-        wrote_to_path = path;
-      }
+      const wrote_to_path: string | null = path
+        ? writeExportFile(path, binaryBuffer ?? (text ?? ""), overwrite, "export_model")
+        : null;
 
       const fullContent = binaryBuffer
         ? binaryBuffer.toString("base64")

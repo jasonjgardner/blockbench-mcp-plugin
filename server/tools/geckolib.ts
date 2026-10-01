@@ -45,6 +45,7 @@ import {
   type IGeckolibDiagnostic,
 } from "@/lib/geckolib-validate";
 import { findGroupOrThrow } from "@/lib/util";
+import { writeExportFile } from "@/lib/export-file";
 import { runUndoableAnimationEdit } from "@/lib/animation-undo";
 import { KEYFRAME_TIME_EPSILON, TRANSFORM_CHANNELS, findAnimationOrSelected, getAnimationClass } from "./animation/shared";
 import {
@@ -248,6 +249,7 @@ function assertEasingApplies(targets: readonly IEasingTarget[], convert: boolean
 interface IExportDelivery {
   mode: "compile" | "dialog";
   path?: string;
+  overwrite: boolean;
   max_content_length: number;
 }
 
@@ -284,19 +286,6 @@ function triggerPluginExport(actionId: string, label: string): string {
   });
 }
 
-/** Writes export content to disk through Blockbench's permission-checked fs access. */
-function writeExportFile(path: string, content: string, label: string): string {
-  // @ts-ignore - requireNativeModule is a Blockbench global
-  const fs = requireNativeModule("fs", {
-    message: `MCP ${label} requested write access to save to ${path}`,
-  });
-  if (!fs) {
-    throw new Error("File system access was denied. Omit `path` to receive the content in the response instead.");
-  }
-  fs.writeFileSync(path, content);
-  return path;
-}
-
 /**
  * Delivers compiled export content: optionally to disk, then back to the client
  * within the requested size budget.
@@ -315,7 +304,7 @@ function deliverExport(
 ): string {
   const compiled = build();
   const content = typeof compiled === "string" ? compiled : JSON.stringify(compiled, null, 2);
-  const wrote_to_path = delivery.path ? writeExportFile(delivery.path, content, label) : null;
+  const wrote_to_path = delivery.path ? writeExportFile(delivery.path, content, delivery.overwrite, label) : null;
   const omitted = delivery.max_content_length === 0;
   const truncated = !omitted && content.length > delivery.max_content_length;
   return JSON.stringify({
@@ -629,10 +618,10 @@ function registerExportTools(): void {
     {
       ...geckolibToolDocs[7],
       parameters: geckolibExportModelParameters,
-      async execute({ mode, path, max_content_length }) {
+      async execute({ mode, path, overwrite, max_content_length }) {
         assertGeckolibFormat();
         if (mode === "dialog") return triggerPluginExport("export_geckolib_model", "model export");
-        return deliverExport(geckolibToolDocs[7].name, { mode, path, max_content_length }, compileGeckolibGeometry);
+        return deliverExport(geckolibToolDocs[7].name, { mode, path, overwrite, max_content_length }, compileGeckolibGeometry);
       },
     },
     geckolibToolDocs[7].status
@@ -643,7 +632,7 @@ function registerExportTools(): void {
     {
       ...geckolibToolDocs[8],
       parameters: geckolibExportAnimationsParameters,
-      async execute({ mode, path, max_content_length, animation_ids }) {
+      async execute({ mode, path, overwrite, max_content_length, animation_ids }) {
         assertGeckolibFormat();
         if (mode === "dialog") return triggerPluginExport("export_geckolib_animations", "animation export");
         const animations = resolveAnimations(animation_ids);
@@ -651,7 +640,7 @@ function registerExportTools(): void {
         const compiled = compileGeckolibAnimationFile(animations);
         return deliverExport(
           geckolibToolDocs[8].name,
-          { mode, path, max_content_length },
+          { mode, path, overwrite, max_content_length },
           () => compiled.content,
           {
             compiled_via: compiled.via,
@@ -673,7 +662,7 @@ function registerExportTools(): void {
     {
       ...geckolibToolDocs[9],
       parameters: geckolibExportDisplayParameters,
-      async execute({ mode, path, max_content_length }) {
+      async execute({ mode, path, overwrite, max_content_length }) {
         assertGeckolibFormat();
         if (mode === "dialog") return triggerPluginExport("export_geckolib_display", "display settings export");
         const project = requireProject();
@@ -684,7 +673,7 @@ function registerExportTools(): void {
           Object.keys(project.display_settings ?? {}).length > 0;
         return deliverExport(
           geckolibToolDocs[9].name,
-          { mode, path, max_content_length },
+          { mode, path, overwrite, max_content_length },
           () => buildGeckolibDisplaySettings(project),
           {
             model_type: modelType,

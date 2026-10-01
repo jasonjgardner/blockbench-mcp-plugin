@@ -131,8 +131,12 @@ const exportDeliveryFields = {
     .string()
     .optional()
     .describe(
-      "Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode."
+      "Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode. Fails if the file exists unless overwrite is true."
     ),
+  overwrite: z
+    .boolean()
+    .default(false)
+    .describe("Replace an existing file at path. Defaults to false so a re-export never silently replaces a reference file."),
   max_content_length: z
     .number()
     .int()
