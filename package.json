@@ -1,6 +1,6 @@
 {
   "name": "blockbench-mcp",
-  "version": "1.9.3",
+  "version": "1.10.0",
   "description": "Blockbench MCP server plugin",
   "keywords": [
     "Blockbench",
