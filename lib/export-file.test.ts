@@ -28,6 +28,9 @@ test("relative, network and device paths are refused", () => {
     "/\\server\\share\\model.json",
     "\\\\?\\C:\\model.json",
     "\\\\.\\pipe\\model",
+    "C:\\exports\\COM1.json",
+    "C:\\exports\\nul.json",
+    "/home/user/con",
   ]) {
     expect(isAbsoluteExportPath(path)).toBe(false);
   }

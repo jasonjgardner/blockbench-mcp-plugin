@@ -172,6 +172,21 @@ class HostArmatureBone extends HostElement {
   setVertexWeight(): void {}
 }
 
+/** Native Armature: an element whose children (bones) are removed with it. */
+class HostArmature extends HostElement {
+  override readonly type: string = "armature";
+  children: HostElement[] = [];
+  forEachChild(callback: (node: HostNode) => void): void {
+    this.children.forEach(callback);
+  }
+  /** Like OutlinerElement#remove: the node and its children leave the project. */
+  remove(): void {
+    const gone = new Set<HostNode>([this, ...this.children]);
+    elements = elements.filter((element) => !gone.has(element));
+    roots = roots.filter((node) => !gone.has(node));
+  }
+}
+
 class HostGroup extends HostNode {
   override readonly type: string = "group";
   children: HostNode[] = [];
@@ -233,6 +248,7 @@ function createNode(saved: INodeData): HostNode {
     mesh: (name) => new HostMesh(name),
     null_object: (name) => new HostNullObject(name),
     armature_bone: (name) => new HostArmatureBone(name),
+    armature: (name) => new HostArmature(name),
     group: (name) => new HostGroup(name),
   };
   const create = types[saved.type];
@@ -345,6 +361,20 @@ useGlobals(() => ({
   },
   updateSelection() {},
 }));
+
+describe("remove_element", () => {
+  test("Undo of a removed armature brings back its bones", async () => {
+    const armature = new HostArmature("rig").init();
+    const bone = new HostArmatureBone("spine");
+    elements.push(bone);
+    armature.children.push(bone);
+
+    await tools.call("remove_element", { id: armature.uuid });
+    expect(elements).toEqual([]);
+    undo.undo();
+    expect(elements.map((element) => element.uuid).toSorted()).toEqual([armature.uuid, bone.uuid].toSorted());
+  });
+});
 
 describe("find_elements_by_criteria", () => {
   test("rejects a pattern it cannot run instead of returning every element", async () => {

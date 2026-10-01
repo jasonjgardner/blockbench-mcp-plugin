@@ -6,6 +6,7 @@
 /// <reference types="three" />
 /// <reference types="blockbench-types" />
 import { VERSION } from "@/lib/constants";
+import { effectiveInstructions } from "@/lib/instructions";
 import { createServer } from "@/server/server";
 import { tools, prompts } from "@/server/tools";
 import { resources } from "@/server";
@@ -18,6 +19,7 @@ import { setupMaterialUndoRefresh, teardownMaterialUndoRefresh } from "@/lib/mat
 import { setupAnimationUndoRestore, teardownAnimationUndoRestore } from "@/lib/animation-undo";
 import { setupEditorStateSync, teardownEditorStateSync } from "@/lib/editor-state";
 import { setupAiDisclosure, teardownAiDisclosure } from "@/lib/ai-disclosure";
+import { setupSketchfabTags, teardownSketchfabTags } from "@/lib/sketchfab-tags";
 import { setupScratchpadMode, teardownScratchpadMode } from "@/lib/scratchpad-mode";
 import { installPluginApi, uninstallPluginApi } from "@/lib/plugin-api";
 import { setupOffscreenViewOwnership, teardownOffscreenViews } from "@/lib/views";
@@ -33,7 +35,7 @@ BBPlugin.register("mcp", {
   version: VERSION,
   title: "MCP Server",
   author: "Jason J. Gardner",
-  contributors: ["jasonjgardner", "brokestar233", "nhjydywd", "djayfresh"],
+  contributors: ["jasonjgardner", "brokestar233", "nhjydywd", "djayfresh", "heide-oficial"],
   description: "Create an MCP server inside Blockbench.",
   tags: ["MCP", "AI"],
   website: "https://jasonjgardner.github.io/blockbench-mcp-plugin/",
@@ -63,6 +65,7 @@ BBPlugin.register("mcp", {
 
     settingsSetup();
     setupAiDisclosure();
+    setupSketchfabTags();
     setupScratchpadMode();
     setupMaterialUndoRefresh();
     setupAnimationUndoRestore();
@@ -107,7 +110,7 @@ BBPlugin.register("mcp", {
       sessionConfig: {
         inactivityTimeoutMs: Math.max(1, sessionTimeoutMin) * 60 * 1000,
       },
-      instructions: () => String(Settings.get("mcp_instructions") ?? ""),
+      instructions: () => effectiveInstructions(Settings.get("mcp_instructions")),
     });
 
     // Built-in tools registered when @/server/tools was imported, so other
@@ -129,6 +132,7 @@ BBPlugin.register("mcp", {
     uninstallPluginApi();
     teardownScratchpadMode();
     teardownAiDisclosure();
+    teardownSketchfabTags();
     teardownEditorStateSync();
     teardownMaterialUndoRefresh();
     teardownAnimationUndoRestore();

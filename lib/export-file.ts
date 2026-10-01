@@ -1,3 +1,5 @@
+import { displayPath, isAbsoluteLocalPath } from "@/lib/local-files";
+
 /**
  * Writing export results to a caller-given path, shared by `export_model` and
  * the GeckoLib export tools.
@@ -10,12 +12,12 @@ interface IExportFs {
 
 /**
  * Windows drive (`C:\`, `C:/`) or POSIX (`/`) absolute path. Network (`\\server\share`, `//server/share`)
- * and device (`\\?\`, `\\.\`) paths are refused: writing to them makes Windows connect to the named host
- * with the user's credentials. A mapped drive letter still works.
+ * and device (`\\?\`, `\\.\`, reserved names such as `COM1.json` or `nul.json`) paths are refused:
+ * writing to them makes Windows connect to the named host with the user's credentials, or opens a device that
+ * can block Blockbench in a synchronous write. A mapped drive letter still works. Same rule as
+ * {@link isAbsoluteLocalPath}, which reads share.
  */
-export function isAbsoluteExportPath(path: string): boolean {
-  return /^(?:[A-Za-z]:[\\/]|\/(?![\\/]))/.test(path);
-}
+export const isAbsoluteExportPath: (path: string) => boolean = isAbsoluteLocalPath;
 
 /**
  * Writes export content to disk through Blockbench's permission-checked `fs`.
@@ -34,11 +36,11 @@ export function isAbsoluteExportPath(path: string): boolean {
  */
 export function writeExportFile(path: string, data: string | Uint8Array, overwrite: boolean, label: string): string {
   if (!isAbsoluteExportPath(path)) {
-    throw new Error(`${label}: path must be an absolute local path; relative, network (UNC) and device paths are refused (got "${path}").`);
+    throw new Error(`${label}: path must be an absolute local path; relative, network (UNC) and device paths are refused (got "${displayPath(path)}").`);
   }
   // @ts-ignore - requireNativeModule is a Blockbench global
   const fs: IExportFs | undefined = requireNativeModule("fs", {
-    message: `MCP ${label} requested write access to save to ${path}`,
+    message: `MCP ${label} requested write access to save to ${displayPath(path)}`,
   });
   if (!fs) {
     throw new Error("File system access was denied. Omit `path` to receive the content in the response instead.");
@@ -48,7 +50,7 @@ export function writeExportFile(path: string, data: string | Uint8Array, overwri
   } catch (error) {
     const code: unknown = typeof error === "object" && error !== null ? Reflect.get(error, "code") : undefined;
     if (code === "EEXIST") {
-      throw new Error(`${label}: ${path} already exists. Pass overwrite: true to replace it.`);
+      throw new Error(`${label}: ${displayPath(path)} already exists. Pass overwrite: true to replace it.`);
     }
     throw error;
   }

@@ -314,7 +314,9 @@ export function captureScreenshot(project?: string, view: string = ACTIVE_VIEW_I
 
   // Render the requested project, then give the user their tab back.
   const switched = !target.selected;
+  const release = switched ? holdDeferredCallbacks(target) : undefined;
   if (switched && (target.select() as unknown) === false) {
+    release?.();
     throw new Error(`Could not switch to project "${target.name}".`);
   }
   try {
@@ -323,7 +325,46 @@ export function captureScreenshot(project?: string, view: string = ACTIVE_VIEW_I
     if (switched && previous && previous !== target && ModelProject.all.includes(previous)) {
       previous.select();
     }
+    release?.();
   }
+}
+
+/** A project's queue of `whenNextOpen` callbacks, which `ModelProject#select()` runs on the next Vue tick. */
+interface IDeferredCallbacks {
+  on_next_upen?: Array<() => void>;
+}
+
+/**
+ * Takes `project`'s pending `whenNextOpen` callbacks off it for a brief tab switch.
+ *
+ * `select()` runs them in `Vue.nextTick`, after a synchronous capture has already
+ * switched back, so they would run against the user's tab (texture reloads can
+ * resize or convert the active project). The returned function puts them back
+ * on a later tick, after the switch's own tick has found the queue empty, so
+ * they still run when the user really opens the project. If the project is
+ * active again by then, they run right away.
+ *
+ * @param project - The project about to be selected temporarily.
+ * @param schedule - Defers the restore; Blockbench's `Vue.nextTick` by default.
+ * @returns A function that restores the callbacks; call it once, after switching back.
+ */
+export function holdDeferredCallbacks(
+  project: ModelProject,
+  // @ts-ignore - Vue is a Blockbench global
+  schedule: (callback: () => void) => void = (callback) => Vue.nextTick(callback),
+): () => void {
+  const host = project as unknown as IDeferredCallbacks;
+  const held = host.on_next_upen;
+  if (!Array.isArray(held) || held.length === 0) return () => {};
+  delete host.on_next_upen;
+  return () =>
+    schedule(() => {
+      if (project.selected) {
+        held.forEach((callback) => callback());
+        return;
+      }
+      host.on_next_upen = [...held, ...(host.on_next_upen ?? [])];
+    });
 }
 
 /**

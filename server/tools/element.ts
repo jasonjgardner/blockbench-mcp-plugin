@@ -546,14 +546,16 @@ export function registerElementTools() {
       // as Blockbench's own Delete does.
       const elements: OutlinerElement[] = [];
       const groups: Group[] = [];
-      if (element instanceof Group) {
-        groups.push(element);
-        element.forEachChild((child: OutlinerNode) => {
+      // Elements can have children too (an Armature holds its bones, meshes and
+      // null objects), and remove() takes them along.
+      if (element instanceof Group) groups.push(element);
+      if (!(element instanceof Group)) elements.push(element);
+      const parent = element as { forEachChild?: (callback: (child: OutlinerNode) => void) => void };
+      if (typeof parent.forEachChild === "function") {
+        parent.forEachChild((child: OutlinerNode) => {
           if (child instanceof Group) groups.push(child);
-          else if (child instanceof OutlinerElement) elements.push(child);
+          if (child instanceof OutlinerElement) elements.push(child);
         });
-      } else {
-        elements.push(element);
       }
       runUndoableEdit(
         { elements, groups, outliner: true, collections: [] },
