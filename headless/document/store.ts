@@ -163,8 +163,8 @@ export function resolveWorkspacePath(workspace: IWorkspace, input: string, exten
 }
 
 /** Short content hash used as a revision token. */
-export function revisionOf(text: string): string {
-  return new Bun.CryptoHasher("sha256").update(text).digest("hex").slice(0, 16);
+export function revisionOf(data: string | Uint8Array): string {
+  return new Bun.CryptoHasher("sha256").update(data).digest("hex").slice(0, 16);
 }
 
 /** Serializes a document the way Blockbench's default settings do (tab-indented JSON). */
@@ -329,14 +329,50 @@ export class ModelStore {
   }
 
   /**
-   * Writes any text file inside the workspace atomically, under the same locks.
+   * Writes any file inside the workspace atomically, under the same locks.
    *
+   * @param data - Text, or bytes such as a PNG.
    * @param overwrite - When false, refuses to replace an existing file.
    */
-  async writeText(path: string, text: string, overwrite: boolean): Promise<string> {
+  async writeFile(path: string, data: string | Uint8Array, overwrite: boolean): Promise<string> {
     return this.withLock(path, async (lock) => {
       if (!overwrite && (await Bun.file(path).exists())) throw new Error(`${path} already exists; pass overwrite: true to replace it.`);
-      return this.writeAtomic(path, text, lock);
+      return this.writeAtomic(path, data, lock);
+    });
+  }
+
+  /**
+   * Writes a file inside the workspace unless it already holds exactly `data`, under the same locks.
+   *
+   * @param overwrite - When false, refuses to replace an existing file with other content.
+   * @returns Whether the file was written.
+   */
+  async writeFileIfChanged(path: string, data: Uint8Array, overwrite: boolean): Promise<boolean> {
+    return this.withLock(path, async (lock) => {
+      const file = Bun.file(path);
+      if (await file.exists()) {
+        if (Buffer.from(await file.arrayBuffer()).equals(data)) return false;
+        if (!overwrite) throw new Error(`${path} already exists with other content; pass overwrite: true to replace it.`);
+      }
+      await this.writeAtomic(path, data, lock);
+      return true;
+    });
+  }
+
+  /**
+   * Runs a read-modify-write cycle on any text file inside the workspace, under the same locks, so
+   * concurrent writers cannot drop each other's changes.
+   *
+   * @param edit - Receives the current text, or undefined when the file does not exist, and returns
+   *   the text to write and a result for the caller. Throwing aborts without writing.
+   */
+  async updateText<T>(path: string, edit: (current: string | undefined) => Promise<{ text: string; result: T }>): Promise<T> {
+    return this.withLock(path, async (lock) => {
+      const file = Bun.file(path);
+      const current = (await file.exists()) ? await file.text() : undefined;
+      const { text, result } = await edit(current);
+      await this.writeAtomic(path, text, lock, current === undefined ? undefined : revisionOf(current));
+      return result;
     });
   }
 
@@ -345,17 +381,17 @@ export class ModelStore {
    *
    * @param expectedRevision - Revision the file must still have, for read-modify-write cycles.
    */
-  private async writeAtomic(path: string, text: string, lock: IFileLock, expectedRevision?: string): Promise<string> {
+  private async writeAtomic(path: string, data: string | Uint8Array, lock: IFileLock, expectedRevision?: string): Promise<string> {
     const temporary = `${path}.${process.pid}.${crypto.randomUUID().slice(0, 8)}.tmp`;
     try {
-      await Bun.write(temporary, text, { createPath: true });
+      await Bun.write(temporary, data, { createPath: true });
       await lock.confirm();
       if (expectedRevision !== undefined) {
         const current = revisionOf(await Bun.file(path).text());
         if (current !== expectedRevision) throw new RevisionConflictError(path, expectedRevision, current);
       }
       await renameWithRetry(temporary, path);
-      return revisionOf(text);
+      return revisionOf(data);
     } catch (error) {
       await unlink(temporary).catch(() => undefined);
       throw error;

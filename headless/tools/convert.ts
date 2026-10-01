@@ -34,7 +34,7 @@ const legacyTool = defineTool({
     const { doc } = await store.read(file);
     const target = store.resolveModelPath(output);
     const converted = downgradeToV410(doc as unknown as Record<string, unknown>);
-    const revision = await store.writeText(target, JSON.stringify(converted.doc, null, "\t"), overwrite);
+    const revision = await store.writeFile(target, JSON.stringify(converted.doc, null, "\t"), overwrite);
     return { path: target, revision, notes: converted.notes, ...(await webAppField(converted.doc, target, webApp)) };
   },
 });
@@ -58,7 +58,7 @@ const bedrockTool = defineTool({
     const text = JSON.stringify(geometry, null, "\t");
     if (output === undefined) return { geometry, skipped, ...(await geometryLinks(text, `${basename(source, ".bbmodel")}.geo.json`, webApp, source)) };
     const target = store.resolvePath(output, [".json"]);
-    await store.writeText(target, text, overwrite);
+    await store.writeFile(target, text, overwrite);
     // Links come after the write, so a refused output path leaves no launcher behind.
     return { path: target, skipped, ...(await geometryLinks(text, basename(target), webApp, target)) };
   },
@@ -83,7 +83,7 @@ const moddedEntityTool = defineTool({
     const { code, className, notes } = compileModdedEntity(doc, { template, modelName: model_name, entityClass: entity_class, flipY: flip_y });
     if (output === undefined) return { class_name: className, template, code, notes };
     const target = store.resolvePath(output, [".java"]);
-    await store.writeText(target, code, overwrite);
+    await store.writeFile(target, code, overwrite);
     return { path: target, class_name: className, template, notes };
   },
 });
@@ -109,7 +109,7 @@ const javaExportTool = defineTool({
     const text = JSON.stringify(model, null, "\t");
     if (output === undefined) return { model, notes, ...(await geometryLinks(text, `${basename(source, ".bbmodel")}.json`, webApp, source)) };
     const target = store.resolvePath(output, [".json"]);
-    await store.writeText(target, text, overwrite);
+    await store.writeFile(target, text, overwrite);
     return { path: target, notes, ...(await geometryLinks(text, basename(target), webApp, target)) };
   },
 });

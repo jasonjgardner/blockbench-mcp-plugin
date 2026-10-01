@@ -47,16 +47,28 @@ async function readEffect(path: string): Promise<ParticleEffectFile | undefined>
 /** Forward-slash path from a model's folder to a file, as keyframes store it. */
 const modelRelative = (modelPath: string, target: string): string => relative(dirname(modelPath), target).split(/[\\/]/).join("/");
 
-/** Copies a workspace PNG into `<packRoot>/textures/particle/`, returning design knobs that point at it. */
-async function copyTexture(context: IHeadlessContext, packRoot: string, source: string, name: string, overwrite: boolean): Promise<{ design: ParticleDesign; file: string }> {
+/** A workspace PNG to copy into `<packRoot>/textures/particle/`, with design knobs that point at the copy. */
+interface ITextureCopy {
+  design: ParticleDesign;
+  source: string;
+  file: string;
+  bytes: Uint8Array;
+}
+
+/** Reads the PNG for {@link ITextureCopy}; nothing is written yet. */
+async function prepareTexture(context: IHeadlessContext, packRoot: string, source: string, name: string): Promise<ITextureCopy> {
   const sourcePath = context.store.resolvePath(source, [".png"]);
   const bytes = new Uint8Array(await Bun.file(sourcePath).arrayBuffer());
   const { width, height } = pngSize(bytes);
   const texture = particleTexturePath(name);
   const target = context.store.resolvePath(join(packRoot, ...`${texture}.png`.split("/")), [".png"]);
-  if (!overwrite && target !== sourcePath && (await Bun.file(target).exists())) throw new Error(`${target} already exists; pass overwrite: true to replace it.`);
-  if (target !== sourcePath) await Bun.write(target, bytes, { createPath: true });
-  return { design: { texture, texture_size: [width, height] }, file: target };
+  return { design: { texture, texture_size: [width, height] }, source: sourcePath, file: target, bytes };
+}
+
+/** A file's text, or undefined when it does not exist. */
+async function readOptionalText(path: string): Promise<string | undefined> {
+  const file = Bun.file(path);
+  return (await file.exists()) ? file.text() : undefined;
 }
 
 const effectTool = defineTool({
@@ -87,22 +99,35 @@ const effectTool = defineTool({
     if (action === "update" && preset) throw new Error("preset applies to create; pass design knobs to update.");
     const packRoot = context.store.resolvePath(pack_root);
     const path = context.store.resolvePath(join(packRoot, ...particleFileRelativePath(identifier).split("/")), [".json"]);
-    const existing = await readEffect(path);
-    if (action === "update" && !existing) throw new Error(`${path} does not exist; use action: create.`);
-    if (action === "create" && existing && !overwrite) throw new Error(`${path} already exists; pass overwrite: true, or use action: update.`);
-    // File names come from the short name, so b:smoke would otherwise edit a:smoke's file.
-    const existingId = existing?.particle_effect.description.identifier;
-    if (action === "update" && existingId !== identifier) throw new Error(`${path} holds ${existingId}, not ${identifier}. Pass that identifier, or create ${identifier} under another pack_root.`);
-    const texture = texture_image ? await copyTexture(context, packRoot, texture_image, shortNameOf(identifier), overwrite) : undefined;
-    const knobs = design ?? {};
-    const rawFile = raw ? parseEffect(JSON.stringify(raw), "raw") : undefined;
-    const renamed = rawFile ? { ...rawFile, particle_effect: { ...rawFile.particle_effect, description: { ...rawFile.particle_effect.description, identifier } } } : undefined;
-    const base = renamed ?? (action === "update" && existing ? existing : undefined);
-    const file = base
-      ? applyParticleDesign(applyParticleDesign(base, knobs), texture?.design ?? {})
-      : buildParticleEffect(identifier, preset ? PARTICLE_PRESETS[preset].design : {}, knobs, texture?.design ?? {});
-    const warnings = assertValid(file);
-    await context.store.writeText(path, `${JSON.stringify(file, null, "\t")}\n`, true);
+    const texture = texture_image ? await prepareTexture(context, packRoot, texture_image, shortNameOf(identifier)) : undefined;
+    const copiesTexture = texture !== undefined && texture.file !== texture.source;
+    /** The effect to write over the file's current text; throws for every refusal. */
+    const build = (current: string | undefined): { file: ParticleEffectFile; warnings: readonly string[] } => {
+      const existing = current === undefined ? undefined : parseEffect(current, path);
+      if (action === "update" && !existing) throw new Error(`${path} does not exist; use action: create.`);
+      if (action === "create" && existing && !overwrite) throw new Error(`${path} already exists; pass overwrite: true, or use action: update.`);
+      // File names come from the short name, so b:smoke would otherwise edit a:smoke's file.
+      const existingId = existing?.particle_effect.description.identifier;
+      if (action === "update" && existingId !== identifier) throw new Error(`${path} holds ${existingId}, not ${identifier}. Pass that identifier, or create ${identifier} under another pack_root.`);
+      const knobs = design ?? {};
+      const rawFile = raw ? parseEffect(JSON.stringify(raw), "raw") : undefined;
+      const renamed = rawFile ? { ...rawFile, particle_effect: { ...rawFile.particle_effect, description: { ...rawFile.particle_effect.description, identifier } } } : undefined;
+      const base = renamed ?? (action === "update" && existing ? existing : undefined);
+      const file = base
+        ? applyParticleDesign(applyParticleDesign(base, knobs), texture?.design ?? {})
+        : buildParticleEffect(identifier, preset ? PARTICLE_PRESETS[preset].design : {}, knobs, texture?.design ?? {});
+      return { file, warnings: assertValid(file) };
+    };
+    // Every refusal is found before the lock is taken, so a refused call (a missing file, a mistyped
+    // pack_root, an invalid design) leaves no file or folder behind.
+    build(await readOptionalText(path));
+    if (copiesTexture && !overwrite && (await Bun.file(texture.file).exists())) throw new Error(`${texture.file} already exists; pass overwrite: true to replace it.`);
+    // Then read, build and write again under the file's lock, so concurrent calls cannot drop each other's changes.
+    const { file, warnings } = await context.store.updateText(path, async (current) => {
+      const built = build(current);
+      if (copiesTexture) await context.store.writeFile(texture.file, texture.bytes, overwrite);
+      return { text: `${JSON.stringify(built.file, null, "\t")}\n`, result: built };
+    });
     const modelPath = model ? context.store.resolveModelPath(model) : undefined;
     return {
       file: path,
@@ -213,7 +238,10 @@ const packTool = defineTool({
     const blocked = writes.filter((_, index) => current[index] === "different");
     if (blocked.length && !overwrite) throw new Error(`These files exist with different content: ${blocked.map((write) => write.target).join(", ")}. Pass overwrite: true to replace them.`);
     const pending = writes.filter((_, index) => current[index] !== "same");
-    await Promise.all(pending.map((write) => Bun.write(write.target, write.bytes, { createPath: true })));
+    // Locked and atomic like model writes. A file that appeared since the check above is refused unless
+    // overwrite is set, or left as it is when it already holds the same bytes (another identical pack).
+    const wrote = await Promise.all(pending.map((write) => context.store.writeFileIfChanged(write.target, write.bytes, overwrite)));
+    const written = pending.filter((_, index) => wrote[index]);
     const problems = [
       ...usages.filter((usage) => !usage.file).map((usage) => `${usage.animation} at ${usage.time}s: effect "${usage.effect}" has no particle file, so it is not packed or previewed.`),
       ...usages.filter((usage) => usage.locator && !locatorNames.has(usage.locator)).map((usage) => `${usage.animation} at ${usage.time}s: locator "${usage.locator}" does not exist.`),
@@ -223,8 +251,8 @@ const packTool = defineTool({
     ];
     return {
       destination: root,
-      written: pending.map((write) => write.target),
-      unchanged: writes.filter((_, index) => current[index] === "same").map((write) => write.target),
+      written: written.map((write) => write.target),
+      unchanged: writes.filter((write) => !written.includes(write)).map((write) => write.target),
       already_in_pack: inPlace.map((source) => source.path),
       client_entity: plan.client_entity,
       problems,

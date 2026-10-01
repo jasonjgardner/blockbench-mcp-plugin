@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { existsSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { ModelStore } from "./document/store";
+import { type ILockTiming, ModelStore } from "./document/store";
 import { applyOperations, operationSchema } from "./edit/operations";
 import { EFFECTS_ANIMATOR_KEY } from "./edit/particle-operations";
 import { compileBedrockGeometry } from "./formats/bedrock";
@@ -82,8 +83,8 @@ describe("particle tools", () => {
     await rm(root, { recursive: true, force: true });
   });
 
-  async function connect(): Promise<<T = Record<string, unknown>>(name: string, args: Record<string, unknown>) => Promise<T>> {
-    const store = new ModelStore({ roots: [root] });
+  async function connect(lockTiming: Partial<ILockTiming> = {}): Promise<<T = Record<string, unknown>>(name: string, args: Record<string, unknown>) => Promise<T>> {
+    const store = new ModelStore({ roots: [root] }, lockTiming);
     const server = createHeadlessServer(() => ({
       store,
       renderer: new BbRenderer({ node: "node", concurrency: 1, timeoutMs: 1000, prepare: () => Promise.reject(new Error("runtime disabled in tests")) }),
@@ -164,6 +165,53 @@ describe("particle tools", () => {
     expect(pack.written).toEqual([]);
     expect(pack.already_in_pack).toEqual([absolute]);
     expect(pack.client_entity).toEqual({ particle_effects: { smoke: "a:smoke" } });
+  });
+
+  test("concurrent updates of one effect keep every change", async () => {
+    const call = await connect();
+    await call("bbmodel_particle_effect", { identifier: "test:bubbles", preset: "bubbles" });
+    await Promise.all([
+      call("bbmodel_particle_effect", { identifier: "test:bubbles", action: "update", design: { lifetime: 4 } }),
+      call("bbmodel_particle_effect", { identifier: "test:bubbles", action: "update", design: { rate: 2 } }),
+    ]);
+    const components = (await Bun.file(join(root, "particles", "bubbles.json")).json()).particle_effect.components;
+    expect(components["minecraft:particle_lifetime_expression"]).toEqual({ max_lifetime: 4 });
+    expect(components["minecraft:emitter_rate_steady"]).toMatchObject({ spawn_rate: 2 });
+  });
+
+  test("textures and packed files wait for the store lock like models", async () => {
+    const call = await connect({ timeoutMs: 100 });
+    await Bun.write(join(root, "art", "ember.png"), PNG_2X4);
+    await Bun.write(join(root, "textures", "particle", "ember.png.lock"), "4242 another writer\n");
+    await expect(call("bbmodel_particle_effect", { identifier: "test:ember", preset: "embers", texture_image: "art/ember.png" })).rejects.toThrow("locked by another process");
+    expect(await Bun.file(join(root, "textures", "particle", "ember.png")).exists()).toBe(false);
+
+    await call("bbmodel_particle_effect", { identifier: "test:smoke", preset: "smoke", pack_root: "src", design: { looping: false, duration: 1 } });
+    const doc = apply([{ op: "set_particle_keyframe", animation: "animation.creature.walk", time: 0, effect: "smoke", file: join(root, "src", "particles", "smoke.json") }]).doc;
+    await Bun.write(join(root, "m.bbmodel"), JSON.stringify(doc));
+    await Bun.write(join(root, "RP", "particles", "smoke.json.lock"), "4242 another writer\n");
+    await expect(call("bbmodel_particle_pack", { file: "m.bbmodel", destination: "RP" })).rejects.toThrow("locked by another process");
+    expect(await Bun.file(join(root, "RP", "particles", "smoke.json")).exists()).toBe(false);
+  });
+
+  test("a refused effect call leaves no file or folder behind", async () => {
+    const call = await connect();
+    await expect(call("bbmodel_particle_effect", { identifier: "test:bubbles", action: "update", pack_root: "RP_typo", design: { lifetime: 2 } })).rejects.toThrow("does not exist");
+    await expect(call("bbmodel_particle_effect", { identifier: "test:odd", pack_root: "fresh", raw: { not: "a particle" } })).rejects.toThrow("not a Bedrock particle effect");
+    expect(existsSync(join(root, "RP_typo"))).toBe(false);
+    expect(existsSync(join(root, "fresh"))).toBe(false);
+  });
+
+  test("two identical packs at once both succeed", async () => {
+    const call = await connect();
+    await call("bbmodel_particle_effect", { identifier: "test:smoke", preset: "smoke", pack_root: "src", design: { looping: false, duration: 1 } });
+    const doc = apply([{ op: "set_particle_keyframe", animation: "animation.creature.walk", time: 0, effect: "smoke", file: join(root, "src", "particles", "smoke.json") }]).doc;
+    await Bun.write(join(root, "m.bbmodel"), JSON.stringify(doc));
+    const pack = () => call<{ written: string[]; unchanged: string[] }>("bbmodel_particle_pack", { file: "m.bbmodel", destination: "RP" });
+    const packs = await Promise.all([pack(), pack()]);
+    const target = join(root, "RP", "particles", "smoke.json");
+    expect(packs.flatMap((result) => result.written)).toEqual([target]);
+    expect(packs.flatMap((result) => result.unchanged)).toEqual([target]);
   });
 
   test("the pack reports keyframes without files and missing locators", async () => {
