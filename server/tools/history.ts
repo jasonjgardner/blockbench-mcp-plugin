@@ -226,11 +226,16 @@ export function registerHistoryTools() {
     ...historyToolDocs[3],
     async execute({ name }) {
       const label = `[checkpoint] ${name}`;
-      Undo.initEdit({
+      // A checkpoint changes nothing in the project. keep_saved (honoured by
+      // UndoSystem#finishEdit, missing from blockbench-types) stops the entry
+      // from marking it unsaved.
+      const aspects: UndoAspects & { keep_saved: boolean } = {
         elements: [],
         outliner: true,
         collections: [],
-      });
+        keep_saved: true,
+      };
+      Undo.initEdit(aspects);
       Undo.finishEdit(label);
 
       return JSON.stringify(

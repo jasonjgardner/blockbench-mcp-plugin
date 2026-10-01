@@ -218,7 +218,8 @@ export default function createNetServer (
     endpoint,
     host,
     keepAlive = DEFAULT_KEEP_ALIVE,
-    sessionConfig
+    sessionConfig,
+    instructions
   }: {
     endpoint: string
     port: number
@@ -226,6 +227,8 @@ export default function createNetServer (
     host?: string
     keepAlive?: Partial<IKeepAliveConfig>
     sessionConfig?: Partial<ISessionConfig>
+    /** Reads the `mcp_instructions` setting when a session starts, so edits apply to new sessions. */
+    instructions?: () => string | undefined
   }
 ): [NetServer[], SessionTransports] {
   const sessionTransports: SessionTransports = new Map()
@@ -629,6 +632,7 @@ export default function createNetServer (
             }
 
             const sessionServer = createMcpServer({
+              instructions: instructions?.(),
               onRequestCancelled: (requestId) => answerCancelled(sessionServer, requestId)
             })
 

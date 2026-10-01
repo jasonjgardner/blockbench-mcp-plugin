@@ -1,5 +1,6 @@
 import { VERSION } from "@/lib/constants";
 import { z } from "zod";
+import bundledManifest from "@/prompts/manifest.json";
 
 // ============================================================================
 // Types
@@ -23,6 +24,13 @@ const FETCH_TIMEOUT_MS = 10_000;
 const STORAGE_KEY_MANIFEST = "bbmcp_prompt_manifest";
 const STORAGE_KEY_VERSION = "bbmcp_prompt_manifest_version";
 const STORAGE_KEY_OVERRIDES = "bbmcp_prompt_overrides";
+
+/**
+ * Prompts embedded in the bundle. `bun run build` regenerates prompts/manifest.json
+ * first, so a build carries the prompts of its own version, the same content the
+ * CDN serves for `@v<version>`, and loading them needs no network request.
+ */
+const BUNDLED_MANIFEST: IPromptManifest = bundledManifest;
 
 // ============================================================================
 // State
@@ -173,19 +181,31 @@ function persistOverrides(): void {
 // ============================================================================
 
 /**
- * Initialize the prompt loader. Loads overrides from localStorage,
- * checks the cache, and fetches from CDN if needed.
+ * Initialize the prompt loader. Loads overrides from localStorage and uses the
+ * prompts bundled for this version; only when the bundle has none for it does
+ * it check the cache and, if enabled, fetch from the CDN.
  *
  * Call during plugin `onload()` before the server starts accepting requests.
  *
- * @param cdnEnabled - Whether to fetch from CDN (default: true).
- *   When false, only localStorage cache is used.
+ * @param cdnEnabled - Whether a bundle without this version's prompts may fetch
+ *   them from the CDN (default: true). When false, only the localStorage cache is used.
+ * @param bundled - Prompts embedded at build time.
  */
 export async function initPromptLoader(
-  cdnEnabled: boolean = true
+  cdnEnabled: boolean = true,
+  bundled: IPromptManifest | null = BUNDLED_MANIFEST
 ): Promise<void> {
   // Load user overrides
   overrides = loadOverrides();
+
+  if (bundled?.version === VERSION) {
+    manifest = bundled;
+    initialized = true;
+    console.log(
+      `[MCP] Prompt manifest bundled with v${VERSION} (${Object.keys(bundled.prompts).length} prompts)`
+    );
+    return;
+  }
 
   // Check cache version
   const cachedVersion = storageGet(STORAGE_KEY_VERSION);
@@ -226,6 +246,16 @@ export async function initPromptLoader(
       `[MCP] Using stale cached manifest (cached: v${staleVersion}, current: v${VERSION})`
     );
     initialized = true;
+    return;
+  }
+
+  // Prompts of another version beat none
+  if (bundled) {
+    manifest = bundled;
+    initialized = true;
+    console.warn(
+      `[MCP] Using bundled prompt manifest of v${bundled.version} (current: v${VERSION})`
+    );
     return;
   }
 

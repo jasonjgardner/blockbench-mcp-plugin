@@ -57,7 +57,7 @@ const en: Record<string, string> = {
 
   // Settings
   "mcp.settings.instructions_name": "MCP System Instructions",
-  "mcp.settings.instructions_desc": "Instructions for the MCP system.",
+  "mcp.settings.instructions_desc": "Sent to MCP clients when they connect, as the server instructions. Leave empty to send none. Applies to new sessions.",
   "mcp.settings.port_name": "MCP Server Port",
   "mcp.settings.port_desc": "Port for the MCP server.",
   "mcp.settings.host_name": "MCP Server Host",
@@ -65,7 +65,7 @@ const en: Record<string, string> = {
   "mcp.settings.endpoint_name": "MCP Server Endpoint",
   "mcp.settings.endpoint_desc": "Endpoint for the MCP server.",
   "mcp.settings.prompt_cdn_name": "Enable Prompt CDN",
-  "mcp.settings.prompt_cdn_desc": "Fetch prompt content from CDN on plugin load. Disable to use only cached prompts.",
+  "mcp.settings.prompt_cdn_desc": "Prompts ship with the plugin. Only when a build lacks the prompts of its version, fetch them from the jsDelivr CDN on plugin load. Disable to use only cached prompts.",
   "mcp.settings.session_timeout_name": "Session Inactivity Timeout (minutes)",
   "mcp.settings.session_timeout_desc": "Disconnect MCP sessions after this many minutes of inactivity. Lower values free resources faster; higher values tolerate idle clients.",
   "mcp.settings.sse_heartbeat_name": "SSE Heartbeat Interval (seconds)",
@@ -175,7 +175,7 @@ const de: Record<string, string> = {
 
   // Settings
   "mcp.settings.instructions_name": "MCP Systemanweisungen",
-  "mcp.settings.instructions_desc": "Anweisungen für das MCP-System.",
+  "mcp.settings.instructions_desc": "Wird MCP-Clients beim Verbinden als Server-Anweisungen gesendet. Leer lassen, um keine zu senden. Gilt für neue Sitzungen.",
   "mcp.settings.port_name": "MCP Server Port",
   "mcp.settings.port_desc": "Port für den MCP-Server.",
   "mcp.settings.host_name": "MCP-Server-Host",
@@ -183,7 +183,7 @@ const de: Record<string, string> = {
   "mcp.settings.endpoint_name": "MCP Server Endpunkt",
   "mcp.settings.endpoint_desc": "Endpunkt für den MCP-Server.",
   "mcp.settings.prompt_cdn_name": "Prompt-CDN aktivieren",
-  "mcp.settings.prompt_cdn_desc": "Prompt-Inhalte beim Laden des Plugins vom CDN abrufen. Deaktivieren, um nur zwischengespeicherte Prompts zu verwenden.",
+  "mcp.settings.prompt_cdn_desc": "Prompts sind im Plugin enthalten. Nur wenn einem Build die Prompts seiner Version fehlen, werden sie beim Laden des Plugins vom jsDelivr-CDN abgerufen. Deaktivieren, um nur zwischengespeicherte Prompts zu verwenden.",
   "mcp.settings.session_timeout_name": "Sitzungs-Inaktivitäts-Timeout (Minuten)",
   "mcp.settings.session_timeout_desc": "MCP-Sitzungen nach dieser Anzahl von Minuten Inaktivität trennen. Niedrigere Werte geben Ressourcen schneller frei; höhere Werte tolerieren inaktive Clients.",
   "mcp.settings.sse_heartbeat_name": "SSE-Heartbeat-Intervall (Sekunden)",
@@ -274,7 +274,7 @@ const ja: Record<string, string> = {
 
   // Settings
   "mcp.settings.instructions_name": "MCPシステム指示",
-  "mcp.settings.instructions_desc": "MCPシステムの指示。",
+  "mcp.settings.instructions_desc": "MCPクライアントの接続時にサーバーの指示として送信されます。空にすると送信しません。新しいセッションに適用されます。",
   "mcp.settings.port_name": "MCPサーバーポート",
   "mcp.settings.port_desc": "MCPサーバーのポート。",
   "mcp.settings.host_name": "MCPサーバーホスト",
@@ -282,7 +282,7 @@ const ja: Record<string, string> = {
   "mcp.settings.endpoint_name": "MCPサーバーエンドポイント",
   "mcp.settings.endpoint_desc": "MCPサーバーのエンドポイント。",
   "mcp.settings.prompt_cdn_name": "プロンプトCDNを有効化",
-  "mcp.settings.prompt_cdn_desc": "プラグイン読み込み時にCDNからプロンプト内容を取得します。無効にするとキャッシュされたプロンプトのみ使用します。",
+  "mcp.settings.prompt_cdn_desc": "プロンプトはプラグインに同梱されています。ビルドにそのバージョンのプロンプトがない場合のみ、プラグイン読み込み時にjsDelivr CDNから取得します。無効にするとキャッシュされたプロンプトのみ使用します。",
   "mcp.settings.session_timeout_name": "セッション非アクティブタイムアウト (分)",
   "mcp.settings.session_timeout_desc": "この分数の非アクティブ後にMCPセッションを切断します。値が小さいほどリソースを早く解放し、大きいほどアイドルクライアントを許容します。",
   "mcp.settings.sse_heartbeat_name": "SSEハートビート間隔 (秒)",
@@ -373,7 +373,7 @@ const zh: Record<string, string> = {
 
   // Settings
   "mcp.settings.instructions_name": "MCP系统指令",
-  "mcp.settings.instructions_desc": "MCP系统的指令。",
+  "mcp.settings.instructions_desc": "在MCP客户端连接时作为服务器指令发送。留空则不发送。对新会话生效。",
   "mcp.settings.port_name": "MCP服务器端口",
   "mcp.settings.port_desc": "MCP服务器的端口。",
   "mcp.settings.host_name": "MCP服务器主机",
@@ -381,7 +381,7 @@ const zh: Record<string, string> = {
   "mcp.settings.endpoint_name": "MCP服务器端点",
   "mcp.settings.endpoint_desc": "MCP服务器的端点。",
   "mcp.settings.prompt_cdn_name": "启用提示词CDN",
-  "mcp.settings.prompt_cdn_desc": "插件加载时从CDN获取提示词内容。禁用后仅使用缓存的提示词。",
+  "mcp.settings.prompt_cdn_desc": "提示词已随插件打包。仅当构建缺少其版本的提示词时，才会在插件加载时从 jsDelivr CDN 获取。禁用后仅使用缓存的提示词。",
   "mcp.settings.session_timeout_name": "会话非活动超时（分钟）",
   "mcp.settings.session_timeout_desc": "在非活动指定分钟数后断开 MCP 会话。较低的值更快释放资源；较高的值容忍空闲客户端。",
   "mcp.settings.sse_heartbeat_name": "SSE 心跳间隔（秒）",

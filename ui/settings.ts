@@ -26,6 +26,8 @@ export function settingsSetup() {
       description: tl("mcp.settings.port_desc"),
       type: "number",
       value: 3000,
+      min: 1,
+      max: 65535,
       category,
       icon: "numbers",
     }),

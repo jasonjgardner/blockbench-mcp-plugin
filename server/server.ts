@@ -15,16 +15,20 @@ export interface ICreateServerOptions {
    * request's HTTP exchange answers it here.
    */
   onRequestCancelled?: (requestId: RequestId) => void;
+  /** Instructions sent to clients in the initialize result (`mcp_instructions` setting); omitted when blank. */
+  instructions?: string;
 }
 
 /**
  * Creates a new MCP server instance using the official SDK
  */
 export function createServer(options: ICreateServerOptions = {}): McpServer {
+  const instructions = options.instructions?.trim();
   const server = new McpServer({
     name: "Blockbench MCP",
     version: VERSION,
   }, {
+    ...(instructions ? { instructions } : {}),
     capabilities: {
       tools: { listChanged: true },
       resources: { listChanged: true },

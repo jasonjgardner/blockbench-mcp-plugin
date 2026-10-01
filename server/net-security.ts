@@ -6,6 +6,8 @@
  * pure (no Blockbench globals) so they can be unit tested and reused by `server/net.ts`.
  */
 
+import { DEFAULT_MCP_ENDPOINT, DEFAULT_MCP_PORT } from "@/lib/constants";
+
 /** `mcp_host` setting value meaning "this computer only": listen on 127.0.0.1 and ::1. */
 export const LOOPBACK_HOST_SETTING = "localhost";
 
@@ -42,6 +44,48 @@ export function resolveListenPlan(setting: unknown): IListenPlan {
   }
   const host = stripBrackets(raw);
   return { hosts: [host], loopbackOnly: isLoopbackHostname(host) };
+}
+
+/** Port and endpoint the server uses, resolved from the `mcp_port` and `mcp_endpoint` settings. */
+export interface IServerAddress {
+  port: number;
+  endpoint: string;
+  /** One message per setting whose invalid value was replaced by the default. */
+  warnings: string[];
+}
+
+/** An endpoint is a plain URL path: RFC 3986 path characters, no query, fragment or spaces. */
+const ENDPOINT_PATTERN = /^\/[A-Za-z0-9\-._~!$&'()*+,;=:@%/]*$/;
+
+function isUnset(value: unknown): boolean {
+  return value === undefined || value === null || (typeof value === "string" && value.trim() === "");
+}
+
+/**
+ * Resolves the `mcp_port` and `mcp_endpoint` settings. The port must be an integer from 1 to 65535:
+ * `listen` throws on anything else and the plugin would fail to load. The endpoint gets one leading
+ * slash and no trailing ones, since requests are matched against it exactly. Unset values use the
+ * defaults silently; invalid ones use them with a warning.
+ */
+export function resolveServerAddress(portSetting: unknown, endpointSetting: unknown): IServerAddress {
+  const warnings: string[] = [];
+  const port = Number(portSetting);
+  const validPort = Number.isInteger(port) && port >= 1 && port <= 65535;
+  if (!validPort && !isUnset(portSetting)) {
+    warnings.push(`MCP port "${String(portSetting)}" is not a whole number from 1 to 65535; using ${DEFAULT_MCP_PORT}.`);
+  }
+  const endpoint = typeof endpointSetting === "string"
+    ? `/${endpointSetting.trim().replace(/^\/+|\/+$/g, "")}`
+    : "";
+  const validEndpoint = ENDPOINT_PATTERN.test(endpoint);
+  if (!validEndpoint && !isUnset(endpointSetting)) {
+    warnings.push(`MCP endpoint "${String(endpointSetting)}" is not a URL path like ${DEFAULT_MCP_ENDPOINT}; using ${DEFAULT_MCP_ENDPOINT}.`);
+  }
+  return {
+    port: validPort ? port : DEFAULT_MCP_PORT,
+    endpoint: validEndpoint && !isUnset(endpointSetting) ? endpoint : DEFAULT_MCP_ENDPOINT,
+    warnings,
+  };
 }
 
 /** Hostname part of a `Host` header: `localhost:3000` → `localhost`, `[::1]:3000` → `::1`. */

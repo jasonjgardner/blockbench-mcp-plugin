@@ -23,9 +23,15 @@ afterEach(() => {
   sessions = new Map();
 });
 
+/** Optional `createNetServer` settings for one test. */
+interface IStartOptions {
+  sessionConfig?: Partial<ISessionConfig>;
+  instructions?: () => string | undefined;
+}
+
 /** Starts the plugin's HTTP server on free ports and waits until every listener is bound. */
-async function start(host?: string, sessionConfig?: Partial<ISessionConfig>): Promise<NetServer[]> {
-  const [servers, transports] = createNetServer(net, { port: 0, endpoint: "/bb-mcp", host, keepAlive: noKeepAlive, sessionConfig });
+async function start(host?: string, options: IStartOptions = {}): Promise<NetServer[]> {
+  const [servers, transports] = createNetServer(net, { port: 0, endpoint: "/bb-mcp", host, keepAlive: noKeepAlive, ...options });
   running = servers;
   sessions = transports;
   await Promise.all(
@@ -394,7 +400,7 @@ describe("createNetServer session lifecycle", () => {
 
   test("at the session limit, closes the least recently active idle session for a new client", async () => {
     try {
-      const [server] = await start("127.0.0.1", { maxSessions: 2 });
+      const [server] = await start("127.0.0.1", { sessionConfig: { maxSessions: 2 } });
       const port = portOf(server);
       const first = await initialize(port);
       await Bun.sleep(10);
@@ -414,7 +420,7 @@ describe("createNetServer session lifecycle", () => {
   test("refuses a new client with 503 while every session at the limit has a request in flight", async () => {
     const tool = registerWaitingTool("net_test_busy");
     try {
-      const [server] = await start("127.0.0.1", { maxSessions: 1 });
+      const [server] = await start("127.0.0.1", { sessionConfig: { maxSessions: 1 } });
       const port = portOf(server);
       const sessionId = await initialize(port);
       const call = request(port, mcpPost(port, sessionId), toolCall(3, "net_test_busy"));
@@ -531,5 +537,19 @@ describe("createNetServer HTTP framing", () => {
     await connection.closed;
     expect(statuses()).toEqual(["HTTP/1.1 100 Continue", "HTTP/1.1 200 OK", "HTTP/1.1 100 Continue", "HTTP/1.1 200 OK"]);
     expect(splitResponses(connection.received()).map((response) => response.body)).toEqual(['{"ready":true}', '{"ready":true}']);
+  });
+});
+
+describe("createNetServer instructions", () => {
+  test("sends the instructions setting to each new session", async () => {
+    let instructions = "Keep models low-poly.";
+    const [server] = await start("127.0.0.1", { instructions: () => instructions });
+    const port = portOf(server);
+    const first = await request(port, mcpPost(port), initializeBody);
+    expect(JSON.parse(first.body).result.instructions).toBe("Keep models low-poly.");
+
+    instructions = "  ";
+    const second = await request(port, mcpPost(port), initializeBody);
+    expect(JSON.parse(second.body).result).not.toHaveProperty("instructions");
   });
 });

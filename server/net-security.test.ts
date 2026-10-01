@@ -5,6 +5,7 @@ import {
   hostnameFromHostHeader,
   isLoopbackHostname,
   resolveListenPlan,
+  resolveServerAddress,
   type IListenPlan,
 } from "@/server/net-security";
 
@@ -87,4 +88,32 @@ describe("checkRequest", () => {
 test("formatHostForUrl brackets IPv6 literals", () => {
   expect(formatHostForUrl("127.0.0.1")).toBe("127.0.0.1");
   expect(formatHostForUrl("::1")).toBe("[::1]");
+});
+
+describe("resolveServerAddress", () => {
+  test("keeps valid settings and normalizes the endpoint's slashes", () => {
+    expect(resolveServerAddress(3100, "/bb-mcp")).toEqual({ port: 3100, endpoint: "/bb-mcp", warnings: [] });
+    expect(resolveServerAddress("3100", " bb-mcp/ ").endpoint).toBe("/bb-mcp");
+    expect(resolveServerAddress(3000, "//mcp/v1//").endpoint).toBe("/mcp/v1");
+  });
+
+  test("uses the defaults silently when a setting is unset", () => {
+    expect(resolveServerAddress(undefined, "")).toEqual({ port: 3000, endpoint: "/bb-mcp", warnings: [] });
+  });
+
+  test("replaces an unusable port with the default and says so", () => {
+    for (const port of [0, -1, 3000.5, 65536, "http", Number.NaN]) {
+      const address = resolveServerAddress(port, "/bb-mcp");
+      expect(address.port).toBe(3000);
+      expect(address.warnings).toHaveLength(1);
+    }
+  });
+
+  test("replaces an endpoint with spaces, a query or a fragment with the default and says so", () => {
+    for (const endpoint of ["/bb mcp", "/bb-mcp?x=1", "/bb-mcp#top", "/café"]) {
+      const address = resolveServerAddress(3000, endpoint);
+      expect(address.endpoint).toBe("/bb-mcp");
+      expect(address.warnings).toEqual([expect.stringContaining("is not a URL path")]);
+    }
+  });
 });

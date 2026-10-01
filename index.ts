@@ -23,6 +23,7 @@ import { installPluginApi, uninstallPluginApi } from "@/lib/plugin-api";
 import { teardownOffscreenViews } from "@/lib/views";
 import type { NetServer, SessionTransports } from "@/server/net";
 import createNetServer from "@/server/net";
+import { resolveServerAddress } from "@/server/net-security";
 import { getIcon } from "@/macros/getIcon" with { type: "macro" };
 
 let httpServers: NetServer[] = [];
@@ -67,9 +68,9 @@ BBPlugin.register("mcp", {
     setupAnimationUndoRestore();
     setupEditorStateSync();
 
-    // Load prompt manifest from CDN/cache before server starts.
-    // Must never abort onload — missing prompts should degrade gracefully,
-    // e.g. when a new version is tagged before the CDN asset is published.
+    // Load the bundled prompt manifest before the server starts; the cache and
+    // CDN are only consulted when the bundle lacks this version's prompts.
+    // Must never abort onload — missing prompts should degrade gracefully.
     try {
       const cdnEnabled = Settings.get("mcp_prompt_cdn_enabled") !== false;
       await initPromptLoader(cdnEnabled);
@@ -90,9 +91,14 @@ BBPlugin.register("mcp", {
       Settings.get("mcp_sse_heartbeat"),
       15
     );
+    const address = resolveServerAddress(Settings.get("mcp_port"), Settings.get("mcp_endpoint"));
+    address.warnings.forEach((warning) => {
+      console.warn(`[MCP] ${warning}`);
+      Blockbench.showQuickMessage(warning, 5000);
+    });
     [httpServers, sessionTransports] = createNetServer(net, {
-      port: Number(Settings.get("mcp_port") || 3000),
-      endpoint: String(Settings.get("mcp_endpoint") || "/bb-mcp"),
+      port: address.port,
+      endpoint: address.endpoint,
       host: String(Settings.get("mcp_host") ?? ""),
       keepAlive: {
         sseHeartbeatIntervalMs: Math.max(0, sseHeartbeatSec) * 1000,
@@ -100,6 +106,7 @@ BBPlugin.register("mcp", {
       sessionConfig: {
         inactivityTimeoutMs: Math.max(1, sessionTimeoutMin) * 60 * 1000,
       },
+      instructions: () => String(Settings.get("mcp_instructions") ?? ""),
     });
 
     // Built-in tools registered when @/server/tools was imported, so other
