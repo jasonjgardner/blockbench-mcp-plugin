@@ -106,8 +106,9 @@ export function applyTextureToTargets(projectTexture: Texture, targets: Paintabl
     addToSelection(targets);
     updateSelection();
     projectTexture.select();
+    // Only face assignments change. updateChangesAfterEdit() would re-encode the
+    // bitmap and flag the texture unsaved, so Ctrl+S would rewrite its PNG.
     Texture.selected?.apply(APPLY_TO_FACES[applyTo]);
-    projectTexture.updateChangesAfterEdit();
   } finally {
     restoreSelection(previousSelection);
   }
