@@ -57,6 +57,21 @@ describe("PBR materials (Blockbench texture groups)", () => {
   });
 });
 
+describe("texture images", () => {
+  const onePixel = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+
+  test("update_texture with a new source embeds it and drops the file link and layers Blockbench would show instead", () => {
+    const layers = [{ name: "paint", uuid: crypto.randomUUID(), type: "pixel_layer", data_url: onePixel }];
+    const linked = { ...creatureModel(), textures: [{ uuid: crypto.randomUUID(), name: "skin", path: "C:/models/skin.png", relative_path: "../skin.png", source: onePixel, width: 1, height: 1, internal: false, saved: true, layers_enabled: true, layers }] };
+    const renamed = applyOperations(linked, ops([{ op: "update_texture", target: "skin", name: "hide" }])).doc;
+    expect(renamed.textures[0]).toMatchObject({ name: "hide", path: "C:/models/skin.png", relative_path: "../skin.png", internal: false, saved: true, layers_enabled: true, layers });
+    const replacement = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAAECAYAAACk7+45AAAAFklEQVR4nGP838Dwn4GBgYEJRGBnAABUcQKGuqbVnwAAAABJRU5ErkJggg==";
+    const replaced = applyOperations(renamed, ops([{ op: "update_texture", target: "hide", source: replacement, width: 2, height: 4 }])).doc;
+    expect(replaced.textures[0]).toMatchObject({ name: "hide", source: replacement, width: 2, height: 4, path: "", relative_path: "", internal: true, saved: false, layers_enabled: false });
+    expect(replaced.textures[0]).not.toHaveProperty("layers");
+  });
+});
+
 describe("box UV sizes follow the format", () => {
   test("modded_entity keeps fractional sizes (box_uv_float_size), others floor them", () => {
     const cube = { op: "add_cube", name: "fin", from: [0, 0, 0], to: [2.5, 1, 1], box_uv: true };
