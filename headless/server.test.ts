@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -61,6 +61,21 @@ describe("headless MCP server", () => {
     expect(tools.map((tool) => tool.name).toSorted()).toEqual(HEADLESS_TOOLS.map((tool) => tool.name).toSorted());
     expect(tools.find((tool) => tool.name === "bbmodel_info")?.annotations?.readOnlyHint).toBe(true);
     expect(tools.find((tool) => tool.name === "bbmodel_edit")?.annotations?.readOnlyHint).toBe(false);
+  });
+
+  test("annotations disclose destructive writes and the render engine's install", async () => {
+    const { client } = await connect(root, "lister");
+    const { tools } = await client.listTools();
+    const annotations = (name: string) => tools.find((tool) => tool.name === name)?.annotations;
+    // A tool that can replace existing files, or delete and replace model data, is destructive.
+    const overwriting = tools.filter((tool) => "overwrite" in (tool.inputSchema.properties ?? {})).map((tool) => tool.name);
+    expect(overwriting.length).toBeGreaterThan(5);
+    expect(overwriting.filter((name) => annotations(name)?.destructiveHint !== true)).toEqual([]);
+    expect(annotations("bbmodel_edit")).toMatchObject({ readOnlyHint: false, destructiveHint: true });
+    for (const name of ["bbmodel_render", "bbmodel_contact_sheet"]) {
+      expect(annotations(name)).toMatchObject({ readOnlyHint: false, openWorldHint: true });
+      expect(tools.find((tool) => tool.name === name)?.description).toContain("about 130 MB");
+    }
   });
 
   test("create → edit → inspect → validate → export, end to end", async () => {
@@ -135,6 +150,48 @@ describe("headless MCP server", () => {
     const result = await session.call("bbmodel_render", { file: "r.bbmodel" });
     expect(result.isError).toBe(true);
     expect(result.content[0]?.type === "text" ? result.content[0].text : "").toContain("The render engine is not available: runtime disabled in tests");
+  });
+
+  test("renders read a copy of the model whose textures cannot reach files outside the workspace", async () => {
+    // Stand-in renderer: keeps the model it was given next to the output and writes a 1x1 PNG.
+    const fakeCli = join(root, "fake-render.mjs");
+    await Bun.write(
+      fakeCli,
+      [
+        `import { copyFileSync, writeFileSync } from "node:fs";`,
+        "const [input, , output] = process.argv.slice(2);",
+        "copyFileSync(input, `${output}.input.json`);",
+        `writeFileSync(output, Buffer.from("${ONE_PIXEL_PNG.split(",")[1]}", "base64"));`,
+      ].join("\n"),
+    );
+    const session = await connect(root, "renderer", new BbRenderer({ cli: fakeCli, node: process.execPath, concurrency: 1, timeoutMs: 20_000 }));
+    const outside = await mkdtemp(join(tmpdir(), "bb-headless-outside-"));
+    try {
+      const secret = join(outside, "secret.png");
+      await Bun.write(secret, Buffer.from(ONE_PIXEL_PNG.split(",")[1] ?? "", "base64"));
+      await session.json("bbmodel_create", { file: "r.bbmodel" });
+      const doc = JSON.parse(await Bun.file(join(root, "r.bbmodel")).text()) as Record<string, unknown>;
+      await Bun.write(join(root, "r.bbmodel"), JSON.stringify({ ...doc, textures: [{ uuid: crypto.randomUUID(), name: "secret", path: secret }] }));
+
+      const rendered = await session.call("bbmodel_render", { file: "r.bbmodel", output: "out.png" });
+      expect(rendered.isError).toBeFalsy();
+      const info = JSON.parse(rendered.content[0]?.type === "text" ? rendered.content[0].text : "{}") as { warnings?: string[] };
+      expect(info.warnings?.[0]).toContain("outside the workspace");
+      expect(rendered.content[1]?.type).toBe("image");
+      const seen = JSON.parse(await Bun.file(join(root, "out.png.input.json")).text()) as { textures: Record<string, unknown>[] };
+      expect(seen.textures[0]).not.toHaveProperty("path");
+      expect(seen.textures[0]).not.toHaveProperty("source");
+
+      const sheet = await session.call("bbmodel_contact_sheet", { file: "r.bbmodel", views: ["front", "top"] });
+      // Labeled views first, as without warnings; the warnings come last.
+      expect(sheet.content.map((part) => part.type)).toEqual(["text", "image", "text", "image", "text"]);
+      expect(sheet.content[0]?.type === "text" ? sheet.content[0].text : "").toStartWith("front: ");
+      const last = sheet.content.at(-1);
+      expect(last?.type === "text" ? last.text : "").toContain("outside the workspace");
+      expect((await readdir(join(root, "renders"))).filter((name) => name.endsWith(".bbmodel"))).toEqual([]);
+    } finally {
+      await rm(outside, { recursive: true, force: true });
+    }
   });
 
   test("a render never replaces an existing workspace PNG unless overwrite is set", async () => {

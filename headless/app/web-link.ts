@@ -225,7 +225,7 @@ export function launcherHtml(url: string, title: string): string {
  * Writes a launcher page. The folder is created private (0700) and refused when
  * it is a symbolic link, and the page is written to a random name and renamed
  * into place, because rename replaces a planted symlink instead of following it
- * (the default folder sits in the shared OS temp directory on Linux).
+ * (a --scratch folder may sit in a shared directory).
  */
 async function writeLauncher(url: string, name: string, key: string, dir: string): Promise<{ path: string; file_url: string }> {
   await mkdir(dir, { recursive: true, mode: 0o700 });

@@ -1,6 +1,6 @@
 import { readFile, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 import { BBModelLoader, type BBModelDocument } from "three-blockbench";
 import { DataTexture, Mesh, RGBAFormat, type AnimationClip, type Object3D, type Texture } from "three/webgpu";
 
@@ -8,6 +8,7 @@ import { fixTextureFrames, texelsPerUvUnit, withFlattenedTextures } from "./bbmo
 import { decodePng, flipRows } from "./png";
 import { blockbenchClipTiming, createPoser, type IPoser } from "./poser";
 import { filterSceneTextures, type TextureFilterMode } from "./texture-filter";
+import { embeddedImageBytes } from "./texture-source";
 import type { IClipTiming } from "./timeline";
 import { unskinRigidMeshes } from "./unskin";
 
@@ -36,17 +37,15 @@ export interface ILoadModelOptions {
 const SAMPLE_RATE = 120;
 
 /**
- * Decodes a data URL or file URL into an RGBA DataTexture, since Node has no Image element.
+ * Decodes an embedded (data URL) image into an RGBA DataTexture, since Node has no Image element.
+ * Any other URL is refused, not read (see `./texture-source`).
  *
  * Rows are flipped so the image's top row lands at v = 1. three-blockbench maps Blockbench's
  * top-down UVs with `v = 1 - y / height`, and a DataTexture uploads its first row at v = 0, so an
  * unflipped decode samples every face upside down (a palette texture shows its bottom rows).
  */
 export async function decodeTexture(url: string): Promise<Texture> {
-  const source = url.startsWith("data:")
-    ? Buffer.from(url.slice(url.indexOf(",") + 1), "base64")
-    : await readFile(url.startsWith("file:") ? fileURLToPath(url) : url);
-  const image = decodePng(source);
+  const image = decodePng(embeddedImageBytes(url));
   const texture = new DataTexture(flipRows(image), image.width, image.height, RGBAFormat);
   texture.needsUpdate = true;
   return texture;

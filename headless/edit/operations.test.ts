@@ -3,7 +3,7 @@ import { creatureModel } from "../test-fixtures";
 import { isCube } from "../document/schema";
 import { emptyModel } from "../tools/edit";
 import { matchesName } from "../tools/inspect";
-import { applyOperations, operationSchema } from "./operations";
+import { applyOperations, operationSchema, stampAiUsage } from "./operations";
 
 const ops = (list: unknown[]) => operationSchema.array().parse(list);
 
@@ -54,6 +54,35 @@ describe("PBR materials (Blockbench texture groups)", () => {
     expect(doc.textures[0]).toMatchObject({ group: b?.uuid, pbr_channel: "mer" });
     const detached = applyOperations(doc, ops([{ op: "update_texture", target: "t", material: null }])).doc;
     expect(detached.textures[0]?.group).toBeUndefined();
+  });
+});
+
+describe("texture images", () => {
+  const onePixel = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+
+  test("update_texture with a new source embeds it and drops the file link and layers Blockbench would show instead", () => {
+    const layers = [{ name: "paint", uuid: crypto.randomUUID(), type: "pixel_layer", data_url: onePixel }];
+    const linked = { ...creatureModel(), textures: [{ uuid: crypto.randomUUID(), name: "skin", path: "C:/models/skin.png", relative_path: "../skin.png", source: onePixel, width: 1, height: 1, internal: false, saved: true, layers_enabled: true, layers }] };
+    const renamed = applyOperations(linked, ops([{ op: "update_texture", target: "skin", name: "hide" }])).doc;
+    expect(renamed.textures[0]).toMatchObject({ name: "hide", path: "C:/models/skin.png", relative_path: "../skin.png", internal: false, saved: true, layers_enabled: true, layers });
+    const replacement = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAAECAYAAACk7+45AAAAFklEQVR4nGP838Dwn4GBgYEJRGBnAABUcQKGuqbVnwAAAABJRU5ErkJggg==";
+    const replaced = applyOperations(renamed, ops([{ op: "update_texture", target: "hide", source: replacement, width: 2, height: 4 }])).doc;
+    expect(replaced.textures[0]).toMatchObject({ name: "hide", source: replacement, width: 2, height: 4, path: "", relative_path: "", internal: true, saved: false, layers_enabled: false });
+    expect(replaced.textures[0]).not.toHaveProperty("layers");
+  });
+});
+
+describe("AI usage stamp", () => {
+  test("a client is listed once however often it writes, even when its name contains the list separator", () => {
+    const once = stampAiUsage(creatureModel(), "Claude, Code");
+    expect(once).toMatchObject({ ai_used: true, ai_agents: "Claude Code" });
+    expect(stampAiUsage(stampAiUsage(once, "Claude, Code"), "Claude, Code").ai_agents).toBe("Claude Code");
+    expect(stampAiUsage(once, "other").ai_agents).toBe("Claude Code, other");
+  });
+
+  test("a client name with nothing printable is recorded as the unknown client, like the plugin does", () => {
+    expect(stampAiUsage(creatureModel(), " ,\u0000, ").ai_agents).toBe("Unknown MCP client");
+    expect(stampAiUsage({ ...creatureModel(), ai_agents: "Claude Code" }, "").ai_agents).toBe("Claude Code, Unknown MCP client");
   });
 });
 

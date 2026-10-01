@@ -3,7 +3,8 @@
  *
  * Renders happen in separate Node processes, so they never block other tool
  * calls or the Blockbench editor. Images are returned inline as PNG content and
- * also kept on disk.
+ * also kept on disk. The renderer reads a copy of the model whose textures only
+ * hold image data from the model or the workspace (see `../render/input`).
  *
  * @module
  */
@@ -13,6 +14,7 @@ import { basename, join } from "node:path";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { RENDER_PRESETS, RENDER_VIEWS, type IRenderRequest, type RenderView } from "../render/bb-render";
+import { writeRenderInput } from "../render/input";
 import { defineTool, fileParam, type IHeadlessContext, type IRegistrableTool } from "../tool";
 
 const clipParams = {
@@ -20,13 +22,17 @@ const clipParams = {
   time: z.number().min(0).default(0).describe("Clip time in seconds."),
 };
 
+/** Side effect of the first render, stated so clients can ask before it happens (see `../render/runtime`). */
+const FIRST_RENDER_NOTE =
+  "The first render on a machine downloads and installs the render engine's packages with npm (three, three-blockbench and Dawn, about 130 MB) into a per-user cache folder; later renders reuse them.";
+
 async function outputPath(context: IHeadlessContext, file: string, label: string, explicit: string | undefined, overwrite = false): Promise<string> {
   if (explicit !== undefined) {
     const target = context.store.resolvePath(explicit, [".png"]);
     if (!overwrite && (await Bun.file(target).exists())) throw new Error(`${target} already exists; pass overwrite: true to replace it.`);
     return target;
   }
-  await mkdir(context.scratchDir, { recursive: true });
+  await mkdir(context.scratchDir, { recursive: true, mode: 0o700 });
   const stem = basename(file).replace(/\.bbmodel$/i, "");
   return join(context.scratchDir, `${stem}-${label}-${Date.now().toString(36)}.png`);
 }
@@ -39,8 +45,7 @@ async function imageContent(path: string): Promise<CallToolResult["content"][num
 const renderTool = defineTool({
   name: "bbmodel_render",
   title: "Render Model",
-  description:
-    "Renders a .bbmodel file to a PNG with bb-render (headless three.js WebGPU), without Blockbench. Returns the image and its path. Optionally poses the model at a time in an animation clip. Views are relative to the model's front (-Z).",
+  description: `Renders a .bbmodel file to a PNG with bb-render (headless three.js WebGPU), without Blockbench. Returns the image and its path. Optionally poses the model at a time in an animation clip. Views are relative to the model's front (-Z). ${FIRST_RENDER_NOTE}`,
   parameters: {
     file: fileParam,
     view: z.enum(RENDER_VIEWS).default("three-quarter"),
@@ -54,13 +59,17 @@ const renderTool = defineTool({
     overwrite: z.boolean().default(false).describe("Allow output to replace an existing PNG."),
     ...clipParams,
   },
-  // Not read-only: an explicit output path writes into the workspace.
+  // Not read-only: an explicit output path writes into the workspace, and may replace a PNG there.
   readOnly: false,
+  destructive: true,
+  // The first render installs packages from the npm registry.
+  openWorld: true,
   async execute(args, context) {
     const { path } = await context.store.read(args.file);
     const output = await outputPath(context, path, args.view, args.output, args.overwrite);
+    const input = await writeRenderInput(context.store, path, context.scratchDir);
     const request: IRenderRequest = {
-      input: path,
+      input: input.path,
       output,
       view: args.view,
       preset: args.preset,
@@ -71,10 +80,11 @@ const renderTool = defineTool({
       lighting: args.lighting,
       ...(args.clip === undefined ? {} : { clip: args.clip, time: args.time }),
     };
-    const outcome = await context.renderer.render(request);
+    const outcome = await context.renderer.render(request).finally(() => input.dispose());
+    const warnings = input.warnings.length > 0 ? { warnings: input.warnings } : {};
     return {
       content: [
-        { type: "text", text: JSON.stringify({ path: outcome.output, view: args.view, milliseconds: outcome.milliseconds }) },
+        { type: "text", text: JSON.stringify({ path: outcome.output, view: args.view, milliseconds: outcome.milliseconds, ...warnings }) },
         await imageContent(outcome.output),
       ],
     };
@@ -86,8 +96,7 @@ const DEFAULT_SHEET_VIEWS: RenderView[] = ["front", "right", "back", "left", "th
 const contactSheetTool = defineTool({
   name: "bbmodel_contact_sheet",
   title: "Render Contact Sheet",
-  description:
-    "Renders several named views of a .bbmodel (front, right, back, left, three-quarter, top by default) with identical settings and returns every image, labeled. Use it to review a model from all sides in one call, for example after bbmodel_validate. Flat lighting and an orthographic camera make faces easy to compare.",
+  description: `Renders several named views of a .bbmodel (front, right, back, left, three-quarter, top by default) with identical settings and returns every image, labeled. Use it to review a model from all sides in one call, for example after bbmodel_validate. Flat lighting and an orthographic camera make faces easy to compare. ${FIRST_RENDER_NOTE}`,
   parameters: {
     file: fileParam,
     views: z.array(z.enum(RENDER_VIEWS)).min(1).max(7).default(DEFAULT_SHEET_VIEWS),
@@ -96,14 +105,17 @@ const contactSheetTool = defineTool({
     lighting: z.enum(["studio", "outdoor", "flat"]).default("flat"),
     ...clipParams,
   },
-  readOnly: true,
+  // Not read-only: images are written to the scratch folder, and the first render installs packages from the npm registry.
+  readOnly: false,
+  openWorld: true,
   async execute(args, context) {
     const { path } = await context.store.read(args.file);
+    const input = await writeRenderInput(context.store, path, context.scratchDir);
     const renders = await Promise.all(
       args.views.map(async (view) => {
         const output = await outputPath(context, path, view, undefined);
         const outcome = await context.renderer.render({
-          input: path,
+          input: input.path,
           output,
           view,
           width: args.size,
@@ -114,11 +126,12 @@ const contactSheetTool = defineTool({
         });
         return { view, outcome };
       }),
-    );
+    ).finally(() => input.dispose());
     const content = await Promise.all(
       renders.map(async ({ view, outcome }) => [{ type: "text" as const, text: `${view}: ${outcome.output}` }, await imageContent(outcome.output)]),
     );
-    return { content: content.flat() };
+    const warnings = input.warnings.length > 0 ? [{ type: "text" as const, text: JSON.stringify({ warnings: input.warnings }) }] : [];
+    return { content: [...content.flat(), ...warnings] };
   },
 });
 
