@@ -1,11 +1,11 @@
 {
   "version": "1.9.3",
-  "generatedAt": "2026-10-01T01:45:44.301Z",
+  "generatedAt": "2026-10-01T02:39:55.671Z",
   "tools": [
     {
       "name": "place_cube",
       "title": "Place Cube",
-      "description": "Creates cubes in one reversible edit. Texture and group are optional, allowing untextured blockouts. Explicit face targets never use the current UV selection; partial/custom faces require per-face UV support.",
+      "description": "Creates cubes in one reversible edit. Texture and group are optional, allowing untextured blockouts. Explicit face targets never use the current UV selection; partial/custom faces require per-face UV support. Elements accept inflate, plus uv_offset and mirror_uv for box UV cubes; unknown element fields are rejected. Cubes the format's size limiter rejects (for example Java Block elements outside -16…32) are refused and nothing is created, unless Blockbench's Deactivate Size Limit setting is on.",
       "status": "stable",
       "category": "Cubes",
       "annotations": {
@@ -84,6 +84,26 @@
                         0,
                         0
                       ]
+                    },
+                    "inflate": {
+                      "type": "number",
+                      "description": "Grows the cube by this amount on every side without changing from/to.",
+                      "markdownDescription": "Grows the cube by this amount on every side without changing from/to."
+                    },
+                    "uv_offset": {
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      },
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "description": "Box UV net offset [u, v]. Requires box UV.",
+                      "markdownDescription": "Box UV net offset [u, v]. Requires box UV."
+                    },
+                    "mirror_uv": {
+                      "type": "boolean",
+                      "description": "Mirror the box UV net. Requires box UV; for per-face mirroring, reverse the face rectangle endpoints.",
+                      "markdownDescription": "Mirror the box UV net. Requires box UV; for per-face mirroring, reverse the face rectangle endpoints."
                     },
                     "shade": {
                       "type": "boolean",
@@ -217,7 +237,7 @@
     {
       "name": "modify_cube",
       "title": "Modify Cube",
-      "description": "Modifies the cube with the given ID. Auto UV setting: saved as an integer, where 0 means disabled, 1 means enabled, and 2 means relative auto UV (cube position affects UV)",
+      "description": "Modifies the cube with the given ID. Auto UV setting: saved as an integer, where 0 means disabled, 1 means enabled, and 2 means relative auto UV (cube position affects UV). A new from/to/inflate that the format's size limiter rejects (for example Java Block elements outside -16…32) is refused before anything changes, unless Blockbench's Deactivate Size Limit setting is on.",
       "status": "stable",
       "category": "Cubes",
       "annotations": {
@@ -558,6 +578,23 @@
                 "description": "View to target: \"active\" for the viewport the user last interacted with, the ID of an offscreen view from create_offscreen_view, or a viewport ID from list_views.",
                 "markdownDescription": "View to target: \"active\" for the viewport the user last interacted with, the ID of an offscreen view from create_offscreen_view, or a viewport ID from list_views.",
                 "default": "active"
+              },
+              "max_size": {
+                "type": "integer",
+                "minimum": 16,
+                "maximum": 8192,
+                "description": "Longest side of the returned image in pixels; larger images are scaled down proportionally. Omit for full size.",
+                "markdownDescription": "Longest side of the returned image in pixels; larger images are scaled down proportionally. Omit for full size."
+              },
+              "format": {
+                "type": "string",
+                "enum": [
+                  "png",
+                  "jpeg",
+                  "webp"
+                ],
+                "description": "Encoding of the returned image: \"png\" (default, lossless), or the smaller \"jpeg\" (no transparency: transparent pixels become white) or \"webp\".",
+                "markdownDescription": "Encoding of the returned image: \"png\" (default, lossless), or the smaller \"jpeg\" (no transparency: transparent pixels become white) or \"webp\"."
               }
             },
             "additionalProperties": false
@@ -580,7 +617,25 @@
         "definitions": {
           "capture_app_screenshot": {
             "type": "object",
-            "properties": {},
+            "properties": {
+              "max_size": {
+                "type": "integer",
+                "minimum": 16,
+                "maximum": 8192,
+                "description": "Longest side of the returned image in pixels; larger images are scaled down proportionally. Omit for full size.",
+                "markdownDescription": "Longest side of the returned image in pixels; larger images are scaled down proportionally. Omit for full size."
+              },
+              "format": {
+                "type": "string",
+                "enum": [
+                  "png",
+                  "jpeg",
+                  "webp"
+                ],
+                "description": "Encoding of the returned image: \"png\" (default, lossless), or the smaller \"jpeg\" (no transparency: transparent pixels become white) or \"webp\".",
+                "markdownDescription": "Encoding of the returned image: \"png\" (default, lossless), or the smaller \"jpeg\" (no transparency: transparent pixels become white) or \"webp\"."
+              }
+            },
             "additionalProperties": false
           }
         },
@@ -674,6 +729,23 @@
                 ],
                 "description": "Lock an orthographic side view (top, bottom, north, south, east, west). Omit to leave the view free.",
                 "markdownDescription": "Lock an orthographic side view (top, bottom, north, south, east, west). Omit to leave the view free."
+              },
+              "max_size": {
+                "type": "integer",
+                "minimum": 16,
+                "maximum": 8192,
+                "description": "Longest side of the returned image in pixels; larger images are scaled down proportionally. Omit for full size.",
+                "markdownDescription": "Longest side of the returned image in pixels; larger images are scaled down proportionally. Omit for full size."
+              },
+              "format": {
+                "type": "string",
+                "enum": [
+                  "png",
+                  "jpeg",
+                  "webp"
+                ],
+                "description": "Encoding of the returned image: \"png\" (default, lossless), or the smaller \"jpeg\" (no transparency: transparent pixels become white) or \"webp\".",
+                "markdownDescription": "Encoding of the returned image: \"png\" (default, lossless), or the smaller \"jpeg\" (no transparency: transparent pixels become white) or \"webp\"."
               }
             },
             "required": [
@@ -689,7 +761,7 @@
     {
       "name": "create_offscreen_view",
       "title": "Create Offscreen View",
-      "description": "Creates a private offscreen viewport that renders the current project without moving the user's camera. Use it with set_camera_angle and capture_screenshot (view: <id>) for multi-angle inspection. The camera starts where the user's is unless copy_view is \"none\". Up to 4 views may exist at once; delete them with delete_offscreen_view when done.",
+      "description": "Creates a private offscreen viewport that renders the current project without moving the user's camera. Use it with set_camera_angle and capture_screenshot (view: <id>) for multi-angle inspection. The camera starts where the user's is unless copy_view is \"none\". Up to 4 views may exist at once; delete them with delete_offscreen_view when done. Views still open when your MCP session ends are deleted.",
       "status": "experimental",
       "category": "Camera & Screenshots",
       "annotations": {
@@ -915,8 +987,8 @@
             "properties": {
               "name": {
                 "type": "string",
-                "description": "Name of the animation",
-                "markdownDescription": "Name of the animation"
+                "description": "Animation name; `animation.` is added unless the name already starts with it, as in Bedrock and GeckoLib animation files.",
+                "markdownDescription": "Animation name; `animation.` is added unless the name already starts with it, as in Bedrock and GeckoLib animation files."
               },
               "loop": {
                 "type": "boolean",
@@ -1093,9 +1165,8 @@
                         "bezier",
                         "step"
                       ],
-                      "default": "linear",
-                      "description": "Interpolation type for the keyframe.",
-                      "markdownDescription": "Interpolation type for the keyframe."
+                      "description": "Interpolation type for the keyframe. New keyframes default to linear; edits keep the current interpolation when omitted.",
+                      "markdownDescription": "Interpolation type for the keyframe. New keyframes default to linear; edits keep the current interpolation when omitted."
                     },
                     "bezier_handles": {
                       "type": "object",
@@ -1170,7 +1241,7 @@
     {
       "name": "animation_graph_editor",
       "title": "Animation Graph Editor",
-      "description": "Edits a bone channel's interpolation or numeric Bezier easing in one reversible edit. Uses native per-axis handle arrays and chronological segment durations. Custom points are normalized time/value fractions. Partial-axis edits require existing Bezier keys; key-wide mode changes require all axes. Rejects curve edits ignored by quaternion rotation. Inspect neighboring segments after range edits.",
+      "description": "Edits a bone channel's interpolation or numeric Bezier easing in one reversible edit. Uses native per-axis handle arrays and chronological segment durations. Custom points are normalized time/value fractions. Partial-axis edits require existing Bezier keys; key-wide mode changes require all axes. Rejects curve edits ignored by quaternion rotation, and step or Bezier curves in GeckoLib models (use geckolib_set_keyframe_easing). Inspect neighboring segments after range edits.",
       "status": "experimental",
       "category": "Animation",
       "annotations": {
@@ -1232,8 +1303,8 @@
                   "stepped",
                   "custom"
                 ],
-                "description": "Curve modification. Easing/custom require at least two distinct chronological numeric single-data-point keys. Smooth and Bezier rotation edits are unavailable when native quaternion interpolation would ignore them.",
-                "markdownDescription": "Curve modification. Easing/custom require at least two distinct chronological numeric single-data-point keys. Smooth and Bezier rotation edits are unavailable when native quaternion interpolation would ignore them."
+                "description": "Curve modification. linear, stepped and smooth set the key-wide interpolation (linear, step, catmullrom). ease_in, ease_out and ease_in_out apply the CSS cubic-bezier curves of the same name to every segment between the selected keys; custom applies custom_curve. Easing/custom require at least two distinct chronological numeric single-data-point keys. Smooth and Bezier rotation edits are unavailable when native quaternion interpolation would ignore them. GeckoLib models reject stepped (the GeckoLib plugin switches step keys back to linear) and the Bezier actions (GeckoLib has no Bezier interpolation); use geckolib_set_keyframe_easing there. In GeckoLib models smooth also clears the easings of the keys it changes, since GeckoLib ignores easings on catmullrom keys.",
+                "markdownDescription": "Curve modification. linear, stepped and smooth set the key-wide interpolation (linear, step, catmullrom). ease_in, ease_out and ease_in_out apply the CSS cubic-bezier curves of the same name to every segment between the selected keys; custom applies custom_curve. Easing/custom require at least two distinct chronological numeric single-data-point keys. Smooth and Bezier rotation edits are unavailable when native quaternion interpolation would ignore them. GeckoLib models reject stepped (the GeckoLib plugin switches step keys back to linear) and the Bezier actions (GeckoLib has no Bezier interpolation); use geckolib_set_keyframe_easing there. In GeckoLib models smooth also clears the easings of the keys it changes, since GeckoLib ignores easings on catmullrom keys."
               },
               "keyframe_range": {
                 "type": "object",
@@ -1304,7 +1375,7 @@
     {
       "name": "bone_rigging",
       "title": "Bone Rigging",
-      "description": "Creates and manipulates the bone structure (rig) of a model for animation. The set_ik action is deprecated; use set_ik_controller for Blockbench's null-object IK (source, target, pole).",
+      "description": "Creates and manipulates the bone structure (rig) of a model for animation. Each action is one undoable edit (create with ik_enabled records the IK controller as a second one); undoing delete brings back child bones, elements and their keyframes. mirror duplicates the bone with its descendants and flips the copy like Blockbench's Flip action. The set_ik action is deprecated; use set_ik_controller for Blockbench's null-object IK (source, target, pole).",
       "status": "experimental",
       "category": "Animation",
       "annotations": {
@@ -1341,8 +1412,8 @@
                   },
                   "parent": {
                     "type": "string",
-                    "description": "Parent bone name; create also accepts a group UUID or root.",
-                    "markdownDescription": "Parent bone name; create also accepts a group UUID or root."
+                    "description": "Parent bone UUID or name; omit it or pass root for the project root (for the parent action, a bone actually named root takes precedence). An unknown parent, or a name several bones share, is an error.",
+                    "markdownDescription": "Parent bone UUID or name; omit it or pass root for the project root (for the parent action, a bone actually named root takes precedence). An unknown parent, or a name several bones share, is an error."
                   },
                   "origin": {
                     "type": "array",
@@ -1374,8 +1445,8 @@
                   },
                   "ik_enabled": {
                     "type": "boolean",
-                    "description": "Deprecated; prefer set_ik_controller. true makes this bone the end effector of a null-object IK controller (created as <bone>_ik when ik_target is omitted); false clears ik_target on controllers driving it.",
-                    "markdownDescription": "Deprecated; prefer set_ik_controller. true makes this bone the end effector of a null-object IK controller (created as <bone>_ik when ik_target is omitted); false clears ik_target on controllers driving it."
+                    "description": "Deprecated; prefer set_ik_controller. true makes this bone the end effector of a null-object IK controller (created as <bone>_ik when ik_target is omitted); false clears ik_target on controllers driving it. With create, the IK controller is a second undo entry after the bone's.",
+                    "markdownDescription": "Deprecated; prefer set_ik_controller. true makes this bone the end effector of a null-object IK controller (created as <bone>_ik when ik_target is omitted); false clears ik_target on controllers driving it. With create, the IK controller is a second undo entry after the bone's."
                   },
                   "ik_target": {
                     "type": "string",
@@ -1389,8 +1460,8 @@
                       "y",
                       "z"
                     ],
-                    "description": "Axis to mirror the bone across.",
-                    "markdownDescription": "Axis to mirror the bone across."
+                    "description": "Axis the mirror action flips across (default x): the bone is duplicated with its descendants and the copy is flipped like Blockbench's Flip action, through the model origin, swapping left/right names when free.",
+                    "markdownDescription": "Axis the mirror action flips across (default x): the bone is duplicated with its descendants and the copy is flipped like Blockbench's Flip action, through the model origin, swapping left/right names when free."
                   }
                 },
                 "required": [
@@ -1523,7 +1594,7 @@
     {
       "name": "batch_keyframe_operations",
       "title": "Batch Keyframe Operations",
-      "description": "Edits keyframes in the active animation atomically; all includes hidden animators. Numeric value edits use native transform values. Bake samples continuous numeric curves within selected channel spans, caps output at 10000 samples, and restores the playhead. Expressions, step/pre-post curves and effect channels require native baking.",
+      "description": "Edits keyframes in the active animation atomically; all includes hidden animators. Numeric value edits use native transform values. Reverse follows the native Reverse Keyframes action, including the GeckoLib plugin's easing adjustment. Bake samples continuous numeric curves within selected channel spans, caps output at 10000 samples, and restores the playhead. Expressions, step/pre-post curves and effect channels require native baking. Smooth and bake clear GeckoLib easings they replace and report it.",
       "status": "experimental",
       "category": "Animation",
       "annotations": {
@@ -1602,8 +1673,8 @@
                   "smooth",
                   "bake"
                 ],
-                "description": "Operation to perform on keyframes.",
-                "markdownDescription": "Operation to perform on keyframes."
+                "description": "Operation to perform on keyframes. reverse works like Blockbench's Reverse Keyframes action: times flip within the selection, pre/post values and Bezier handles swap, and GeckoLib easings flip direction and move to the key their segment now arrives at, as the GeckoLib plugin does. smooth and bake clear the GeckoLib easings they replace and report it.",
+                "markdownDescription": "Operation to perform on keyframes. reverse works like Blockbench's Reverse Keyframes action: times flip within the selection, pre/post values and Bezier handles swap, and GeckoLib easings flip direction and move to the key their segment now arrives at, as the GeckoLib plugin does. smooth and bake clear the GeckoLib easings they replace and report it."
               },
               "parameters": {
                 "type": "object",
@@ -1625,8 +1696,8 @@
                   },
                   "scale_factor": {
                     "type": "number",
-                    "description": "Scale factor for keyframe times around scale_pivot. Does not scale values; zero is accepted only when it creates no timestamp collisions.",
-                    "markdownDescription": "Scale factor for keyframe times around scale_pivot. Does not scale values; zero is accepted only when it creates no timestamp collisions."
+                    "description": "Scale factor for keyframe times around scale_pivot. Does not scale values; zero is accepted only when it creates no timestamp collisions. A negative factor also reverses the keys like reverse.",
+                    "markdownDescription": "Scale factor for keyframe times around scale_pivot. Does not scale values; zero is accepted only when it creates no timestamp collisions. A negative factor also reverses the keys like reverse."
                   },
                   "scale_pivot": {
                     "type": "number",
@@ -2860,7 +2931,7 @@
     {
       "name": "set_display_transform",
       "title": "Set Display Transform",
-      "description": "Writes a Java Edition display slot's transform (translation, rotation, scale, mirror, pivots). Creates the slot if it does not exist yet (seeded from Blockbench's Bedrock item display defaults on bedrock_block projects, identity otherwise) and wraps the change in an undo step. This edits data that ships in the exported model JSON — it changes the deliverable, not just the preview. Requires a format that supports display mode (e.g. Java Block/Item).",
+      "description": "Writes a Java Edition display slot's transform (translation, rotation, scale, mirror, pivots). Creates the slot if it does not exist yet (seeded from Blockbench's Bedrock item display defaults on bedrock_block projects, identity otherwise) and wraps the change in an undo step. This edits data that ships in the exported model JSON — it changes the deliverable, not just the preview. Values are kept as given, like Blockbench does; outside bedrock_block projects the result warns about those Minecraft Java clamps or ignores (translation beyond ±80, scale beyond ±4, pivots, the embedded slot). Requires a format that supports display mode (e.g. Java Block/Item).",
       "status": "experimental",
       "category": "Display Settings",
       "annotations": {
@@ -2886,8 +2957,8 @@
                   "fixed",
                   "on_shelf"
                 ],
-                "description": "Display slot to modify.",
-                "markdownDescription": "Display slot to modify."
+                "description": "Display slot to modify. embedded is a Bedrock block slot that Minecraft Java ignores.",
+                "markdownDescription": "Display slot to modify. embedded is a Bedrock block slot that Minecraft Java ignores."
               },
               "translation": {
                 "type": "array",
@@ -2896,8 +2967,8 @@
                 },
                 "minItems": 3,
                 "maxItems": 3,
-                "description": "Translation offset as [x, y, z] (Minecraft display units).",
-                "markdownDescription": "Translation offset as [x, y, z] (Minecraft display units)."
+                "description": "Translation offset as [x, y, z] (Minecraft display units, 1/16 block). Minecraft Java clamps each component to ±80.",
+                "markdownDescription": "Translation offset as [x, y, z] (Minecraft display units, 1/16 block). Minecraft Java clamps each component to ±80."
               },
               "rotation": {
                 "type": "array",
@@ -2916,8 +2987,8 @@
                 },
                 "minItems": 3,
                 "maxItems": 3,
-                "description": "Scale factor as [x, y, z].",
-                "markdownDescription": "Scale factor as [x, y, z]."
+                "description": "Scale factor as [x, y, z]; a negative component mirrors that axis. Minecraft Java clamps each exported component to ±4.",
+                "markdownDescription": "Scale factor as [x, y, z]; a negative component mirrors that axis. Minecraft Java clamps each exported component to ±4."
               },
               "rotation_pivot": {
                 "type": "array",
@@ -2926,8 +2997,8 @@
                 },
                 "minItems": 3,
                 "maxItems": 3,
-                "description": "Rotation pivot point as [x, y, z].",
-                "markdownDescription": "Rotation pivot point as [x, y, z]."
+                "description": "Rotation pivot point as [x, y, z]. Only Bedrock reads pivots; Minecraft Java ignores them.",
+                "markdownDescription": "Rotation pivot point as [x, y, z]. Only Bedrock reads pivots; Minecraft Java ignores them."
               },
               "scale_pivot": {
                 "type": "array",
@@ -2936,8 +3007,8 @@
                 },
                 "minItems": 3,
                 "maxItems": 3,
-                "description": "Scale pivot point as [x, y, z].",
-                "markdownDescription": "Scale pivot point as [x, y, z]."
+                "description": "Scale pivot point as [x, y, z]. Only Bedrock reads pivots; Minecraft Java ignores them.",
+                "markdownDescription": "Scale pivot point as [x, y, z]. Only Bedrock reads pivots; Minecraft Java ignores them."
               },
               "mirror": {
                 "type": "array",
@@ -3177,7 +3248,7 @@
     {
       "name": "duplicate_element",
       "title": "Duplicate Element",
-      "description": "Duplicates any outliner element or group (with its children) by ID or name using Blockbench's native duplicate, so every property, face UV, texture and mesh vertex key is preserved. Mesh copies inherit their armature bone vertex weights. Optionally offsets the copy and assigns a new name. Selection is left unchanged.",
+      "description": "Duplicates any outliner element or group (with its children) by ID or name using Blockbench's native duplicate, so every property, face UV, texture and mesh vertex key is preserved. Mesh copies inherit their armature bone vertex weights, and copied IK null objects point at the copied bones when their chain was duplicated with them. Optionally offsets the copy and assigns a new name. Selection is left unchanged.",
       "status": "experimental",
       "category": "Elements",
       "annotations": {
@@ -3277,8 +3348,8 @@
             "properties": {
               "name_pattern": {
                 "type": "string",
-                "description": "Regex pattern to match element names (e.g., '^arm_.*'). Case-sensitive.",
-                "markdownDescription": "Regex pattern to match element names (e.g., '^arm_.*'). Case-sensitive."
+                "description": "Regex pattern to match element names (e.g., '^arm_.*'). Case-sensitive. Patterns over 512 characters, with nested quantifiers such as (a+)+, or that do not compile are rejected with an error.",
+                "markdownDescription": "Regex pattern to match element names (e.g., '^arm_.*'). Case-sensitive. Patterns over 512 characters, with nested quantifiers such as (a+)+, or that do not compile are rejected with an error."
               },
               "name_contains": {
                 "type": "string",
@@ -3346,7 +3417,7 @@
     {
       "name": "select_all_of_type",
       "title": "Select All of Type",
-      "description": "Selects all elements of the given type (cube, mesh, or group) in the current project. Optionally restrict to descendants of a parent group, or add to (rather than replace) the current selection.",
+      "description": "Selects all elements of the given type (cube, mesh, or group) in the current project. Optionally restrict to descendants of a parent group, or add to (rather than replace) the current selection. As in Blockbench, locked nodes are skipped and selecting a group also selects its contents.",
       "status": "stable",
       "category": "Elements",
       "annotations": {
@@ -3481,7 +3552,7 @@
       "status": "experimental",
       "category": "Export",
       "annotations": {
-        "destructiveHint": false,
+        "destructiveHint": true,
         "openWorldHint": true
       },
       "parameters": {
@@ -3503,8 +3574,14 @@
               },
               "path": {
                 "type": "string",
-                "description": "Absolute filesystem path to write the compiled model to. Requires user permission (Blockbench v5.0+ prompts for 'fs' access). If omitted, content is returned in the response only.",
-                "markdownDescription": "Absolute filesystem path to write the compiled model to. Requires user permission (Blockbench v5.0+ prompts for 'fs' access). If omitted, content is returned in the response only."
+                "description": "Absolute filesystem path to write the compiled model to. Requires user permission (Blockbench v5.0+ prompts for 'fs' access). If omitted, content is returned in the response only. Fails if the file exists unless overwrite is true.",
+                "markdownDescription": "Absolute filesystem path to write the compiled model to. Requires user permission (Blockbench v5.0+ prompts for 'fs' access). If omitted, content is returned in the response only. Fails if the file exists unless overwrite is true."
+              },
+              "overwrite": {
+                "type": "boolean",
+                "default": false,
+                "description": "Replace an existing file at path. Defaults to false so an export never silently replaces another file.",
+                "markdownDescription": "Replace an existing file at path. Defaults to false so an export never silently replaces another file."
               },
               "max_content_length": {
                 "type": "integer",
@@ -3656,7 +3733,7 @@
     {
       "name": "from_geo_json",
       "title": "Import GeoJSON",
-      "description": "Imports a model from a GeoJSON file.",
+      "description": "Imports one Bedrock geometry (.geo.json) into the current project, which keeps its format (one with bones: Bedrock, GeckoLib, generic, ...), as one undoable edit, and returns a screenshot. Adds the bones with their cubes, locators and texture meshes; the texture size, box UV mode and item display transforms it sets are undone with it, while the project's visible bounds can only grow. URLs on this computer or a private network are refused; pass a file path instead.",
       "status": "stable",
       "category": "Import/Export",
       "annotations": {
@@ -3670,8 +3747,13 @@
             "properties": {
               "geojson": {
                 "type": "string",
-                "description": "Path to the GeoJSON file or data URL, or the GeoJSON string itself.",
-                "markdownDescription": "Path to the GeoJSON file or data URL, or the GeoJSON string itself."
+                "description": "Bedrock geometry (format 1.12 or later) as inline JSON, an absolute path or file:// URL of a file on this computer (read with Blockbench's file permission), or a public http(s) URL (at most 10 MB).",
+                "markdownDescription": "Bedrock geometry (format 1.12 or later) as inline JSON, an absolute path or file:// URL of a file on this computer (read with Blockbench's file permission), or a public http(s) URL (at most 10 MB)."
+              },
+              "geometry": {
+                "type": "string",
+                "description": "Identifier of the geometry to import, such as geometry.robot, when the file holds several. Omit it when the file holds one.",
+                "markdownDescription": "Identifier of the geometry to import, such as geometry.robot, when the file holds several. Omit it when the file holds one."
               }
             },
             "required": [
@@ -4236,7 +4318,7 @@
     {
       "name": "select_mesh_elements",
       "title": "Select Mesh Elements",
-      "description": "Selects vertices, edges, or faces of a mesh for manipulation.",
+      "description": "Selects vertices, edges, or faces of a mesh for manipulation. Keys the mesh does not have are rejected, except when removing them from the selection.",
       "status": "experimental",
       "category": "Mesh Editing",
       "annotations": {
@@ -4266,13 +4348,12 @@
               "elements": {
                 "type": "array",
                 "items": {
-                  "type": [
-                    "string",
-                    "number"
-                  ]
+                  "type": "string",
+                  "description": "Vertex key, edge as 'vkey1-vkey2', or face key",
+                  "markdownDescription": "Vertex key, edge as 'vkey1-vkey2', or face key"
                 },
-                "description": "Specific elements to select. If not provided, selects all.",
-                "markdownDescription": "Specific elements to select. If not provided, selects all."
+                "description": "Keys to select: vertex keys in vertex mode, face keys in face mode, 'vkey1-vkey2' edges in edge mode (from get_mesh_info or the creation tools). If not provided, selects all.",
+                "markdownDescription": "Keys to select: vertex keys in vertex mode, face keys in face mode, 'vkey1-vkey2' edges in edge mode (from get_mesh_info or the creation tools). If not provided, selects all."
               },
               "action": {
                 "type": "string",
@@ -4300,7 +4381,7 @@
     {
       "name": "move_mesh_vertices",
       "title": "Move Mesh Vertices",
-      "description": "Moves selected vertices of a mesh by the specified offset.",
+      "description": "Moves the given vertex keys, or the mesh's selected vertices, by the specified offset in one undo entry. Unknown keys are rejected before anything moves.",
       "status": "experimental",
       "category": "Mesh Editing",
       "annotations": {
@@ -4392,7 +4473,7 @@
     {
       "name": "merge_mesh_vertices",
       "title": "Merge Mesh Vertices",
-      "description": "Merges vertices that are within a specified distance of each other.",
+      "description": "Merges vertices that are within a specified distance of each other, in one undo entry. Each face keeps a surviving vertex once; faces the merge collapses (fewer than three vertices left) are removed.",
       "status": "experimental",
       "category": "Mesh Editing",
       "annotations": {
@@ -4436,7 +4517,7 @@
     {
       "name": "create_mesh_face",
       "title": "Create Mesh Face",
-      "description": "Creates a new face from selected vertices.",
+      "description": "Creates a triangle or quad face from 3 or 4 distinct existing vertex keys, with an optional texture, in one undo entry.",
       "status": "experimental",
       "category": "Mesh Editing",
       "annotations": {
@@ -4943,7 +5024,7 @@
     {
       "name": "paint_fill_tool",
       "title": "Paint Fill Tool",
-      "description": "Uses the fill/bucket tool to fill areas with color. In 'face' and 'element' fill modes only the face or element whose UV area contains the given texture pixel is filled. Opacity is 0-255 regardless of Blockbench's opacity range setting.",
+      "description": "Uses the fill/bucket tool to fill areas with color. In 'face' and 'element' fill modes only the face or element whose UV area contains the given texture pixel is filled, and a pixel no face covers is an error. Seeds outside the texture are rejected, and so are color and color_connected seeds outside the active layer, where the fill reads its seed color. Opacity is 0-255 regardless of Blockbench's opacity range setting.",
       "status": "experimental",
       "category": "Paint Tools",
       "annotations": {
@@ -4962,13 +5043,13 @@
               },
               "x": {
                 "type": "number",
-                "description": "X coordinate to start fill.",
-                "markdownDescription": "X coordinate to start fill."
+                "description": "Texture pixel X where the fill starts; must lie inside the texture except for 'selection' and 'selected_elements' fills, which ignore it.",
+                "markdownDescription": "Texture pixel X where the fill starts; must lie inside the texture except for 'selection' and 'selected_elements' fills, which ignore it."
               },
               "y": {
                 "type": "number",
-                "description": "Y coordinate to start fill.",
-                "markdownDescription": "Y coordinate to start fill."
+                "description": "Texture pixel Y where the fill starts; must lie inside the texture except for 'selection' and 'selected_elements' fills, which ignore it.",
+                "markdownDescription": "Texture pixel Y where the fill starts; must lie inside the texture except for 'selection' and 'selected_elements' fills, which ignore it."
               },
               "color": {
                 "type": "string",
@@ -5257,11 +5338,12 @@
     {
       "name": "color_picker_tool",
       "title": "Color Picker Tool",
-      "description": "Picks colors from textures and sets them as the active color.",
+      "description": "Picks a texture pixel's color and makes it the primary or secondary color, like Blockbench's color picker. It does not edit the texture, but it changes the active colors, selects the texture, and depending on Blockbench's settings can set the brush opacity or switch the active paint tool.",
       "status": "experimental",
       "category": "Paint Tools",
       "annotations": {
-        "readOnlyHint": true
+        "destructiveHint": false,
+        "idempotentHint": true
       },
       "parameters": {
         "$ref": "#/definitions/color_picker_tool",
@@ -5661,7 +5743,7 @@
     {
       "name": "paint_with_brush",
       "title": "Paint with Brush",
-      "description": "Paints on textures using the brush tool with customizable settings (opacity 0-255, softness 0-100%, optional aspect ratio). Paints on the selected pixel layer; if a layer group is selected, a pixel layer inside it is used.",
+      "description": "Paints with Blockbench's own brush tool, so blend mode, pixel-perfect drawing, lock alpha and mirror painting apply as when painting by hand. Given brush settings (opacity 0-255, softness 0-100%, hex or named color, shape, blend mode, aspect ratio) are set on the brush first; omitted ones keep the current brush. Paints on the selected pixel layer; if a layer group is selected, a pixel layer inside it is used.",
       "status": "experimental",
       "category": "Paint Tools",
       "annotations": {
@@ -5739,8 +5821,8 @@
                   },
                   "color": {
                     "type": "string",
-                    "description": "Brush color as hex string.",
-                    "markdownDescription": "Brush color as hex string."
+                    "description": "Brush color as hex (#RGB or #RRGGBB, so #F00 is #FF0000; an alpha part is ignored) or a color name.",
+                    "markdownDescription": "Brush color as hex (#RGB or #RRGGBB, so #F00 is #FF0000; an alpha part is ignored) or a color name."
                   },
                   "blend_mode": {
                     "type": "string",
@@ -5767,14 +5849,14 @@
                   }
                 },
                 "additionalProperties": false,
-                "description": "Brush settings to apply. Opacity is 0-255; softness is a 0-100 percentage.",
-                "markdownDescription": "Brush settings to apply. Opacity is 0-255; softness is a 0-100 percentage."
+                "description": "Brush settings written to Blockbench's brush before painting. Opacity is 0-255; softness is a 0-100 percentage. Omitted settings keep the current brush.",
+                "markdownDescription": "Brush settings written to Blockbench's brush before painting. Opacity is 0-255; softness is a 0-100 percentage. Omitted settings keep the current brush."
               },
               "connect_strokes": {
                 "type": "boolean",
                 "default": true,
-                "description": "Whether to interpolate brush samples between coordinates, at no more than one texture pixel per step.",
-                "markdownDescription": "Whether to interpolate brush samples between coordinates, at no more than one texture pixel per step."
+                "description": "Whether to draw lines between consecutive coordinates, like dragging the brush, as one undo entry. false stamps each coordinate on its own: still one undo entry on Blockbench 5.2 and later, one per coordinate on older versions.",
+                "markdownDescription": "Whether to draw lines between consecutive coordinates, like dragging the brush, as one undo entry. false stamps each coordinate on its own: still one undo entry on Blockbench 5.2 and later, one per coordinate on older versions."
               }
             },
             "required": [
@@ -8085,8 +8167,8 @@
               },
               "data": {
                 "type": "string",
-                "description": "Path to the image file or data URL.",
-                "markdownDescription": "Path to the image file or data URL."
+                "description": "Image data URL, or an absolute path or file:// URL of an image file (desktop only, read with Blockbench's file permission).",
+                "markdownDescription": "Image data URL, or an absolute path or file:// URL of an image file (desktop only, read with Blockbench's file permission)."
               },
               "group": {
                 "type": "string"
@@ -8125,8 +8207,8 @@
               },
               "layer_name": {
                 "type": "string",
-                "description": "Name of the texture layer. Required if fill_color is set.",
-                "markdownDescription": "Name of the texture layer. Required if fill_color is set."
+                "description": "Deprecated and ignored: textures are created without layers. Use texture_layer_management create_layer to add a named layer.",
+                "markdownDescription": "Deprecated and ignored: textures are created without layers. Use texture_layer_management create_layer to add a named layer."
               },
               "pbr_channel": {
                 "type": "string",
@@ -8204,8 +8286,8 @@
                   "blank",
                   "none"
                 ],
-                "description": "Apply texture to element or group.",
-                "markdownDescription": "Apply texture to element or group.",
+                "description": "Faces that receive the texture: all (every face), blank (default; faces without a texture) or none (no face: the call only checks the element and texture and changes nothing).",
+                "markdownDescription": "Faces that receive the texture: all (every face), blank (default; faces without a texture) or none (no face: the call only checks the element and texture and changes nothing).",
                 "default": "blank"
               }
             },
@@ -9767,7 +9849,7 @@
     {
       "name": "geckolib_reverse_keyframe_easing",
       "title": "Reverse GeckoLib Keyframe Easing",
-      "description": "Mirrors easing directions the way GeckoLib's own reverse-keyframes handler does: each easeIn becomes easeOut and back, the easings shift one keyframe later in time, and the first keyframe of each channel is cleared. Use after reversing keyframe values.",
+      "description": "Reverses and shifts easings the way the GeckoLib plugin's handler for Blockbench's Reverse Keyframes action does: each easeIn becomes easeOut and back, every easing moves to the next later keyframe, and the first keyframe of each channel loses its easing. Use it only after keyframe times were reversed by something that left the easings in place, such as times rewritten with manage_keyframes. Do not use it after the native Reverse Keyframes action or batch_keyframe_operations reverse: with the GeckoLib plugin loaded, both already adjust the easings, so this tool would shift them a second time. It is not its own inverse; use undo to revert it.",
       "status": "experimental",
       "category": "GeckoLib Integration",
       "annotations": {
@@ -9847,11 +9929,11 @@
     {
       "name": "geckolib_export_model",
       "title": "Export GeckoLib Model",
-      "description": "Compiles the GeckoLib geometry the plugin's model export produces, returning it as JSON and optionally writing it to a path. Set mode='dialog' to trigger the plugin's own export action and its save dialog instead.",
+      "description": "Compiles the GeckoLib geometry the plugin's model export produces, returning it as JSON and optionally writing it to a path. The text is formatted like Blockbench's own export (its JSON indentation, minify and final-newline settings). Set mode='dialog' to trigger the plugin's own export action and its save dialog instead.",
       "status": "experimental",
       "category": "GeckoLib Integration",
       "annotations": {
-        "destructiveHint": false,
+        "destructiveHint": true,
         "openWorldHint": true
       },
       "parameters": {
@@ -9872,8 +9954,14 @@
               },
               "path": {
                 "type": "string",
-                "description": "Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode.",
-                "markdownDescription": "Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode."
+                "description": "Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode. Fails if the file exists unless overwrite is true.",
+                "markdownDescription": "Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode. Fails if the file exists unless overwrite is true."
+              },
+              "overwrite": {
+                "type": "boolean",
+                "default": false,
+                "description": "Replace an existing file at path. Defaults to false so a re-export never silently replaces a reference file.",
+                "markdownDescription": "Replace an existing file at path. Defaults to false so a re-export never silently replaces a reference file."
               },
               "max_content_length": {
                 "type": "integer",
@@ -9893,11 +9981,11 @@
     {
       "name": "geckolib_export_animations",
       "title": "Export GeckoLib Animations",
-      "description": "Compiles the project's animations into GeckoLib animation-file JSON, including the easing and easingArgs the plugin writes, and optionally writes it to a path. Reports which host API compiled it, since only the plugin-patched route stamps geckolib_format_version. Set mode='dialog' to trigger the plugin's own animation export action instead.",
+      "description": "Compiles the project's animations into GeckoLib animation-file JSON, including the easing and easingArgs the plugin writes, and optionally writes it to a path. The text is formatted like Blockbench's own export (its JSON indentation, minify and final-newline settings). Reports which host API compiled it, since only the plugin-patched route stamps geckolib_format_version. Set mode='dialog' to trigger the plugin's own animation export action instead.",
       "status": "experimental",
       "category": "GeckoLib Integration",
       "annotations": {
-        "destructiveHint": false,
+        "destructiveHint": true,
         "openWorldHint": true
       },
       "parameters": {
@@ -9918,8 +10006,14 @@
               },
               "path": {
                 "type": "string",
-                "description": "Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode.",
-                "markdownDescription": "Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode."
+                "description": "Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode. Fails if the file exists unless overwrite is true.",
+                "markdownDescription": "Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode. Fails if the file exists unless overwrite is true."
+              },
+              "overwrite": {
+                "type": "boolean",
+                "default": false,
+                "description": "Replace an existing file at path. Defaults to false so a re-export never silently replaces a reference file.",
+                "markdownDescription": "Replace an existing file at path. Defaults to false so a re-export never silently replaces a reference file."
               },
               "max_content_length": {
                 "type": "integer",
@@ -9948,11 +10042,11 @@
     {
       "name": "geckolib_export_display",
       "title": "Export GeckoLib Display Settings",
-      "description": "Builds the Java item/block display-settings JSON for GeckoLib Item and Block models: parent model, texture size, GUI light, per-perspective display transforms and the namespaced particle texture. Reports when the active model type would not normally ship one. Set mode='dialog' to trigger the plugin's own display export action instead.",
+      "description": "Builds the Java item/block display-settings JSON for GeckoLib Item and Block models: parent model, texture size, GUI light, per-perspective display transforms and the namespaced particle texture. The text is two-space JSON, as the plugin's own display export writes it. The parent defaults to the plugin's builtin/entity, which Minecraft Java 1.21.4 and later no longer have; the result then warns, and parent picks another. Reports when the active model type would not normally ship one. Set mode='dialog' to trigger the plugin's own display export action instead.",
       "status": "experimental",
       "category": "GeckoLib Integration",
       "annotations": {
-        "destructiveHint": false,
+        "destructiveHint": true,
         "openWorldHint": true
       },
       "parameters": {
@@ -9973,8 +10067,14 @@
               },
               "path": {
                 "type": "string",
-                "description": "Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode.",
-                "markdownDescription": "Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode."
+                "description": "Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode. Fails if the file exists unless overwrite is true.",
+                "markdownDescription": "Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode. Fails if the file exists unless overwrite is true."
+              },
+              "overwrite": {
+                "type": "boolean",
+                "default": false,
+                "description": "Replace an existing file at path. Defaults to false so a re-export never silently replaces a reference file.",
+                "markdownDescription": "Replace an existing file at path. Defaults to false so a re-export never silently replaces a reference file."
               },
               "max_content_length": {
                 "type": "integer",
@@ -9983,6 +10083,15 @@
                 "default": 100000,
                 "description": "Maximum characters of content to return. Use 0 to omit the content and only report its size.",
                 "markdownDescription": "Maximum characters of content to return. Use 0 to omit the content and only report its size."
+              },
+              "parent": {
+                "type": "string",
+                "pattern": "^(?:(?:[a-z0-9_.-]+:)?[a-z0-9_./-]+)?$",
+                "errorMessage": {
+                  "pattern": "Use a model resource location such as minecraft:item/handheld, or an empty string for no parent."
+                },
+                "description": "Parent model to write, compile mode only. Omit to keep the project's parent, which the GeckoLib plugin sets to builtin/entity for Item models and uses as its default, so files match the plugin's own export. Minecraft Java 1.21.4 and later have no builtin/entity model (the result then carries a warning): when targeting them, pass another parent such as minecraft:item/handheld, or an empty string to write none.",
+                "markdownDescription": "Parent model to write, compile mode only. Omit to keep the project's parent, which the GeckoLib plugin sets to builtin/entity for Item models and uses as its default, so files match the plugin's own export. Minecraft Java 1.21.4 and later have no builtin/entity model (the result then carries a warning): when targeting them, pass another parent such as minecraft:item/handheld, or an empty string to write none."
               }
             },
             "additionalProperties": false
@@ -10557,7 +10666,7 @@
     {
       "name": "nodes",
       "title": "Blockbench Nodes",
-      "description": "Returns the current 3D nodes in the editor. List URIs use slugified names (e.g. `nodes://head`) when unique, with `~<uuid-prefix>` on collision. Reads accept UUID, exact name, or slug.",
+      "description": "Returns the current 3D nodes in the editor. List URIs use slugified names (e.g. `nodes://head`) when unique, with `~<uuid-prefix>` on collision. Reads accept UUID, exact name, or slug, and return the node as Blockbench saves it in a .bbmodel (its `getSaveCopy()`), plus uuid, name, type, parent (`root` or a UUID) and child UUIDs: a cube's `from`, `to` and `origin` in Blockbench units, `rotation` in degrees, faces and UVs; a mesh's vertices and faces; a group's origin and rotation. Fields Blockbench leaves out at their default are missing, such as a cube's zero rotation.",
       "uriTemplate": "nodes://{id}"
     },
     {

@@ -102,6 +102,8 @@ export interface IMcpToolContext {
   reportProgress(progress: { progress: number; total: number }): void;
   /** MCP session issuing the call, when it came from a connected client. */
   sessionId?: string;
+  /** Aborted when the client cancels the call. Tools that wait should stop early. */
+  signal?: AbortSignal;
 }
 
 /** Everything `registerTool` needs. `TSchema` types the arguments `execute` receives. */
