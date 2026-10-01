@@ -165,6 +165,8 @@ test("rendering restores an offscreen camera that Blockbench re-targeted on a pr
   renderViewToDataUrl(preview);
   expect(host.events.slice(start)).toEqual([
     "angle:mcp_offscreen_inspect",
+    // offscreen cameras are sized after every angle change (blank orthographic views)
+    "resize:mcp_offscreen_inspect:640x480",
     "gizmos:hidden",
     "render:mcp_offscreen_inspect",
     "gizmos:restored",

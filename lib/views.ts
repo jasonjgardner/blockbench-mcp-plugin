@@ -282,10 +282,41 @@ export function resolveView(ref: string = ACTIVE_VIEW_ID): Preview {
  * @param angle - Position, target or rotation, projection, and optional zoom, FOV, and side-view lock.
  */
 export function loadViewAngle(preview: Preview, angle: ICameraAngle): void {
+  // A locked side view replaces the target's off-axis coordinates with the
+  // preview's side-view centre, which offscreen views never set (it stays at
+  // the origin). Seed it with the requested target so the target is kept.
+  if (angle.locked_angle && angle.target) {
+    sideViewTarget(preview)?.fromArray(toArrayVector(angle.target));
+  }
   preview.loadAnglePreset(buildAnglePreset(angle));
+  // loadAnglePreset skips the zoom while a side view is locked.
+  if (angle.locked_angle && angle.zoom !== undefined && preview.isOrtho) {
+    preview.camOrtho.zoom = angle.zoom;
+    preview.camOrtho.updateProjectionMatrix();
+  }
   const record = findRecord(preview);
   if (!record) return;
+  sizeOffscreenCamera(record);
   offscreenViews.set(record.id, { ...record, camera: describeCamera(preview) });
+}
+
+/**
+ * Sizes an offscreen view's cameras explicitly. `Preview.resize()` without
+ * arguments does nothing for a canvas outside the page, so after a projection
+ * change the orthographic camera would keep Blockbench's placeholder bounds
+ * (±8000 units) and render the model below one pixel: a blank image.
+ */
+function sizeOffscreenCamera(record: IOffscreenViewRecord): void {
+  record.preview.resize(record.width, record.height);
+}
+
+/** The preview's side-view centre (a THREE.Vector3), missing from blockbench-types. */
+function sideViewTarget(preview: Preview): { fromArray(values: number[]): unknown } | undefined {
+  const target: unknown = Reflect.get(preview, "side_view_target");
+  if (typeof target !== "object" || target === null || typeof Reflect.get(target, "fromArray") !== "function") {
+    return undefined;
+  }
+  return target as { fromArray(values: number[]): unknown };
 }
 
 function nextGeneratedId(): string {
@@ -434,11 +465,8 @@ function restoreOffscreenView(record: IOffscreenViewRecord): void {
     preview.resize(record.width, record.height);
   }
   if (sameCamera(describeCamera(preview), camera)) return;
-  preview.loadAnglePreset(buildAnglePreset(cameraToAngle(camera)));
-  if (camera.projection !== "orthographic") return;
-  // loadAnglePreset skips the zoom while a side view is locked.
-  preview.camOrtho.zoom = camera.zoom;
-  preview.camOrtho.updateProjectionMatrix();
+  // Same path as set_camera_angle: side-view centre, locked zoom and camera size.
+  loadViewAngle(preview, cameraToAngle(camera));
 }
 
 /**

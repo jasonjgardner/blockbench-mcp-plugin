@@ -155,6 +155,8 @@ test("set_camera_angle on an offscreen view moves only that camera and returns i
   });
   expect(host.events.slice(start)).toEqual([
     "angle:mcp_offscreen_inspect",
+    // offscreen cameras are sized after every angle change (blank orthographic views)
+    "resize:mcp_offscreen_inspect:1024x768",
     "gizmos:hidden",
     "render:mcp_offscreen_inspect",
     "gizmos:restored",
