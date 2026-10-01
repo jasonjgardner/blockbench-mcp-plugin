@@ -37,6 +37,7 @@ let tools: IToolFixture;
 let roots: HostCube[] = [];
 let failInitName: string | undefined;
 let failRefresh = false;
+let failAutoUv = false;
 let refuseParent = false;
 let textureCalls: { cube: string; sides: Side[] | true | undefined }[] = [];
 let autoUvCalls: string[] = [];
@@ -85,9 +86,13 @@ class HostCube {
     west: new HostFace(), up: new HostFace(), down: new HostFace(),
   };
   constructor(data: Partial<ICubeData>) {
+    this.extend(data);
+  }
+  extend(data: Partial<ICubeData>): this {
     const { faces, ...properties } = data;
     Object.assign(this, structuredClone(properties));
     if (faces) SIDES.forEach(side => this.faces[side].extend(faces[side]));
+    return this;
   }
   init(): this {
     HostCube.all.push(this);
@@ -112,6 +117,7 @@ class HostCube {
     targets.forEach(side => { this.faces[side].texture = texture.uuid; });
   }
   mapAutoUV(): void {
+    if (failAutoUv) throw new Error("Auto UV failed");
     autoUvCalls.push(this.uuid);
     autoUvInputs.push(Object.fromEntries(SIDES.map(side => [side, [...this.faces[side].uv]])) as Record<Side, number[]>);
     if (!format.id.startsWith("hytale_") || this.box_uv || this.autouv !== 1) return;
@@ -200,6 +206,7 @@ beforeEach(() => {
   roots = [];
   failInitName = undefined;
   failRefresh = false;
+  failAutoUv = false;
   refuseParent = false;
   textureCalls = [];
   autoUvCalls = [];
@@ -410,6 +417,35 @@ test.each(["initialization", "preview", "parent"])("%s failure rolls back the wh
   await expect(tools.call("place_cube", {
     elements: [{ name: "First" }, { name: "Second" }], group: parent.uuid,
   })).rejects.toThrow();
+  expect(model()).toEqual(before);
+  expect(undo.pending).toBeUndefined();
+  expect(undo.lastEdit).toBeUndefined();
+  expect(undo.cancels).toBe(1);
+});
+
+test("modify_cube records one undo entry and re-maps auto UV after a resize", async () => {
+  const cube = new HostCube({ name: "Box", autouv: 1 }).init();
+  const before = model();
+  await tools.call("modify_cube", { id: cube.uuid, to: [6, 4, 2] });
+  const modified = model();
+  expect(cube.to).toEqual([6, 4, 2]);
+  expect(autoUvCalls).toEqual([cube.uuid]);
+  expect(undo.starts).toBe(1);
+  expect(undo.finishes).toBe(1);
+  undo.undo();
+  expect(model()).toEqual(before);
+  undo.redo();
+  expect(model()).toEqual(modified);
+});
+
+test.each(["auto UV", "preview"])("modify_cube %s failure reverts every cube and closes the edit", async failure => {
+  const first = new HostCube({ name: "First", autouv: 1 }).init();
+  const second = new HostCube({ name: "Second", autouv: 1 }).init();
+  HostCube.selected = [first, second];
+  const before = model();
+  failAutoUv = failure === "auto UV";
+  failRefresh = failure === "preview";
+  await expect(tools.call("modify_cube", { from: [1, 1, 1], to: [5, 5, 5] })).rejects.toThrow(failure === "preview" ? "Preview failed" : "Auto UV failed");
   expect(model()).toEqual(before);
   expect(undo.pending).toBeUndefined();
   expect(undo.lastEdit).toBeUndefined();

@@ -363,40 +363,35 @@ createTool(cubeToolDocs[1].name, {
 
     const shading = planCubeShading({ shade, shade_direction_override, light_emission }, activeShadingFormat());
 
-    Undo.initEdit({
-      elements: Array.isArray(cubes) ? cubes : [cubes],
-      outliner: true,
-      collections: [],
-    });
+    // One transaction: a failure part-way (auto UV, preview refresh) reverts every cube instead of leaving the edit open.
+    runUndoableEdit({ elements: [...cubes], outliner: true, collections: [] }, "Agent modified cubes", () => {
+      cubes.forEach((cube) => {
+        const cubeOrigin: [number, number, number] = (origin ?? cube.origin) as [number, number, number];
+        const cubeFrom: [number, number, number] = (from ?? cube.from) as [number, number, number];
+        const cubeTo: [number, number, number] = (to ?? cube.to) as [number, number, number];
+        const cubeRotation: [number, number, number] = (rotation ?? cube.rotation) as [number, number, number];
+        const cubeUVOffset: [number, number] = (uv_offset ?? cube.uv_offset) as [number, number];
 
-    cubes.forEach((cube) => {
-      const cubeOrigin: [number, number, number] = (origin ?? cube.origin) as [number, number, number];
-      const cubeFrom: [number, number, number] = (from ?? cube.from) as [number, number, number];
-      const cubeTo: [number, number, number] = (to ?? cube.to) as [number, number, number];
-      const cubeRotation: [number, number, number] = (rotation ?? cube.rotation) as [number, number, number];
-      const cubeUVOffset: [number, number] = (uv_offset ?? cube.uv_offset) as [number, number];
-
-      cube.extend({
-        name: name ?? cube.name,
-        origin: cubeOrigin,
-        from: cubeFrom,
-        to: cubeTo,
-        rotation: cubeRotation,
-        uv_offset: cubeUVOffset,
-        autouv: autouv ? (Number(autouv) as 0 | 1 | 2) : cube.autouv,
-        mirror_uv: Boolean(mirror_uv ?? cube.mirror_uv),
-        inflate: inflate ?? cube.inflate,
-        color: color ?? cube.color,
-        visibility: visibility ?? cube.visibility,
-        ...shading.patch,
+        cube.extend({
+          name: name ?? cube.name,
+          origin: cubeOrigin,
+          from: cubeFrom,
+          to: cubeTo,
+          rotation: cubeRotation,
+          uv_offset: cubeUVOffset,
+          autouv: autouv ? (Number(autouv) as 0 | 1 | 2) : cube.autouv,
+          mirror_uv: Boolean(mirror_uv ?? cube.mirror_uv),
+          inflate: inflate ?? cube.inflate,
+          color: color ?? cube.color,
+          visibility: visibility ?? cube.visibility,
+          ...shading.patch,
+        });
+        // Auto UV follows the geometry, as it does when Blockbench's own tools resize a cube.
+        const geometryChanged = from !== undefined || to !== undefined || inflate !== undefined || autouv !== undefined;
+        if (geometryChanged && cube.autouv && !cube.box_uv) cube.mapAutoUV();
       });
-      // Auto UV follows the geometry, as it does when Blockbench's own tools resize a cube.
-      const geometryChanged = from !== undefined || to !== undefined || inflate !== undefined || autouv !== undefined;
-      if (geometryChanged && cube.autouv && !cube.box_uv) cube.mapAutoUV();
+      Canvas.updateAll();
     });
-
-    Undo.finishEdit("Agent modified cubes");
-    Canvas.updateAll();
 
     const summary = `Modified cubes ${cubes
       .map((cube) => cube.name)
