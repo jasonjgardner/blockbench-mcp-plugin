@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { Vector3 } from "three";
-import { createCylinderParameters, createSphereParameters, placeMeshParameters, registerMeshTools } from "@/server/tools/mesh";
+import { createCylinderParameters, createSphereParameters, placeMeshParameters, registerMeshTools, selectMeshElementsParameters } from "@/server/tools/mesh";
 import { useGlobals } from "@/tests/helpers/globals";
 import { evaluateHostCondition } from "@/tests/helpers/condition-host";
 import type { ITextureReference, MeshSelectionMap, Vector3Tuple } from "@/tests/helpers/shapes";
@@ -155,6 +155,7 @@ useGlobals(() => ({
   Undo: undoHost,
   Canvas: { updateAll() {}, updateView() {} },
   BarItems: { selection_mode: { set() {} } },
+  UVEditor: { setAutoSize() {} },
 }));
 
 const triangle = { name: "triangle", vertices: [[0, 0, 0], [2, 0, 0], [0, 2, 0]], faces: [[0, 1, 2]] };
@@ -320,5 +321,77 @@ describe("mesh editing tools", () => {
     expect(face.vertices).toHaveLength(3);
     expect(new Set(face.vertices).size).toBe(3);
     expect(Object.keys(mesh.vertices)).toHaveLength(3);
+  });
+});
+
+describe("mesh edits validate first and roll back on failure", () => {
+  /** A triangle plus a loose fourth vertex: keys 9999..9997 form face 99999999, 9996 is unused. */
+  async function placeTriangleWithSpare(): Promise<TestMesh> {
+    await executeText("place_mesh", { elements: [{ ...triangle, vertices: [...triangle.vertices, [2, 2, 0]] }] });
+    return TestMesh.all[0];
+  }
+
+  test("select_mesh_elements takes component keys only; numbers never named a component", () => {
+    expect(selectMeshElementsParameters.safeParse({ mesh_id: "mesh", mode: "vertex", elements: [0] }).success).toBe(false);
+    expect(selectMeshElementsParameters.safeParse({ mesh_id: "mesh", mode: "edge", elements: ["a-b"] }).success).toBe(true);
+  });
+
+  test("select_mesh_elements rejects unknown keys and malformed edges before Undo", async () => {
+    const mesh = await placeTriangleWithSpare();
+    const starts = undoHost.starts;
+    await expect(executeText("select_mesh_elements", { mesh_id: mesh.uuid, mode: "vertex", elements: ["9999", "nope"] })).rejects.toThrow('Mesh "triangle" has no vertex "nope"');
+    await expect(executeText("select_mesh_elements", { mesh_id: mesh.uuid, mode: "face", action: "toggle", elements: ["nope"] })).rejects.toThrow('has no face "nope"');
+    await expect(executeText("select_mesh_elements", { mesh_id: mesh.uuid, mode: "edge", elements: ["9999"] })).rejects.toThrow('edges are two vertex keys joined by "-"');
+    await expect(executeText("select_mesh_elements", { mesh_id: mesh.uuid, mode: "edge", elements: ["9999-nope"] })).rejects.toThrow('has no edge "9999-nope"');
+    expect(undoHost.starts).toBe(starts);
+    // Removing a key that no longer exists is harmless and allowed.
+    await executeText("select_mesh_elements", { mesh_id: mesh.uuid, mode: "vertex", action: "remove", elements: ["stale"] });
+    expect(undoHost.finishes).toBe(starts + 1);
+  });
+
+  test("a failure while selecting closes the edit", async () => {
+    const mesh = await placeTriangleWithSpare();
+    Object.assign(globalThis, { BarItems: { selection_mode: { set() { throw new Error("Selection mode failed"); } } } });
+    await expect(executeText("select_mesh_elements", { mesh_id: mesh.uuid, mode: "vertex" })).rejects.toThrow("Selection mode failed");
+    expect(undoHost.pending).toBeUndefined();
+    expect(undoHost.cancels).toBe(1);
+  });
+
+  test("move_mesh_vertices validates keys and offset before Undo and moves each vertex once", async () => {
+    const mesh = await placeTriangleWithSpare();
+    const starts = undoHost.starts;
+    await expect(executeText("move_mesh_vertices", { mesh_id: mesh.uuid, offset: [0, 1, 0], vertices: ["9999", "nope"] })).rejects.toThrow('has no vertex "nope"');
+    await expect(executeText("move_mesh_vertices", { mesh_id: mesh.uuid, offset: [0, 1, 0] })).rejects.toThrow("No vertices selected");
+    await expect(executeText("move_mesh_vertices", { mesh_id: mesh.uuid, offset: [0, 1, 0], vertices: [] })).rejects.toThrow("vertices is empty");
+    await expect(executeText("move_mesh_vertices", { mesh_id: mesh.uuid, offset: [0, Number.POSITIVE_INFINITY, 0], vertices: ["9999"] })).rejects.toThrow("finite");
+    expect(undoHost.starts).toBe(starts);
+    expect(await executeText("move_mesh_vertices", { mesh_id: mesh.uuid, offset: [0, 1, 0], vertices: ["9999", "9999"] })).toBe('Moved 1 vertices of mesh "triangle"');
+    expect(mesh.vertices["9999"]).toEqual([0, 1, 0]);
+  });
+
+  test("a preview failure while moving vertices restores them", async () => {
+    const mesh = await placeTriangleWithSpare();
+    const before = structuredClone(mesh.vertices);
+    Object.assign(globalThis, { Canvas: { updateAll() {}, updateView() { throw new Error("Preview failed"); } } });
+    await expect(executeText("move_mesh_vertices", { mesh_id: mesh.uuid, offset: [0, 1, 0], vertices: ["9999"] })).rejects.toThrow("Preview failed");
+    expect(mesh.vertices).toEqual(before);
+    expect(undoHost.pending).toBeUndefined();
+  });
+
+  test("create_mesh_face validates vertices and texture before Undo, and a failed auto UV removes the face", async () => {
+    const mesh = await placeTriangleWithSpare();
+    const starts = undoHost.starts;
+    await expect(executeText("create_mesh_face", { mesh_id: mesh.uuid, vertices: ["9998", "9996", "nope"] })).rejects.toThrow('has no vertex "nope"');
+    await expect(executeText("create_mesh_face", { mesh_id: mesh.uuid, vertices: ["9998", "9996", "9996"] })).rejects.toThrow("distinct");
+    await expect(executeText("create_mesh_face", { mesh_id: mesh.uuid, vertices: ["9998", "9996", "9997"], texture: "missing" })).rejects.toThrow('Texture "missing" not found');
+    expect(undoHost.starts).toBe(starts);
+    const faces = Object.keys(mesh.faces);
+    Object.assign(globalThis, { UVEditor: { setAutoSize() { throw new Error("Auto UV failed"); } } });
+    await expect(executeText("create_mesh_face", { mesh_id: mesh.uuid, vertices: ["9998", "9996", "9997"] })).rejects.toThrow("Auto UV failed");
+    expect(Object.keys(mesh.faces)).toEqual(faces);
+    expect(undoHost.pending).toBeUndefined();
+    Object.assign(globalThis, { UVEditor: { setAutoSize() {} } });
+    await executeText("create_mesh_face", { mesh_id: mesh.uuid, vertices: ["9998", "9996", "9997"] });
+    expect(Object.keys(mesh.faces)).toHaveLength(faces.length + 1);
   });
 });
