@@ -3,7 +3,6 @@
 import type { z } from "zod";
 import { createTool } from "@/lib/factories";
 import { getAndActivateTexture } from "@/lib/util";
-import { runUndoableEdit } from "@/lib/undo";
 import { paintToolDocs } from "./docs";
 import { textureSelectionParameters } from "./schemas";
 
@@ -61,21 +60,56 @@ function combine(before: boolean[], inShape: (index: number) => boolean, mode: S
   });
 }
 
-/** Grows (or, with `grow` false, shrinks) the selection by a round brush of `radius` pixels. */
-function morph(before: boolean[], width: number, height: number, radius: number, grow: boolean): boolean[] {
+/**
+ * Grows (or, with `grow` false, shrinks) the selection by a round brush of `radius` pixels: a pixel is selected
+ * when any pixel (all pixels, when shrinking) within `dx² + dy² <= r²` is. Outside the texture counts as selected
+ * when shrinking, so edges do not erode. Each brush row is checked with per-row prefix sums, so the cost is
+ * O(width × height × radius) instead of O(width × height × radius²).
+ *
+ * @param before - Current selection, one boolean per pixel, row by row.
+ * @returns The new selection in the same layout.
+ */
+export function morphSelection(before: boolean[], width: number, height: number, radius: number, grow: boolean): boolean[] {
   const r = Math.max(1, Math.round(radius));
-  const offsets: Array<[number, number]> = [];
-  for (let dy = -r; dy <= r; dy++) {
-    for (let dx = -r; dx <= r; dx++) if (dx * dx + dy * dy <= r * r) offsets.push([dx, dy]);
-  }
+  const prefix = Array.from({ length: height }, (_, y) => {
+    const row = new Int32Array(width + 1);
+    for (let x = 0; x < width; x++) row[x + 1] = row[x] + (before[y * width + x] ? 1 : 0);
+    return row;
+  });
+  // Half-width of the brush on each row offset; sqrt is exact for perfect squares, so the disk matches dx² + dy² <= r².
+  const spans = Array.from({ length: 2 * r + 1 }, (_, i) => [i - r, Math.floor(Math.sqrt(r * r - (i - r) ** 2))] as const);
   return before.map((_, index) => {
     const x = index % width;
     const y = Math.floor(index / width);
-    // Outside the texture counts as selected when shrinking, so edges do not erode.
-    const at = (px: number, py: number): boolean =>
-      px < 0 || py < 0 || px >= width || py >= height ? !grow : before[py * width + px];
-    return grow ? offsets.some(([dx, dy]) => at(x + dx, y + dy)) : offsets.every(([dx, dy]) => at(x + dx, y + dy));
+    const hit = ([dy, half]: readonly [number, number]): boolean => {
+      const row = y + dy;
+      if (row < 0 || row >= height) return !grow;
+      const lo = Math.max(0, x - half);
+      const hi = Math.min(width - 1, x + half);
+      const inside = prefix[row][hi + 1] - prefix[row][lo];
+      return grow ? inside > 0 : inside === hi - lo + 1;
+    };
+    return grow ? spans.some(hit) : spans.every(hit);
   });
+}
+
+/**
+ * Runs `edit` as one selection history entry, like the UV editor's own Select All and Invert.
+ *
+ * A texture selection is selection state, not bitmap content: Undo restores it from
+ * `Undo.initSelection({ texture_selection: true })`, which saves `UVEditor.texture.selection`. A bitmap edit
+ * would copy the image twice and leave the selection in place on Ctrl+Z. When the user has turned off
+ * "Undo selections", Blockbench records nothing, as it does natively.
+ */
+function recordTextureSelection(label: string, edit: () => void): void {
+  const save: unknown = Undo.initSelection({ texture_selection: true });
+  try {
+    edit();
+  } catch (error) {
+    if (save) Undo.cancelSelection(true);
+    throw error;
+  }
+  Undo.finishSelection(label);
 }
 
 /** Checks the inputs an action needs before any edit is opened. */
@@ -93,7 +127,7 @@ function validate({ action, coordinates, radius }: SelectionInput): void {
 
 /**
  * Registers `texture_selection` (`paintToolDocs[10]`): applies one selection
- * action to a texture's pixel selection inside an undo entry.
+ * action to a texture's pixel selection as one selection history entry.
  */
 export function registerTextureSelectionTool(): void {
   createTool(
@@ -108,7 +142,7 @@ export function registerTextureSelectionTool(): void {
         const selection = texture.selection as unknown as ISelectionMatrix;
         const { width, height } = texture;
 
-        runUndoableEdit({ textures: [texture], bitmap: true }, "Texture selection", () => {
+        recordTextureSelection("Texture selection", () => {
           if (action === "select_all") {
             selection.setOverride(true);
             return;
@@ -122,7 +156,7 @@ export function registerTextureSelectionTool(): void {
           if (action === "invert_selection") {
             after = before.map((was) => !was);
           } else if (action === "expand_selection" || action === "contract_selection") {
-            after = morph(before, width, height, radius ?? 1, action === "expand_selection");
+            after = morphSelection(before, width, height, radius ?? 1, action === "expand_selection");
           } else {
             // Rectangle and ellipse: pixel coordinates, both corners inclusive.
             const box = coordinates!;

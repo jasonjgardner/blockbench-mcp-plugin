@@ -361,8 +361,9 @@ export const textureSelectionParameters = z.object({
     .describe("Selection area coordinates."),
   radius: z
     .number()
+    .max(64)
     .optional()
-    .describe("Radius for expand/contract/feather operations."),
+    .describe("Radius in pixels for expand/contract operations (at most 64)."),
   mode: z
     .enum(["create", "add", "subtract", "intersect"])
     .optional()
