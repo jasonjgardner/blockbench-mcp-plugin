@@ -2,7 +2,7 @@
 /// <reference types="blockbench-types" />
 import { z } from "zod";
 import { createTool, type IToolSpec } from "@/lib/factories";
-import { findElementOrThrow, findTextureOrThrow } from "@/lib/util";
+import { findElementOrThrow, findTextureOrThrow, formatUsesBoneRig } from "@/lib/util";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
 import { createGroupWithUndo } from "@/lib/group-creation";
 import { runUndoableEdit } from "@/lib/undo";
@@ -458,14 +458,18 @@ function duplicateNode(node: DuplicableNode, offset: ArrayVector3, name: string 
   const originals = [node, ...pairSubtrees(node, node).slice(1).map(([original]) => original)];
   const bones = bonesWeightingMeshes(originals.filter((candidate): candidate is Mesh => candidate instanceof Mesh));
   const elements: OutlinerElement[] = [...bones];
+  // Copied groups are not OutlinerElements: without the groups aspect, Undo left them behind.
+  const groups: Group[] = [];
   const selected = [...Outliner.selected];
   try {
-    return runUndoableEdit({ elements, outliner: true }, "Agent duplicated element", () => {
+    return runUndoableEdit({ elements, groups, outliner: true }, "Agent duplicated element", () => {
       const copy = (node as unknown as { duplicate(): DuplicableNode }).duplicate();
       const pairs = pairSubtrees(node, copy);
       elements.push(...pairs.map(([, created]) => created).filter((created): created is OutlinerElement => created instanceof OutlinerElement));
+      groups.push(...pairs.map(([, created]) => created).filter((created): created is Group => created instanceof Group));
       if (offset.some((value) => value !== 0)) offsetSubtree(copy, offset);
       if (name !== undefined) copy.name = name;
+      if (copy instanceof Group && formatUsesBoneRig()) copy.createUniqueName();
       copyVertexWeights(pairs, bones);
       return copy;
     });
@@ -481,15 +485,28 @@ export function registerElementTools() {
     async execute({ id }) {
       const element = findElementOrThrow(id);
 
-      Undo.initEdit({
-        elements: [],
-        outliner: true,
-        collections: [],
-      });
-
-      element.remove();
-
-      Undo.finishEdit("Agent removed element");
+      // Undo can only rebuild what the "before" snapshot holds: list the node,
+      // its descendant elements and its groups, then finish with empty lists,
+      // as Blockbench's own Delete does.
+      const elements: OutlinerElement[] = [];
+      const groups: Group[] = [];
+      if (element instanceof Group) {
+        groups.push(element);
+        element.forEachChild((child: OutlinerNode) => {
+          if (child instanceof Group) groups.push(child);
+          else if (child instanceof OutlinerElement) elements.push(child);
+        });
+      } else {
+        elements.push(element);
+      }
+      runUndoableEdit(
+        { elements, groups, outliner: true, collections: [] },
+        "Agent removed element",
+        () => {
+          element.remove();
+        },
+        { elements: [], groups: [], outliner: true, collections: [] }
+      );
       Canvas.updateAll();
 
       return `Removed element with ID ${id}`;
@@ -611,9 +628,14 @@ export function registerElementTools() {
       runUndoableEdit(aspects, "Agent renamed element", () => {
         // Both types implement extend(), which sanitizes the name; the published union does not guarantee it.
         (element as unknown as { extend(data: { name: string }): unknown }).extend({ name: new_name });
+        // Bone rigs (GeckoLib, Bedrock) key bones by name: keep them unique, as Blockbench's own rename does.
+        if (element instanceof Group && formatUsesBoneRig()) element.createUniqueName();
       });
       Canvas.updateAll();
-      return `Renamed element "${id}" to "${new_name}".`;
+      const applied = element.name;
+      return applied === new_name
+        ? `Renamed element "${id}" to "${applied}".`
+        : `Renamed element "${id}" to "${applied}" ("${new_name}" was adjusted to a valid, unique name).`;
     },
   }, elementToolDocs[4].status);
 

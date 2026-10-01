@@ -345,9 +345,14 @@ createTool(cubeToolDocs[1].name, {
   }) {
     let cubes: Cube[];
     if (id) {
-      cubes = (Cube.all ?? []).filter((el: Cube) => el.uuid === id || el.name === id);
+      // UUID first; a name must be unique, or several cubes would get the same geometry.
+      const byUuid = (Cube.all ?? []).filter((el: Cube) => el.uuid === id);
+      cubes = byUuid.length ? byUuid : (Cube.all ?? []).filter((el: Cube) => el.name === id);
       if (!cubes.length) {
         throw new Error(`Cube with ID "${id}" not found. Use the list_outline tool to see available cubes.`);
+      }
+      if (cubes.length > 1) {
+        throw new Error(`Cube name "${id}" is shared by ${cubes.length} cubes (${cubes.map((cube) => cube.uuid).join(", ")}); pass the UUID of the one to modify.`);
       }
     } else {
       cubes = Cube.selected;
@@ -385,6 +390,9 @@ createTool(cubeToolDocs[1].name, {
         visibility: visibility ?? cube.visibility,
         ...shading.patch,
       });
+      // Auto UV follows the geometry, as it does when Blockbench's own tools resize a cube.
+      const geometryChanged = from !== undefined || to !== undefined || inflate !== undefined || autouv !== undefined;
+      if (geometryChanged && cube.autouv && !cube.box_uv) cube.mapAutoUV();
     });
 
     Undo.finishEdit("Agent modified cubes");
