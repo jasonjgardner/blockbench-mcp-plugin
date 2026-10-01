@@ -39,6 +39,7 @@ function updateSuggestions(dialog: ISketchfabDialog): void {
 let hostPrototype: typeof Dialog.prototype | undefined;
 let originalBuild: typeof Dialog.prototype.build | undefined;
 let patchedBuild: typeof Dialog.prototype.build | undefined;
+let isPatchActive = false;
 
 /**
  * Adjusts Sketchfab suggestions before the host builds its buttons. Projects
@@ -50,15 +51,21 @@ export function setupSketchfabTags(): void {
   hostPrototype = Dialog.prototype;
   const build = hostPrototype.build;
   originalBuild = build;
+  isPatchActive = true;
   patchedBuild = function (this: Dialog): Dialog {
-    updateSuggestions(this);
+    if (isPatchActive) updateSuggestions(this);
     return build.call(this);
   };
   hostPrototype.build = patchedBuild;
 }
 
-/** Restores the host dialog builder on unload without replacing a later plugin's hook. */
+/**
+ * Restores the host dialog builder on unload without replacing a later plugin's
+ * hook. Deactivates the wrapper first so a retained reference (kept alive by a
+ * later plugin's hook chain) becomes inert instead of continuing to fire.
+ */
 export function teardownSketchfabTags(): void {
+  isPatchActive = false;
   if (hostPrototype && originalBuild && hostPrototype.build === patchedBuild) {
     hostPrototype.build = originalBuild;
   }
