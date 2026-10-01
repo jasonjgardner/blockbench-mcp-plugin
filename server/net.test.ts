@@ -1,8 +1,9 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import net, { type AddressInfo } from "node:net";
+import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { z } from "zod";
 import { createTool, removeTool } from "@/lib/factories";
-import { sessionManager } from "@/lib/sessions";
+import { DEFAULT_MAX_SESSIONS, sessionManager, type ISessionConfig } from "@/lib/sessions";
 import createNetServer, { type NetServer, type SessionTransports } from "@/server/net";
 import { useGlobals } from "@/tests/helpers/globals";
 
@@ -23,8 +24,8 @@ afterEach(() => {
 });
 
 /** Starts the plugin's HTTP server on free ports and waits until every listener is bound. */
-async function start(host?: string): Promise<NetServer[]> {
-  const [servers, transports] = createNetServer(net, { port: 0, endpoint: "/bb-mcp", host, keepAlive: noKeepAlive });
+async function start(host?: string, sessionConfig?: Partial<ISessionConfig>): Promise<NetServer[]> {
+  const [servers, transports] = createNetServer(net, { port: 0, endpoint: "/bb-mcp", host, keepAlive: noKeepAlive, sessionConfig });
   running = servers;
   sessions = transports;
   await Promise.all(
@@ -351,6 +352,79 @@ describe("createNetServer pending calls", () => {
     } finally {
       tool.release();
       removeTool("net_test_wait_delete");
+    }
+  });
+});
+
+describe("createNetServer session lifecycle", () => {
+  test("closes the server of an initialize the transport refuses", async () => {
+    const closes = spyOn(WebStandardStreamableHTTPServerTransport.prototype, "close");
+    try {
+      const [server] = await start("127.0.0.1");
+      const port = portOf(server);
+      const lines = mcpPost(port).map((line) => line.startsWith("Accept:") ? "Accept: application/json" : line);
+      const refused = await request(port, lines, initializeBody);
+      expect(refused.status).toBe(406);
+      expect(closes).toHaveBeenCalledTimes(1);
+      expect(sessions.size).toBe(0);
+    } finally {
+      closes.mockRestore();
+    }
+  });
+
+  test("refuses an initialize sent as a notification without opening a session", async () => {
+    const [server] = await start("127.0.0.1");
+    const port = portOf(server);
+    const before = sessionManager.getCount();
+    const notification = JSON.stringify({
+      jsonrpc: "2.0",
+      method: "initialize",
+      params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "net-test", version: "0" } },
+    });
+    const refused = await request(port, mcpPost(port), notification);
+    expect(refused.status).toBe(400);
+    expect(sessions.size).toBe(0);
+    expect(sessionManager.getCount()).toBe(before);
+  });
+
+  test("at the session limit, closes the least recently active idle session for a new client", async () => {
+    try {
+      const [server] = await start("127.0.0.1", { maxSessions: 2 });
+      const port = portOf(server);
+      const first = await initialize(port);
+      await Bun.sleep(10);
+      const second = await initialize(port);
+      await Bun.sleep(10);
+      const ping = await request(port, mcpPost(port, first), JSON.stringify({ jsonrpc: "2.0", id: 2, method: "ping" }));
+      expect(ping.status).toBe(200);
+
+      const third = await initialize(port);
+      expect([...sessions.keys()].sort()).toEqual([first, third].sort());
+      expect((await request(port, mcpPost(port, second), toolCall(3, "net_test_any"))).status).toBe(404);
+    } finally {
+      sessionManager.configure({ maxSessions: DEFAULT_MAX_SESSIONS });
+    }
+  });
+
+  test("refuses a new client with 503 while every session at the limit has a request in flight", async () => {
+    const tool = registerWaitingTool("net_test_busy");
+    try {
+      const [server] = await start("127.0.0.1", { maxSessions: 1 });
+      const port = portOf(server);
+      const sessionId = await initialize(port);
+      const call = request(port, mcpPost(port, sessionId), toolCall(3, "net_test_busy"));
+      await tool.started;
+
+      const refused = await request(port, mcpPost(port), initializeBody);
+      expect(refused.status).toBe(503);
+      expect(refused.body).toContain("Too many MCP sessions: 1 are open and all are in use");
+      expect([...sessions.keys()]).toEqual([sessionId]);
+
+      tool.release();
+      expect((await call).status).toBe(200);
+    } finally {
+      removeTool("net_test_busy");
+      sessionManager.configure({ maxSessions: DEFAULT_MAX_SESSIONS });
     }
   });
 });

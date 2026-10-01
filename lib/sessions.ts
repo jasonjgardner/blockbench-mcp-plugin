@@ -16,6 +16,12 @@ export const DEFAULT_PING_INTERVAL_MS = 30 * 1000;
 /** Max consecutive failed pings before considering session dead */
 export const DEFAULT_MAX_FAILED_PINGS = 3;
 
+/**
+ * Default cap on concurrent sessions. Each one holds its own MCP server with
+ * every tool registered, and idle sessions stay until the inactivity timeout.
+ */
+export const DEFAULT_MAX_SESSIONS = 32;
+
 export interface ISessionConfig {
   /** Inactivity timeout in milliseconds */
   inactivityTimeoutMs: number;
@@ -23,6 +29,8 @@ export interface ISessionConfig {
   pingIntervalMs: number;
   /** Max consecutive failed pings before session termination */
   maxFailedPings: number;
+  /** Concurrent sessions allowed; further initialize requests are refused */
+  maxSessions: number;
 }
 
 export interface ISession {
@@ -54,6 +62,7 @@ class SessionManager {
     inactivityTimeoutMs: DEFAULT_INACTIVITY_TIMEOUT_MS,
     pingIntervalMs: DEFAULT_PING_INTERVAL_MS,
     maxFailedPings: DEFAULT_MAX_FAILED_PINGS,
+    maxSessions: DEFAULT_MAX_SESSIONS,
   };
 
   /**

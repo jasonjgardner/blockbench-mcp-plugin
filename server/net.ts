@@ -58,6 +58,8 @@ interface ISessionEntry {
   closed: boolean
   /** Requests waiting for a response; each is answered when the transport closes first. */
   waiting: Set<() => void>
+  /** Open SSE response streams. A session with none and no waiting request is idle. */
+  streams: number
 }
 
 export type SessionTransports = Map<string, ISessionEntry>
@@ -77,7 +79,8 @@ function getStatusText (status: number): string {
     413: 'Payload Too Large',
     415: 'Unsupported Media Type',
     500: 'Internal Server Error',
-    501: 'Not Implemented'
+    501: 'Not Implemented',
+    503: 'Service Unavailable'
   }
   return texts[status] || 'Unknown'
 }
@@ -184,12 +187,11 @@ function isInitializeRequestBody (method: string, body: string): boolean {
   if (method !== 'POST' || !body) return false
   try {
     const parsed: unknown = JSON.parse(body)
-    if (Array.isArray(parsed)) return false
-    return (
-      typeof parsed === 'object' &&
-      parsed !== null &&
-      (parsed as { method?: unknown }).method === 'initialize'
-    )
+    if (Array.isArray(parsed) || typeof parsed !== 'object' || parsed === null) return false
+    const { method, id } = parsed as { method?: unknown, id?: unknown }
+    // Without an id it is a notification: the transport would open a session,
+    // answer 202 without its id, and the slot could never be freed.
+    return method === 'initialize' && (typeof id === 'string' || typeof id === 'number')
   } catch {
     return false
   }
@@ -217,10 +219,51 @@ export default function createNetServer (
   const sessionTransports: SessionTransports = new Map()
   const keepAliveConfig = { ...DEFAULT_KEEP_ALIVE, ...keepAlive }
   const listenPlan = resolveListenPlan(host)
+  /** New sessions whose initialize request is still being handled. */
+  const opening = new Set<ISessionEntry>()
 
   // Apply session configuration if provided
   if (sessionConfig) {
     sessionManager.configure(sessionConfig)
+  }
+
+  /** Open sessions plus initialize requests that will open one; the manager already counts initialized ones. */
+  const sessionCount = (): number =>
+    sessionManager.getCount() + [...opening].filter((entry) => entry.transport.sessionId === undefined).length
+
+  /**
+   * Ends a new session's handling. An initialize the transport refused (wrong
+   * Accept or Content-Type, invalid JSON-RPC) leaves it without a session id,
+   * so no later request can reach it: close its server instead of leaving it
+   * connected and tracked by the tool and resource registries.
+   */
+  async function finishOpening (entry: ISessionEntry): Promise<void> {
+    opening.delete(entry)
+    if (entry.transport.sessionId !== undefined) return
+    try {
+      await entry.server.close()
+    } catch (error) {
+      console.error('[MCP] Error closing an unused session server:', error)
+    }
+  }
+
+  /**
+   * Makes room at the session limit by closing the least recently active
+   * session with no request in flight. A client that restarts without a
+   * DELETE leaves its session open until the inactivity timeout, which would
+   * lock new clients out for that long.
+   *
+   * @returns Whether a session was closed.
+   */
+  function evictIdleSession (): boolean {
+    const [oldest] = [...sessionTransports.entries()]
+      .filter(([, entry]) => entry.waiting.size === 0 && entry.streams === 0)
+      .map(([id]) => ({ id, lastActivity: sessionManager.get(id)?.lastActivity.getTime() ?? 0 }))
+      .sort((a, b) => a.lastActivity - b.lastActivity)
+    if (!oldest) return false
+    console.warn(`[MCP] Session limit reached: closing the least recently active idle session ${oldest.id.slice(0, 8)}... for a new client`)
+    sessionManager.remove(oldest.id)
+    return true
   }
 
   // Set up ping callback for session keep-alive.
@@ -530,7 +573,28 @@ export default function createNetServer (
 
           // No session yet and this is an initialize request: create a new
           // session with its own server and transport
+          let created: ISessionEntry | undefined
           if (!session) {
+            const { maxSessions } = sessionManager.getConfig()
+            if (sessionCount() >= maxSessions && !evictIdleSession()) {
+              console.warn(`[MCP] Refused initialize: ${maxSessions} sessions are open and all are in use`)
+              sendResponse(
+                socket,
+                503,
+                { 'content-type': 'application/json' },
+                JSON.stringify({
+                  jsonrpc: '2.0',
+                  error: {
+                    code: -32000,
+                    message: `Too many MCP sessions: ${maxSessions} are open and all are in use. Close an unused client and retry.`
+                  },
+                  id: null
+                }),
+                headers['connection']
+              )
+              continue
+            }
+
             const sessionServer = createMcpServer({
               onRequestCancelled: (requestId) => answerCancelled(sessionServer, requestId)
             })
@@ -577,10 +641,18 @@ export default function createNetServer (
               }
             })
 
-            const newSession: ISessionEntry = { transport, server: sessionServer, closed: false, waiting: new Set() }
+            const newSession: ISessionEntry = { transport, server: sessionServer, closed: false, waiting: new Set(), streams: 0 }
+            // Counted toward the limit from now on, so concurrent initialize requests cannot overshoot it.
+            opening.add(newSession)
+            created = newSession
 
             // Connect this session's server to its transport
-            await sessionServer.connect(transport)
+            try {
+              await sessionServer.connect(transport)
+            } catch (error) {
+              await finishOpening(newSession)
+              throw error
+            }
             trackClose(newSession)
             session = newSession
           }
@@ -592,8 +664,13 @@ export default function createNetServer (
 
           // Let the transport handle the MCP protocol
           refreshToolAvailability()
-          const pending = session.transport.handleRequest(webRequest)
-          const webResponse = method === 'POST' ? await awaitPostResponse(session, pending) : await pending
+          let webResponse: Response
+          try {
+            const pending = session.transport.handleRequest(webRequest)
+            webResponse = method === 'POST' ? await awaitPostResponse(session, pending) : await pending
+          } finally {
+            if (created) await finishOpening(created)
+          }
 
           // Convert Web Standard Response to HTTP
           const responseHeaders: Record<string, string> = {}
@@ -647,6 +724,7 @@ export default function createNetServer (
               }
               socket.once('close', cancelStream)
 
+              session.streams++
               try {
                 while (true) {
                   // Check socket is still writable before each chunk
@@ -662,6 +740,7 @@ export default function createNetServer (
               } catch (streamError) {
                 console.error('[MCP] SSE stream error:', streamError)
               } finally {
+                session.streams--
                 socket.off('close', cancelStream)
                 if (heartbeat) clearInterval(heartbeat)
                 cancelStream()
