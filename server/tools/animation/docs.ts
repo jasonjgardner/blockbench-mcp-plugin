@@ -62,7 +62,7 @@ export const animationToolDocs: IToolSpec[] = [
     name: "bone_rigging",
     condition: { project: true, features: ["bone_rig"] },
     description:
-      "Creates and manipulates the bone structure (rig) of a model for animation. The set_ik action is deprecated; use set_ik_controller for Blockbench's null-object IK (source, target, pole).",
+      "Creates and manipulates the bone structure (rig) of a model for animation. Each action is one undoable edit (create with ik_enabled records the IK controller as a second one); undoing delete brings back child bones, elements and their keyframes. mirror duplicates the bone with its descendants and flips the copy like Blockbench's Flip action. The set_ik action is deprecated; use set_ik_controller for Blockbench's null-object IK (source, target, pole).",
     annotations: {
       title: "Bone Rigging",
       destructiveHint: true,

@@ -154,6 +154,29 @@ test("removes new animator and its selected frames/timeline references without c
   expect(selectedAnimation.save()).toEqual(after);
 });
 
+test("finish aspects take the after snapshot and are marked, so redo drops animators the edit removed", () => {
+  setupAnimationUndoRestore();
+  selectedAnimation.animator("bone").add(1);
+  selectedAnimation.animator("kept").add(2);
+  const other = new TestAnimation("other");
+  other.animator("bone").add(3);
+  animations.push(other);
+  const all = [selectedAnimation, other] as unknown as BBAnimation[];
+  runUndoableAnimationEdit({ animations: all }, "Delete bone", () => {
+    selectedAnimation.removeAnimator("bone");
+    other.removeAnimator("bone");
+  }, { animations: [selectedAnimation as unknown as BBAnimation] });
+  const after = selectedAnimation.save();
+  const entry = undo.history[0];
+  expect(Object.keys(entry.after.animations)).toEqual(["main"]);
+  expect(entry.after.mcp_full_animation_restore).toBe(true);
+  undo.undo();
+  expect(Object.keys(selectedAnimation.animators)).toEqual(["kept", "bone"]);
+  // Native loading keeps animators missing from the saved blueprint; only the marked "after" save removes it again.
+  undo.redo();
+  expect(selectedAnimation.save()).toEqual(after);
+});
+
 test("missing animators means empty and zero-length snapshots restore exactly", () => {
   setupAnimationUndoRestore();
   selectedAnimation.length = 0;

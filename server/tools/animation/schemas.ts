@@ -139,7 +139,7 @@ export const boneRiggingParameters = z.object({
   bone_data: z
     .object({
       name: z.string().describe("Name of the bone."),
-      parent: z.string().optional().describe("Parent bone name; create also accepts a group UUID or root."),
+      parent: z.string().optional().describe("Parent bone UUID or name; omit it or pass root for the project root (for the parent action, a bone actually named root takes precedence). An unknown parent, or a name several bones share, is an error."),
       origin: vector3Schema.optional().describe("Pivot point of the bone."),
       rotation: vector3Schema.optional().describe("Initial rotation of the bone."),
       children: z
@@ -150,13 +150,13 @@ export const boneRiggingParameters = z.object({
         .boolean()
         .optional()
         .describe(
-          "Deprecated; prefer set_ik_controller. true makes this bone the end effector of a null-object IK controller (created as <bone>_ik when ik_target is omitted); false clears ik_target on controllers driving it."
+          "Deprecated; prefer set_ik_controller. true makes this bone the end effector of a null-object IK controller (created as <bone>_ik when ik_target is omitted); false clears ik_target on controllers driving it. With create, the IK controller is a second undo entry after the bone's."
         ),
       ik_target: z
         .string()
         .optional()
         .describe("Name or UUID of the null object that drives this bone as the IK controller."),
-      mirror_axis: axisEnum.optional().describe("Axis to mirror the bone across."),
+      mirror_axis: axisEnum.optional().describe("Axis the mirror action flips across (default x): the bone is duplicated with its descendants and the copy is flipped like Blockbench's Flip action, through the model origin, swapping left/right names when free."),
     })
     .describe("Bone configuration data."),
 });
