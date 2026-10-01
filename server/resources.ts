@@ -110,11 +110,80 @@ createResource("projects", {
   },
 });
 
+/** Nesting kept when copying a saved field: faces with UVs, mesh vertices, bone vertex weights. */
+const MAX_SAVED_DEPTH = 6;
+
+/** Fields taken from the live node, never from its save copy (which drops or empties them). */
+const NODE_IDENTITY_KEYS = new Set(["uuid", "name", "type", "parent", "children"]);
+
+/** A JSON copy of plain data; `undefined` for class instances (three.js objects, nodes, textures) and functions. */
+function plainValue(value: unknown, depth = 0): unknown {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value !== "object" || depth >= MAX_SAVED_DEPTH) return undefined;
+  if (Array.isArray(value)) return value.map((item) => plainValue(item, depth + 1) ?? null);
+  const prototype: unknown = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) return undefined;
+  return Object.fromEntries(Object.entries(value).flatMap(([key, item]) => {
+    const copy = plainValue(item, depth + 1);
+    return copy === undefined ? [] : [[key, copy]];
+  }));
+}
+
+/** Values of the properties Blockbench registers for the node's type. */
+function registeredProperties(node: OutlinerNode): Record<string, unknown> {
+  const registered: unknown = Reflect.get(node.constructor, "properties");
+  if (typeof registered !== "object" || registered === null) return {};
+  return Object.fromEntries(Object.keys(registered).map((key) => [key, Reflect.get(node, key)]));
+}
+
+/**
+ * The fields Blockbench writes for the node into a .bbmodel: its save copy
+ * (`getSaveCopy()`; for groups `getSaveCopy(false)`, without children). The
+ * registered properties are only a fallback for nodes without one: Blockbench
+ * 5.2 registers name, box_uv and render settings for cubes, while from, to,
+ * origin and rotation are plain fields that only the save copy includes.
+ */
+function savedFields(node: OutlinerNode): Record<string, unknown> {
+  const getSaveCopy: unknown = Reflect.get(node, "getSaveCopy");
+  let copy: unknown;
+  try {
+    copy = typeof getSaveCopy === "function" ? getSaveCopy.call(node, false) : registeredProperties(node);
+  } catch {
+    copy = registeredProperties(node);
+  }
+  if (typeof copy !== "object" || copy === null) return {};
+  // A group's save copy is a Group instance: take its own fields, skipping internals such as `_static`.
+  return Object.fromEntries(Object.entries(copy).flatMap(([key, value]) => {
+    if (NODE_IDENTITY_KEYS.has(key) || key.startsWith("_")) return [];
+    const plain = plainValue(value);
+    return plain === undefined ? [] : [[key, plain]];
+  }));
+}
+
+/**
+ * Describes a scene node by its outliner node: uuid, name, type, parent,
+ * child UUIDs and the fields Blockbench saves for it. Serializing the three.js
+ * object instead walked into its parent scene, geometry, shaders and textures.
+ */
+function describeNode(uuid: string, node: THREE.Object3D): Record<string, unknown> {
+  const element: OutlinerNode | undefined = OutlinerNode.uuids?.[uuid];
+  if (!element) return { uuid, name: node.name, type: node.type };
+  return {
+    uuid,
+    name: element.name,
+    type: element.type,
+    parent: element.parent === "root" ? "root" : element.parent?.uuid ?? null,
+    ...(Array.isArray(element.children) ? { children: element.children.map((child) => child.uuid) } : {}),
+    ...savedFields(element),
+  };
+}
+
 createResource("nodes", {
   uriTemplate: "nodes://{id}",
   title: "Blockbench Nodes",
   description:
-    "Returns the current nodes in the Blockbench editor. List URIs use the node's slugified name (e.g. `nodes://head`) when unique, with a `~<uuid-prefix>` suffix added to disambiguate collisions. Reads also accept the raw UUID or exact name.",
+    "Returns the current nodes in the Blockbench editor. List URIs use the node's slugified name (e.g. `nodes://head`) when unique, with a `~<uuid-prefix>` suffix added to disambiguate collisions. Reads also accept the raw UUID or exact name, and return the node as Blockbench saves it in a .bbmodel (its `getSaveCopy()`), plus uuid, name, type, parent (`root` or a UUID) and child UUIDs: a cube's `from`, `to` and `origin` in Blockbench units, `rotation` in degrees, faces and UVs; a mesh's vertices and faces; a group's origin and rotation. Fields Blockbench leaves out at their default are missing, such as a cube's zero rotation.",
   async listCallback() {
     if (!Project?.nodes_3d) {
       return { resources: [] };
@@ -134,25 +203,20 @@ createResource("nodes", {
       throw resourceNotFound(uri, "No nodes found in the Blockbench editor.");
     }
 
-    const nodes = Object.values(Project.nodes_3d);
-    const node =
-      (id ? Project.nodes_3d[id] : undefined) ?? findByResourceId(nodes, id);
+    const entries = Object.entries(Project.nodes_3d);
+    const direct = id ? Project.nodes_3d[id] : undefined;
+    const node = direct ?? findByResourceId(entries.map(([, candidate]) => candidate), id);
+    const uuid = direct ? id : entries.find(([, candidate]) => candidate === node)?.[0];
 
-    if (!node) {
+    if (!node || !uuid) {
       throw resourceNotFound(uri, `Node with ID "${id}" not found.`);
     }
 
-    const { position, rotation, scale, ...rest } = node;
     return {
       contents: [
         {
           uri: uri.href,
-          text: JSON.stringify({
-            ...rest,
-            position: position.toArray(),
-            rotation: rotation.toArray(),
-            scale: scale.toArray(),
-          }),
+          text: JSON.stringify(describeNode(uuid, node)),
           mimeType: "application/json",
         },
       ],
