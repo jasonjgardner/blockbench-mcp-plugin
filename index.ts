@@ -20,7 +20,7 @@ import { setupEditorStateSync, teardownEditorStateSync } from "@/lib/editor-stat
 import { setupAiDisclosure, teardownAiDisclosure } from "@/lib/ai-disclosure";
 import { setupScratchpadMode, teardownScratchpadMode } from "@/lib/scratchpad-mode";
 import { installPluginApi, uninstallPluginApi } from "@/lib/plugin-api";
-import { teardownOffscreenViews } from "@/lib/views";
+import { setupOffscreenViewOwnership, teardownOffscreenViews } from "@/lib/views";
 import type { NetServer, SessionTransports } from "@/server/net";
 import createNetServer from "@/server/net";
 import { resolveServerAddress } from "@/server/net-security";
@@ -67,6 +67,7 @@ BBPlugin.register("mcp", {
     setupMaterialUndoRefresh();
     setupAnimationUndoRestore();
     setupEditorStateSync();
+    setupOffscreenViewOwnership();
 
     // Load the bundled prompt manifest before the server starts; the cache and
     // CDN are only consulted when the bundle lacks this version's prompts.
