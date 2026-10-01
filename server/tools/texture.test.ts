@@ -1,5 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { win32 } from "node:path";
+import { tmpdir } from "node:os";
+import { join, win32 } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { registerTextureTools } from "@/server/tools/texture";
 import { required } from "@/tests/helpers/assertions";
 import { useGlobals } from "@/tests/helpers/globals";
@@ -70,6 +72,8 @@ let failRefresh = false;
 let selectedTexture: TestTexture | undefined;
 let project: ITextureCollections;
 let files = new Map<string, string>();
+/** Messages of the file permission prompts tools requested. */
+let fsPrompts: string[] = [];
 
 class TestTexture {
   static get all(): TestTexture[] {
@@ -206,8 +210,10 @@ function restore(target: ISnapshot, reference: ISnapshot): void {
 
 const undo = createUndoHost({ restore, snapshot });
 
-function requireNativeModule(name: string): unknown {
+function requireNativeModule(name: string, options?: { message?: string }): unknown {
   if (name === "path") return win32;
+  if (name === "url") return { fileURLToPath };
+  if (options?.message) fsPrompts.push(options.message);
   return {
     existsSync: (path: string) => files.has(path),
     statSync: () => ({ isFile: () => true }),
@@ -225,6 +231,7 @@ beforeEach(() => {
   selectedTexture = undefined;
   project = { textures: [], texture_groups: [] };
   files = new Map();
+  fsPrompts = [];
   undo.reset();
 });
 useGlobals(() => ({
@@ -592,5 +599,30 @@ describe("delete_texture", () => {
     Object.assign(globalThis, { Project: null });
     await expect(executeTool("delete_texture", { texture: "present" })).rejects.toThrow('Tool "delete_texture" is unavailable');
     expect(undo.starts).toBe(0);
+  });
+});
+
+describe("create_texture file paths", () => {
+  test("reads a file URL as a platform path, through a permission prompt that names it", async () => {
+    const path = join(tmpdir(), "My Textures", "skin.png");
+    await expect(executeTool("create_texture", { name: "skin", data: pathToFileURL(path).href }))
+      .rejects.toThrow(`Texture file not found: ${path}`);
+    expect(fsPrompts).toEqual([`MCP create_texture requested read access to load ${path}`]);
+  });
+
+  test("refuses relative paths, network shares and devices before asking for file access", async () => {
+    const refused = [
+      "textures/skin.png",
+      "\\\\nas\\share\\skin.png",
+      "//nas/share/skin.png",
+      "\\\\.\\pipe\\blockbench",
+      "\\\\?\\C:\\textures\\skin.png",
+      "C:\\textures\\COM1",
+    ];
+    for (const data of refused) {
+      await expect(executeTool("create_texture", { name: "skin", data })).rejects.toThrow("is not an absolute path to a file on this computer");
+    }
+    await expect(executeTool("create_texture", { name: "skin", data: "file://nas/share/skin.png" })).rejects.toThrow('not on "nas"');
+    expect(fsPrompts).toEqual([]);
   });
 });
