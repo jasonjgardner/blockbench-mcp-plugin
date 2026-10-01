@@ -10,7 +10,7 @@
  */
 
 import { z } from "zod";
-import { MAX_AGENT_NAME_LENGTH } from "@/lib/ai-disclosure";
+import { mergeAgents, sanitizeAgentName, UNKNOWN_AGENT } from "@/lib/ai-disclosure";
 import {
   CUBE_FACES,
   type CubeFaceName,
@@ -136,7 +136,7 @@ export const updateTextureOp = z.object({
   op: z.literal("update_texture"),
   target: z.union([z.string().min(1), z.number().int().min(0)]).describe("Texture UUID, name, or index."),
   name: z.string().min(1).optional(),
-  source: z.string().startsWith("data:image/").optional().describe("New PNG data URL; replaces the image and keeps every face and material assignment."),
+  source: z.string().startsWith("data:image/").optional().describe("New PNG data URL; replaces the image, embeds it (dropping any link to a PNG file and any layers) and keeps every face and material assignment."),
   width: z.number().int().positive().optional().describe("Pixel width of the new source (required with source)."),
   height: z.number().int().positive().optional().describe("Pixel height of the new source (required with source)."),
   material: z.string().min(1).nullable().optional().describe("Material UUID or name; null removes the texture from its material."),
@@ -515,12 +515,19 @@ function applyUpdateTexture(doc: IBBModel, op: z.infer<typeof updateTextureOp>):
   const target = doc.textures[resolveTexture(doc, op.target)];
   if (!target) throw new Error(`Texture ${op.target} not found.`);
   if (op.source !== undefined && (op.width === undefined || op.height === undefined)) throw new Error("source needs width and height.");
-  const image = op.source === undefined ? {} : { source: op.source, width: op.width, height: op.height };
+  // Blockbench loads relative_path, then path, before the embedded source (bbmodel codec), and draws
+  // enabled layers instead of the source (Texture.updateLayerChanges). A new image therefore drops the
+  // file link and the layers, like add_texture's entries; internal and unsaved match Texture.fromDataURL.
+  const withImage = (texture: ITexture): ITexture => {
+    if (op.source === undefined) return texture;
+    const { layers: _layers, ...rest } = texture;
+    return { ...rest, source: op.source, width: op.width, height: op.height, path: "", relative_path: "", internal: true, saved: false, layers_enabled: false };
+  };
   const renamed: IBBModel = {
     ...doc,
     textures: doc.textures.map((texture) =>
       texture.uuid === target.uuid
-        ? { ...texture, ...image, ...(op.name === undefined ? {} : { name: op.name }), ...(op.wrap_mode === undefined ? {} : { wrap_mode: op.wrap_mode }), ...(op.render_mode === undefined ? {} : { render_mode: op.render_mode }) }
+        ? { ...withImage(texture), ...(op.name === undefined ? {} : { name: op.name }), ...(op.wrap_mode === undefined ? {} : { wrap_mode: op.wrap_mode }), ...(op.render_mode === undefined ? {} : { render_mode: op.render_mode }) }
         : texture,
     ),
   };
@@ -688,12 +695,13 @@ export function applyOperations(doc: IBBModel, operations: readonly Operation[])
 
 /**
  * Records AI involvement the way the desktop plugin does: `ai_used: true` and the
- * client name appended to the comma-separated `ai_agents` list.
+ * client name merged into the comma-separated `ai_agents` list with the plugin's
+ * {@link mergeAgents}, so the name is sanitized and repeated writes add nothing.
+ * A name with nothing printable left is recorded as {@link UNKNOWN_AGENT}, like
+ * the plugin's `resolveAgentName`.
  */
 export function stampAiUsage(doc: IBBModel, agent: string): IBBModel {
-  const name = agent.slice(0, MAX_AGENT_NAME_LENGTH);
-  const existing = typeof doc.ai_agents === "string" && doc.ai_agents ? doc.ai_agents.split(", ") : [];
-  const agents = existing.includes(name) ? existing : [...existing, name];
-  return { ...doc, ai_used: true, ai_agents: agents.join(", ") };
+  const name = sanitizeAgentName(agent) ?? UNKNOWN_AGENT;
+  return { ...doc, ai_used: true, ai_agents: mergeAgents(typeof doc.ai_agents === "string" ? doc.ai_agents : undefined, [name]) };
 }
 

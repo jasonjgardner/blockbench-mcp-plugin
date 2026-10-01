@@ -15,8 +15,9 @@ import {
   STATUS_EXPERIMENTAL,
   STATUS_STABLE,
 } from "@/lib/constants";
-import { lockedAngleEnum, offscreenViewIdSchema, projectionEnum, vec3, viewRefSchema } from "@/lib/zodObjects";
+import { imageOutputShape, lockedAngleEnum, offscreenViewIdSchema, projectionEnum, vec3, viewRefSchema } from "@/lib/zodObjects";
 import { createJsonResult } from "@/lib/tool-results";
+import { applyImageOutput } from "@/lib/image-output";
 import {
   createOffscreenView,
   deleteOffscreenView,
@@ -39,9 +40,12 @@ const targetViewSchema = viewRefSchema.optional().default(ACTIVE_VIEW_ID);
 export const captureScreenshotParameters = z.object({
   project: z.string().optional().describe("Project name or UUID."),
   view: targetViewSchema,
+  ...imageOutputShape,
 });
 
-export const captureAppScreenshotParameters = z.object({});
+export const captureAppScreenshotParameters = z.object({
+  ...imageOutputShape,
+});
 
 export const setCameraAngleParameters = z.object({
   view: targetViewSchema,
@@ -55,6 +59,7 @@ export const setCameraAngleParameters = z.object({
     .describe("Perspective field of view in degrees. Uses the Blockbench setting when omitted."),
   locked_angle: lockedAngleEnum.optional()
     .describe("Lock an orthographic side view (top, bottom, north, south, east, west). Omit to leave the view free."),
+  ...imageOutputShape,
 }).refine(angle => !(angle.locked_angle && angle.projection === "perspective"), {
   message: 'locked_angle requires projection "orthographic", or "unset" on a view that is already orthographic.',
   path: ["locked_angle"],
@@ -83,6 +88,7 @@ export const deleteOffscreenViewParameters = z.object({
 });
 
 type CaptureScreenshotArgs = z.infer<typeof captureScreenshotParameters>;
+type CaptureAppScreenshotArgs = z.infer<typeof captureAppScreenshotParameters>;
 type SetCameraAngleArgs = z.infer<typeof setCameraAngleParameters>;
 type CreateOffscreenViewArgs = z.infer<typeof createOffscreenViewParameters>;
 type ResizeOffscreenViewArgs = z.infer<typeof resizeOffscreenViewParameters>;
@@ -129,7 +135,7 @@ const setCameraAngleSpec: IToolSpec = {
 const createOffscreenViewSpec: IToolSpec = {
   name: "create_offscreen_view",
   description:
-    `Creates a private offscreen viewport that renders the current project without moving the user's camera. Use it with set_camera_angle and capture_screenshot (view: <id>) for multi-angle inspection. The camera starts where the user's is unless copy_view is "${NO_COPY_VIEW_ID}". Up to ${MAX_OFFSCREEN_VIEWS} views may exist at once; delete them with delete_offscreen_view when done.`,
+    `Creates a private offscreen viewport that renders the current project without moving the user's camera. Use it with set_camera_angle and capture_screenshot (view: <id>) for multi-angle inspection. The camera starts where the user's is unless copy_view is "${NO_COPY_VIEW_ID}". Up to ${MAX_OFFSCREEN_VIEWS} views may exist at once; delete them with delete_offscreen_view when done. Views still open when your MCP session ends are deleted.`,
   annotations: {
     title: "Create Offscreen View",
     idempotentHint: false,
@@ -185,26 +191,28 @@ export const cameraToolDocs: IToolSpec[] = [
 export function registerCameraTools() {
   createTool(captureScreenshotSpec.name, {
     ...captureScreenshotSpec,
-    async execute({ project, view }: CaptureScreenshotArgs) {
-      return captureScreenshot(project, view);
+    async execute({ project, view, max_size, format }: CaptureScreenshotArgs) {
+      return applyImageOutput(captureScreenshot(project, view), { max_size, format });
     },
   }, captureScreenshotSpec.status);
 
   createTool(captureAppScreenshotSpec.name, {
     ...captureAppScreenshotSpec,
-    async execute() {
-      return captureAppScreenshot();
+    async execute({ max_size, format }: CaptureAppScreenshotArgs) {
+      return applyImageOutput(await captureAppScreenshot(), { max_size, format });
     },
   }, captureAppScreenshotSpec.status);
 
   createTool(setCameraAngleSpec.name, {
     ...setCameraAngleSpec,
-    async execute({ view, ...angle }: SetCameraAngleArgs): Promise<CallToolResult> {
+    async execute({ view, max_size, format, ...angle }: SetCameraAngleArgs): Promise<CallToolResult> {
       const preview = resolveView(view);
       loadViewAngle(preview, angle);
-      const image = imageContent(renderViewToDataUrl(preview), "image/png");
-      // Describe after rendering: orbit controls clamp the distance during render.
+      const frame = imageContent(renderViewToDataUrl(preview), "image/png");
+      // Describe after rendering, since orbit controls clamp the distance during render,
+      // and before re-encoding, which yields: a view deleted meanwhile would read as a viewport.
       const result = { view: describeView(preview) };
+      const image = await applyImageOutput(frame, { max_size, format });
       return {
         content: [...image.content, { type: "text", text: JSON.stringify(result, null, 2) }],
         structuredContent: result,
@@ -214,8 +222,10 @@ export function registerCameraTools() {
 
   createTool(createOffscreenViewSpec.name, {
     ...createOffscreenViewSpec,
-    async execute({ id, width, height, antialias, copy_view }: CreateOffscreenViewArgs) {
-      return createJsonResult({ view: createOffscreenView({ id, width, height, antialias, copyFrom: copy_view }) });
+    async execute({ id, width, height, antialias, copy_view }: CreateOffscreenViewArgs, context) {
+      return createJsonResult({
+        view: createOffscreenView({ id, width, height, antialias, copyFrom: copy_view, owner: context?.sessionId }),
+      });
     },
   }, createOffscreenViewSpec.status);
 

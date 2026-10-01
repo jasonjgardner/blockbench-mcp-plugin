@@ -1,9 +1,14 @@
 /// <reference types="blockbench-types" />
 
-/** Maps apply_texture's `applyTo` option to `Texture.apply`: every face, blank faces only, or no faces. */
-const APPLY_TO_FACES = { all: true, blank: "blank", none: false } as const;
+/**
+ * Maps apply_texture's face modes to `Texture.apply`: every face, or only faces
+ * without a texture. `Texture.apply(false)` is not "no faces": it textures the
+ * faces selected in the UV editor and every face of a box-UV cube, so `none`
+ * never reaches it.
+ */
+const APPLY_TO_FACES = { all: true, blank: "blank" } as const;
 
-/** apply_texture's `applyTo` option. */
+/** apply_texture's `applyTo` options that change faces; `none` is answered without an edit. */
 export type ApplyToMode = keyof typeof APPLY_TO_FACES;
 
 /** Element types whose faces can receive a texture. */
@@ -106,8 +111,9 @@ export function applyTextureToTargets(projectTexture: Texture, targets: Paintabl
     addToSelection(targets);
     updateSelection();
     projectTexture.select();
+    // Only face assignments change. updateChangesAfterEdit() would re-encode the
+    // bitmap and flag the texture unsaved, so Ctrl+S would rewrite its PNG.
     Texture.selected?.apply(APPLY_TO_FACES[applyTo]);
-    projectTexture.updateChangesAfterEdit();
   } finally {
     restoreSelection(previousSelection);
   }

@@ -20,6 +20,30 @@ import { GECKOLIB_PATH_PATTERN, getGeckolibModelType, getGeckolibModid } from ".
 /** Setting the plugin exposes to guess the particle texture of single-texture models. */
 const SETTING_AUTO_PARTICLE_TEXTURE = "geckolib_auto_particle_texture";
 
+/**
+ * Parent the GeckoLib plugin writes when the project has none, and forces onto
+ * Item models. Minecraft Java 1.21.3 and older render such items through it.
+ */
+export const GECKOLIB_DEFAULT_DISPLAY_PARENT = "builtin/entity";
+
+/**
+ * Parent written to the display file: the requested one (an empty string means
+ * none), else the project's own, else the plugin's default.
+ */
+export function resolveDisplayParent(project: ModelProject, requested?: string): string {
+  return requested ?? (project.parent || GECKOLIB_DEFAULT_DISPLAY_PARENT);
+}
+
+/**
+ * Whether a parent is `builtin/entity`, which Minecraft Java 1.21.4 removed:
+ * from then on (26.3 included) the model loader only provides
+ * builtin/generated and builtin/missing, so the game reports a missing model
+ * and the file inherits nothing from it.
+ */
+export function isRemovedBuiltinEntityParent(parent: string): boolean {
+  return parent === GECKOLIB_DEFAULT_DISPLAY_PARENT || parent === `minecraft:${GECKOLIB_DEFAULT_DISPLAY_PARENT}`;
+}
+
 /** Reads a Blockbench setting's value without assuming the setting exists. */
 function getSettingValue(id: string): unknown {
   // @ts-ignore - settings is a Blockbench global
@@ -68,14 +92,17 @@ function buildParticleTexture(project: ModelProject): string | null {
  * Compiles the display-settings document for the active project.
  *
  * @param project - The active Blockbench project.
+ * @param parent - Parent model to write instead of the project's; an empty
+ *   string writes none. See {@link resolveDisplayParent}.
  * @returns The display-settings JSON object, ready to stringify.
  */
-export function buildGeckolibDisplaySettings(project: ModelProject): Record<string, unknown> {
+export function buildGeckolibDisplaySettings(project: ModelProject, parent?: string): Record<string, unknown> {
   const transforms = buildDisplayTransforms(project);
   const particle = buildParticleTexture(project);
+  const resolvedParent = resolveDisplayParent(project, parent);
   return {
     ...(getSettingValue("credit") ? { credit: getSettingValue("credit") } : {}),
-    parent: project.parent || "builtin/entity",
+    ...(resolvedParent ? { parent: resolvedParent } : {}),
     ...(project.ambientocclusion === false ? { ambientocclusion: false } : {}),
     ...(project.texture_width !== 16 || project.texture_height !== 16
       ? { texture_size: [project.texture_width, project.texture_height] }

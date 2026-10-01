@@ -1,5 +1,5 @@
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
-import { EmptyResultSchema } from '@modelcontextprotocol/sdk/types.js'
+import { EmptyResultSchema, type RequestId } from '@modelcontextprotocol/sdk/types.js'
 import type { Server as NetServer, Socket } from 'node:net'
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
@@ -10,6 +10,7 @@ import {
 } from '@/lib/factories'
 import { createServer as createMcpServer } from '@/server/server'
 import { sessionManager, type ISessionConfig } from '@/lib/sessions'
+import { checkRequest, formatHostForUrl, resolveListenPlan } from '@/server/net-security'
 
 export type { NetServer }
 
@@ -50,10 +51,26 @@ const DEFAULT_KEEP_ALIVE: IKeepAliveConfig = {
   httpKeepAliveTimeoutSec: 75    // matches typical browser/proxy defaults
 }
 
-export type SessionTransports = Map<
-  string,
-  { transport: WebStandardStreamableHTTPServerTransport; server: McpServer }
->
+interface ISessionEntry {
+  transport: WebStandardStreamableHTTPServerTransport
+  server: McpServer
+  /** Set once the transport closes (DELETE, inactivity timeout, unload). */
+  closed: boolean
+  /** Requests waiting for a response; each is answered when the transport closes first. */
+  waiting: Set<() => void>
+  /** Open SSE response streams. A session with none and no waiting request is idle. */
+  streams: number
+}
+
+export type SessionTransports = Map<string, ISessionEntry>
+
+/** What a response needs from the request it answers. */
+interface IAnsweredRequest {
+  /** The request's `Connection` header; `close` ends the connection after the response. */
+  connection?: string
+  /** A HEAD request: the response carries headers only. */
+  head?: boolean
+}
 
 function getStatusText (status: number): string {
   const texts: Record<number, string> = {
@@ -62,12 +79,114 @@ function getStatusText (status: number): string {
     202: 'Accepted',
     204: 'No Content',
     400: 'Bad Request',
+    403: 'Forbidden',
     404: 'Not Found',
     405: 'Method Not Allowed',
+    406: 'Not Acceptable',
     409: 'Conflict',
-    500: 'Internal Server Error'
+    413: 'Payload Too Large',
+    415: 'Unsupported Media Type',
+    431: 'Request Header Fields Too Large',
+    500: 'Internal Server Error',
+    501: 'Not Implemented',
+    503: 'Service Unavailable'
   }
   return texts[status] || 'Unknown'
+}
+
+/** Largest request body accepted; larger requests are refused before being buffered. */
+const MAX_BODY_BYTES = 16 * 1024 * 1024
+
+/** Largest request line plus header section accepted; larger ones are refused with 431. */
+const MAX_HEADER_BYTES = 64 * 1024
+
+/** Bytes a connection may queue while its current request is answered: about one more request. */
+const MAX_QUEUED_BYTES = MAX_BODY_BYTES + MAX_HEADER_BYTES
+
+/**
+ * Validates the framing headers of one request. `Content-Length` must be
+ * plain digits: `parseInt` accepts "x" (NaN) and negative values, which made
+ * the parser answer the same request forever and freeze Blockbench. Chunked
+ * bodies are not decoded by this parser, so they are refused instead of being
+ * read as a second request.
+ *
+ * @returns The body length, or the status and reason to refuse with.
+ */
+export function readBodyLength (headers: Record<string, string>): { length: number } | { status: number, reason: string } {
+  if (headers['transfer-encoding'] !== undefined) {
+    return { status: 501, reason: 'Transfer-Encoding is not supported; send a Content-Length body' }
+  }
+  const raw = headers['content-length']
+  if (raw === undefined || raw === '') return { length: 0 }
+  if (!/^\d+$/.test(raw)) {
+    return { status: 400, reason: `Invalid Content-Length "${raw.slice(0, 32)}"` }
+  }
+  const length = Number(raw)
+  if (length > MAX_BODY_BYTES) {
+    return { status: 413, reason: `Body of ${length} bytes exceeds the ${MAX_BODY_BYTES}-byte limit` }
+  }
+  return { length }
+}
+
+/** JSON-RPC error code for a request the client cancelled (LSP's RequestCancelled; MCP defines none). */
+const REQUEST_CANCELLED = -32800
+
+/**
+ * Answers a request whose handler the SDK aborted on `notifications/cancelled`.
+ * MCP says a receiver SHOULD NOT answer a cancelled request, and the SDK sends
+ * nothing; but in JSON response mode the POST that carried the request stays
+ * open until every request in it is answered, so it would never close and its
+ * stream mapping would stay in the transport. The error closes the exchange;
+ * the client that cancelled ignores it. Only aborted handlers get here: the SDK
+ * ignores some cancellations (a falsy `requestId` such as 0, a malformed
+ * `reason`), and a request that already answered keeps its result.
+ */
+function answerCancelled (server: McpServer, requestId: RequestId): void {
+  server.server.transport
+    ?.send({
+      jsonrpc: '2.0',
+      id: requestId,
+      error: { code: REQUEST_CANCELLED, message: 'Request cancelled by the client' }
+    })
+    .catch(() => undefined)
+}
+
+/** Marks `session` closed and releases its waiting requests when the transport closes. */
+function trackClose (session: ISessionEntry): void {
+  const onclose = session.transport.onclose
+  session.transport.onclose = () => {
+    onclose?.()
+    session.closed = true
+    for (const release of session.waiting) release()
+    session.waiting.clear()
+  }
+}
+
+/** Answer for a request whose session closed before the transport produced a response. */
+function sessionClosedResponse (): Response {
+  return new Response(
+    JSON.stringify({
+      jsonrpc: '2.0',
+      error: { code: -32001, message: 'Session closed before the request completed. Please reinitialize.' },
+      id: null
+    }),
+    { status: 404, headers: { 'content-type': 'application/json' } }
+  )
+}
+
+/**
+ * Waits for the transport's answer to a POST. A JSON response waits for every
+ * answer, and the SDK never resolves it once the transport closes (DELETE from
+ * another connection, inactivity timeout), so the POST is answered instead of
+ * hanging.
+ */
+function awaitPostResponse (session: ISessionEntry, pending: Promise<Response>): Promise<Response> {
+  if (session.closed) return Promise.resolve(sessionClosedResponse())
+  return new Promise((resolve, reject) => {
+    const release = (): void => resolve(sessionClosedResponse())
+    session.waiting.add(release)
+    pending.then(resolve, reject).finally(() => session.waiting.delete(release))
+  })
 }
 
 /**
@@ -80,12 +199,11 @@ function isInitializeRequestBody (method: string, body: string): boolean {
   if (method !== 'POST' || !body) return false
   try {
     const parsed: unknown = JSON.parse(body)
-    if (Array.isArray(parsed)) return false
-    return (
-      typeof parsed === 'object' &&
-      parsed !== null &&
-      (parsed as { method?: unknown }).method === 'initialize'
-    )
+    if (Array.isArray(parsed) || typeof parsed !== 'object' || parsed === null) return false
+    const { method, id } = parsed as { method?: unknown, id?: unknown }
+    // Without an id it is a notification: the transport would open a session,
+    // answer 202 without its id, and the slot could never be freed.
+    return method === 'initialize' && (typeof id === 'string' || typeof id === 'number')
   } catch {
     return false
   }
@@ -98,22 +216,69 @@ export default function createNetServer (
   {
     port,
     endpoint,
+    host,
     keepAlive = DEFAULT_KEEP_ALIVE,
-    sessionConfig
+    sessionConfig,
+    instructions
   }: {
     endpoint: string
     port: number
+    /** `mcp_host` setting; empty or `localhost` listens on 127.0.0.1 and ::1 only. */
     host?: string
     keepAlive?: Partial<IKeepAliveConfig>
     sessionConfig?: Partial<ISessionConfig>
+    /** Reads the `mcp_instructions` setting when a session starts, so edits apply to new sessions. */
+    instructions?: () => string | undefined
   }
-): [NetServer, SessionTransports] {
+): [NetServer[], SessionTransports] {
   const sessionTransports: SessionTransports = new Map()
   const keepAliveConfig = { ...DEFAULT_KEEP_ALIVE, ...keepAlive }
+  const listenPlan = resolveListenPlan(host)
+  /** New sessions whose initialize request is still being handled. */
+  const opening = new Set<ISessionEntry>()
 
   // Apply session configuration if provided
   if (sessionConfig) {
     sessionManager.configure(sessionConfig)
+  }
+
+  /** Open sessions plus initialize requests that will open one; the manager already counts initialized ones. */
+  const sessionCount = (): number =>
+    sessionManager.getCount() + [...opening].filter((entry) => entry.transport.sessionId === undefined).length
+
+  /**
+   * Ends a new session's handling. An initialize the transport refused (wrong
+   * Accept or Content-Type, invalid JSON-RPC) leaves it without a session id,
+   * so no later request can reach it: close its server instead of leaving it
+   * connected and tracked by the tool and resource registries.
+   */
+  async function finishOpening (entry: ISessionEntry): Promise<void> {
+    opening.delete(entry)
+    if (entry.transport.sessionId !== undefined) return
+    try {
+      await entry.server.close()
+    } catch (error) {
+      console.error('[MCP] Error closing an unused session server:', error)
+    }
+  }
+
+  /**
+   * Makes room at the session limit by closing the least recently active
+   * session with no request in flight. A client that restarts without a
+   * DELETE leaves its session open until the inactivity timeout, which would
+   * lock new clients out for that long.
+   *
+   * @returns Whether a session was closed.
+   */
+  function evictIdleSession (): boolean {
+    const [oldest] = [...sessionTransports.entries()]
+      .filter(([, entry]) => entry.waiting.size === 0 && entry.streams === 0)
+      .map(([id]) => ({ id, lastActivity: sessionManager.get(id)?.lastActivity.getTime() ?? 0 }))
+      .sort((a, b) => a.lastActivity - b.lastActivity)
+    if (!oldest) return false
+    console.warn(`[MCP] Session limit reached: closing the least recently active idle session ${oldest.id.slice(0, 8)}... for a new client`)
+    sessionManager.remove(oldest.id)
+    return true
   }
 
   // Set up ping callback for session keep-alive.
@@ -156,9 +321,13 @@ export default function createNetServer (
     }
   })
 
-  const httpServer = createServer((socket: Socket) => {
+  const onConnection = (socket: Socket): void => {
     let buffer = Buffer.alloc(0)
     let socketEnded = false
+    /** `processHttpRequests` is running; it reads bytes that arrive meanwhile once its request is answered. */
+    let processing = false
+    /** `100 Continue` was already sent for the request at the head of the buffer, waiting for its body. */
+    let continueSent = false
 
     // Configure TCP keep-alive for connection health
     if (keepAliveConfig.enabled) {
@@ -181,6 +350,14 @@ export default function createNetServer (
     socket.on('data', (chunk: Buffer) => {
       if (socketEnded) return
       buffer = Buffer.concat([buffer, chunk])
+      // One loop per connection: a request that arrives while another is still
+      // being answered (HTTP pipelining) must wait, or a second loop would
+      // answer it first and the responses would come out of order.
+      if (processing) {
+        if (buffer.length > MAX_QUEUED_BYTES) socket.destroy()
+        return
+      }
+      processing = true
       processHttpRequests().catch(err => {
         console.error('[MCP] Unhandled error in processHttpRequests:', err)
         // Try to send error response if socket is still writable
@@ -191,13 +368,15 @@ export default function createNetServer (
               500,
               { 'content-type': 'application/json' },
               JSON.stringify({ error: 'Internal server error' }),
-              undefined
+              {}
             )
           } catch (sendErr) {
             console.error('[MCP] Failed to send error response:', sendErr)
             socket.destroy()
           }
         }
+      }).finally(() => {
+        processing = false
       })
     })
 
@@ -215,6 +394,23 @@ export default function createNetServer (
       buffer = Buffer.alloc(0)
     })
 
+    /** Answers `status` and closes the connection: the rest of the stream cannot be framed. */
+    function refuseAndClose (status: number, reason: string): void {
+      console.warn(`[MCP] Rejected request: ${reason}`)
+      buffer = Buffer.alloc(0)
+      sendResponse(
+        socket,
+        status,
+        { 'content-type': 'application/json' },
+        JSON.stringify({
+          jsonrpc: '2.0',
+          error: { code: -32600, message: reason },
+          id: null
+        }),
+        { connection: 'close' }
+      )
+    }
+
     async function processHttpRequests () {
       while (true) {
         // Stop processing if socket is no longer writable
@@ -222,13 +418,17 @@ export default function createNetServer (
           return
         }
 
-        // Look for end of HTTP headers
+        // Look for end of HTTP headers; an endless header section must not grow the buffer forever
         const headerEnd = buffer.indexOf('\r\n\r\n')
+        if (headerEnd > MAX_HEADER_BYTES || (headerEnd === -1 && buffer.length > MAX_HEADER_BYTES)) {
+          refuseAndClose(431, `Request header section exceeds ${MAX_HEADER_BYTES} bytes`)
+          return
+        }
         if (headerEnd === -1) return
 
         const headerSection = buffer.subarray(0, headerEnd).toString()
         const lines = headerSection.split('\r\n')
-        const [method, path] = lines[0].split(' ')
+        const [method, path, version] = lines[0].split(' ')
 
         // Parse headers
         const headers: Record<string, string> = {}
@@ -240,17 +440,51 @@ export default function createNetServer (
             headers[key] = value
           }
         }
+        const answered: IAnsweredRequest = { connection: headers['connection'], head: method === 'HEAD' }
 
-        // Calculate body boundaries
+        // Calculate body boundaries; malformed framing closes the connection
         const bodyStart = headerEnd + 4
-        const contentLength = parseInt(headers['content-length'] || '0', 10)
+        const framing = readBodyLength(headers)
+        if ('status' in framing) {
+          refuseAndClose(framing.status, framing.reason)
+          return
+        }
+        const contentLength = framing.length
         const requestEnd = bodyStart + contentLength
 
         // Wait for complete request body
-        if (buffer.length < requestEnd) return
+        if (buffer.length < requestEnd) {
+          // A client that sent `Expect: 100-continue` may hold the body back
+          // until it gets this interim response (RFC 9110, section 10.1.1).
+          if (!continueSent && version === 'HTTP/1.1' && headers['expect']?.toLowerCase() === '100-continue') {
+            continueSent = true
+            socket.write('HTTP/1.1 100 Continue\r\n\r\n')
+          }
+          return
+        }
 
         const body = buffer.subarray(bodyStart, requestEnd).toString()
         buffer = buffer.subarray(requestEnd)
+        continueSent = false
+
+        // Refuse requests another website could send through the user's browser
+        // (cross-origin pages and DNS rebinding) before any routing happens.
+        const check = checkRequest(headers, listenPlan)
+        if (!check.allowed) {
+          console.warn(`[MCP] Rejected request: ${check.reason}`)
+          sendResponse(
+            socket,
+            403,
+            { 'content-type': 'application/json' },
+            JSON.stringify({
+              jsonrpc: '2.0',
+              error: { code: -32000, message: `Forbidden: ${check.reason}` },
+              id: null
+            }),
+            answered
+          )
+          continue
+        }
 
         // Build Web Standard Request
         const url = `http://localhost:${port}${path}`
@@ -287,7 +521,7 @@ export default function createNetServer (
             200,
             { 'content-type': 'application/json' },
             JSON.stringify(healthStatus),
-            headers['connection']
+            answered
           )
           continue
         }
@@ -299,7 +533,7 @@ export default function createNetServer (
             200,
             { 'content-type': 'application/json' },
             JSON.stringify({ ready: true }),
-            headers['connection']
+            answered
           )
           continue
         }
@@ -315,7 +549,7 @@ export default function createNetServer (
             404,
             { 'content-type': 'text/plain' },
             'Not Found',
-            headers['connection']
+            answered
           )
           continue
         }
@@ -345,7 +579,7 @@ export default function createNetServer (
                 },
                 id: null
               }),
-              headers['connection']
+              answered
             )
             continue
           }
@@ -368,30 +602,48 @@ export default function createNetServer (
                 },
                 id: null
               }),
-              headers['connection']
+              answered
             )
             continue
           }
 
           // No session yet and this is an initialize request: create a new
           // session with its own server and transport
+          let created: ISessionEntry | undefined
           if (!session) {
-            const sessionServer = createMcpServer()
+            const { maxSessions } = sessionManager.getConfig()
+            if (sessionCount() >= maxSessions && !evictIdleSession()) {
+              console.warn(`[MCP] Refused initialize: ${maxSessions} sessions are open and all are in use`)
+              sendResponse(
+                socket,
+                503,
+                { 'content-type': 'application/json' },
+                JSON.stringify({
+                  jsonrpc: '2.0',
+                  error: {
+                    code: -32000,
+                    message: `Too many MCP sessions: ${maxSessions} are open and all are in use. Close an unused client and retry.`
+                  },
+                  id: null
+                }),
+                answered
+              )
+              continue
+            }
+
+            const sessionServer = createMcpServer({
+              instructions: instructions?.(),
+              onRequestCancelled: (requestId) => answerCancelled(sessionServer, requestId)
+            })
 
             // Register all tools, resources, and prompts on this session's server
             registerToolsOnServer(sessionServer)
             registerResourcesOnServer(sessionServer)
             registerPromptsOnServer(sessionServer)
 
-            // Filled in below before handleRequest runs; onsessioninitialized
-            // (fired during handleRequest) closes over this object, which
-            // avoids a shared temporary map key that concurrent initialize
-            // requests could clobber.
-            const newSession = { server: sessionServer } as {
-              transport: WebStandardStreamableHTTPServerTransport
-              server: McpServer
-            }
-
+            // onsessioninitialized (fired during handleRequest) closes over
+            // `newSession`, created right below, which avoids a shared
+            // temporary map key that concurrent initialize requests could clobber.
             const transport = new WebStandardStreamableHTTPServerTransport({
               sessionIdGenerator: () => crypto.randomUUID(),
               enableJsonResponse: true,
@@ -426,10 +678,19 @@ export default function createNetServer (
               }
             })
 
-            // Connect this session's server to its transport
-            await sessionServer.connect(transport)
+            const newSession: ISessionEntry = { transport, server: sessionServer, closed: false, waiting: new Set(), streams: 0 }
+            // Counted toward the limit from now on, so concurrent initialize requests cannot overshoot it.
+            opening.add(newSession)
+            created = newSession
 
-            newSession.transport = transport
+            // Connect this session's server to its transport
+            try {
+              await sessionServer.connect(transport)
+            } catch (error) {
+              await finishOpening(newSession)
+              throw error
+            }
+            trackClose(newSession)
             session = newSession
           }
 
@@ -440,7 +701,13 @@ export default function createNetServer (
 
           // Let the transport handle the MCP protocol
           refreshToolAvailability()
-          const webResponse = await session.transport.handleRequest(webRequest)
+          let webResponse: Response
+          try {
+            const pending = session.transport.handleRequest(webRequest)
+            webResponse = method === 'POST' ? await awaitPostResponse(session, pending) : await pending
+          } finally {
+            if (created) await finishOpening(created)
+          }
 
           // Convert Web Standard Response to HTTP
           const responseHeaders: Record<string, string> = {}
@@ -485,6 +752,16 @@ export default function createNetServer (
                   }, heartbeatMs)
                 : null
 
+              // A dropped connection must cancel the stream: the SDK only
+              // frees a session's single GET stream on cancel, so a reader left
+              // pending makes every reconnect fail with 409 and silently drops
+              // list_changed notifications for the rest of the session.
+              const cancelStream = (): void => {
+                reader.cancel().catch(() => undefined)
+              }
+              socket.once('close', cancelStream)
+
+              session.streams++
               try {
                 while (true) {
                   // Check socket is still writable before each chunk
@@ -500,7 +777,10 @@ export default function createNetServer (
               } catch (streamError) {
                 console.error('[MCP] SSE stream error:', streamError)
               } finally {
+                session.streams--
+                socket.off('close', cancelStream)
                 if (heartbeat) clearInterval(heartbeat)
+                cancelStream()
                 socketEnded = true
                 socket.end()
               }
@@ -516,7 +796,7 @@ export default function createNetServer (
               webResponse.status,
               responseHeaders,
               responseBody,
-              headers['connection']
+              answered
             )
           }
         } catch (error) {
@@ -526,7 +806,7 @@ export default function createNetServer (
             500,
             { 'content-type': 'application/json' },
             JSON.stringify({ error: String(error) }),
-            headers['connection']
+            answered
           )
         }
       }
@@ -565,7 +845,7 @@ export default function createNetServer (
       status: number,
       headers: Record<string, string>,
       body: string,
-      connection?: string
+      request: IAnsweredRequest = {}
     ): boolean {
       // Don't write to an already-ended socket
       if (socketEnded || sock.destroyed || !sock.writable) {
@@ -580,7 +860,7 @@ export default function createNetServer (
 
       // Set connection header based on client request. HTTP/1.1 defaults to
       // keep-alive unless the client explicitly opted out with `close`.
-      const keepAlive = connection?.toLowerCase() !== 'close'
+      const keepAlive = request.connection?.toLowerCase() !== 'close'
       headers['connection'] = keepAlive ? 'keep-alive' : 'close'
 
       // Tell the client how long we'll hold an idle connection. Helps clients
@@ -599,7 +879,8 @@ export default function createNetServer (
         response += `${key}: ${value}\r\n`
       }
       response += '\r\n'
-      response += body
+      // A HEAD response has no body; its Content-Length describes the GET response.
+      if (!request.head) response += body
 
       // Write response and wait for it to be flushed before closing
       if (!keepAlive) {
@@ -614,16 +895,58 @@ export default function createNetServer (
 
       return true
     }
+  }
+
+  // One listener per address. Without a host, Node would listen on every
+  // interface and let other computers on the network drive Blockbench.
+  const httpServers = listenPlan.hosts.map((listenHost) => {
+    // `close()` only stops new connections; open keep-alive sockets would keep
+    // running this (possibly unloaded) code. Track them and destroy them on close.
+    const openSockets = new Set<Socket>()
+    const httpServer = createServer((socket: Socket) => {
+      openSockets.add(socket)
+      socket.once('close', () => openSockets.delete(socket))
+      onConnection(socket)
+    })
+    const closeListener = httpServer.close.bind(httpServer)
+    httpServer.close = ((callback?: (err?: Error) => void) => {
+      closeListener(callback)
+      for (const socket of openSockets) socket.destroy()
+      openSockets.clear()
+      return httpServer
+    }) as typeof httpServer.close
+
+    httpServer.on('error', (err: NodeJS.ErrnoException) => {
+      // IPv6 may be disabled; the 127.0.0.1 listener still serves `localhost`.
+      const ipv6LoopbackUnavailable =
+        listenPlan.hosts.length > 1 &&
+        listenHost === '::1' &&
+        (err.code === 'EADDRNOTAVAIL' || err.code === 'EAFNOSUPPORT')
+      if (ipv6LoopbackUnavailable) {
+        console.warn('[MCP] IPv6 loopback (::1) unavailable; listening on 127.0.0.1 only')
+        return
+      }
+      console.error('[MCP] Server error:', err)
+      Blockbench.showQuickMessage(`MCP Server error: ${err.message}`, 3000)
+    })
+
+    httpServer.listen(port, listenHost, () => {
+      const bound = httpServer.address()
+      const boundPort = typeof bound === 'object' && bound ? bound.port : port
+      console.log(
+        `[MCP] Server listening on http://${formatHostForUrl(listenHost)}:${boundPort}${endpoint}`
+      )
+    })
+
+    return httpServer
   })
 
-  httpServer.listen(port, () => {
-    console.log(`[MCP] Server listening on http://localhost:${port}${endpoint}`)
-  })
+  if (!listenPlan.loopbackOnly) {
+    console.warn(
+      `[MCP] mcp_host is "${host}": other computers can connect. ` +
+        `Anyone who can reach port ${port} can control Blockbench.`
+    )
+  }
 
-  httpServer.on('error', (err: Error) => {
-    console.error('[MCP] Server error:', err)
-    Blockbench.showQuickMessage(`MCP Server error: ${err.message}`, 3000)
-  })
-
-  return [httpServer, sessionTransports]
+  return [httpServers, sessionTransports]
 }

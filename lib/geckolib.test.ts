@@ -12,10 +12,12 @@ import {
   getProjectBoneNames,
   isGeckolibFormat,
   isGeckolibPluginInstalled,
+  stringifyLikeBlockbench,
 } from "./geckolib";
 import { useGlobals } from "@/tests/helpers/globals";
 
 useGlobals(() => ({
+  autoStringify: undefined,
   Format: { id: GECKOLIB_FORMAT_ID },
   Plugins: { all: [{ id: "geckolib", version: "4.2.1" }], installed: [{ id: "geckolib", version: "4.2.1" }] },
   Project: {
@@ -183,6 +185,22 @@ test("every project animation is compiled when none are named", () => {
   });
   compileGeckolibAnimationFile();
   expect(calls).toEqual([[null, ["idle", "walk"]]]);
+});
+
+test("exports are serialized with Blockbench's autoStringify, like its native exports", () => {
+  const received: unknown[] = [];
+  Object.assign(globalThis, {
+    autoStringify: (value: unknown) => {
+      received.push(value);
+      return "{\n\t\"format_version\": \"1.12.0\"\n}\n";
+    },
+  });
+  expect(stringifyLikeBlockbench({ format_version: "1.12.0" })).toBe("{\n\t\"format_version\": \"1.12.0\"\n}\n");
+  expect(received).toEqual([{ format_version: "1.12.0" }]);
+
+  // Outside Blockbench there is no autoStringify, so plain two-space JSON is used.
+  Object.assign(globalThis, { autoStringify: undefined });
+  expect(stringifyLikeBlockbench({ a: [1, 2] })).toBe(JSON.stringify({ a: [1, 2] }, null, 2));
 });
 
 test("a host with no animation compiler fails instead of returning empty content", () => {

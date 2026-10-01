@@ -1,4 +1,5 @@
-import { SETTING_DISCLOSE_AI_USAGE, SETTING_SCRATCHPAD_ENABLED } from "@/lib/constants";
+import { SETTING_DISCLOSE_AI_USAGE, SETTING_RISKY_EVAL_ENABLED, SETTING_SCRATCHPAD_ENABLED } from "@/lib/constants";
+import { refreshToolAvailability } from "@/lib/factories";
 import { onScratchpadSettingChanged } from "@/lib/scratchpad-mode";
 
 const settings: Setting[] = [];
@@ -26,8 +27,18 @@ export function settingsSetup() {
       description: tl("mcp.settings.port_desc"),
       type: "number",
       value: 3000,
+      min: 1,
+      max: 65535,
       category,
       icon: "numbers",
+    }),
+    new Setting("mcp_host", {
+      name: tl("mcp.settings.host_name"),
+      description: tl("mcp.settings.host_desc"),
+      type: "text",
+      value: "localhost",
+      category,
+      icon: "lan",
     }),
     new Setting("mcp_endpoint", {
       name: tl("mcp.settings.endpoint_name"),
@@ -81,6 +92,16 @@ export function settingsSetup() {
       value: true,
       category,
       icon: "verified_user",
+    }),
+    new Setting(SETTING_RISKY_EVAL_ENABLED, {
+      name: tl("mcp.settings.risky_eval_name"),
+      description: tl("mcp.settings.risky_eval_desc"),
+      type: "toggle",
+      value: true,
+      category,
+      icon: "code",
+      // Connected clients get tools/list_changed right away instead of on the next editor refresh.
+      onChange: () => refreshToolAvailability(),
     })
   );
 }

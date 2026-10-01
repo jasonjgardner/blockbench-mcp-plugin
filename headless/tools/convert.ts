@@ -30,11 +30,12 @@ const legacyTool = defineTool({
     "Writes a copy of a .bbmodel in the 4.10 layout that Blockbench 4.x can open (a 5.0 file opens there as an empty scene). Mirrors Blockbench's Export Legacy Project: groups are inlined into the outliner and position/rotation X and rotation Y keyframes are negated.",
   parameters: { file: fileParam, output: outputParam.describe("Output .bbmodel path inside the workspace."), overwrite: z.boolean().default(false) },
   readOnly: false,
+  destructive: true,
   async execute({ file, output, overwrite }, { store, webApp }) {
     const { doc } = await store.read(file);
     const target = store.resolveModelPath(output);
     const converted = downgradeToV410(doc as unknown as Record<string, unknown>);
-    const revision = await store.writeText(target, JSON.stringify(converted.doc, null, "\t"), overwrite);
+    const revision = await store.writeFile(target, JSON.stringify(converted.doc, null, "\t"), overwrite);
     return { path: target, revision, notes: converted.notes, ...(await webAppField(converted.doc, target, webApp)) };
   },
 });
@@ -52,13 +53,14 @@ const bedrockTool = defineTool({
     overwrite: z.boolean().default(false),
   },
   readOnly: false,
+  destructive: true,
   async execute({ file, output, identifier, visible_bounds, overwrite }, { store, webApp }) {
     const { doc, path: source } = await store.read(file);
     const { geometry, skipped } = compileBedrockGeometry(doc, { identifier, visibleBounds: visible_bounds });
     const text = JSON.stringify(geometry, null, "\t");
     if (output === undefined) return { geometry, skipped, ...(await geometryLinks(text, `${basename(source, ".bbmodel")}.geo.json`, webApp, source)) };
     const target = store.resolvePath(output, [".json"]);
-    await store.writeText(target, text, overwrite);
+    await store.writeFile(target, text, overwrite);
     // Links come after the write, so a refused output path leaves no launcher behind.
     return { path: target, skipped, ...(await geometryLinks(text, basename(target), webApp, target)) };
   },
@@ -78,12 +80,13 @@ const moddedEntityTool = defineTool({
     overwrite: z.boolean().default(false),
   },
   readOnly: false,
+  destructive: true,
   async execute({ file, template, output, model_name, entity_class, flip_y, overwrite }, { store }) {
     const { doc } = await store.read(file);
     const { code, className, notes } = compileModdedEntity(doc, { template, modelName: model_name, entityClass: entity_class, flipY: flip_y });
     if (output === undefined) return { class_name: className, template, code, notes };
     const target = store.resolvePath(output, [".java"]);
-    await store.writeText(target, code, overwrite);
+    await store.writeFile(target, code, overwrite);
     return { path: target, class_name: className, template, notes };
   },
 });
@@ -103,13 +106,14 @@ const javaExportTool = defineTool({
     overwrite: z.boolean().default(false),
   },
   readOnly: false,
+  destructive: true,
   async execute({ file, output, version, export_groups, export_pivots, credit, overwrite }, { store, webApp }) {
     const { doc, path: source } = await store.read(file);
     const { model, notes } = compileJavaBlockModel(doc, { version, exportGroups: export_groups, exportPivots: export_pivots, credit });
     const text = JSON.stringify(model, null, "\t");
     if (output === undefined) return { model, notes, ...(await geometryLinks(text, `${basename(source, ".bbmodel")}.json`, webApp, source)) };
     const target = store.resolvePath(output, [".json"]);
-    await store.writeText(target, text, overwrite);
+    await store.writeFile(target, text, overwrite);
     return { path: target, notes, ...(await geometryLinks(text, basename(target), webApp, target)) };
   },
 });

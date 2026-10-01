@@ -145,7 +145,7 @@ export const resourceDocs: IResourceSpec[] = [
     uriTemplate: "nodes://{id}",
     title: "Blockbench Nodes",
     description:
-      "Returns the current 3D nodes in the editor. List URIs use slugified names (e.g. `nodes://head`) when unique, with `~<uuid-prefix>` on collision. Reads accept UUID, exact name, or slug.",
+      "Returns the current 3D nodes in the editor. List URIs use slugified names (e.g. `nodes://head`) when unique, with `~<uuid-prefix>` on collision. Reads accept UUID, exact name, or slug, and return the node as Blockbench saves it in a .bbmodel (its `getSaveCopy()`), plus uuid, name, type, parent (`root` or a UUID) and child UUIDs: a cube's `from`, `to` and `origin` in Blockbench units, `rotation` in degrees, faces and UVs; a mesh's vertices and faces; a group's origin and rotation. Fields Blockbench leaves out at their default are missing, such as a cube's zero rotation.",
   },
   {
     name: "textures",

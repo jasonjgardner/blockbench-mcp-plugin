@@ -135,7 +135,8 @@ useGlobals(() => ({
 }));
 
 describe("create_texture undo", () => {
-  test.each([{ name: "blank" }, { name: "filled", fill_color: "#ff0000", layer_name: "Base" }])("$name bitmap resizes the native 16x16 backing canvas before serialization", async input => {
+  // A fill no longer needs layer_name, which create_texture never used; the deprecated field is still accepted below.
+  test.each([{ name: "blank" }, { name: "filled", fill_color: "#ff0000" }])("$name bitmap resizes the native 16x16 backing canvas before serialization", async input => {
     await tools.call("create_texture", { ...input, width: 96, height: 32 });
     const texture = required(TestTexture.all.at(-1), "created texture");
     expect(texture).toMatchObject({ width: 96, height: 32, canvas: { width: 96, height: 32 } });

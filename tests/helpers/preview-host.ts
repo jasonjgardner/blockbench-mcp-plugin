@@ -72,7 +72,10 @@ export interface IHostPreview {
   readonly presets: IHostAnglePreset[];
   readonly camPers: { readonly position: HostVector3; fov: number };
   readonly camOrtho: { readonly position: HostVector3; zoom: number; updateProjectionMatrix(): void };
-  readonly controls: { readonly target: HostVector3 };
+  /** Orbit controls; `dispose` removes their document and window listeners. */
+  readonly controls: { readonly target: HostVector3; dispose(): void };
+  /** WebGL renderer; `forceContextLoss` releases the context, which then reports itself lost. */
+  readonly renderer: { forceContextLoss(): void; getContext(): { isContextLost(): boolean } };
   /** Canvas backing store; `width`/`height` follow `resize` like Blockbench's renderer does. */
   readonly canvas: { readonly isConnected: boolean; width: number; height: number; toDataURL(): string };
   /** Active camera, like Blockbench's getter. */
@@ -128,7 +131,20 @@ export function createPreviewHost(): IPreviewHost {
     readonly presets: IHostAnglePreset[] = [];
     readonly camPers = { position: new HostVector3(-80, 40, 80), fov: 45 };
     readonly camOrtho = { position: new HostVector3(), zoom: 0.5, updateProjectionMatrix: () => {} };
-    readonly controls = { target: new HostVector3(0, 8, 0) };
+    readonly controls = {
+      target: new HostVector3(0, 8, 0),
+      dispose: (): void => {
+        events.push(`dispose-controls:${this.id}`);
+      },
+    };
+    #contextLost = false;
+    readonly renderer = {
+      forceContextLoss: (): void => {
+        this.#contextLost = true;
+        events.push(`lose-context:${this.id}`);
+      },
+      getContext: () => ({ isContextLost: () => this.#contextLost }),
+    };
     readonly canvas: { readonly isConnected: boolean; width: number; height: number; toDataURL(): string };
 
     constructor(options: IHostPreviewOptions) {
@@ -189,9 +205,11 @@ export function createPreviewHost(): IPreviewHost {
       this.controls.target.copy(source.controls.target);
     }
 
+    /** Like `Preview#delete` in Blockbench 5.2: forces the context loss, but leaves the orbit controls. */
     delete(): void {
       this.deleted = true;
       events.push(`delete:${this.id}`);
+      this.renderer.forceContextLoss();
       HostPreview.all = HostPreview.all.filter(preview => preview !== this);
       if (HostPreview.selected !== this) return;
       HostPreview.selected = HostPreview.all.find(preview => preview.canvas.isConnected) ?? null;

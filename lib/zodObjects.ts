@@ -110,6 +110,17 @@ export const viewRefSchema = z
 /** Orthographic side views a camera can lock to. */
 export const lockedAngleEnum = z.enum(["top", "bottom", "north", "south", "east", "west"]);
 
+/** Encodings a tool can return an image in. */
+export const imageFormatEnum = z.enum(["png", "jpeg", "webp"]);
+
+/** Optional size and encoding of an image a tool returns; leaving both out keeps the full-size PNG. */
+export const imageOutputShape = {
+  max_size: z.number().int().min(16).max(8192).optional()
+    .describe("Longest side of the returned image in pixels; larger images are scaled down proportionally. Omit for full size."),
+  format: imageFormatEnum.optional()
+    .describe('Encoding of the returned image: "png" (default, lossless), or the smaller "jpeg" (no transparency: transparent pixels become white) or "webp".'),
+};
+
 /** Agent-chosen identifier for a plugin-owned offscreen view. */
 export const offscreenViewIdSchema = z
   .string()
@@ -381,6 +392,20 @@ export const cubeSchema = z.object({
     .optional()
     .default([0, 0, 0])
     .describe("Rotation of the cube."),
+  inflate: z
+    .number()
+    .finite()
+    .optional()
+    .describe("Grows the cube by this amount on every side without changing from/to."),
+  uv_offset: z
+    .array(z.number().finite())
+    .length(2)
+    .optional()
+    .describe("Box UV net offset [u, v]. Requires box UV."),
+  mirror_uv: z
+    .boolean()
+    .optional()
+    .describe("Mirror the box UV net. Requires box UV; for per-face mirroring, reverse the face rectangle endpoints."),
 });
 
 /**
@@ -426,8 +451,7 @@ export const keyframeDataSchema = z.object({
     .describe("Values: [x,y,z] for position/rotation, number for uniform scale."),
   interpolation: interpolationEnum
     .optional()
-    .default("linear")
-    .describe("Interpolation type for the keyframe."),
+    .describe("Interpolation type for the keyframe. New keyframes default to linear; edits keep the current interpolation when omitted."),
   bezier_handles: z
     .object({
       left_time: z.number().optional(),

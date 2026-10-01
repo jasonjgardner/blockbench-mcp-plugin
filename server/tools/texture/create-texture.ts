@@ -1,5 +1,6 @@
 /// <reference types="blockbench-types" />
 import type { z } from "zod";
+import { localFileSystem, toLocalPath } from "@/lib/local-files";
 import { runUndoableEdit } from "@/lib/undo";
 import { pbrChannelEnum, type colorSchema } from "@/lib/zodObjects";
 import { commitMaterialEdit, type ITextureChange, type PbrChannel } from "./material-edit";
@@ -23,9 +24,6 @@ declare const tinycolor: (value: string | ITinycolorRgba) => ITinycolorInstance;
 
 /** `data` values with this prefix are decoded in memory; anything else is treated as a local file path. */
 const IMAGE_DATA_URL_PREFIX = "data:image/";
-
-/** Optional `file://` scheme stripped from desktop file paths. */
-const FILE_URL_SCHEME = /^file:\/\//;
 
 /** Largest 8-bit channel value: the opaque alpha default and the divisor for tinycolor's 0-1 alpha. */
 const MAX_COLOR_BYTE = 255;
@@ -75,12 +73,16 @@ async function loadDataUrl(texture: Texture, data: string): Promise<void> {
   await decodeTextureImage(texture, "Cannot decode texture data URL. Provide valid image data.");
 }
 
-/** Stages a desktop image file as a new detached texture, rejecting paths that are already loaded. */
+/**
+ * Stages a desktop image file as a new detached texture, rejecting paths that are already loaded.
+ * Only absolute paths and file URLs of local files are read, through Blockbench's permission-checked
+ * `fs`, whose prompt names the path: a relative path would resolve against Blockbench's working
+ * directory, and network shares or devices are refused (see `lib/local-files.ts`).
+ */
 async function loadTextureFile(data: string, channel: PbrChannel): Promise<Texture> {
   if (Blockbench.isWeb) throw new Error("File paths require Blockbench desktop. Pass an image data URL instead.");
-  const fs = requireNativeModule("fs");
-  if (!fs) throw new Error("Local file access is unavailable.");
-  const path = data.replace(FILE_URL_SCHEME, "");
+  const path = toLocalPath(data);
+  const fs = localFileSystem(path, "create_texture");
   if (!fs.existsSync(path) || !fs.statSync(path).isFile()) throw new Error(`Texture file not found: ${path}`);
   const texture = await stageImportedImage(path, channel, fs);
   if (Texture.all.includes(texture)) {

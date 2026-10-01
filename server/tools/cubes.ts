@@ -88,12 +88,16 @@ function activeShadingFormat(): ICubeShadingFormat {
   };
 }
 
-/** A place_cube element: shared geometry plus optional shading fields. */
+/**
+ * A place_cube element: shared geometry plus optional shading fields. Strict, so
+ * an unknown key (a typo, or a property place_cube does not set) is an error
+ * instead of being dropped while the cube is created without it.
+ */
 const placeCubeElementSchema = cubeSchema.extend({
   shade: shadeSchema.optional(),
   shade_direction_override: shadeDirectionOverrideEnum.optional(),
   light_emission: lightEmissionSchema.optional(),
-});
+}).strict();
 
 /**
  * Creates a nonempty batch of cubes with optional texture and parent references.
@@ -198,7 +202,7 @@ export const cubeToolDocs: IToolSpec[] = [
     name: "place_cube",
     condition: { project: true, features: ["edit_mode"] },
     description:
-      "Creates cubes in one reversible edit. Texture and group are optional, allowing untextured blockouts. Explicit face targets never use the current UV selection; partial/custom faces require per-face UV support.",
+      "Creates cubes in one reversible edit. Texture and group are optional, allowing untextured blockouts. Explicit face targets never use the current UV selection; partial/custom faces require per-face UV support. Elements accept inflate, plus uv_offset and mirror_uv for box UV cubes; unknown element fields are rejected. Cubes the format's size limiter rejects (for example Java Block elements outside -16…32) are refused and nothing is created, unless Blockbench's Deactivate Size Limit setting is on.",
     annotations: {
       title: "Place Cube",
       destructiveHint: true,
@@ -210,7 +214,7 @@ export const cubeToolDocs: IToolSpec[] = [
     name: "modify_cube",
     condition: { project: true, features: ["edit_mode"] },
     description:
-      "Modifies the cube with the given ID. Auto UV setting: saved as an integer, where 0 means disabled, 1 means enabled, and 2 means relative auto UV (cube position affects UV)",
+      "Modifies the cube with the given ID. Auto UV setting: saved as an integer, where 0 means disabled, 1 means enabled, and 2 means relative auto UV (cube position affects UV). A new from/to/inflate that the format's size limiter rejects (for example Java Block elements outside -16…32) is refused before anything changes, unless Blockbench's Deactivate Size Limit setting is on.",
     annotations: {
       title: "Modify Cube",
       destructiveHint: true,
@@ -247,6 +251,36 @@ function validateHytaleRectangles(elements: PlaceCubeInput["elements"], rectangl
   });
 }
 
+/** Blockbench's per-format cube size limiter. */
+type CubeSizeLimiter = NonNullable<ModelFormat["cube_size_limiter"]>;
+
+/**
+ * The active format's cube size limiter (Java block -16…32, Bedrock block
+ * 30×30×30), unless it is switched off with Blockbench's "Deactivate Size
+ * Limit" setting, which every native caller checks first.
+ */
+function activeSizeLimiter(): CubeSizeLimiter | undefined {
+  const limiter = Format.cube_size_limiter;
+  if (!limiter) return undefined;
+  const deactivated: unknown = typeof settings === "undefined" ? undefined : settings.deactivate_size_limit?.value;
+  return deactivated === true ? undefined : limiter;
+}
+
+/** The limiter's bounds for an error message. */
+function describeSizeLimit(limiter: CubeSizeLimiter): string {
+  const limits = limiter.coordinate_limits;
+  if (limits) return `every coordinate, including inflate, must stay within ${limits[0]}…${limits[1]}`;
+  const box: unknown = Reflect.get(limiter, "box_marker_size");
+  if (Array.isArray(box) && box.length === 3) return `the model must fit in a ${box.join("×")} box`;
+  return "the geometry exceeds the format's size limit";
+}
+
+/** Refusal naming the cubes Blockbench's own size limiter rejects. */
+function sizeLimitError(limiter: CubeSizeLimiter, names: string[]): Error {
+  const listed = names.map(name => `"${name}"`).join(", ");
+  return new Error(`The ${Format.id} format's size limit refuses ${listed}: ${describeSizeLimit(limiter)}. Move or shrink the geometry (Blockbench's "Deactivate Size Limit" setting turns this check off, at the risk of an invalid model).`);
+}
+
 /** Resolves an explicit parent without silently placing cubes at the root. */
 function cubeParent(reference: string | undefined): Group | "root" {
   if (reference === undefined || reference === "root") return "root";
@@ -281,6 +315,14 @@ async function placeCubes({ elements, texture, faces, group }: PlaceCubeInput): 
   if (needsPerFace && Format.box_uv && !Format.optional_box_uv) {
     throw new Error("The current format only supports box UV. Custom UV rectangles and partial face texture assignments require per-face UV support.");
   }
+  // New cubes follow the project's UV mode unless per-face targets switch them off.
+  // uv_offset and mirror_uv only place the box UV net, so on per-face cubes only
+  // values that would change something are refused ([0, 0] and false are no-ops).
+  const boxUv = !needsPerFace && Boolean(Project.box_uv);
+  const boxNet = elements.find(element => element.mirror_uv === true || (element.uv_offset ?? []).some(value => value !== 0));
+  if (boxNet && !boxUv) {
+    throw new Error(`Cube "${boxNet.name}": uv_offset and mirror_uv place the box UV net, but these cubes use per-face UV${needsPerFace ? " because partial or custom faces were requested" : ""}. Omit them; for per-face mirroring, reverse the face rectangle endpoints.`);
+  }
   const hytale = isHytaleFormat();
   if (hytale) validateHytaleRectangles(elements, rectangles);
   const autouv = hytale || faces === true || (Array.isArray(faces) && rectangles.length === 0 && sides.length > 0);
@@ -297,6 +339,9 @@ async function placeCubes({ elements, texture, faces, group }: PlaceCubeInput): 
         to: element.to as [number, number, number],
         origin: element.origin as [number, number, number],
         rotation: element.rotation as [number, number, number],
+        ...(element.inflate !== undefined && { inflate: element.inflate }),
+        ...(element.uv_offset !== undefined && { uv_offset: [element.uv_offset[0], element.uv_offset[1]] as [number, number] }),
+        ...(element.mirror_uv !== undefined && { mirror_uv: element.mirror_uv }),
       });
       cubes.push(cube);
       if (needsPerFace) cube.box_uv = false;
@@ -311,6 +356,11 @@ async function placeCubes({ elements, texture, faces, group }: PlaceCubeInput): 
       });
     });
     Canvas.updateAll();
+    // Blockbench's own size limiter, run once the cubes are in the scene: the Bedrock block
+    // limiter measures them in world space. A refusal reverts the whole batch.
+    const limiter = activeSizeLimiter();
+    const refused = limiter ? cubes.filter(cube => limiter.test(cube)) : [];
+    if (limiter && refused.length) throw sizeLimitError(limiter, refused.map(cube => cube.name));
   });
   const notes = [...new Set(shading.flatMap(plan => plan.notes))];
   return JSON.stringify([...cubes.map(cube => `Added cube ${cube.name} with ID ${cube.uuid}`), ...notes]);
@@ -345,9 +395,14 @@ createTool(cubeToolDocs[1].name, {
   }) {
     let cubes: Cube[];
     if (id) {
-      cubes = (Cube.all ?? []).filter((el: Cube) => el.uuid === id || el.name === id);
+      // UUID first; a name must be unique, or several cubes would get the same geometry.
+      const byUuid = (Cube.all ?? []).filter((el: Cube) => el.uuid === id);
+      cubes = byUuid.length ? byUuid : (Cube.all ?? []).filter((el: Cube) => el.name === id);
       if (!cubes.length) {
         throw new Error(`Cube with ID "${id}" not found. Use the list_outline tool to see available cubes.`);
+      }
+      if (cubes.length > 1) {
+        throw new Error(`Cube name "${id}" is shared by ${cubes.length} cubes (${cubes.map((cube) => cube.uuid).join(", ")}); pass the UUID of the one to modify.`);
       }
     } else {
       cubes = Cube.selected;
@@ -357,38 +412,44 @@ createTool(cubeToolDocs[1].name, {
     }
 
     const shading = planCubeShading({ shade, shade_direction_override, light_emission }, activeShadingFormat());
+    // A new size must pass Blockbench's own size limiter, as with its resize tools; other edits are not checked.
+    const limiter = from !== undefined || to !== undefined || inflate !== undefined ? activeSizeLimiter() : undefined;
+    const refused = limiter ? cubes.filter((cube) => limiter.test(cube, {
+      from: (from ?? cube.from) as ArrayVector3,
+      to: (to ?? cube.to) as ArrayVector3,
+      inflate: inflate ?? cube.inflate,
+    })) : [];
+    if (limiter && refused.length) throw sizeLimitError(limiter, refused.map((cube) => cube.name));
 
-    Undo.initEdit({
-      elements: Array.isArray(cubes) ? cubes : [cubes],
-      outliner: true,
-      collections: [],
-    });
+    // One transaction: a failure part-way (auto UV, preview refresh) reverts every cube instead of leaving the edit open.
+    runUndoableEdit({ elements: [...cubes], outliner: true, collections: [] }, "Agent modified cubes", () => {
+      cubes.forEach((cube) => {
+        const cubeOrigin: [number, number, number] = (origin ?? cube.origin) as [number, number, number];
+        const cubeFrom: [number, number, number] = (from ?? cube.from) as [number, number, number];
+        const cubeTo: [number, number, number] = (to ?? cube.to) as [number, number, number];
+        const cubeRotation: [number, number, number] = (rotation ?? cube.rotation) as [number, number, number];
+        const cubeUVOffset: [number, number] = (uv_offset ?? cube.uv_offset) as [number, number];
 
-    cubes.forEach((cube) => {
-      const cubeOrigin: [number, number, number] = (origin ?? cube.origin) as [number, number, number];
-      const cubeFrom: [number, number, number] = (from ?? cube.from) as [number, number, number];
-      const cubeTo: [number, number, number] = (to ?? cube.to) as [number, number, number];
-      const cubeRotation: [number, number, number] = (rotation ?? cube.rotation) as [number, number, number];
-      const cubeUVOffset: [number, number] = (uv_offset ?? cube.uv_offset) as [number, number];
-
-      cube.extend({
-        name: name ?? cube.name,
-        origin: cubeOrigin,
-        from: cubeFrom,
-        to: cubeTo,
-        rotation: cubeRotation,
-        uv_offset: cubeUVOffset,
-        autouv: autouv ? (Number(autouv) as 0 | 1 | 2) : cube.autouv,
-        mirror_uv: Boolean(mirror_uv ?? cube.mirror_uv),
-        inflate: inflate ?? cube.inflate,
-        color: color ?? cube.color,
-        visibility: visibility ?? cube.visibility,
-        ...shading.patch,
+        cube.extend({
+          name: name ?? cube.name,
+          origin: cubeOrigin,
+          from: cubeFrom,
+          to: cubeTo,
+          rotation: cubeRotation,
+          uv_offset: cubeUVOffset,
+          autouv: autouv ? (Number(autouv) as 0 | 1 | 2) : cube.autouv,
+          mirror_uv: Boolean(mirror_uv ?? cube.mirror_uv),
+          inflate: inflate ?? cube.inflate,
+          color: color ?? cube.color,
+          visibility: visibility ?? cube.visibility,
+          ...shading.patch,
+        });
+        // Auto UV follows the geometry, as it does when Blockbench's own tools resize a cube.
+        const geometryChanged = from !== undefined || to !== undefined || inflate !== undefined || autouv !== undefined;
+        if (geometryChanged && cube.autouv && !cube.box_uv) cube.mapAutoUV();
       });
+      Canvas.updateAll();
     });
-
-    Undo.finishEdit("Agent modified cubes");
-    Canvas.updateAll();
 
     const summary = `Modified cubes ${cubes
       .map((cube) => cube.name)

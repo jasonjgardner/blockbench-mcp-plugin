@@ -137,6 +137,18 @@ class TestAnimation {
   getBoneAnimator(target: { uuid: string }) {
     return this.animators[target.uuid] ??= new TestAnimator();
   }
+  /** Port of Blockbench's Animation.calculateSnappingFromKeyframes: the lowest 10-100 fps grid that fits every key time. */
+  calculateSnappingFromKeyframes() {
+    const times = [...new Set(Object.values(this.animators).flatMap((animator) => animator.keyframes.map(({ time }) => time)))];
+    if (times.length < 2) return undefined;
+    for (let fps = 10; fps <= 100; fps++) {
+      if (times.every((time) => { const factor = (time * fps) % 1; return factor <= 0.01 || factor >= 0.99; })) {
+        this.snapping = fps;
+        return fps;
+      }
+    }
+    return undefined;
+  }
 }
 function snapshot(animations: TestAnimation[]): ISnapshot[] {
   return animations.map((animation) => ({
@@ -209,6 +221,23 @@ test("creation uses native signs and linear interpolation and records the comple
   expect(edit.before).toEqual([]);
   expect(edit.after[0]?.animators[group.uuid]?.[1]).toMatchObject({ interpolation: "linear", data_points: [{ x: 0, y: 360, z: 0 }] });
   expect(TestAnimation.selected).toBe(TestAnimation.all[0]);
+});
+test("creation adds the animation. prefix only when the name lacks it", async () => {
+  await tools.call("create_animation", { name: "animation.walk", bones: {} });
+  await tools.call("create_animation", { name: "run", bones: {} });
+  expect(TestAnimation.all.map((animation) => animation.name)).toEqual(["animation.walk", "animation.run"]);
+});
+test("creation fits the timeline snapping inside its undo entry, so redo restores it", async () => {
+  const result = await tools.call("create_animation", { name: "grid", bones: { logo: [{ time: 0, rotation: [0, 0, 0] }, { time: 4, rotation: [0, 90, 0] }] } });
+  expect(JSON.parse(String(result))).toMatchObject({ snapping: 10 });
+  expect(required(undo.lastEdit, "create_animation undo entry").after[0]?.snapping).toBe(10);
+});
+test("keyframe creation fits the timeline snapping inside its undo entry", async () => {
+  const animation = new TestAnimation().add().select();
+  await tools.call("manage_keyframes", { action: "create", bone_name: "logo", channel: "rotation", keyframes: [{ time: 0.05, values: [0, 0, 0] }, { time: 0.15, values: [0, 90, 0] }] });
+  expect(animation.snapping).toBe(20);
+  const edit = required(undo.lastEdit, "manage_keyframes undo entry");
+  expect([edit.before[0]?.snapping, edit.after[0]?.snapping]).toEqual([24, 20]);
 });
 test("creation preserves zero and nonuniform scales and native position coordinates", async () => {
   await tools.call("create_animation", { name: "scales", bones: { logo: [{ time: 0, scale: 0, position: [1, 2, 3] }, { time: 1, scale: [1, 2, 3] }] } });

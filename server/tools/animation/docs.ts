@@ -50,7 +50,7 @@ export const animationToolDocs: IToolSpec[] = [
     name: "animation_graph_editor",
     condition: { project: true, features: ["animation_mode"] },
     description:
-      "Edits a bone channel's interpolation or numeric Bezier easing in one reversible edit. Uses native per-axis handle arrays and chronological segment durations. Custom points are normalized time/value fractions. Partial-axis edits require existing Bezier keys; key-wide mode changes require all axes. Rejects curve edits ignored by quaternion rotation. Inspect neighboring segments after range edits.",
+      "Edits a bone channel's interpolation or numeric Bezier easing in one reversible edit. Uses native per-axis handle arrays and chronological segment durations. Custom points are normalized time/value fractions. Partial-axis edits require existing Bezier keys; key-wide mode changes require all axes. Rejects curve edits ignored by quaternion rotation, and step or Bezier curves in GeckoLib models (use geckolib_set_keyframe_easing). Inspect neighboring segments after range edits.",
     annotations: {
       title: "Animation Graph Editor",
       destructiveHint: true,
@@ -62,7 +62,7 @@ export const animationToolDocs: IToolSpec[] = [
     name: "bone_rigging",
     condition: { project: true, features: ["bone_rig"] },
     description:
-      "Creates and manipulates the bone structure (rig) of a model for animation. The set_ik action is deprecated; use set_ik_controller for Blockbench's null-object IK (source, target, pole).",
+      "Creates and manipulates the bone structure (rig) of a model for animation. Each action is one undoable edit (create with ik_enabled records the IK controller as a second one); undoing delete brings back child bones, elements and their keyframes. mirror duplicates the bone with its descendants and flips the copy like Blockbench's Flip action. The set_ik action is deprecated; use set_ik_controller for Blockbench's null-object IK (source, target, pole).",
     annotations: {
       title: "Bone Rigging",
       destructiveHint: true,
@@ -85,7 +85,7 @@ export const animationToolDocs: IToolSpec[] = [
   {
     name: "batch_keyframe_operations",
     condition: { project: true, features: ["animation_mode"] },
-    description: "Edits keyframes in the active animation atomically; all includes hidden animators. Numeric value edits use native transform values. Bake samples continuous numeric curves within selected channel spans, caps output at 10000 samples, and restores the playhead. Expressions, step/pre-post curves and effect channels require native baking.",
+    description: "Edits keyframes in the active animation atomically; all includes hidden animators. Numeric value edits use native transform values. Reverse follows the native Reverse Keyframes action, including the GeckoLib plugin's easing adjustment. Bake samples continuous numeric curves within selected channel spans, caps output at 10000 samples, and restores the playhead. Expressions, step/pre-post curves and effect channels require native baking. Smooth and bake clear GeckoLib easings they replace and report it.",
     annotations: {
       title: "Batch Keyframe Operations",
       destructiveHint: true,

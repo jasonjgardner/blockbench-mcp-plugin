@@ -1,5 +1,6 @@
 /// <reference types="blockbench-types" />
 import { runUndoableEdit } from "@/lib/undo";
+import { formatUsesBoneRig } from "@/lib/util";
 
 /** Parent reference (and Blockbench `addTo` target) meaning the project's top outliner level. */
 const ROOT_PARENT = "root";
@@ -50,6 +51,9 @@ export function createGroupWithUndo(
     const group = new Group(options);
     groups.push(group);
     group.init().addTo(parent);
+    // Bone rigs (GeckoLib, Bedrock) key bones by name, so only one of two
+    // same-named bones would load; Blockbench's own Add Group does the same.
+    if (formatUsesBoneRig()) group.createUniqueName();
     if (group.parent !== parent) throw new Error("The current format does not allow the requested group parent.");
     children.forEach(child => {
       child.addTo(group);

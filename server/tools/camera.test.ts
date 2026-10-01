@@ -2,7 +2,7 @@ import { afterEach, beforeAll, beforeEach, expect, test } from "bun:test";
 import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { MAX_OFFSCREEN_VIEWS } from "@/lib/constants";
 import { isRecord } from "@/tests/helpers/assertions";
-import { useGlobals } from "@/tests/helpers/globals";
+import { installGlobals, useGlobals } from "@/tests/helpers/globals";
 import { createPreviewHost, type IHostPreview, type IPreviewHost } from "@/tests/helpers/preview-host";
 import { loadToolDefinitions, type IToolFixture } from "@/tests/helpers/tool-fixture";
 
@@ -155,6 +155,8 @@ test("set_camera_angle on an offscreen view moves only that camera and returns i
   });
   expect(host.events.slice(start)).toEqual([
     "angle:mcp_offscreen_inspect",
+    // offscreen cameras are sized after every angle change (blank orthographic views)
+    "resize:mcp_offscreen_inspect:1024x768",
     "gizmos:hidden",
     "render:mcp_offscreen_inspect",
     "gizmos:restored",
@@ -217,4 +219,63 @@ test("the offscreen view cap is enforced without leaking previews", async () => 
   await Promise.all(Array.from({ length: MAX_OFFSCREEN_VIEWS }, () => tools.call("create_offscreen_view", {})));
   await expect(tools.call("create_offscreen_view", {})).rejects.toThrow(new RegExp(`At most ${MAX_OFFSCREEN_VIEWS}`));
   expect(host.Preview.all.filter(preview => preview.offscreen)).toHaveLength(MAX_OFFSCREEN_VIEWS);
+});
+
+/**
+ * Installs `Image` and `document` doubles for re-encoding: every image decodes as
+ * 640×480 (after `onDecode`), and a canvas encodes as `data:<type>;base64,<w>x<h>`.
+ */
+function installImageHost(onDecode: () => Promise<void> = async () => {}): () => void {
+  return installGlobals({
+    Image: class {
+      src = "";
+      readonly naturalWidth = 640;
+      readonly naturalHeight = 480;
+      decode(): Promise<void> {
+        return onDecode();
+      }
+    },
+    document: {
+      createElement: () => ({
+        width: 0,
+        height: 0,
+        getContext: () => ({ fillRect() {}, drawImage() {} }),
+        toDataURL(type: string): string {
+          return `data:${type};base64,${btoa(`${this.width}x${this.height}`)}`;
+        },
+      }),
+    },
+  });
+}
+
+test("set_camera_angle describes the view it rendered, even if it is deleted while the image is re-encoded", async () => {
+  await callJson("create_offscreen_view", { id: "inspect" });
+  const restore = installImageHost(async () => {
+    await tools.call("delete_offscreen_view", { view: "inspect" });
+  });
+  try {
+    const capture = CallToolResultSchema.parse(await tools.call("set_camera_angle", {
+      view: "inspect",
+      position: [0, 50, 0],
+      projection: "perspective",
+      max_size: 64,
+    }));
+    expect(viewOf(capture.structuredContent)).toMatchObject({ id: "inspect", kind: "offscreen" });
+  } finally {
+    restore();
+  }
+});
+
+test("capture tools scale and re-encode the image only on request", async () => {
+  const restore = installImageHost();
+  try {
+    const result = CallToolResultSchema.parse(await tools.call("capture_screenshot", { max_size: 64, format: "webp" }));
+    expect(result.content).toEqual([{ type: "image", mimeType: "image/webp", data: btoa("64x48") }]);
+    // Without options the frame is the viewport's own PNG (third render: each capture repaints once more).
+    expect(await callFrame("capture_screenshot")).toBe("main:3");
+  } finally {
+    restore();
+  }
+  await expect(tools.call("capture_screenshot", { max_size: 8 })).rejects.toThrow();
+  await expect(tools.call("capture_app_screenshot", { format: "gif" })).rejects.toThrow();
 });

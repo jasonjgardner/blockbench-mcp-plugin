@@ -25,7 +25,7 @@ const MAX_TIMELINE_FPS = 120;
 
 /** Native Blockbench animation data; rotations are degrees in editor coordinates. */
 export const createAnimationParameters = z.object({
-  name: z.string().describe("Name of the animation"),
+  name: z.string().describe("Animation name; `animation.` is added unless the name already starts with it, as in Bedrock and GeckoLib animation files."),
   loop: z
     .boolean()
     .default(false)
@@ -90,7 +90,7 @@ export const animationGraphEditorParameters = z.object({
       "stepped",
       "custom",
     ])
-    .describe("Curve modification. Easing/custom require at least two distinct chronological numeric single-data-point keys. Smooth and Bezier rotation edits are unavailable when native quaternion interpolation would ignore them."),
+    .describe("Curve modification. linear, stepped and smooth set the key-wide interpolation (linear, step, catmullrom). ease_in, ease_out and ease_in_out apply the CSS cubic-bezier curves of the same name to every segment between the selected keys; custom applies custom_curve. Easing/custom require at least two distinct chronological numeric single-data-point keys. Smooth and Bezier rotation edits are unavailable when native quaternion interpolation would ignore them. GeckoLib models reject stepped (the GeckoLib plugin switches step keys back to linear) and the Bezier actions (GeckoLib has no Bezier interpolation); use geckolib_set_keyframe_easing there. In GeckoLib models smooth also clears the easings of the keys it changes, since GeckoLib ignores easings on catmullrom keys."),
   keyframe_range: timeRangeSchema
     .optional()
     .describe(
@@ -139,7 +139,7 @@ export const boneRiggingParameters = z.object({
   bone_data: z
     .object({
       name: z.string().describe("Name of the bone."),
-      parent: z.string().optional().describe("Parent bone name; create also accepts a group UUID or root."),
+      parent: z.string().optional().describe("Parent bone UUID or name; omit it or pass root for the project root (for the parent action, a bone actually named root takes precedence). An unknown parent, or a name several bones share, is an error."),
       origin: vector3Schema.optional().describe("Pivot point of the bone."),
       rotation: vector3Schema.optional().describe("Initial rotation of the bone."),
       children: z
@@ -150,13 +150,13 @@ export const boneRiggingParameters = z.object({
         .boolean()
         .optional()
         .describe(
-          "Deprecated; prefer set_ik_controller. true makes this bone the end effector of a null-object IK controller (created as <bone>_ik when ik_target is omitted); false clears ik_target on controllers driving it."
+          "Deprecated; prefer set_ik_controller. true makes this bone the end effector of a null-object IK controller (created as <bone>_ik when ik_target is omitted); false clears ik_target on controllers driving it. With create, the IK controller is a second undo entry after the bone's."
         ),
       ik_target: z
         .string()
         .optional()
         .describe("Name or UUID of the null object that drives this bone as the IK controller."),
-      mirror_axis: axisEnum.optional().describe("Axis to mirror the bone across."),
+      mirror_axis: axisEnum.optional().describe("Axis the mirror action flips across (default x): the bone is duplicated with its descendants and the copy is flipped like Blockbench's Flip action, through the model origin, swapping left/right names when free."),
     })
     .describe("Bone configuration data."),
 });
@@ -230,7 +230,7 @@ export const batchKeyframeOperationsParameters = z.object({
     .describe("Pattern-based selection."),
   operation: z
     .enum(["offset", "scale", "reverse", "mirror", "smooth", "bake"])
-    .describe("Operation to perform on keyframes."),
+    .describe("Operation to perform on keyframes. reverse works like Blockbench's Reverse Keyframes action: times flip within the selection, pre/post values and Bezier handles swap, and GeckoLib easings flip direction and move to the key their segment now arrives at, as the GeckoLib plugin does. smooth and bake clear the GeckoLib easings they replace and report it."),
   parameters: z
     .object({
       offset_time: z.number().finite().optional().describe("Time offset to apply; resulting keyframes must remain between 0 and 10000 seconds."),
@@ -239,7 +239,7 @@ export const batchKeyframeOperationsParameters = z.object({
         .number()
         .finite()
         .optional()
-        .describe("Scale factor for keyframe times around scale_pivot. Does not scale values; zero is accepted only when it creates no timestamp collisions."),
+        .describe("Scale factor for keyframe times around scale_pivot. Does not scale values; zero is accepted only when it creates no timestamp collisions. A negative factor also reverses the keys like reverse."),
       scale_pivot: z
         .number()
         .finite()

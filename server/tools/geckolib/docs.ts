@@ -86,7 +86,7 @@ export const geckolibToolDocs: IToolSpec[] = [
     name: "geckolib_reverse_keyframe_easing",
     condition: GECKOLIB_CONDITION,
     description:
-      "Mirrors easing directions the way GeckoLib's own reverse-keyframes handler does: each easeIn becomes easeOut and back, the easings shift one keyframe later in time, and the first keyframe of each channel is cleared. Use after reversing keyframe values.",
+      "Reverses and shifts easings the way the GeckoLib plugin's handler for Blockbench's Reverse Keyframes action does: each easeIn becomes easeOut and back, every easing moves to the next later keyframe, and the first keyframe of each channel loses its easing. Use it only after keyframe times were reversed by something that left the easings in place, such as times rewritten with manage_keyframes. Do not use it after the native Reverse Keyframes action or batch_keyframe_operations reverse: with the GeckoLib plugin loaded, both already adjust the easings, so this tool would shift them a second time. It is not its own inverse; use undo to revert it.",
     annotations: { title: "Reverse GeckoLib Keyframe Easing", destructiveHint: false },
     parameters: geckolibReverseKeyframeEasingParameters,
     status: STATUS_EXPERIMENTAL,
@@ -104,8 +104,8 @@ export const geckolibToolDocs: IToolSpec[] = [
     name: "geckolib_export_model",
     condition: GECKOLIB_CONDITION,
     description:
-      "Compiles the GeckoLib geometry the plugin's model export produces, returning it as JSON and optionally writing it to a path. Set mode='dialog' to trigger the plugin's own export action and its save dialog instead.",
-    annotations: { title: "Export GeckoLib Model", destructiveHint: false, openWorldHint: true },
+      "Compiles the GeckoLib geometry the plugin's model export produces, returning it as JSON and optionally writing it to a path. The text is formatted like Blockbench's own export (its JSON indentation, minify and final-newline settings). Set mode='dialog' to trigger the plugin's own export action and its save dialog instead.",
+    annotations: { title: "Export GeckoLib Model", destructiveHint: true, openWorldHint: true },
     parameters: geckolibExportModelParameters,
     status: STATUS_EXPERIMENTAL,
   },
@@ -113,8 +113,8 @@ export const geckolibToolDocs: IToolSpec[] = [
     name: "geckolib_export_animations",
     condition: GECKOLIB_CONDITION,
     description:
-      "Compiles the project's animations into GeckoLib animation-file JSON, including the easing and easingArgs the plugin writes, and optionally writes it to a path. Reports which host API compiled it, since only the plugin-patched route stamps geckolib_format_version. Set mode='dialog' to trigger the plugin's own animation export action instead.",
-    annotations: { title: "Export GeckoLib Animations", destructiveHint: false, openWorldHint: true },
+      "Compiles the project's animations into GeckoLib animation-file JSON, including the easing and easingArgs the plugin writes, and optionally writes it to a path. The text is formatted like Blockbench's own export (its JSON indentation, minify and final-newline settings). Reports which host API compiled it, since only the plugin-patched route stamps geckolib_format_version. Set mode='dialog' to trigger the plugin's own animation export action instead.",
+    annotations: { title: "Export GeckoLib Animations", destructiveHint: true, openWorldHint: true },
     parameters: geckolibExportAnimationsParameters,
     status: STATUS_EXPERIMENTAL,
   },
@@ -122,8 +122,8 @@ export const geckolibToolDocs: IToolSpec[] = [
     name: "geckolib_export_display",
     condition: GECKOLIB_CONDITION,
     description:
-      "Builds the Java item/block display-settings JSON for GeckoLib Item and Block models: parent model, texture size, GUI light, per-perspective display transforms and the namespaced particle texture. Reports when the active model type would not normally ship one. Set mode='dialog' to trigger the plugin's own display export action instead.",
-    annotations: { title: "Export GeckoLib Display Settings", destructiveHint: false, openWorldHint: true },
+      "Builds the Java item/block display-settings JSON for GeckoLib Item and Block models: parent model, texture size, GUI light, per-perspective display transforms and the namespaced particle texture. The text is two-space JSON, as the plugin's own display export writes it. The parent defaults to the plugin's builtin/entity, which Minecraft Java 1.21.4 and later no longer have; the result then warns, and parent picks another. Reports when the active model type would not normally ship one. Set mode='dialog' to trigger the plugin's own display export action instead.",
+    annotations: { title: "Export GeckoLib Display Settings", destructiveHint: true, openWorldHint: true },
     parameters: geckolibExportDisplayParameters,
     status: STATUS_EXPERIMENTAL,
   },

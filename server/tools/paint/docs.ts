@@ -29,7 +29,7 @@ export const paintToolDocs: IToolSpec[] = [
     name: "paint_fill_tool",
     condition: { project: true, features: ["paint_mode"], method: () => Texture.all.length > 0 && Boolean(BarItems.fill_tool) && Condition(BarItems.fill_tool.condition) },
     description:
-      "Uses the fill/bucket tool to fill areas with color. In 'face' and 'element' fill modes only the face or element whose UV area contains the given texture pixel is filled. Opacity is 0-255 regardless of Blockbench's opacity range setting.",
+      "Uses the fill/bucket tool to fill areas with color. In 'face' and 'element' fill modes only the face or element whose UV area contains the given texture pixel is filled, and a pixel no face covers is an error. Seeds outside the texture are rejected, and so are color and color_connected seeds outside the active layer, where the fill reads its seed color. Opacity is 0-255 regardless of Blockbench's opacity range setting.",
     annotations: {
       title: "Paint Fill Tool",
       destructiveHint: true,
@@ -63,10 +63,11 @@ export const paintToolDocs: IToolSpec[] = [
     name: "color_picker_tool",
     condition: { project: true, features: ["paint_mode"], method: () => Texture.all.length > 0 },
     description:
-      "Picks colors from textures and sets them as the active color.",
+      "Picks a texture pixel's color and makes it the primary or secondary color, like Blockbench's color picker. It does not edit the texture, but it changes the active colors, selects the texture, and depending on Blockbench's settings can set the brush opacity or switch the active paint tool.",
     annotations: {
       title: "Color Picker Tool",
-      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
     },
     parameters: colorPickerToolParameters,
     status: STATUS_EXPERIMENTAL,
@@ -109,7 +110,7 @@ export const paintToolDocs: IToolSpec[] = [
     name: "paint_with_brush",
     condition: { project: true, features: ["paint_mode"], method: () => Texture.all.length > 0 },
     description:
-      "Paints on textures using the brush tool with customizable settings (opacity 0-255, softness 0-100%, optional aspect ratio). Paints on the selected pixel layer; if a layer group is selected, a pixel layer inside it is used.",
+      "Paints with Blockbench's own brush tool, so blend mode, pixel-perfect drawing, lock alpha and mirror painting apply as when painting by hand. Given brush settings (opacity 0-255, softness 0-100%, hex or named color, shape, blend mode, aspect ratio) are set on the brush first; omitted ones keep the current brush. Paints on the selected pixel layer; if a layer group is selected, a pixel layer inside it is used.",
     annotations: {
       title: "Paint with Brush",
       destructiveHint: true,

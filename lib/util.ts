@@ -1,3 +1,4 @@
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { ACTIVE_VIEW_ID } from "@/lib/constants";
 import { renderViewToDataUrl, resolveView } from "@/lib/views";
 
@@ -186,20 +187,24 @@ export function findGroupOrThrow(name: string): Group {
 }
 
 /**
- * Finds a mesh by ID or name and throws an actionable error if not found.
+ * Finds a mesh by UUID, or by a unique name, and throws an actionable error if not found.
  * @param id - The UUID or name of the mesh to find
  * @returns The found Mesh
- * @throws Error with suggestion to use list_outline
+ * @throws Error with suggestion to use list_outline, or listing the UUIDs when the name is shared
  */
 export function findMeshOrThrow(id: string): Mesh {
-  // @ts-ignore - Mesh is globally available in Blockbench
-  const mesh = Mesh.all.find((m: Mesh) => m.uuid === id || m.name === id);
-  if (!mesh) {
-    throw new Error(
-      `Mesh "${id}" not found. Use the list_outline tool to see available meshes.`
-    );
+  // UUID first; a name must be unique, as in findElementOrThrow, or edits land on the wrong mesh.
+  const byUuid = Mesh.all.find((m: Mesh) => m.uuid === id);
+  if (byUuid) return byUuid;
+  const byName = Mesh.all.filter((m: Mesh) => m.name === id);
+  if (byName.length === 1) return byName[0];
+  if (byName.length > 1) {
+    const listed = byName.map((m: Mesh) => m.uuid).join(", ");
+    throw new Error(`Mesh name "${id}" matches ${byName.length} meshes (${listed}); pass the UUID of the one you mean.`);
   }
-  return mesh;
+  throw new Error(
+    `Mesh "${id}" not found. Use the list_outline tool to see available meshes.`
+  );
 }
 
 /**
@@ -209,15 +214,23 @@ export function findMeshOrThrow(id: string): Mesh {
  * @throws Error with suggestion to use list_outline
  */
 export function findElementOrThrow(id: string): OutlinerElement | Group {
-  const element = Outliner.elements.find(
-    (el: OutlinerElement) => el.uuid === id || el.name === id
-  ) || Group.all.find((g: Group) => g.uuid === id || g.name === id);
-  if (!element) {
-    throw new Error(
-      `Element "${id}" not found. Use the list_outline tool to see available elements.`
-    );
+  // UUID first. A name must be unique: geo.json imports name each cube after
+  // its bone, and the first match would silently be the wrong node.
+  const byUuid = Outliner.elements.find((el: OutlinerElement) => el.uuid === id)
+    ?? Group.all.find((g: Group) => g.uuid === id);
+  if (byUuid) return byUuid;
+  const byName: Array<OutlinerElement | Group> = [
+    ...Outliner.elements.filter((el: OutlinerElement) => el.name === id),
+    ...Group.all.filter((g: Group) => g.name === id),
+  ];
+  if (byName.length === 1) return byName[0];
+  if (byName.length > 1) {
+    const listed = byName.map((node) => `${node instanceof Group ? "group" : node.type} ${node.uuid}`).join(", ");
+    throw new Error(`Name "${id}" matches ${byName.length} nodes (${listed}); pass the UUID of the one you mean.`);
   }
-  return element;
+  throw new Error(
+    `Element "${id}" not found. Use the list_outline tool to see available elements.`
+  );
 }
 
 /**
@@ -292,32 +305,70 @@ export function getMeshOrSelected(meshId?: string): Mesh {
  * @throws {Error} When no project is open, the view is unknown, or rendering fails.
  */
 export function captureScreenshot(project?: string, view: string = ACTIVE_VIEW_ID) {
-  let selectedProject: ModelProject | undefined = Project;
+  const previous: ModelProject | undefined = Project || undefined;
+  const target = project === undefined ? previous : findProject(project);
 
-  if (!selectedProject || project !== undefined) {
-    selectedProject = ModelProject.all.find(
-      (p) => p.name === project || p.uuid === project || p.selected
-    );
-  }
-
-  if (!selectedProject) {
+  if (!target) {
     throw new Error("No project found in the Blockbench editor.");
   }
 
-  // Select the project if needed
-  if (!selectedProject.selected) {
-    selectedProject.select();
+  // Render the requested project, then give the user their tab back.
+  const switched = !target.selected;
+  if (switched && (target.select() as unknown) === false) {
+    throw new Error(`Could not switch to project "${target.name}".`);
   }
-
-  return imageContent(renderViewToDataUrl(resolveView(view)), "image/png");
+  try {
+    return imageContent(renderViewToDataUrl(resolveView(view)), "image/png");
+  } finally {
+    if (switched && previous && previous !== target && ModelProject.all.includes(previous)) {
+      previous.select();
+    }
+  }
 }
+
+/**
+ * Finds an open project by UUID, or by a unique name.
+ *
+ * @throws {Error} When nothing matches or the name is shared by several projects.
+ */
+function findProject(ref: string): ModelProject {
+  const byUuid = ModelProject.all.find((p) => p.uuid === ref);
+  if (byUuid) return byUuid;
+  const byName = ModelProject.all.filter((p) => p.name === ref);
+  if (byName.length === 1) return byName[0];
+  const open = ModelProject.all.map((p) => `"${p.name}" (${p.uuid})`).join(", ") || "none";
+  if (byName.length > 1) {
+    throw new Error(`Project name "${ref}" is shared by ${byName.length} open projects; use the UUID. Open projects: ${open}.`);
+  }
+  throw new Error(`No open project with name or UUID "${ref}". Open projects: ${open}.`);
+}
+
+/** Text returned with app captures taken while Chromium treats the window as hidden. */
+export const HIDDEN_WINDOW_CAPTURE_WARNING =
+  'Warning: the Blockbench window is covered or minimized (document.visibilityState is "hidden"). ' +
+  "Chromium does not repaint hidden windows, so this image can show an earlier state than the current one. " +
+  "Confirm state with a read-only query, use capture_screenshot for 3D views (it renders on demand), " +
+  "or bring Blockbench to the front.";
 
 /**
  * Captures a screenshot of the entire Blockbench application window.
  * Uses Electron's native capturePage API through Blockbench's Screencam.
  * Only available when running as a desktop application.
+ *
+ * capturePage returns the last frame Chromium painted. While the window is
+ * covered or minimized the page is hidden and nothing repaints (repainting
+ * viewports or waiting for frames does not help), so the image can predate the
+ * latest tool calls; the result then starts with a text warning.
  */
-export async function captureAppScreenshot(): Promise<ReturnType<typeof imageContent>> {
+export async function captureAppScreenshot(): Promise<CallToolResult> {
+  const hidden = typeof document !== "undefined" && document.visibilityState === "hidden";
+  const capture = await captureAppImage();
+  if (!hidden) return capture;
+  return { content: [{ type: "text", text: HIDDEN_WINDOW_CAPTURE_WARNING }, ...capture.content] };
+}
+
+/** Screencam.fullScreen wrapped in a promise, with a timeout and an empty-capture check. */
+function captureAppImage(): Promise<ReturnType<typeof imageContent>> {
   return new Promise((resolve, reject) => {
     let resolved = false;
 
@@ -335,7 +386,8 @@ export async function captureAppScreenshot(): Promise<ReturnType<typeof imageCon
       if (!resolved) {
         resolved = true;
         clearTimeout(timeoutId);
-        if (dataUrl) {
+        // A bare "data:image/png;base64," is an empty capture, not an image.
+        if (dataUrl && !/^data:[^;,]*;base64,$/.test(dataUrl)) {
           resolve(imageContent(dataUrl, "image/png"));
         } else {
           reject(
@@ -345,4 +397,13 @@ export async function captureAppScreenshot(): Promise<ReturnType<typeof imageCon
       }
     });
   });
+}
+
+/**
+ * Whether the active format keys bones by name (GeckoLib, Bedrock). Tolerates
+ * hosts without the `Format` global, such as unit tests.
+ */
+export function formatUsesBoneRig(): boolean {
+  const format: unknown = Reflect.get(globalThis, "Format");
+  return typeof format === "object" && format !== null && Boolean(Reflect.get(format, "bone_rig"));
 }

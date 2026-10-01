@@ -70,11 +70,20 @@ function restoreAnimationSave(event: unknown): void {
  * @param aspects - Native Undo aspects containing the full animations to snapshot.
  * @param label - The history entry shown to the user.
  * @param edit - Synchronous mutation; errors cancel and restore the complete edit.
+ * @param finishAspects - Aspects for the "after" snapshot when they differ, as
+ *   in {@link runUndoableEdit}; they are marked the same way, so Redo also drops
+ *   animators the edit removed.
  * @returns The mutation callback's result.
  */
-export function runUndoableAnimationEdit<T>(aspects: UndoAspects & { animations: BBAnimation[] }, label: string, edit: () => T): T {
+export function runUndoableAnimationEdit<T>(
+  aspects: UndoAspects & { animations: BBAnimation[] },
+  label: string,
+  edit: () => T,
+  finishAspects?: UndoAspects & { animations: BBAnimation[] },
+): T {
   const trackedAspects = { ...aspects, [RESTORE_MARKER]: true };
-  return runUndoableEdit(trackedAspects, label, edit);
+  const trackedFinish = finishAspects && { ...finishAspects, [RESTORE_MARKER]: true };
+  return runUndoableEdit(trackedAspects, label, edit, trackedFinish);
 }
 
 /** Installs idempotent save/load listeners; unmarked native edits retain native behavior. */

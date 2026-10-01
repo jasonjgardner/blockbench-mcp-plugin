@@ -106,6 +106,8 @@ const editTool = defineTool({
     operations: z.array(operationSchema).min(1).max(500),
   },
   readOnly: false,
+  // Operations delete nodes, animations and keyframes, and replace geometry, UVs and images.
+  destructive: true,
   async execute({ file, expected_revision, operations }, context) {
     const written = await context.store.update(file, expected_revision, ({ doc }) => {
       const { doc: edited, results } = applyOperations(doc, operations);
@@ -141,6 +143,8 @@ const addTextureTool = defineTool({
     assign_to: z.array(z.string().min(1)).default([]).describe("Cubes or groups (UUID or name) whose faces should use the texture."),
   },
   readOnly: false,
+  // assign_to replaces the textures those faces had.
+  destructive: true,
   async execute({ file, expected_revision, image, name, material, channel, wrap_mode, render_mode, assign_to }, context) {
     const isDataUrl = image.startsWith("data:");
     const imagePath = isDataUrl ? undefined : context.store.resolvePath(image, [".png"]);

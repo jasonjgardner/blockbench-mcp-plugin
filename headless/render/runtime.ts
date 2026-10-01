@@ -9,8 +9,12 @@
  * because Node refuses to strip types from files under `node_modules` (where `npx` unpacks this
  * package).
  *
+ * The install runs `npm install`, which resolves the manifest's version ranges. Once a
+ * `package-lock.json` is committed beside the manifest, it is copied too and installed with
+ * `npm ci`, which pins every package; none is committed yet, so nothing is pinned.
+ *
  * Layout of the cache folder (`home`):
- * - `package.json`, `node_modules/`: the installed dependencies
+ * - `package.json`, `package-lock.json`, `node_modules/`: the installed dependencies
  * - `cli.mjs`: the bundled engine
  * - `.install` / `.build`: content hashes that decide when to reinstall or rebuild
  * - `.lock/`: a directory taken while installing, so parallel agents do not corrupt each other
@@ -29,6 +33,9 @@ const EXTERNAL_PACKAGES = ["three", "three/*", "three-blockbench", "@rendergl/*"
 /** File whose presence means the install finished. */
 const INSTALL_PROBE = join("node_modules", "@rendergl", "headless-three-webgpu", "package.json");
 
+/** npm lockfile beside the manifest, used when one is committed. */
+const LOCKFILE = "package-lock.json";
+
 /** Stale lock age in milliseconds; an install that ran this long has died. */
 const LOCK_STALE_MS = 15 * 60_000;
 
@@ -38,6 +45,8 @@ export interface IPrepareOptions {
   home?: string;
   /** Engine source folder; defaults to the one shipped beside this file. */
   engineDir?: string;
+  /** npm executable; defaults to npm on PATH. */
+  npm?: string;
   /** Receives progress lines (installing can take a minute the first time). */
   log?: (message: string) => void;
 }
@@ -102,15 +111,20 @@ async function withLock<T>(home: string, task: () => Promise<T>, log: (message: 
   }
 }
 
-/** Installs the manifest's dependencies into `home` with npm (Node is required anyway to run the engine). */
-async function installDependencies(home: string, log: (message: string) => void): Promise<void> {
-  const npm = Bun.which("npm");
+/**
+ * Installs the manifest's dependencies into `home` with npm (Node is required anyway to run the engine).
+ *
+ * @param locked - A lockfile was copied into `home`: `npm ci` installs exactly its versions.
+ */
+async function installDependencies(home: string, locked: boolean, npmPath: string | undefined, log: (message: string) => void): Promise<void> {
+  const npm = npmPath ?? Bun.which("npm");
   if (npm === null) throw new Error("npm was not found on PATH. Install Node 23.6+ (which includes npm) to render, or run `npm install` in " + home + " yourself.");
+  const command = locked ? "ci" : "install";
   log(`Installing the render engine's dependencies into ${home} (first render only)...`);
-  const child = Bun.spawn([npm, "install", "--omit=dev", "--no-audit", "--no-fund", "--loglevel=error"], { cwd: home, stdout: "pipe", stderr: "pipe" });
+  const child = Bun.spawn([npm, command, "--omit=dev", "--no-audit", "--no-fund", "--loglevel=error"], { cwd: home, stdout: "pipe", stderr: "pipe" });
   const [stdout, stderr, exitCode] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
-  if (exitCode !== 0) throw new Error(`npm install failed in ${home} (exit ${exitCode}).\n${`${stdout}${stderr}`.trim()}`);
-  if (!existsSync(join(home, INSTALL_PROBE))) throw new Error(`npm install finished but @rendergl/headless-three-webgpu is missing from ${home}.`);
+  if (exitCode !== 0) throw new Error(`npm ${command} failed in ${home} (exit ${exitCode}).\n${`${stdout}${stderr}`.trim()}`);
+  if (!existsSync(join(home, INSTALL_PROBE))) throw new Error(`npm ${command} finished but @rendergl/headless-three-webgpu is missing from ${home}.`);
 }
 
 /** Bundles the engine into `cli.mjs`, leaving the installed packages external. */
@@ -132,8 +146,8 @@ async function buildEngine(engineDir: string, home: string): Promise<void> {
 /**
  * Makes sure the render runtime is installed and bundled, and returns the path of its `cli.mjs`.
  *
- * Work is skipped when the dependency manifest and engine sources match what was last installed
- * and bundled, so only the first render (or the first after an update) pays for it.
+ * Work is skipped when the dependency manifest (and lockfile) and engine sources match what was
+ * last installed and bundled, so only the first render (or the first after an update) pays for it.
  *
  * @throws Error explaining what to do when npm is missing or the install fails.
  */
@@ -142,9 +156,11 @@ export async function prepareRenderRuntime(options: IPrepareOptions = {}): Promi
   const engineDir = options.engineDir ?? locateEngineDir();
   const log = options.log ?? (() => undefined);
   const manifest = join(dirname(dirname(engineDir)), "package.json");
+  const lockfile = join(dirname(manifest), LOCKFILE);
+  const locked = existsSync(lockfile);
   const cli = join(home, "cli.mjs");
 
-  const installHash = await hashFiles([manifest]);
+  const installHash = await hashFiles(locked ? [manifest, lockfile] : [manifest]);
   const buildHash = await hashFiles(await engineSources(engineDir));
   const upToDate = async (): Promise<boolean> =>
     (await readStamp(join(home, ".install"))) === installHash &&
@@ -158,7 +174,8 @@ export async function prepareRenderRuntime(options: IPrepareOptions = {}): Promi
     if (await upToDate()) return cli;
     if ((await readStamp(join(home, ".install"))) !== installHash || !existsSync(join(home, INSTALL_PROBE))) {
       await Bun.write(join(home, "package.json"), await Bun.file(manifest).text());
-      await installDependencies(home, log);
+      if (locked) await Bun.write(join(home, LOCKFILE), await Bun.file(lockfile).text());
+      await installDependencies(home, locked, options.npm, log);
       await Bun.write(join(home, ".install"), installHash);
     }
     await buildEngine(engineDir, home);
