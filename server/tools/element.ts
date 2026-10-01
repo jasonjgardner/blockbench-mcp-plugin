@@ -25,7 +25,7 @@ export const findElementsByCriteriaParameters = z.object({
     .string()
     .optional()
     .describe(
-      "Regex pattern to match element names (e.g., '^arm_.*'). Case-sensitive."
+      "Regex pattern to match element names (e.g., '^arm_.*'). Case-sensitive. Patterns over 512 characters, with nested quantifiers such as (a+)+, or that do not compile are rejected with an error."
     ),
   name_contains: z
     .string()
@@ -321,33 +321,63 @@ function exceedsBounds(
 }
 
 const MAX_REGEX_PATTERN_LENGTH = 512;
-// Heuristic: nested quantifiers like (a+)+, (.*)*, (a+|b)*, (foo){2,}+ are the
-// classic catastrophic-backtracking shape. Reject quantifiers applied to a
-// group whose body already contains a quantifier.
-const CATASTROPHIC_BACKTRACK_HEURISTIC = /\([^)]*[+*?][^)]*\)\s*[+*?{]/;
 
+/**
+ * Heuristic for the classic catastrophic-backtracking shape: a group repeated
+ * with `+`, `*` or `{…}` whose body already contains a quantifier, such as
+ * (a+)+, (a*)*, (.*)+, (\w+\s?)* or ((a|b)+)+. Escapes and character classes
+ * are neutralized first, and the "?" of group syntax like (?: or (?= is not a
+ * quantifier. A group followed only by "?" runs at most once, so (_.*)? passes.
+ */
+function hasNestedQuantifier(pattern: string): boolean {
+  const source = pattern
+    .replace(/\\./g, "x")
+    .replace(/\[[^\]]*\]/g, "x")
+    .replace(/\(\?(?:[:=!]|<[=!]|<[A-Za-z_$][\w$]*>)/g, "(");
+  // One entry per open group: whether its body holds a quantifier so far.
+  const open: boolean[] = [];
+  for (let i = 0; i < source.length; i++) {
+    const char = source[i];
+    if (char === "(") {
+      open.push(false);
+    } else if (char === ")") {
+      const quantified = open.pop() ?? false;
+      const next = source.charAt(i + 1);
+      if (quantified && next !== "" && "+*{".includes(next)) return true;
+      if (quantified && open.length) open[open.length - 1] = true;
+    } else if ("+*?{".includes(char) && open.length) {
+      open[open.length - 1] = true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Compiles `name_pattern`. A pattern that is too long, risks catastrophic
+ * backtracking or does not compile fails the call: ignoring it would silently
+ * widen the search to every element.
+ *
+ * @returns `null` when no pattern was given.
+ * @throws {Error} Naming why the pattern was rejected and how to rewrite it.
+ */
 function safeCompileRegex(pattern: string | undefined): RegExp | null {
   if (!pattern) return null;
   if (pattern.length > MAX_REGEX_PATTERN_LENGTH) {
-    console.warn(
-      `[MCP] find_elements_by_criteria: name_pattern rejected — exceeds ${MAX_REGEX_PATTERN_LENGTH} chars (got ${pattern.length}).`
+    throw new Error(
+      `name_pattern is ${pattern.length} characters long; the limit is ${MAX_REGEX_PATTERN_LENGTH}. Shorten it, or use name_contains.`
     );
-    return null;
   }
-  if (CATASTROPHIC_BACKTRACK_HEURISTIC.test(pattern)) {
-    console.warn(
-      `[MCP] find_elements_by_criteria: name_pattern rejected — nested quantifiers risk catastrophic backtracking: ${pattern}`
+  if (hasNestedQuantifier(pattern)) {
+    throw new Error(
+      `name_pattern "${pattern}" was rejected: it repeats a group that already contains a quantifier (such as (a+)+ or (.*)*), which risks catastrophic backtracking. Rewrite it without nested quantifiers, or use name_contains.`
     );
-    return null;
   }
   try {
     return new RegExp(pattern);
   } catch (err) {
-    console.warn(
-      `[MCP] find_elements_by_criteria: name_pattern failed to compile, ignoring filter:`,
-      err
+    throw new Error(
+      `name_pattern "${pattern}" is not a valid regular expression: ${err instanceof Error ? err.message : String(err)}`
     );
-    return null;
   }
 }
 
