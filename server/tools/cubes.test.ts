@@ -47,3 +47,16 @@ describe("cube shading schemas", () => {
     expect(() => modifyCubeParameters.parse({ shade_direction_override: "sideways" })).toThrow();
   });
 });
+
+describe("place_cube element schema", () => {
+  test("accepts inflate, uv_offset and mirror_uv", () => {
+    const placed = placeCubeParameters.parse({ elements: [{ name: "hat", inflate: 0.5, uv_offset: [32, 0], mirror_uv: true }] });
+    expect(placed.elements[0]).toMatchObject({ inflate: 0.5, uv_offset: [32, 0], mirror_uv: true });
+  });
+
+  test("rejects unknown element keys and malformed box UV fields", () => {
+    expect(placeCubeParameters.safeParse({ elements: [{ name: "hat", colour: 3 }] }).success).toBe(false);
+    expect(placeCubeParameters.safeParse({ elements: [{ name: "hat", uv_offset: [1, 2, 3] }] }).success).toBe(false);
+    expect(placeCubeParameters.safeParse({ elements: [{ name: "hat", inflate: Number.POSITIVE_INFINITY }] }).success).toBe(false);
+  });
+});

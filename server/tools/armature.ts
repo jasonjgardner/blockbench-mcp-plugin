@@ -16,12 +16,31 @@ import { applyIkController, setIkControllerParameters } from "@/server/tools/ani
 // ============================================================================
 
 /**
- * Find an armature by UUID or name
+ * Finds a node by exact UUID, then by unique name, like `findElementOrThrow`.
+ * UUID prefixes never match: an empty or partial id used to pick the first node.
+ *
+ * @param candidates - Nodes to search.
+ * @param id - UUID or name.
+ * @param label - Node kind for the ambiguity error, e.g. "Armature".
+ * @returns The match, or `undefined` when nothing matches.
+ * @throws When the name is shared by several candidates.
+ */
+function findByUuidOrName<T extends { uuid: string; name: string }>(candidates: readonly T[], id: string, label: string): T | undefined {
+  const byUuid = candidates.find((candidate) => candidate.uuid === id);
+  if (byUuid) return byUuid;
+  const byName = candidates.filter((candidate) => candidate.name === id);
+  if (byName.length > 1) {
+    const listed = byName.map((candidate) => candidate.uuid).join(", ");
+    throw new Error(`${label} name "${id}" matches ${byName.length} nodes (${listed}); pass the UUID of the one you mean.`);
+  }
+  return byName[0];
+}
+
+/**
+ * Find an armature by UUID or unique name
  */
 function findArmature(id: string): Armature | undefined {
-  return Armature.all.find(
-    (a) => a.uuid === id || a.name === id || a.uuid.startsWith(id)
-  );
+  return findByUuidOrName(Armature.all, id, "Armature");
 }
 
 /**
@@ -36,12 +55,10 @@ function findArmatureOrThrow(id: string): Armature {
 }
 
 /**
- * Find an armature bone by UUID or name
+ * Find an armature bone by UUID or unique name
  */
 function findArmatureBone(id: string): ArmatureBone | undefined {
-  return ArmatureBone.all.find(
-    (b) => b.uuid === id || b.name === id || b.uuid.startsWith(id)
-  );
+  return findByUuidOrName(ArmatureBone.all, id, "Armature bone");
 }
 
 /**
@@ -56,12 +73,10 @@ function findArmatureBoneOrThrow(id: string): ArmatureBone {
 }
 
 /**
- * Find a mesh by UUID or name
+ * Find a mesh by UUID or unique name
  */
 function findMesh(id: string): Mesh | undefined {
-  return Mesh.all.find(
-    (m) => m.uuid === id || m.name === id || m.uuid.startsWith(id)
-  );
+  return findByUuidOrName(Mesh.all, id, "Mesh");
 }
 
 /**
@@ -674,11 +689,8 @@ export function registerArmatureTools() {
       connected,
       color,
     }) {
-      // Find parent (can be Armature or ArmatureBone)
-      let parent: Armature | ArmatureBone | undefined = findArmature(parent_id);
-      if (!parent) {
-        parent = findArmatureBone(parent_id);
-      }
+      // Find parent (can be Armature or ArmatureBone); a name shared across both kinds is ambiguous.
+      const parent = findByUuidOrName<Armature | ArmatureBone>([...Armature.all, ...ArmatureBone.all], parent_id, "Parent");
       if (!parent) {
         throw new Error(`Parent not found: ${parent_id}. Must be an armature or bone.`);
       }

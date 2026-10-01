@@ -2,7 +2,7 @@
 /// <reference types="blockbench-types" />
 import { z } from "zod";
 import { createTool, type IToolSpec } from "@/lib/factories";
-import { findElementOrThrow, findTextureOrThrow } from "@/lib/util";
+import { findElementOrThrow, findTextureOrThrow, formatUsesBoneRig } from "@/lib/util";
 import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
 import { createGroupWithUndo } from "@/lib/group-creation";
 import { runUndoableEdit } from "@/lib/undo";
@@ -25,7 +25,7 @@ export const findElementsByCriteriaParameters = z.object({
     .string()
     .optional()
     .describe(
-      "Regex pattern to match element names (e.g., '^arm_.*'). Case-sensitive."
+      "Regex pattern to match element names (e.g., '^arm_.*'). Case-sensitive. Patterns over 512 characters, with nested quantifiers such as (a+)+, or that do not compile are rejected with an error."
     ),
   name_contains: z
     .string()
@@ -203,7 +203,7 @@ export const elementToolDocs: IToolSpec[] = [
     name: "duplicate_element",
     condition: { project: true, features: ["edit_mode"] },
     description:
-      "Duplicates any outliner element or group (with its children) by ID or name using Blockbench's native duplicate, so every property, face UV, texture and mesh vertex key is preserved. Mesh copies inherit their armature bone vertex weights. Optionally offsets the copy and assigns a new name. Selection is left unchanged.",
+      "Duplicates any outliner element or group (with its children) by ID or name using Blockbench's native duplicate, so every property, face UV, texture and mesh vertex key is preserved. Mesh copies inherit their armature bone vertex weights, and copied IK null objects point at the copied bones when their chain was duplicated with them. Optionally offsets the copy and assigns a new name. Selection is left unchanged.",
     annotations: { title: "Duplicate Element", destructiveHint: true },
     parameters: duplicateElementParameters,
     status: STATUS_EXPERIMENTAL,
@@ -232,7 +232,7 @@ export const elementToolDocs: IToolSpec[] = [
     name: "select_all_of_type",
     condition: { project: true },
     description:
-      "Selects all elements of the given type (cube, mesh, or group) in the current project. Optionally restrict to descendants of a parent group, or add to (rather than replace) the current selection.",
+      "Selects all elements of the given type (cube, mesh, or group) in the current project. Optionally restrict to descendants of a parent group, or add to (rather than replace) the current selection. As in Blockbench, locked nodes are skipped and selecting a group also selects its contents.",
     annotations: {
       title: "Select All of Type",
       destructiveHint: true,
@@ -321,33 +321,63 @@ function exceedsBounds(
 }
 
 const MAX_REGEX_PATTERN_LENGTH = 512;
-// Heuristic: nested quantifiers like (a+)+, (.*)*, (a+|b)*, (foo){2,}+ are the
-// classic catastrophic-backtracking shape. Reject quantifiers applied to a
-// group whose body already contains a quantifier.
-const CATASTROPHIC_BACKTRACK_HEURISTIC = /\([^)]*[+*?][^)]*\)\s*[+*?{]/;
 
+/**
+ * Heuristic for the classic catastrophic-backtracking shape: a group repeated
+ * with `+`, `*` or `{…}` whose body already contains a quantifier, such as
+ * (a+)+, (a*)*, (.*)+, (\w+\s?)* or ((a|b)+)+. Escapes and character classes
+ * are neutralized first, and the "?" of group syntax like (?: or (?= is not a
+ * quantifier. A group followed only by "?" runs at most once, so (_.*)? passes.
+ */
+function hasNestedQuantifier(pattern: string): boolean {
+  const source = pattern
+    .replace(/\\./g, "x")
+    .replace(/\[[^\]]*\]/g, "x")
+    .replace(/\(\?(?:[:=!]|<[=!]|<[A-Za-z_$][\w$]*>)/g, "(");
+  // One entry per open group: whether its body holds a quantifier so far.
+  const open: boolean[] = [];
+  for (let i = 0; i < source.length; i++) {
+    const char = source[i];
+    if (char === "(") {
+      open.push(false);
+    } else if (char === ")") {
+      const quantified = open.pop() ?? false;
+      const next = source.charAt(i + 1);
+      if (quantified && next !== "" && "+*{".includes(next)) return true;
+      if (quantified && open.length) open[open.length - 1] = true;
+    } else if ("+*?{".includes(char) && open.length) {
+      open[open.length - 1] = true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Compiles `name_pattern`. A pattern that is too long, risks catastrophic
+ * backtracking or does not compile fails the call: ignoring it would silently
+ * widen the search to every element.
+ *
+ * @returns `null` when no pattern was given.
+ * @throws {Error} Naming why the pattern was rejected and how to rewrite it.
+ */
 function safeCompileRegex(pattern: string | undefined): RegExp | null {
   if (!pattern) return null;
   if (pattern.length > MAX_REGEX_PATTERN_LENGTH) {
-    console.warn(
-      `[MCP] find_elements_by_criteria: name_pattern rejected — exceeds ${MAX_REGEX_PATTERN_LENGTH} chars (got ${pattern.length}).`
+    throw new Error(
+      `name_pattern is ${pattern.length} characters long; the limit is ${MAX_REGEX_PATTERN_LENGTH}. Shorten it, or use name_contains.`
     );
-    return null;
   }
-  if (CATASTROPHIC_BACKTRACK_HEURISTIC.test(pattern)) {
-    console.warn(
-      `[MCP] find_elements_by_criteria: name_pattern rejected — nested quantifiers risk catastrophic backtracking: ${pattern}`
+  if (hasNestedQuantifier(pattern)) {
+    throw new Error(
+      `name_pattern "${pattern}" was rejected: it repeats a group that already contains a quantifier (such as (a+)+ or (.*)*), which risks catastrophic backtracking. Rewrite it without nested quantifiers, or use name_contains.`
     );
-    return null;
   }
   try {
     return new RegExp(pattern);
   } catch (err) {
-    console.warn(
-      `[MCP] find_elements_by_criteria: name_pattern failed to compile, ignoring filter:`,
-      err
+    throw new Error(
+      `name_pattern "${pattern}" is not a valid regular expression: ${err instanceof Error ? err.message : String(err)}`
     );
-    return null;
   }
 }
 
@@ -443,9 +473,34 @@ function copyVertexWeights(pairs: [OutlinerNode, OutlinerNode][], bones: Armatur
   }));
 }
 
+/** NullObject properties that name another node by UUID; `ik_pole` exists since Blockbench 5.2. */
+const IK_REFERENCE_KEYS = ["ik_target", "ik_source", "ik_pole"] as const;
+
+/**
+ * Points the IK references of copied null objects at the copies of the nodes
+ * they name. `duplicate()` copies the UUIDs verbatim, so a duplicated limb rig
+ * would otherwise drive the original limb. Blockbench's own element Duplicate
+ * remaps the same properties for the elements it copied (through
+ * `Clipbench.duplicate_map`); here every node of the copied subtree counts,
+ * groups included. References to nodes outside the copy are kept.
+ */
+function remapIkReferences(pairs: [OutlinerNode, OutlinerNode][]): void {
+  if (typeof NullObject === "undefined") return;
+  const copies = new Map(pairs.map(([original, copy]) => [original.uuid, copy.uuid]));
+  pairs.forEach(([, copy]) => {
+    if (!(copy instanceof NullObject)) return;
+    IK_REFERENCE_KEYS.forEach((key) => {
+      const reference: unknown = Reflect.get(copy, key);
+      const remapped = typeof reference === "string" ? copies.get(reference) : undefined;
+      if (remapped !== undefined) Reflect.set(copy, key, remapped);
+    });
+  });
+}
+
 /**
  * Duplicates `node` (and its subtree) with Blockbench's own `duplicate()` in one
- * undoable edit, then offsets, renames, and carries mesh vertex weights over.
+ * undoable edit, then offsets, renames, remaps IK references to the copied
+ * nodes, and carries mesh vertex weights over.
  * The live selection is restored afterwards, and `Clipbench.duplicate_map` is
  * reset because only the native Duplicate action clears it.
  *
@@ -458,14 +513,19 @@ function duplicateNode(node: DuplicableNode, offset: ArrayVector3, name: string 
   const originals = [node, ...pairSubtrees(node, node).slice(1).map(([original]) => original)];
   const bones = bonesWeightingMeshes(originals.filter((candidate): candidate is Mesh => candidate instanceof Mesh));
   const elements: OutlinerElement[] = [...bones];
+  // Copied groups are not OutlinerElements: without the groups aspect, Undo left them behind.
+  const groups: Group[] = [];
   const selected = [...Outliner.selected];
   try {
-    return runUndoableEdit({ elements, outliner: true }, "Agent duplicated element", () => {
+    return runUndoableEdit({ elements, groups, outliner: true }, "Agent duplicated element", () => {
       const copy = (node as unknown as { duplicate(): DuplicableNode }).duplicate();
       const pairs = pairSubtrees(node, copy);
       elements.push(...pairs.map(([, created]) => created).filter((created): created is OutlinerElement => created instanceof OutlinerElement));
+      groups.push(...pairs.map(([, created]) => created).filter((created): created is Group => created instanceof Group));
+      remapIkReferences(pairs);
       if (offset.some((value) => value !== 0)) offsetSubtree(copy, offset);
       if (name !== undefined) copy.name = name;
+      if (copy instanceof Group && formatUsesBoneRig()) copy.createUniqueName();
       copyVertexWeights(pairs, bones);
       return copy;
     });
@@ -481,15 +541,28 @@ export function registerElementTools() {
     async execute({ id }) {
       const element = findElementOrThrow(id);
 
-      Undo.initEdit({
-        elements: [],
-        outliner: true,
-        collections: [],
-      });
-
-      element.remove();
-
-      Undo.finishEdit("Agent removed element");
+      // Undo can only rebuild what the "before" snapshot holds: list the node,
+      // its descendant elements and its groups, then finish with empty lists,
+      // as Blockbench's own Delete does.
+      const elements: OutlinerElement[] = [];
+      const groups: Group[] = [];
+      if (element instanceof Group) {
+        groups.push(element);
+        element.forEachChild((child: OutlinerNode) => {
+          if (child instanceof Group) groups.push(child);
+          else if (child instanceof OutlinerElement) elements.push(child);
+        });
+      } else {
+        elements.push(element);
+      }
+      runUndoableEdit(
+        { elements, groups, outliner: true, collections: [] },
+        "Agent removed element",
+        () => {
+          element.remove();
+        },
+        { elements: [], groups: [], outliner: true, collections: [] }
+      );
       Canvas.updateAll();
 
       return `Removed element with ID ${id}`;
@@ -611,9 +684,14 @@ export function registerElementTools() {
       runUndoableEdit(aspects, "Agent renamed element", () => {
         // Both types implement extend(), which sanitizes the name; the published union does not guarantee it.
         (element as unknown as { extend(data: { name: string }): unknown }).extend({ name: new_name });
+        // Bone rigs (GeckoLib, Bedrock) key bones by name: keep them unique, as Blockbench's own rename does.
+        if (element instanceof Group && formatUsesBoneRig()) element.createUniqueName();
       });
       Canvas.updateAll();
-      return `Renamed element "${id}" to "${new_name}".`;
+      const applied = element.name;
+      return applied === new_name
+        ? `Renamed element "${id}" to "${applied}".`
+        : `Renamed element "${id}" to "${applied}" ("${new_name}" was adjusted to a valid, unique name).`;
     },
   }, elementToolDocs[4].status);
 
@@ -708,23 +786,19 @@ export function registerElementTools() {
         ? pool.filter((el) => isDescendantOf(el, parentScope))
         : pool;
 
-      if (!add_to_selection) {
-        // @ts-ignore - selected method available on element classes
-        Cube.all.forEach((c: Cube) => c.selected && c.unselect?.());
-        // @ts-ignore - selected method available on element classes
-        Mesh.all.forEach((m: Mesh) => m.selected && m.unselect?.());
-        Group.all.forEach((g: Group) => {
-          if (g.selected) g.selected = false;
-        });
-      }
+      // Locked nodes stay unselected, as in Blockbench's own Select All.
+      const selectable = targets.filter((el) => !el.locked);
 
-      for (const el of targets) {
-        if (el instanceof Group) {
-          el.selected = true;
-          continue;
-        }
-        // @ts-ignore - select method available on outliner elements
-        el.select?.({ shiftKey: true });
+      // Replace clears every other selection, including the vertex/face selections
+      // of meshes that are deselected; nodes being selected keep theirs, as with a click.
+      if (!add_to_selection) unselectAllElements(selectable);
+
+      // markAsSelected and Group.multiSelect only add to the selection (a Shift-style
+      // select() toggles, deselecting targets that were already selected). A selected
+      // group also selects its contents, as in Blockbench.
+      for (const el of selectable) {
+        if (el instanceof Group) el.multiSelect();
+        else el.markAsSelected();
       }
 
       updateSelection();
@@ -733,7 +807,8 @@ export function registerElementTools() {
       return JSON.stringify(
         {
           type,
-          selected: targets.length,
+          selected: selectable.length,
+          ...(selectable.length < targets.length && { skipped_locked: targets.length - selectable.length }),
           parent_group: parentScope?.name ?? null,
         },
         null,

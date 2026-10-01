@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { Object3D, OrthographicCamera, Vector3 } from "three";
-import { deleteMeshSelection, extrudeMeshFaces, subdivideMeshFaces } from "@/lib/mesh-editing";
+import { deleteMeshSelection, extrudeMeshFaces, mergeMeshVertices, subdivideMeshFaces } from "@/lib/mesh-editing";
 import { registerUVTools } from "@/server/tools/uv";
 import { registerUITools } from "@/server/tools/ui";
 import { required } from "@/tests/helpers/assertions";
@@ -100,6 +100,9 @@ class HostMesh {
   }
   getSelectedFaces(): string[] {
     return project.mesh_selection[this.uuid]?.faces ?? [];
+  }
+  getSelectedVertices(): string[] {
+    return project.mesh_selection[this.uuid]?.vertices ?? [];
   }
   getWorldCenter(): Vector3 {
     return new Vector3();
@@ -393,5 +396,67 @@ describe("targeted UV and native action boundaries", () => {
     for (const result of results) {
       expect(result).toEqual(expect.stringMatching(/^\(Code executed successfully, but its result could not be converted to JSON: /));
     }
+  });
+});
+
+describe("vertex merging", () => {
+  /** Gives every face corner a distinct UV, `[corner, corner * 10]`, so merges can be traced. */
+  const labelUvs = (mesh: HostMesh): void => {
+    Object.values(mesh.faces).forEach(face => face.vertices.forEach((key, corner) => { face.uv[key] = [corner, corner * 10]; }));
+  };
+
+  test("a face that already holds the survivor drops the merged key and keeps the survivor's own UV", () => {
+    const mesh = new HostMesh([[0, 0, 0], [0.05, 0, 0], [2, 2, 0], [0, 2, 0]], [[0, 1, 2, 3]]);
+    const [a, , c, d] = Object.keys(mesh.vertices);
+    const face = required(Object.values(mesh.faces)[0], "quad face");
+    labelUvs(mesh);
+    expect(mergeMeshVertices(asMesh(mesh), 0.1, false)).toEqual({ merged_vertices: 1, removed_faces: 0 });
+    expect(face.vertices).toEqual([a, c, d]);
+    expect(face.uv).toEqual({ [a]: [0, 0], [c]: [2, 20], [d]: [3, 30] });
+    expect(Object.keys(mesh.vertices)).toEqual([a, c, d]);
+    expect(undo.finishes).toBe(1);
+  });
+
+  test("welding a seam puts each survivor in place of the merged key, with that corner's UV", () => {
+    // Two quads touching at x = 2 without sharing vertices.
+    const mesh = new HostMesh([[0, 0, 0], [2, 0, 0], [2, 2, 0], [0, 2, 0], [2, 0, 0], [4, 0, 0], [4, 2, 0], [2, 2, 0]], [[0, 1, 2, 3], [4, 5, 6, 7]]);
+    const keys = Object.keys(mesh.vertices);
+    const [left, right] = Object.values(mesh.faces);
+    labelUvs(mesh);
+    expect(mergeMeshVertices(asMesh(mesh), 0.001, false)).toEqual({ merged_vertices: 2, removed_faces: 0 });
+    expect(left.vertices).toEqual(keys.slice(0, 4));
+    expect(right.vertices).toEqual([keys[1], keys[5], keys[6], keys[2]]);
+    expect(right.uv).toEqual({ [keys[1]]: [0, 0], [keys[5]]: [1, 10], [keys[6]]: [2, 20], [keys[2]]: [3, 30] });
+    expect(Object.keys(mesh.vertices)).toHaveLength(6);
+  });
+
+  test("faces the merge collapses are removed and the selection drops removed keys", () => {
+    // A sliver triangle whose last two corners nearly coincide, next to a triangle that survives the merge.
+    const mesh = new HostMesh([[0, 0, 0], [2, 0, 0], [2, 0.01, 0], [0, 2, 0]], [[0, 1, 2], [0, 2, 3]]);
+    const [a, b, c, d] = Object.keys(mesh.vertices);
+    const [sliver, kept] = Object.keys(mesh.faces);
+    select(mesh);
+    required(project.mesh_selection[mesh.uuid], "mesh selection").edges = [[b, c], [a, b]];
+    expect(mergeMeshVertices(asMesh(mesh), 0.1, true)).toEqual({ merged_vertices: 1, removed_faces: 1 });
+    expect(mesh.faces[sliver]).toBeUndefined();
+    expect(mesh.faces[kept].vertices).toEqual([a, b, d]);
+    expect(project.mesh_selection[mesh.uuid]).toEqual({ vertices: [a, b, d], edges: [[a, b]], faces: [kept] });
+  });
+
+  test("invalid input fails before Undo, nothing to merge adds no history, and a preview failure rolls back", () => {
+    const mesh = quad();
+    expect(() => mergeMeshVertices(asMesh(mesh), -1, false)).toThrow("finite distance of 0 or more");
+    expect(() => mergeMeshVertices(asMesh(mesh), 0.1, true)).toThrow("No vertices selected");
+    project.mesh_selection[mesh.uuid] = { vertices: ["missing"], edges: [], faces: [] };
+    expect(() => mergeMeshVertices(asMesh(mesh), 0.1, true)).toThrow("missing vertices");
+    expect(mergeMeshVertices(asMesh(mesh), 0.1, false)).toEqual({ merged_vertices: 0, removed_faces: 0 });
+    expect(undo.starts).toBe(0);
+    const welded = new HostMesh([[0, 0, 0], [0, 0, 0], [2, 2, 0], [0, 2, 0]], [[0, 1, 2, 3]]);
+    const before = snapshot(welded);
+    refreshFailure = true;
+    expect(() => mergeMeshVertices(asMesh(welded), 0.1, false)).toThrow("Preview failure");
+    expect(snapshot(welded)).toEqual(before);
+    expect(undo.pending).toBeUndefined();
+    expect(undo.finishes).toBe(0);
   });
 });

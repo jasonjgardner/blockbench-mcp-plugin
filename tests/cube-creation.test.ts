@@ -21,6 +21,9 @@ interface ICubeData {
   rotation: number[];
   autouv: number;
   box_uv: boolean;
+  inflate: number;
+  uv_offset: number[];
+  mirror_uv: boolean;
   faces: Record<Side, IFaceData>;
 }
 /** Property snapshots own creation/deletion, while the outline only owns parenting. */
@@ -37,12 +40,39 @@ let tools: IToolFixture;
 let roots: HostCube[] = [];
 let failInitName: string | undefined;
 let failRefresh = false;
+let failAutoUv = false;
 let refuseParent = false;
 let textureCalls: { cube: string; sides: Side[] | true | undefined }[] = [];
 let autoUvCalls: string[] = [];
 let autoUvInputs: Record<Side, number[]>[] = [];
-const format = { id: "free", box_uv: false, optional_box_uv: false };
+/** Geometry a size limiter test may override, as Blockbench's `cube_size_limiter.test(cube, values)` takes it. */
+interface ILimitValues {
+  from?: number[];
+  to?: number[];
+  inflate?: number;
+}
+/** The part of Blockbench's `Format.cube_size_limiter` the tools use. */
+interface ISizeLimiter {
+  coordinate_limits?: [number, number];
+  box_marker_size?: number[];
+  test(cube: HostCube, values?: ILimitValues): boolean;
+}
+/** Blockbench's Java block limiter test (js/formats/java/java_block.ts): from/to ± inflate within -16…32. */
+const javaBlockLimiter: ISizeLimiter = {
+  coordinate_limits: [-16, 32],
+  test(cube, values = {}) {
+    const from = values.from ?? cube.from;
+    const to = values.to ?? cube.to;
+    const inflate = values.inflate ?? cube.inflate;
+    return from.some((start, axis) => {
+      const end = to[axis] ?? start;
+      return end + inflate > 32 || end + inflate < -16 || start - inflate > 32 || start - inflate < -16;
+    });
+  },
+};
+const format: { id: string; box_uv: boolean; optional_box_uv: boolean; cube_size_limiter?: ISizeLimiter } = { id: "free", box_uv: false, optional_box_uv: false };
 const project = { box_uv: false, get textures(): HostTexture[] { return HostTexture.all; } };
+const settings = { deactivate_size_limit: { value: false } };
 
 class HostTexture {
   static all: HostTexture[] = [];
@@ -80,14 +110,21 @@ class HostCube {
   rotation = [0, 0, 0];
   autouv = 0;
   box_uv = project.box_uv;
+  inflate = 0;
+  uv_offset = [0, 0];
+  mirror_uv = false;
   faces: Record<Side, HostFace> = {
     north: new HostFace(), east: new HostFace(), south: new HostFace(),
     west: new HostFace(), up: new HostFace(), down: new HostFace(),
   };
   constructor(data: Partial<ICubeData>) {
+    this.extend(data);
+  }
+  extend(data: Partial<ICubeData>): this {
     const { faces, ...properties } = data;
     Object.assign(this, structuredClone(properties));
     if (faces) SIDES.forEach(side => this.faces[side].extend(faces[side]));
+    return this;
   }
   init(): this {
     HostCube.all.push(this);
@@ -112,6 +149,7 @@ class HostCube {
     targets.forEach(side => { this.faces[side].texture = texture.uuid; });
   }
   mapAutoUV(): void {
+    if (failAutoUv) throw new Error("Auto UV failed");
     autoUvCalls.push(this.uuid);
     autoUvInputs.push(Object.fromEntries(SIDES.map(side => [side, [...this.faces[side].uv]])) as Record<Side, number[]>);
     if (!format.id.startsWith("hytale_") || this.box_uv || this.autouv !== 1) return;
@@ -134,7 +172,7 @@ function cubeData(cube: HostCube): ICubeData {
   return {
     uuid: cube.uuid, name: cube.name, from: [...cube.from], to: [...cube.to],
     origin: [...cube.origin], rotation: [...cube.rotation], autouv: cube.autouv,
-    box_uv: cube.box_uv,
+    box_uv: cube.box_uv, inflate: cube.inflate, uv_offset: [...cube.uv_offset], mirror_uv: cube.mirror_uv,
     faces: Object.fromEntries(SIDES.map(side => [side, {
       uv: [...cube.faces[side].uv], texture: cube.faces[side].texture,
     }])) as Record<Side, IFaceData>,
@@ -200,6 +238,7 @@ beforeEach(() => {
   roots = [];
   failInitName = undefined;
   failRefresh = false;
+  failAutoUv = false;
   refuseParent = false;
   textureCalls = [];
   autoUvCalls = [];
@@ -207,13 +246,15 @@ beforeEach(() => {
   format.id = "free";
   format.box_uv = false;
   format.optional_box_uv = false;
+  format.cube_size_limiter = undefined;
+  settings.deactivate_size_limit.value = false;
   project.box_uv = false;
   undo.reset();
 });
 useGlobals(() => ({
   Canvas: { updateAll() { if (failRefresh) throw new Error("Preview failed"); } },
   Cube: HostCube, Group: HostGroup, Texture: HostTexture, Format: format,
-  Project: project, Undo: nativeUndo,
+  Project: project, Undo: nativeUndo, settings,
 }));
 
 test("untextured batch blockout undo removes new cubes and redo restores UUIDs, geometry and parents", async () => {
@@ -414,4 +455,133 @@ test.each(["initialization", "preview", "parent"])("%s failure rolls back the wh
   expect(undo.pending).toBeUndefined();
   expect(undo.lastEdit).toBeUndefined();
   expect(undo.cancels).toBe(1);
+});
+
+test("modify_cube records one undo entry and re-maps auto UV after a resize", async () => {
+  const cube = new HostCube({ name: "Box", autouv: 1 }).init();
+  const before = model();
+  await tools.call("modify_cube", { id: cube.uuid, to: [6, 4, 2] });
+  const modified = model();
+  expect(cube.to).toEqual([6, 4, 2]);
+  expect(autoUvCalls).toEqual([cube.uuid]);
+  expect(undo.starts).toBe(1);
+  expect(undo.finishes).toBe(1);
+  undo.undo();
+  expect(model()).toEqual(before);
+  undo.redo();
+  expect(model()).toEqual(modified);
+});
+
+test.each(["auto UV", "preview"])("modify_cube %s failure reverts every cube and closes the edit", async failure => {
+  const first = new HostCube({ name: "First", autouv: 1 }).init();
+  const second = new HostCube({ name: "Second", autouv: 1 }).init();
+  HostCube.selected = [first, second];
+  const before = model();
+  failAutoUv = failure === "auto UV";
+  failRefresh = failure === "preview";
+  await expect(tools.call("modify_cube", { from: [1, 1, 1], to: [5, 5, 5] })).rejects.toThrow(failure === "preview" ? "Preview failed" : "Auto UV failed");
+  expect(model()).toEqual(before);
+  expect(undo.pending).toBeUndefined();
+  expect(undo.lastEdit).toBeUndefined();
+  expect(undo.cancels).toBe(1);
+});
+
+test("inflate, uv_offset and mirror_uv reach box UV cubes and survive undo/redo", async () => {
+  project.box_uv = true;
+  format.box_uv = true;
+  format.optional_box_uv = true;
+  await tools.call("place_cube", { elements: [{ name: "Hat", from: [0, 0, 0], to: [8, 8, 8], inflate: 0.5, uv_offset: [32, 0], mirror_uv: true }] });
+  const cube = required(HostCube.all[0], "created cube");
+  expect(cube).toMatchObject({ box_uv: true, inflate: 0.5, uv_offset: [32, 0], mirror_uv: true });
+  const created = model();
+  undo.undo();
+  expect(HostCube.all).toEqual([]);
+  undo.redo();
+  expect(model()).toEqual(created);
+});
+
+test("inflate applies to per-face cubes too", async () => {
+  await tools.call("place_cube", { elements: [{ name: "Shell", inflate: 0.25 }] });
+  expect(required(HostCube.all[0], "created cube").inflate).toBe(0.25);
+});
+
+test.each([
+  { label: "a per-face project", setup: () => {}, faces: undefined },
+  { label: "partial faces in a box UV project", setup: () => { project.box_uv = true; format.box_uv = true; format.optional_box_uv = true; }, faces: ["up"] },
+])("uv_offset and mirror_uv are refused before Undo for $label", async ({ setup, faces }) => {
+  setup();
+  await expect(tools.call("place_cube", { elements: [{ name: "Arm", uv_offset: [16, 0] }], ...(faces && { faces }) })).rejects.toThrow('Cube "Arm": uv_offset and mirror_uv place the box UV net');
+  await expect(tools.call("place_cube", { elements: [{ name: "Arm", mirror_uv: true }], ...(faces && { faces }) })).rejects.toThrow("per-face UV");
+  expect(undo.starts).toBe(0);
+  expect(HostCube.all).toEqual([]);
+});
+
+test("no-op uv_offset and mirror_uv values are accepted on per-face cubes", async () => {
+  await tools.call("place_cube", { elements: [{ name: "Plain", uv_offset: [0, 0], mirror_uv: false }] });
+  expect(required(HostCube.all[0], "created cube")).toMatchObject({ box_uv: false, uv_offset: [0, 0], mirror_uv: false });
+});
+
+test("unknown element fields are rejected instead of silently dropped", async () => {
+  await expect(tools.call("place_cube", { elements: [{ name: "Typo", inflat: 0.5 }] })).rejects.toThrow("Unrecognized key");
+  await expect(tools.call("place_cube", { elements: [{ name: "Unsupported", box_uv: false }] })).rejects.toThrow("Unrecognized key");
+  expect(undo.starts).toBe(0);
+  expect(HostCube.all).toEqual([]);
+});
+
+test("place_cube refuses cubes the format's size limiter rejects and reverts the whole batch", async () => {
+  format.id = "java_block";
+  format.cube_size_limiter = javaBlockLimiter;
+  const before = model();
+  await expect(tools.call("place_cube", {
+    elements: [{ name: "near", to: [2, 2, 2] }, { name: "far", from: [40, 0, 0], to: [41, 1, 1] }],
+  })).rejects.toThrow('The java_block format\'s size limit refuses "far": every coordinate, including inflate, must stay within -16…32.');
+  expect(model()).toEqual(before);
+  expect(undo.pending).toBeUndefined();
+  expect(undo.lastEdit).toBeUndefined();
+  expect(undo.cancels).toBe(1);
+});
+
+test("place_cube accepts cubes inside the size limit and counts inflate", async () => {
+  format.id = "java_block";
+  format.cube_size_limiter = javaBlockLimiter;
+  await tools.call("place_cube", { elements: [{ name: "edge", from: [30, 0, 0], to: [32, 2, 2] }] });
+  await expect(tools.call("place_cube", { elements: [{ name: "puffy", from: [30, 0, 0], to: [32, 2, 2], inflate: 0.5 }] })).rejects.toThrow('refuses "puffy"');
+  expect(HostCube.all.map(cube => cube.name)).toEqual(["edge"]);
+});
+
+test("modify_cube refuses a new size the limiter rejects before Undo, and leaves other edits alone", async () => {
+  format.id = "java_block";
+  format.cube_size_limiter = javaBlockLimiter;
+  const inside = new HostCube({ name: "inside", from: [0, 0, 0], to: [4, 4, 4] }).init();
+  const outside = new HostCube({ name: "outside", from: [40, 0, 0], to: [41, 1, 1] }).init();
+  await expect(tools.call("modify_cube", { id: inside.uuid, to: [4, 40, 4] })).rejects.toThrow('refuses "inside"');
+  await expect(tools.call("modify_cube", { id: inside.uuid, inflate: 20 })).rejects.toThrow('refuses "inside"');
+  expect(undo.starts).toBe(0);
+  expect(inside.to).toEqual([4, 4, 4]);
+  // Renaming or rotating a cube that is already out of bounds is not a new size.
+  await tools.call("modify_cube", { id: outside.uuid, name: "renamed", rotation: [0, 45, 0] });
+  expect(outside).toMatchObject({ name: "renamed", rotation: [0, 45, 0] });
+});
+
+test("the Deactivate Size Limit setting lets geometry past the limit through", async () => {
+  format.id = "java_block";
+  format.cube_size_limiter = javaBlockLimiter;
+  settings.deactivate_size_limit.value = true;
+  await tools.call("place_cube", { elements: [{ name: "far", from: [40, 0, 0], to: [41, 1, 1] }] });
+  const far = required(HostCube.all[0], "created cube");
+  await tools.call("modify_cube", { id: far.uuid, to: [60, 1, 1] });
+  expect(far.to).toEqual([60, 1, 1]);
+});
+
+test("formats without a size limiter are unaffected", async () => {
+  await tools.call("place_cube", { elements: [{ name: "far", from: [400, 0, 0], to: [401, 1, 1] }] });
+  await tools.call("modify_cube", { id: required(HostCube.all[0], "created cube").uuid, to: [600, 1, 1] });
+  expect(HostCube.all[0]?.to).toEqual([600, 1, 1]);
+});
+
+test("a limiter without coordinate limits is described by its box size", async () => {
+  format.id = "bedrock_block";
+  format.cube_size_limiter = { box_marker_size: [30, 30, 30], test: () => true };
+  const cube = new HostCube({ name: "tower" }).init();
+  await expect(tools.call("modify_cube", { id: cube.uuid, to: [1, 40, 1] })).rejects.toThrow('The bedrock_block format\'s size limit refuses "tower": the model must fit in a 30×30×30 box.');
 });

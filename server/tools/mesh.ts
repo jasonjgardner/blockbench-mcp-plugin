@@ -14,7 +14,8 @@ import {
 } from "@/lib/zodObjects";
 import { MAX_SUBDIVISION_CUTS, STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
 import { getProjectTexture, getMeshOrSelected, findMeshOrThrow } from "@/lib/util";
-import { deleteMeshSelection, extrudeMeshFaces, subdivideMeshFaces } from "@/lib/mesh-editing";
+import { deleteMeshSelection, editMesh, extrudeMeshFaces, mergeMeshVertices, subdivideMeshFaces } from "@/lib/mesh-editing";
+import { runUndoableEdit } from "@/lib/undo";
 import {
   addCylinderGeometry,
   addIndexedGeometry,
@@ -113,16 +114,9 @@ export const selectMeshElementsParameters = z.object({
   mesh_id: meshIdSchema.describe("ID or name of the mesh to select elements from."),
   mode: meshSelectionModeEnum.describe("Selection mode."),
   elements: z
-    .array(
-      z.union([
-        z
-          .string()
-          .describe("Vertex key, edge as 'vkey1-vkey2', or face key"),
-        z.number().describe("Index of the element"),
-      ])
-    )
+    .array(z.string().describe("Vertex key, edge as 'vkey1-vkey2', or face key"))
     .optional()
-    .describe("Specific elements to select. If not provided, selects all."),
+    .describe("Keys to select: vertex keys in vertex mode, face keys in face mode, 'vkey1-vkey2' edges in edge mode (from get_mesh_info or the creation tools). If not provided, selects all."),
   action: selectionActionEnum
     .default("select")
     .describe(
@@ -338,7 +332,7 @@ export const meshToolDocs: IToolSpec[] = [
     name: "select_mesh_elements",
     condition: { project: true, features: ["meshes"] },
     description:
-      "Selects vertices, edges, or faces of a mesh for manipulation.",
+      "Selects vertices, edges, or faces of a mesh for manipulation. Keys the mesh does not have are rejected, except when removing them from the selection.",
     annotations: {
       title: "Select Mesh Elements",
       destructiveHint: true,
@@ -349,7 +343,7 @@ export const meshToolDocs: IToolSpec[] = [
   {
     name: "move_mesh_vertices",
     condition: { project: true, features: ["meshes"] },
-    description: "Moves selected vertices of a mesh by the specified offset.",
+    description: "Moves the given vertex keys, or the mesh's selected vertices, by the specified offset in one undo entry. Unknown keys are rejected before anything moves.",
     annotations: {
       title: "Move Mesh Vertices",
       destructiveHint: true,
@@ -372,7 +366,7 @@ export const meshToolDocs: IToolSpec[] = [
     name: "merge_mesh_vertices",
     condition: { project: true, features: ["meshes"] },
     description:
-      "Merges vertices that are within a specified distance of each other.",
+      "Merges vertices that are within a specified distance of each other, in one undo entry. Each face keeps a surviving vertex once; faces the merge collapses (fewer than three vertices left) are removed.",
     annotations: {
       title: "Merge Mesh Vertices",
       destructiveHint: true,
@@ -383,7 +377,7 @@ export const meshToolDocs: IToolSpec[] = [
   {
     name: "create_mesh_face",
     condition: { project: true, features: ["meshes"] },
-    description: "Creates a new face from selected vertices.",
+    description: "Creates a triangle or quad face from 3 or 4 distinct existing vertex keys, with an optional texture, in one undo entry.",
     annotations: {
       title: "Create Mesh Face",
       destructiveHint: true,
@@ -447,6 +441,25 @@ export const meshToolDocs: IToolSpec[] = [
 interface IPlacedMesh extends IIndexedGeometryKeys {
   name: string;
   uuid: string;
+}
+
+/**
+ * Entries of `keys` that name no component of `mesh` in `mode`. Edges are two
+ * existing vertex keys joined by "-".
+ */
+function unknownComponents(mesh: Mesh, mode: z.infer<typeof meshSelectionModeEnum>, keys: readonly string[]): string[] {
+  if (mode === "vertex") return keys.filter((key) => !Object.hasOwn(mesh.vertices, key));
+  if (mode === "face") return keys.filter((key) => !Object.hasOwn(mesh.faces, key));
+  return keys.filter((key) => {
+    const ends = key.split("-");
+    return ends.length !== 2 || ends.some((end) => !Object.hasOwn(mesh.vertices, end));
+  });
+}
+
+/** Error for component keys a mesh does not have, pointing to where current keys are listed. */
+function unknownComponentsError(mesh: Mesh, kind: string, keys: readonly string[]): Error {
+  const hint = kind === "edge" ? '; edges are two vertex keys joined by "-"' : "";
+  return new Error(`Mesh "${mesh.name}" has no ${kind} ${keys.map((key) => `"${key}"`).join(", ")}. Use get_mesh_info for current keys${hint}.`);
 }
 
 /** Resolve references before beginning an edit so invalid inputs leave no undo state. */
@@ -543,124 +556,110 @@ export function registerMeshTools(): void {
     ...meshToolDocs[4],
     parameters: selectMeshElementsParameters,
     async execute({ mesh_id, mode, elements, action }) {
-      if (!Project) {
+      const project = Project;
+      if (!project) {
         throw new Error("No project is open. Open a project before selecting mesh elements.");
       }
       const mesh = findMeshOrThrow(mesh_id);
+      // Keys being added must exist on the mesh; removing a stale key is harmless.
+      const unknown = action === "remove" ? [] : unknownComponents(mesh, mode, elements ?? []);
+      if (unknown.length) throw unknownComponentsError(mesh, mode, unknown);
 
-      Undo.initEdit({
-        elements: [mesh],
-        selection: true,
-        collections: [],
-      });
+      // One transaction: a failure part-way reverts the selection instead of leaving the edit open.
+      const selected = runUndoableEdit({ elements: [mesh], selection: true, collections: [] }, "Select mesh elements", () => {
+        // Object selection may clear component state. Preserve existing keys for
+        // add/remove/toggle and finish that lifecycle before installing the result.
+        const previousSelection = project.mesh_selection[mesh.uuid];
+        mesh.select();
 
-      // Object selection may clear component state. Preserve existing keys for
-      // add/remove/toggle and finish that lifecycle before installing the result.
-      const previousSelection = Project.mesh_selection[mesh.uuid];
-      mesh.select();
+        // Set selection mode
+        // @ts-expect-error Selection mode setter available at runtime
+        BarItems.selection_mode.set(mode);
+        const selection = (project.mesh_selection[mesh.uuid] ??= previousSelection ??
+        {
+          vertices: [],
+          edges: [],
+          faces: [],
+        }) as {
+          vertices: string[];
+          edges: unknown[];
+          faces: string[];
+        };
 
-      // Set selection mode
-      // @ts-expect-error Selection mode setter available at runtime
-      BarItems.selection_mode.set(mode);
-      const selection = (Project.mesh_selection[mesh.uuid] ??= previousSelection ??
-      {
-        vertices: [],
-        edges: [],
-        faces: [],
-      }) as {
-        vertices: string[];
-        edges: unknown[];
-        faces: string[];
-      };
-
-      if (action === "select") {
-        // Clear existing selection
-        selection.vertices = [];
-        selection.edges.length = 0;
-        selection.faces = [];
-      }
-
-      if (!elements || elements.length === 0) {
-        // Select all elements of the specified type
-        if (mode === "vertex") {
-          selection.vertices = Object.keys(mesh.vertices);
-        } else if (mode === "face") {
-          selection.faces = Object.keys(mesh.faces);
-        } else if (mode === "edge") {
-          // Collect all unique edges from faces
-          const allEdges: [string, string][] = [];
-          const seen = new Set<string>();
-          for (const fkey in mesh.faces) {
-            const face = mesh.faces[fkey];
-            const edges = (face.getEdges() as unknown as [string, string][]);
-            for (const [a, b] of edges) {
-              const key = a < b ? `${a}-${b}` : `${b}-${a}`;
-              if (!seen.has(key)) {
-                seen.add(key);
-                allEdges.push([a, b]);
-              }
-            }
-          }
-          const selEdges = selection.edges as unknown as [string, string][];
-          selEdges.length = 0;
-          selEdges.push(...allEdges);
+        if (action === "select") {
+          // Clear existing selection
+          selection.vertices = [];
+          selection.edges.length = 0;
+          selection.faces = [];
         }
-      } else {
-        // Select specific elements
-        elements.forEach((element) => {
+
+        if (!elements || elements.length === 0) {
+          // Select all elements of the specified type
           if (mode === "vertex") {
-            const vkey = String(element);
-            if (action === "add" || action === "select") {
-              if (!selection.vertices.includes(vkey)) {
-                selection.vertices.push(vkey);
-              }
-            } else if (action === "remove") {
-              selection.vertices = selection.vertices.filter((k) => k !== vkey);
-            } else if (action === "toggle") {
-              if (selection.vertices.includes(vkey)) {
-                selection.vertices = selection.vertices.filter((k) => k !== vkey);
-              } else {
-                selection.vertices.push(vkey);
-              }
-            }
+            selection.vertices = Object.keys(mesh.vertices);
           } else if (mode === "face") {
-            const fkey = String(element);
-            if (action === "add" || action === "select") {
-              if (!selection.faces.includes(fkey)) {
-                selection.faces.push(fkey);
-              }
-            } else if (action === "remove") {
-              selection.faces = selection.faces.filter((k) => k !== fkey);
-            } else if (action === "toggle") {
-              if (selection.faces.includes(fkey)) {
-                selection.faces = selection.faces.filter((k) => k !== fkey);
-              } else {
-                selection.faces.push(fkey);
+            selection.faces = Object.keys(mesh.faces);
+          } else if (mode === "edge") {
+            // Collect all unique edges from faces
+            const allEdges: [string, string][] = [];
+            const seen = new Set<string>();
+            for (const fkey in mesh.faces) {
+              const face = mesh.faces[fkey];
+              const edges = (face.getEdges() as unknown as [string, string][]);
+              for (const [a, b] of edges) {
+                const key = a < b ? `${a}-${b}` : `${b}-${a}`;
+                if (!seen.has(key)) {
+                  seen.add(key);
+                  allEdges.push([a, b]);
+                }
               }
             }
-          } else if (mode === "edge") {
-            // Parse edge format "vkey1-vkey2"
-            const edgeParts = String(element).split("-");
-            if (edgeParts.length === 2) {
-              const edge: [string, string] = [edgeParts[0], edgeParts[1]];
-              const selEdges = selection.edges as unknown as [string, string][];
+            const selEdges = selection.edges as unknown as [string, string][];
+            selEdges.length = 0;
+            selEdges.push(...allEdges);
+          }
+        } else {
+          // Select specific elements
+          elements.forEach((element) => {
+            if (mode === "vertex") {
+              const vkey = String(element);
               if (action === "add" || action === "select") {
-                selEdges.push(edge);
+                if (!selection.vertices.includes(vkey)) {
+                  selection.vertices.push(vkey);
+                }
               } else if (action === "remove") {
-                const filtered = selEdges.filter(
-                  (e) =>
-                    !(e[0] === edge[0] && e[1] === edge[1]) &&
-                    !(e[0] === edge[1] && e[1] === edge[0])
-                );
-                selEdges.length = 0;
-                selEdges.push(...filtered);
+                selection.vertices = selection.vertices.filter((k) => k !== vkey);
               } else if (action === "toggle") {
-                const exists = selEdges.some(
-                  (e) =>
-                    (e[0] === edge[0] && e[1] === edge[1]) ||
-                    (e[0] === edge[1] && e[1] === edge[0])
-                );
-                if (exists) {
+                if (selection.vertices.includes(vkey)) {
+                  selection.vertices = selection.vertices.filter((k) => k !== vkey);
+                } else {
+                  selection.vertices.push(vkey);
+                }
+              }
+            } else if (mode === "face") {
+              const fkey = String(element);
+              if (action === "add" || action === "select") {
+                if (!selection.faces.includes(fkey)) {
+                  selection.faces.push(fkey);
+                }
+              } else if (action === "remove") {
+                selection.faces = selection.faces.filter((k) => k !== fkey);
+              } else if (action === "toggle") {
+                if (selection.faces.includes(fkey)) {
+                  selection.faces = selection.faces.filter((k) => k !== fkey);
+                } else {
+                  selection.faces.push(fkey);
+                }
+              }
+            } else if (mode === "edge") {
+              // Parse edge format "vkey1-vkey2"
+              const edgeParts = String(element).split("-");
+              if (edgeParts.length === 2) {
+                const edge: [string, string] = [edgeParts[0], edgeParts[1]];
+                const selEdges = selection.edges as unknown as [string, string][];
+                if (action === "add" || action === "select") {
+                  selEdges.push(edge);
+                } else if (action === "remove") {
                   const filtered = selEdges.filter(
                     (e) =>
                       !(e[0] === edge[0] && e[1] === edge[1]) &&
@@ -668,29 +667,43 @@ export function registerMeshTools(): void {
                   );
                   selEdges.length = 0;
                   selEdges.push(...filtered);
-                } else {
-                  selEdges.push(edge);
+                } else if (action === "toggle") {
+                  const exists = selEdges.some(
+                    (e) =>
+                      (e[0] === edge[0] && e[1] === edge[1]) ||
+                      (e[0] === edge[1] && e[1] === edge[0])
+                  );
+                  if (exists) {
+                    const filtered = selEdges.filter(
+                      (e) =>
+                        !(e[0] === edge[0] && e[1] === edge[1]) &&
+                        !(e[0] === edge[1] && e[1] === edge[0])
+                    );
+                    selEdges.length = 0;
+                    selEdges.push(...filtered);
+                  } else {
+                    selEdges.push(edge);
+                  }
                 }
               }
             }
-          }
+          });
+        }
+
+        Canvas.updateView({
+          elements: [mesh],
+          selection: true,
         });
-      }
-
-      Canvas.updateView({
-        elements: [mesh],
-        selection: true,
+        return selection;
       });
-
-      Undo.finishEdit("Select mesh elements");
 
       return JSON.stringify({
         mesh: mesh.name,
         mode,
         selected: {
-          vertices: selection.vertices.length,
-          edges: selection.edges.length,
-          faces: selection.faces.length,
+          vertices: selected.vertices.length,
+          edges: selected.edges.length,
+          faces: selected.faces.length,
         },
       });
     },
@@ -701,31 +714,22 @@ export function registerMeshTools(): void {
     parameters: moveMeshVerticesParameters,
     async execute({ mesh_id, offset, vertices }) {
       const mesh = getMeshOrSelected(mesh_id);
+      if (offset.some((value) => !Number.isFinite(value))) throw new Error("offset must contain finite numbers.");
+      // A key listed twice still moves once.
+      const verticesToMove = [...new Set(vertices ?? mesh.getSelectedVertices())];
+      if (!verticesToMove.length) {
+        throw new Error(vertices ? "vertices is empty; pass the vertex keys to move." : "No vertices selected. Pass vertices, or select them with select_mesh_elements.");
+      }
+      const missing = verticesToMove.filter((vkey) => !Object.hasOwn(mesh.vertices, vkey));
+      if (missing.length) throw unknownComponentsError(mesh, "vertex", missing);
 
-      Undo.initEdit({
-        elements: [mesh],
-      });
-
-      const verticesToMove = vertices || mesh.getSelectedVertices();
-
-      verticesToMove.forEach((vkey) => {
-        if (mesh.vertices[vkey]) {
-          mesh.vertices[vkey][0] += offset[0];
-          mesh.vertices[vkey][1] += offset[1];
-          mesh.vertices[vkey][2] += offset[2];
-        }
-      });
-
-      mesh.preview_controller.updateGeometry(mesh);
-
-      Undo.finishEdit("Move mesh vertices");
-      Canvas.updateView({
-        elements: [mesh],
-        element_aspects: {
-          geometry: true,
-          uv: true,
-          faces: true,
-        },
+      editMesh(mesh, "Move mesh vertices", () => {
+        verticesToMove.forEach((vkey) => {
+          const position = mesh.vertices[vkey];
+          position[0] += offset[0];
+          position[1] += offset[1];
+          position[2] += offset[2];
+        });
       });
 
       return `Moved ${verticesToMove.length} vertices of mesh "${mesh.name}"`;
@@ -743,105 +747,30 @@ export function registerMeshTools(): void {
 
   createTool(meshToolDocs[7].name, {
     ...meshToolDocs[7],
+    parameters: mergeMeshVerticesParameters,
     async execute({ mesh_id, threshold, selected_only }) {
       const mesh = findMeshOrThrow(mesh_id);
-
-      Undo.initEdit({
-        elements: [mesh],
-      });
-
-      const verticesToCheck = selected_only
-        ? mesh.getSelectedVertices()
-        : Object.keys(mesh.vertices);
-
-      let mergedCount = 0;
-      const mergeMap: Record<string, string> = {};
-
-      // Find vertices to merge
-      for (let i = 0; i < verticesToCheck.length; i++) {
-        const vkey1 = verticesToCheck[i];
-        if (mergeMap[vkey1]) continue;
-
-        for (let j = i + 1; j < verticesToCheck.length; j++) {
-          const vkey2 = verticesToCheck[j];
-          if (mergeMap[vkey2]) continue;
-
-          const v1 = mesh.vertices[vkey1];
-          const v2 = mesh.vertices[vkey2];
-          const distance = Math.sqrt(
-            (v1[0] - v2[0]) ** 2 + (v1[1] - v2[1]) ** 2 + (v1[2] - v2[2]) ** 2
-          );
-
-          if (distance <= threshold) {
-            mergeMap[vkey2] = vkey1;
-            mergedCount++;
-          }
-        }
-      }
-
-      // Apply merges
-      Object.entries(mergeMap).forEach(([oldKey, newKey]) => {
-        // Update faces
-        for (const fkey in mesh.faces) {
-          const face = mesh.faces[fkey];
-          const index = face.vertices.indexOf(oldKey);
-          if (index !== -1) {
-            face.vertices[index] = newKey;
-            face.uv[newKey] = face.uv[oldKey] || [0, 0];
-            delete face.uv[oldKey];
-          }
-        }
-        // Remove merged vertex
-        delete mesh.vertices[oldKey];
-      });
-
-      mesh.preview_controller.updateGeometry(mesh);
-
-      Undo.finishEdit("Merge mesh vertices");
-      Canvas.updateView({
-        elements: [mesh],
-        element_aspects: {
-          geometry: true,
-          uv: true,
-          faces: true,
-        },
-      });
-
-      return `Merged ${mergedCount} vertices in mesh "${mesh.name}"`;
+      const { merged_vertices, removed_faces } = mergeMeshVertices(mesh, threshold, selected_only);
+      const removed = removed_faces ? `; removed ${removed_faces} collapsed face${removed_faces === 1 ? "" : "s"}` : "";
+      return `Merged ${merged_vertices} vertices in mesh "${mesh.name}"${removed}`;
     },
   }, meshToolDocs[7].status);
 
   createTool(meshToolDocs[8].name, {
     ...meshToolDocs[8],
+    parameters: createMeshFaceParameters,
     async execute({ mesh_id, vertices, texture }) {
       const mesh = getMeshOrSelected(mesh_id);
+      if (new Set(vertices).size !== vertices.length) throw new Error("Face vertices must be distinct keys.");
+      const missing = vertices.filter((vkey) => !Object.hasOwn(mesh.vertices, vkey));
+      if (missing.length) throw unknownComponentsError(mesh, "vertex", missing);
+      const faceTexture = texture ? getProjectTexture(texture) : undefined;
+      if (texture && !faceTexture) throw new Error(`Texture "${texture}" not found. Use list_textures to find a texture.`);
 
-      Undo.initEdit({
-        elements: [mesh],
-      });
-
-      // Create the face
-      const face = new MeshFace(mesh, {
-        vertices,
-        texture: texture ? getProjectTexture(texture)?.uuid : undefined,
-      });
-
-      const [faceKey] = mesh.addFaces(face);
-
-      // Auto UV the new face
-      UVEditor.setAutoSize(null, true, [faceKey]);
-
-      mesh.preview_controller.updateGeometry(mesh);
-      mesh.preview_controller.updateUV(mesh);
-
-      Undo.finishEdit("Create mesh face");
-      Canvas.updateView({
-        elements: [mesh],
-        element_aspects: {
-          geometry: true,
-          uv: true,
-          faces: true,
-        },
+      editMesh(mesh, "Create mesh face", () => {
+        const [faceKey] = mesh.addFaces(new MeshFace(mesh, { vertices, texture: faceTexture?.uuid }));
+        // Auto UV the new face
+        UVEditor.setAutoSize(null, true, [faceKey]);
       });
 
       return `Created face with ${vertices.length} vertices in mesh "${mesh.name}"`;

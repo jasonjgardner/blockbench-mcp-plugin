@@ -33,6 +33,14 @@ export interface IMeshDeleteResult {
   deleted_faces: number;
 }
 
+/** Counts reported after merging vertices by distance. */
+export interface IMeshMergeResult {
+  /** Vertices merged into another vertex and removed. */
+  merged_vertices: number;
+  /** Faces removed because the merge collapsed them. */
+  removed_faces: number;
+}
+
 /** A selected face captured before editing, with its perimeter in winding order. */
 interface IFaceSource {
   key: string;
@@ -308,6 +316,95 @@ export function subdivideMeshFaces(mesh: Mesh, cuts: number): IMeshEditResult {
     selected.edges = [];
     selected.vertices = [...new Set(createdFaces.flatMap(key => mesh.faces[key].vertices))];
     return { vertex_keys: [...edgeVertices.values()], face_keys: createdFaces };
+  });
+}
+
+/**
+ * Greedy distance clustering in candidate order: each vertex merges into the
+ * first earlier candidate within `threshold`, and survivors are never merged away.
+ *
+ * @returns Merged vertex key mapped to its surviving vertex key.
+ */
+function mergeSurvivors(mesh: Mesh, candidates: readonly string[], threshold: number): Map<string, string> {
+  const survivors = new Map<string, string>();
+  for (let i = 0; i < candidates.length; i++) {
+    const key = candidates[i];
+    if (survivors.has(key)) continue;
+    const position = mesh.vertices[key];
+    for (let j = i + 1; j < candidates.length; j++) {
+      const other = candidates[j];
+      if (survivors.has(other)) continue;
+      const target = mesh.vertices[other];
+      if (Math.hypot(target[0] - position[0], target[1] - position[1], target[2] - position[2]) <= threshold) survivors.set(other, key);
+    }
+  }
+  return survivors;
+}
+
+/**
+ * Replaces merged vertex keys in one face, as Blockbench's own Merge Vertices
+ * does (modeling/mesh/merge_split.ts): a key whose survivor the face already
+ * holds is dropped with its UV, otherwise the survivor takes its place (keeping
+ * the winding) and its UV, so the face holds every key once.
+ *
+ * @returns Whether the face referenced a merged vertex.
+ */
+function remapMergedFace(face: MeshFace, survivors: ReadonlyMap<string, string>): boolean {
+  const merged = face.vertices.filter(key => survivors.has(key));
+  merged.forEach(key => {
+    const survivor = getOrThrow(survivors, key, "merge survivor");
+    const index = face.vertices.indexOf(key);
+    if (face.vertices.includes(survivor)) {
+      face.vertices.splice(index, 1);
+    } else {
+      face.vertices[index] = survivor;
+      face.uv[survivor] = copyUV(face.uv[key]);
+    }
+    delete face.uv[key];
+  });
+  return merged.length > 0;
+}
+
+/**
+ * Merges vertices lying within `threshold` of an earlier vertex, then repairs the faces.
+ *
+ * Every face keeps each surviving vertex once (see {@link remapMergedFace}). Faces the
+ * merge collapses have no area and are removed: polygons left with fewer than three
+ * vertices, and two-vertex edge faces reduced to a point. Unlike the native action,
+ * which keeps a collapsed polygon as an edge unless another face covers it and then
+ * deletes every face covered by another, faces the merge did not collapse are kept,
+ * so double-sided faces survive. The component selection drops removed keys.
+ * Nothing to merge leaves no history entry.
+ *
+ * @param mesh - Mesh to edit.
+ * @param threshold - Maximum distance between merged vertices, in local units.
+ * @param selectedOnly - Merge only the mesh's selected vertices instead of all of them.
+ * @returns How many vertices were merged away and how many faces were removed.
+ * @throws When `threshold` is negative or not finite, `selectedOnly` finds no selected
+ *   vertices, or the selection references missing vertices.
+ */
+export function mergeMeshVertices(mesh: Mesh, threshold: number, selectedOnly: boolean): IMeshMergeResult {
+  if (!Number.isFinite(threshold) || threshold < 0) throw new Error("Merge threshold must be a finite distance of 0 or more.");
+  const candidates = selectedOnly ? [...new Set(mesh.getSelectedVertices())] : Object.keys(mesh.vertices);
+  if (selectedOnly && !candidates.length) throw new Error("No vertices selected. Use select_mesh_elements, or pass selected_only: false to merge across the whole mesh.");
+  if (candidates.some(key => !Object.hasOwn(mesh.vertices, key))) throw new Error("Mesh selection contains missing vertices. Select current keys from get_mesh_info.");
+  const survivors = mergeSurvivors(mesh, candidates, threshold);
+  if (!survivors.size) return { merged_vertices: 0, removed_faces: 0 };
+  return editMesh(mesh, "Merge mesh vertices", () => {
+    const collapsed = Object.keys(mesh.faces).filter(key => {
+      const face = mesh.faces[key];
+      const before = face.vertices.length;
+      return remapMergedFace(face, survivors) && face.vertices.length < Math.min(3, before);
+    });
+    collapsed.forEach(key => { delete mesh.faces[key]; });
+    survivors.forEach((_, key) => { delete mesh.vertices[key]; });
+    const selected = selectionMap()[mesh.uuid];
+    if (selected) {
+      selected.vertices = selected.vertices.filter(key => Object.hasOwn(mesh.vertices, key));
+      selected.faces = selected.faces.filter(key => Object.hasOwn(mesh.faces, key));
+      selected.edges = selected.edges.filter(edge => edge.every(key => Object.hasOwn(mesh.vertices, key)));
+    }
+    return { merged_vertices: survivors.size, removed_faces: collapsed.length };
   });
 }
 

@@ -187,20 +187,24 @@ export function findGroupOrThrow(name: string): Group {
 }
 
 /**
- * Finds a mesh by ID or name and throws an actionable error if not found.
+ * Finds a mesh by UUID, or by a unique name, and throws an actionable error if not found.
  * @param id - The UUID or name of the mesh to find
  * @returns The found Mesh
- * @throws Error with suggestion to use list_outline
+ * @throws Error with suggestion to use list_outline, or listing the UUIDs when the name is shared
  */
 export function findMeshOrThrow(id: string): Mesh {
-  // @ts-ignore - Mesh is globally available in Blockbench
-  const mesh = Mesh.all.find((m: Mesh) => m.uuid === id || m.name === id);
-  if (!mesh) {
-    throw new Error(
-      `Mesh "${id}" not found. Use the list_outline tool to see available meshes.`
-    );
+  // UUID first; a name must be unique, as in findElementOrThrow, or edits land on the wrong mesh.
+  const byUuid = Mesh.all.find((m: Mesh) => m.uuid === id);
+  if (byUuid) return byUuid;
+  const byName = Mesh.all.filter((m: Mesh) => m.name === id);
+  if (byName.length === 1) return byName[0];
+  if (byName.length > 1) {
+    const listed = byName.map((m: Mesh) => m.uuid).join(", ");
+    throw new Error(`Mesh name "${id}" matches ${byName.length} meshes (${listed}); pass the UUID of the one you mean.`);
   }
-  return mesh;
+  throw new Error(
+    `Mesh "${id}" not found. Use the list_outline tool to see available meshes.`
+  );
 }
 
 /**
@@ -210,15 +214,23 @@ export function findMeshOrThrow(id: string): Mesh {
  * @throws Error with suggestion to use list_outline
  */
 export function findElementOrThrow(id: string): OutlinerElement | Group {
-  const element = Outliner.elements.find(
-    (el: OutlinerElement) => el.uuid === id || el.name === id
-  ) || Group.all.find((g: Group) => g.uuid === id || g.name === id);
-  if (!element) {
-    throw new Error(
-      `Element "${id}" not found. Use the list_outline tool to see available elements.`
-    );
+  // UUID first. A name must be unique: geo.json imports name each cube after
+  // its bone, and the first match would silently be the wrong node.
+  const byUuid = Outliner.elements.find((el: OutlinerElement) => el.uuid === id)
+    ?? Group.all.find((g: Group) => g.uuid === id);
+  if (byUuid) return byUuid;
+  const byName: Array<OutlinerElement | Group> = [
+    ...Outliner.elements.filter((el: OutlinerElement) => el.name === id),
+    ...Group.all.filter((g: Group) => g.name === id),
+  ];
+  if (byName.length === 1) return byName[0];
+  if (byName.length > 1) {
+    const listed = byName.map((node) => `${node instanceof Group ? "group" : node.type} ${node.uuid}`).join(", ");
+    throw new Error(`Name "${id}" matches ${byName.length} nodes (${listed}); pass the UUID of the one you mean.`);
   }
-  return element;
+  throw new Error(
+    `Element "${id}" not found. Use the list_outline tool to see available elements.`
+  );
 }
 
 /**
@@ -385,4 +397,13 @@ function captureAppImage(): Promise<ReturnType<typeof imageContent>> {
       }
     });
   });
+}
+
+/**
+ * Whether the active format keys bones by name (GeckoLib, Bedrock). Tolerates
+ * hosts without the `Format` global, such as unit tests.
+ */
+export function formatUsesBoneRig(): boolean {
+  const format: unknown = Reflect.get(globalThis, "Format");
+  return typeof format === "object" && format !== null && Boolean(Reflect.get(format, "bone_rig"));
 }
