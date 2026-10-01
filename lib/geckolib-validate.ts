@@ -44,7 +44,7 @@ import {
   GECKOLIB_NAMESPACE_PATTERN,
   GECKOLIB_PATH_PATTERN,
 } from "./geckolib";
-import { isArgsEasing, isGeckolibEasing } from "./geckolib-easing";
+import { isArgsEasing, isGeckolibRuntimeEasing } from "./geckolib-easing";
 
 /** GeckoLib Blockbench plugin generation the rules were surveyed against. */
 export const SURVEYED_GECKOLIB_PLUGIN_MAJOR = 4;
@@ -135,6 +135,18 @@ function checkBoneName(name: string, seen: Map<string, string>): IGeckolibDiagno
     seen.set(folded, name);
     return findings;
   }
+  if (existing !== name) {
+    // GeckoLib 5.5.x looks bones up by exact name, so both load; still worth a look.
+    return [
+      ...findings,
+      diagnostic(
+        "warning",
+        "geckolib_duplicate_bone_names",
+        `Bone name "${name}" differs from "${existing}" only in letter case; GeckoLib keeps both, but code that looks bones up case-insensitively will not.`,
+        name
+      ),
+    ];
+  }
   return [
     ...findings,
     diagnostic(
@@ -150,8 +162,10 @@ function checkBoneName(name: string, seen: Map<string, string>): IGeckolibDiagno
 function checkIdentifiers(facts: IGeckolibProjectFacts): IGeckolibDiagnostic[] {
   const findings: IGeckolibDiagnostic[] = [];
   if (!facts.modid) {
+    // GeckoLib 5.5.x never reads the mod ID from .geo or .animation files; only
+    // the plugin's own export paths use it.
     findings.push(
-      diagnostic("error", "geckolib_modid", "The project has no geckolib_modid; GeckoLib exports need a mod namespace.")
+      diagnostic("warning", "geckolib_modid", "The project has no geckolib_modid; the GeckoLib plugin's export dialog uses it for paths, but the exported files load without it.")
     );
   }
   if (facts.modid && !GECKOLIB_NAMESPACE_PATTERN.test(facts.modid)) {
@@ -165,11 +179,12 @@ function checkIdentifiers(facts: IGeckolibProjectFacts): IGeckolibDiagnostic[] {
     );
   }
   if (!facts.identifier) {
+    // GeckoLib 5.5.x defaults a missing identifier to "geometry.unknown" and loads the model.
     findings.push(
       diagnostic(
-        "error",
+        "warning",
         "geckolib_identifier",
-        "The project has no model identifier; the geometry would export as geometry.unknown."
+        "The project has no model identifier; the geometry would export as geometry.unknown (GeckoLib still loads it)."
       )
     );
   }
@@ -265,7 +280,7 @@ function checkKeyframeEasing(
   // GeckoLib resolves a missing or null easing to linear (`easing || default`),
   // so both mean "no easing" rather than a malformed one.
   const easing = keyframe.easing ?? undefined;
-  if (easing !== undefined && (typeof easing !== "string" || !isGeckolibEasing(easing))) {
+  if (easing !== undefined && (typeof easing !== "string" || !isGeckolibRuntimeEasing(easing))) {
     findings.push(
       diagnostic(
         "error",
@@ -275,7 +290,8 @@ function checkKeyframeEasing(
       )
     );
   }
-  if (easingArgs !== undefined && (!Array.isArray(easingArgs) || !easingArgs.every((arg) => typeof arg === "number" && Number.isFinite(arg)))) {
+  // GeckoLib 5.5.x parses each argument as a number or a Molang string.
+  if (easingArgs !== undefined && (!Array.isArray(easingArgs) || !easingArgs.every((arg) => (typeof arg === "number" && Number.isFinite(arg)) || typeof arg === "string"))) {
     findings.push(
       diagnostic(
         "error",

@@ -34,17 +34,32 @@ test("bone names outside Blockbench's bone-rig charset are errors", () => {
   expect(diagnostics[0]).toMatchObject({ severity: "error", target: "left arm" });
 });
 
-test("bones that differ only in case collide in GeckoLib's name-keyed map", () => {
+test("bones that differ only in case are a warning: GeckoLib 5.5 looks bones up by exact name", () => {
   const diagnostics = validateGeckolibProject({ ...validFacts, boneNames: ["Head", "head", "body"] });
   expect(checkIds(diagnostics)).toEqual(["geckolib_duplicate_bone_names"]);
-  expect(diagnostics[0].message).toContain('"head" duplicates "Head"');
+  expect(diagnostics[0]).toMatchObject({ severity: "warning" });
+  expect(diagnostics[0].message).toContain('"head" differs from "Head" only in letter case');
+});
+
+test("bones with the same exact name collide in GeckoLib's name-keyed map", () => {
+  const diagnostics = validateGeckolibProject({ ...validFacts, boneNames: ["head", "head", "body"] });
+  expect(checkIds(diagnostics)).toEqual(["geckolib_duplicate_bone_names"]);
+  expect(diagnostics[0]).toMatchObject({ severity: "error" });
+  expect(diagnostics[0].message).toContain('"head" duplicates "head"');
 });
 
 test.each([
   [{ modid: null }, "geckolib_modid"],
+  [{ identifier: null }, "geckolib_identifier"],
+])("missing metadata %p reports %s as a warning: GeckoLib 5.5 loads files without it", (override, checkId) => {
+  const diagnostics = validateGeckolibProject({ ...validFacts, ...override });
+  expect(checkIds(diagnostics)).toEqual([checkId]);
+  expect(diagnostics[0].severity).toBe("warning");
+});
+
+test.each([
   [{ modid: "My_Mod" }, "geckolib_modid"],
   [{ modid: "my mod" }, "geckolib_modid"],
-  [{ identifier: null }, "geckolib_identifier"],
   [{ identifier: "MyEntity" }, "geckolib_identifier"],
   [{ identifier: "my entity" }, "geckolib_identifier"],
 ])("invalid metadata %p reports %s as an error", (override, checkId) => {
@@ -164,10 +179,16 @@ test("unknown easing names are errors because GeckoLib falls back to linear", ()
 
 test("malformed easingArgs are errors, and missing ones a warning", () => {
   const malformed = validateGeckolibAnimations({
-    animations: { walk: { bones: { head: { rotation: { "0": { easing: "step", easingArgs: ["5"] } } } } } },
+    animations: { walk: { bones: { head: { rotation: { "0": { easing: "step", easingArgs: [{ value: 5 }] } } } } } },
   });
   expect(checkIds(malformed)).toEqual(["geckolib_animation_easing_args"]);
   expect(malformed[0].severity).toBe("error");
+
+  // GeckoLib 5.5 parses each argument as a number or a Molang string.
+  const molang = validateGeckolibAnimations({
+    animations: { walk: { bones: { head: { rotation: { "0": { easing: "easeInBack", easingArgs: ["query.anim_time"] } } } } } },
+  });
+  expect(molang).toEqual([]);
 
   const missing = validateGeckolibAnimations({
     animations: { walk: { bones: { head: { rotation: { "0": { easing: "easeInBounce" } } } } } },
@@ -248,6 +269,6 @@ test("keyframes past animation_length warn that playback is truncated", () => {
 });
 
 test("summaries split errors from warnings", () => {
-  const diagnostics = validateGeckolibProject({ ...validFacts, modid: null, pluginVersion: "5.1.0" });
+  const diagnostics = validateGeckolibProject({ ...validFacts, modid: "My_Mod", pluginVersion: "5.1.0" });
   expect(summarizeDiagnostics(diagnostics)).toEqual({ valid: false, errors: 1, warnings: 1 });
 });

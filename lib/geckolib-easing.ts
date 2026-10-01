@@ -56,6 +56,23 @@ export function isGeckolibEasing(easing: string): boolean {
   return GECKOLIB_EASING_NAMES.includes(easing);
 }
 
+/** Lower-cased names GeckoLib 5.5.x resolves at runtime: the plugin's names plus `none` and `catmullrom`. */
+const GECKOLIB_RUNTIME_EASINGS: ReadonlySet<string> = new Set([
+  ...GECKOLIB_EASING_NAMES.map((name) => name.toLowerCase()),
+  "none",
+  "catmullrom",
+]);
+
+/**
+ * Whether a file's easing name loads in GeckoLib 5.5.x. Its `EasingType.fromString`
+ * lower-cases the name and also registers `none` and `catmullrom`, so files may
+ * spell names in any case. Tools that write easings keep using the plugin's
+ * exact names ({@link isGeckolibEasing}).
+ */
+export function isGeckolibRuntimeEasing(easing: string): boolean {
+  return GECKOLIB_RUNTIME_EASINGS.has(easing.toLowerCase());
+}
+
 /**
  * Whether an easing reads `easingArgs`. The Back, Elastic, and Bounce families
  * take a shape argument and `step` takes a step count; every other easing

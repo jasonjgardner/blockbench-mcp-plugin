@@ -472,7 +472,7 @@ test("reverse groups by animator, so two bones sharing a name do not merge", asy
 
 test("validation reports project and compiled-animation findings with check IDs", async () => {
   // @ts-ignore - the host project double stands in for the Blockbench global
-  Project.geckolib_modid = "";
+  Project.geckolib_modid = "My_Mod";
   const result = await call("geckolib_validate_model", {});
   expect(result).toMatchObject({ valid: false, errors: 1, warnings: 1 });
   const diagnostics = result.diagnostics as { check_id: string; severity: string }[];
