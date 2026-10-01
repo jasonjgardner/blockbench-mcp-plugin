@@ -19,17 +19,17 @@ export const getDisplayTransformParameters = z.object({
 });
 
 export const setDisplayTransformParameters = z.object({
-  slot: displaySlotEnum.describe("Display slot to modify."),
+  slot: displaySlotEnum.describe("Display slot to modify. embedded is a Bedrock block slot that Minecraft Java ignores."),
   // Each vector uses a fresh schema instance (via vec3) so the advertised JSON
   // schema stays fully inlined rather than collapsing repeated instances into a
   // bare, unresolved `$ref`. See issue #44.
   translation: vec3(
-    "Translation offset as [x, y, z] (Minecraft display units)."
+    "Translation offset as [x, y, z] (Minecraft display units, 1/16 block). Minecraft Java clamps each component to ±80."
   ).optional(),
   rotation: vec3("Rotation in degrees as [x, y, z].").optional(),
-  scale: vec3("Scale factor as [x, y, z].").optional(),
-  rotation_pivot: vec3("Rotation pivot point as [x, y, z].").optional(),
-  scale_pivot: vec3("Scale pivot point as [x, y, z].").optional(),
+  scale: vec3("Scale factor as [x, y, z]; a negative component mirrors that axis. Minecraft Java clamps each exported component to ±4.").optional(),
+  rotation_pivot: vec3("Rotation pivot point as [x, y, z]. Only Bedrock reads pivots; Minecraft Java ignores them.").optional(),
+  scale_pivot: vec3("Scale pivot point as [x, y, z]. Only Bedrock reads pivots; Minecraft Java ignores them.").optional(),
   mirror: z
     .array(z.boolean())
     .length(3)
@@ -75,7 +75,7 @@ export const displayToolDocs: IToolSpec[] = [
     name: "set_display_transform",
     condition: { project: true, features: ["display_mode"] },
     description:
-      "Writes a Java Edition display slot's transform (translation, rotation, scale, mirror, pivots). Creates the slot if it does not exist yet (seeded from Blockbench's Bedrock item display defaults on bedrock_block projects, identity otherwise) and wraps the change in an undo step. This edits data that ships in the exported model JSON — it changes the deliverable, not just the preview. Requires a format that supports display mode (e.g. Java Block/Item).",
+      "Writes a Java Edition display slot's transform (translation, rotation, scale, mirror, pivots). Creates the slot if it does not exist yet (seeded from Blockbench's Bedrock item display defaults on bedrock_block projects, identity otherwise) and wraps the change in an undo step. This edits data that ships in the exported model JSON — it changes the deliverable, not just the preview. Values are kept as given, like Blockbench does; outside bedrock_block projects the result warns about those Minecraft Java clamps or ignores (translation beyond ±80, scale beyond ±4, pivots, the embedded slot). Requires a format that supports display mode (e.g. Java Block/Item).",
     annotations: {
       title: "Set Display Transform",
       destructiveHint: true,
@@ -146,6 +146,74 @@ function serializeSlot(slot: DisplaySlot) {
     rotation_pivot: slot.rotation_pivot,
     scale_pivot: slot.scale_pivot,
   };
+}
+
+/**
+ * Largest translation component Minecraft Java keeps: its item model loader
+ * (`ItemTransform.Deserializer` in 26.3) divides it by 16 and clamps the
+ * result to ±5 blocks.
+ */
+const JAVA_MAX_TRANSLATION = 80;
+
+/** Largest scale magnitude Minecraft Java keeps: its item model loader clamps each component to ±4. */
+const JAVA_MAX_SCALE = 4;
+
+/** Display contexts (`ItemDisplayContext`; `on_shelf` is the newest) that Minecraft Java reads from a model's display block. */
+const JAVA_DISPLAY_SLOTS: ReadonlySet<string> = new Set([
+  "thirdperson_righthand",
+  "thirdperson_lefthand",
+  "firstperson_righthand",
+  "firstperson_lefthand",
+  "head",
+  "gui",
+  "ground",
+  "fixed",
+  "on_shelf",
+]);
+
+/** The slot values the Java checks read. Blockbench stores scale as magnitudes plus mirror flags. */
+export interface IJavaDisplayValues {
+  translation: number[];
+  scale: number[];
+  mirror: boolean[];
+  rotation_pivot: number[];
+  scale_pivot: number[];
+}
+
+function formatVector(values: number[]): string {
+  return `[${values.join(", ")}]`;
+}
+
+/**
+ * Explains the parts of a display slot that Minecraft Java ignores or clamps
+ * when it loads the exported model (in 26.3: `ItemTransform.Deserializer`,
+ * `ItemTransforms`), so the in-game result differs from Blockbench's preview.
+ * Scale is checked as exported: `DisplaySlot.export` writes each magnitude
+ * negated where the axis is mirrored. Values are reported, not changed:
+ * Blockbench keeps them, and other targets may read them.
+ *
+ * @param slot - Display slot ID.
+ * @param values - The slot's resulting transform.
+ * @returns One message per problem; empty when the game uses the slot as is.
+ */
+export function javaDisplayWarnings(slot: string, values: IJavaDisplayValues): string[] {
+  const warnings: string[] = [];
+  if (!JAVA_DISPLAY_SLOTS.has(slot)) {
+    warnings.push(`Minecraft Java has no "${slot}" display context, so it ignores this slot; Blockbench uses it for Bedrock blocks.`);
+  }
+  if (values.translation.some((value) => Math.abs(value) > JAVA_MAX_TRANSLATION)) {
+    const clamped = values.translation.map((value) => Math.min(JAVA_MAX_TRANSLATION, Math.max(-JAVA_MAX_TRANSLATION, value)));
+    warnings.push(`translation ${formatVector(values.translation)} exceeds ±${JAVA_MAX_TRANSLATION} (5 blocks); Minecraft Java clamps it to ${formatVector(clamped)}.`);
+  }
+  const scale = values.scale.map((value, index) => (values.mirror[index] ? -value : value));
+  if (scale.some((value) => Math.abs(value) > JAVA_MAX_SCALE)) {
+    const clamped = scale.map((value) => Math.min(JAVA_MAX_SCALE, Math.max(-JAVA_MAX_SCALE, value)));
+    warnings.push(`scale ${formatVector(scale)} exceeds ±${JAVA_MAX_SCALE}; Minecraft Java clamps it to ${formatVector(clamped)}.`);
+  }
+  (["rotation_pivot", "scale_pivot"] as const)
+    .filter((key) => values[key].some((value) => value !== 0))
+    .forEach((key) => warnings.push(`${key} ${formatVector(values[key])} only affects Bedrock; Minecraft Java ignores it.`));
+  return warnings;
 }
 
 /**
@@ -274,12 +342,15 @@ export function registerDisplayTools() {
         Undo.finishEdit("Agent set display transform");
         Canvas.updateAll();
 
+        const transform = serializeSlot(displaySlot);
         return JSON.stringify(
           {
             slot,
             reset: Boolean(reset),
             defaults: slotDefaults ? "bedrock_block" : "identity",
-            transform: serializeSlot(displaySlot),
+            transform,
+            // bedrock_block slots export to Bedrock's item_display_transforms, which the Java limits do not govern.
+            warnings: Format?.id === "bedrock_block" ? [] : javaDisplayWarnings(slot, transform),
           },
           null,
           2
