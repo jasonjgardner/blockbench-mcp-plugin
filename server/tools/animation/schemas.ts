@@ -25,7 +25,7 @@ const MAX_TIMELINE_FPS = 120;
 
 /** Native Blockbench animation data; rotations are degrees in editor coordinates. */
 export const createAnimationParameters = z.object({
-  name: z.string().describe("Name of the animation"),
+  name: z.string().describe("Animation name; `animation.` is added unless the name already starts with it, as in Bedrock and GeckoLib animation files."),
   loop: z
     .boolean()
     .default(false)

@@ -222,6 +222,11 @@ test("creation uses native signs and linear interpolation and records the comple
   expect(edit.after[0]?.animators[group.uuid]?.[1]).toMatchObject({ interpolation: "linear", data_points: [{ x: 0, y: 360, z: 0 }] });
   expect(TestAnimation.selected).toBe(TestAnimation.all[0]);
 });
+test("creation adds the animation. prefix only when the name lacks it", async () => {
+  await tools.call("create_animation", { name: "animation.walk", bones: {} });
+  await tools.call("create_animation", { name: "run", bones: {} });
+  expect(TestAnimation.all.map((animation) => animation.name)).toEqual(["animation.walk", "animation.run"]);
+});
 test("creation fits the timeline snapping inside its undo entry, so redo restores it", async () => {
   const result = await tools.call("create_animation", { name: "grid", bones: { logo: [{ time: 0, rotation: [0, 0, 0] }, { time: 4, rotation: [0, 90, 0] }] } });
   expect(JSON.parse(String(result))).toMatchObject({ snapping: 10 });

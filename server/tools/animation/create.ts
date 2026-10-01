@@ -117,6 +117,14 @@ function addParticleKeyframes(animation: BBAnimation, particles: IParticleKeyfra
   });
 }
 
+/** Prefix of animation names in Bedrock and GeckoLib animation files. */
+const ANIMATION_NAME_PREFIX = "animation.";
+
+/** Adds the `animation.` prefix unless the requested name already carries it. */
+function prefixedAnimationName(name: string): string {
+  return name.startsWith(ANIMATION_NAME_PREFIX) ? name : `${ANIMATION_NAME_PREFIX}${name}`;
+}
+
 /** Populates a new animation with validated bone and particle keyframes. */
 function buildAnimationKeyframes(animation: BBAnimation, { targets, particles }: IValidatedAnimationInput): void {
   targets.forEach(({ group, keyframes }) => {
@@ -145,7 +153,7 @@ export function registerCreateAnimationTool(): void {
         const { animation, grid } = runUndoableAnimationEdit({ animations }, "Create animation", () => {
           const AnimationClass = getAnimationClass();
           const created = new AnimationClass({
-            name: `animation.${input.name}`, loop: input.loop ? "loop" : "once",
+            name: prefixedAnimationName(input.name), loop: input.loop ? "loop" : "once",
             length: input.animation_length ?? validated.latestTime,
           });
           animations.push(created);
