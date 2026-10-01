@@ -82,7 +82,7 @@
         </div>
       </div>
       <p class="card-title">Place Cube</p>
-      <p class="card-desc">Creates cubes in one reversible edit. Texture and group are optional, allowing untextured blockouts. Explicit face targets never use the current UV selection; partial/custom faces require per-face UV support.</p>
+      <p class="card-desc">Creates cubes in one reversible edit. Texture and group are optional, allowing untextured blockouts. Explicit face targets never use the current UV selection; partial/custom faces require per-face UV support. Elements accept inflate, plus uv_offset and mirror_uv for box UV cubes; unknown element fields are rejected. Cubes the format's size limiter rejects (for example Java Block elements outside -16…32) are refused and nothing is created, unless Blockbench's Deactivate Size Limit setting is on.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -126,7 +126,7 @@
         </div>
       </div>
       <p class="card-title">Modify Cube</p>
-      <p class="card-desc">Modifies the cube with the given ID. Auto UV setting: saved as an integer, where 0 means disabled, 1 means enabled, and 2 means relative auto UV (cube position affects UV)</p>
+      <p class="card-desc">Modifies the cube with the given ID. Auto UV setting: saved as an integer, where 0 means disabled, 1 means enabled, and 2 means relative auto UV (cube position affects UV). A new from/to/inflate that the format's size limiter rejects (for example Java Block elements outside -16…32) is refused before anything changes, unless Blockbench's Deactivate Size Limit setting is on.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -386,6 +386,16 @@
       <td class="col-type">string</td>
       <td><span class="param-optional">optional</span></td>
       <td class="col-desc">View to target: &quot;active&quot; for the viewport the user last interacted with, the ID of an offscreen view from create_offscreen_view, or a viewport ID from list_views. <span class="param-meta">(default: <code>&quot;active&quot;</code>) [minLength: 1]</span></td>
+    </tr><tr>
+      <td class="col-name">max_size</td>
+      <td class="col-type">integer</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Longest side of the returned image in pixels; larger images are scaled down proportionally. Omit for full size. <span class="param-meta">[min: 16, max: 8192]</span></td>
+    </tr><tr>
+      <td class="col-name">format</td>
+      <td class="col-type">&quot;png&quot; | &quot;jpeg&quot; | &quot;webp&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Encoding of the returned image: &quot;png&quot; (default, lossless), or the smaller &quot;jpeg&quot; (no transparency: transparent pixels become white) or &quot;webp&quot;.</td>
     </tr></tbody>
     </table>
       </div>
@@ -401,7 +411,27 @@
       <p class="card-title">Capture App Screenshot</p>
       <p class="card-desc">Returns the image data of the Blockbench app.</p>
       <div class="overflow-x">
-        <p class="empty-params">No parameters</p>
+        <table class="param-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+      <td class="col-name">max_size</td>
+      <td class="col-type">integer</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Longest side of the returned image in pixels; larger images are scaled down proportionally. Omit for full size. <span class="param-meta">[min: 16, max: 8192]</span></td>
+    </tr><tr>
+      <td class="col-name">format</td>
+      <td class="col-type">&quot;png&quot; | &quot;jpeg&quot; | &quot;webp&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Encoding of the returned image: &quot;png&quot; (default, lossless), or the smaller &quot;jpeg&quot; (no transparency: transparent pixels become white) or &quot;webp&quot;.</td>
+    </tr></tbody>
+    </table>
       </div>
     </div>
 <div id="tool-set_camera_angle" class="card tool-card">
@@ -464,6 +494,16 @@
       <td class="col-type">&quot;top&quot; | &quot;bottom&quot; | &quot;north&quot; | &quot;south&quot; | &quot;east&quot; | &quot;west&quot;</td>
       <td><span class="param-optional">optional</span></td>
       <td class="col-desc">Lock an orthographic side view (top, bottom, north, south, east, west). Omit to leave the view free.</td>
+    </tr><tr>
+      <td class="col-name">max_size</td>
+      <td class="col-type">integer</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Longest side of the returned image in pixels; larger images are scaled down proportionally. Omit for full size. <span class="param-meta">[min: 16, max: 8192]</span></td>
+    </tr><tr>
+      <td class="col-name">format</td>
+      <td class="col-type">&quot;png&quot; | &quot;jpeg&quot; | &quot;webp&quot;</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Encoding of the returned image: &quot;png&quot; (default, lossless), or the smaller &quot;jpeg&quot; (no transparency: transparent pixels become white) or &quot;webp&quot;.</td>
     </tr></tbody>
     </table>
       </div>
@@ -477,7 +517,7 @@
         </div>
       </div>
       <p class="card-title">Create Offscreen View</p>
-      <p class="card-desc">Creates a private offscreen viewport that renders the current project without moving the user's camera. Use it with set_camera_angle and capture_screenshot (view: &lt;id&gt;) for multi-angle inspection. The camera starts where the user's is unless copy_view is &quot;none&quot;. Up to 4 views may exist at once; delete them with delete_offscreen_view when done.</p>
+      <p class="card-desc">Creates a private offscreen viewport that renders the current project without moving the user's camera. Use it with set_camera_angle and capture_screenshot (view: &lt;id&gt;) for multi-angle inspection. The camera starts where the user's is unless copy_view is &quot;none&quot;. Up to 4 views may exist at once; delete them with delete_offscreen_view when done. Views still open when your MCP session ends are deleted.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -663,7 +703,7 @@
       <td class="col-name">name</td>
       <td class="col-type">string</td>
       <td><span class="param-required">required</span></td>
-      <td class="col-desc">Name of the animation</td>
+      <td class="col-desc">Animation name; `animation.` is added unless the name already starts with it, as in Bedrock and GeckoLib animation files.</td>
     </tr><tr>
       <td class="col-name">loop</td>
       <td class="col-type">boolean</td>
@@ -746,7 +786,7 @@
         </div>
       </div>
       <p class="card-title">Animation Graph Editor</p>
-      <p class="card-desc">Edits a bone channel's interpolation or numeric Bezier easing in one reversible edit. Uses native per-axis handle arrays and chronological segment durations. Custom points are normalized time/value fractions. Partial-axis edits require existing Bezier keys; key-wide mode changes require all axes. Rejects curve edits ignored by quaternion rotation. Inspect neighboring segments after range edits.</p>
+      <p class="card-desc">Edits a bone channel's interpolation or numeric Bezier easing in one reversible edit. Uses native per-axis handle arrays and chronological segment durations. Custom points are normalized time/value fractions. Partial-axis edits require existing Bezier keys; key-wide mode changes require all axes. Rejects curve edits ignored by quaternion rotation, and step or Bezier curves in GeckoLib models (use geckolib_set_keyframe_easing). Inspect neighboring segments after range edits.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -781,7 +821,7 @@
       <td class="col-name">action</td>
       <td class="col-type">&quot;smooth&quot; | &quot;linear&quot; | &quot;ease_in&quot; | &quot;ease_out&quot; | &quot;ease_in_out&quot; | &quot;stepped&quot; | &quot;custom&quot;</td>
       <td><span class="param-required">required</span></td>
-      <td class="col-desc">Curve modification. Easing/custom require at least two distinct chronological numeric single-data-point keys. Smooth and Bezier rotation edits are unavailable when native quaternion interpolation would ignore them.</td>
+      <td class="col-desc">Curve modification. linear, stepped and smooth set the key-wide interpolation (linear, step, catmullrom). ease_in, ease_out and ease_in_out apply the CSS cubic-bezier curves of the same name to every segment between the selected keys; custom applies custom_curve. Easing/custom require at least two distinct chronological numeric single-data-point keys. Smooth and Bezier rotation edits are unavailable when native quaternion interpolation would ignore them. GeckoLib models reject stepped (the GeckoLib plugin switches step keys back to linear) and the Bezier actions (GeckoLib has no Bezier interpolation); use geckolib_set_keyframe_easing there. In GeckoLib models smooth also clears the easings of the keys it changes, since GeckoLib ignores easings on catmullrom keys.</td>
     </tr><tr>
       <td class="col-name">keyframe_range</td>
       <td class="col-type">object</td>
@@ -805,7 +845,7 @@
         </div>
       </div>
       <p class="card-title">Bone Rigging</p>
-      <p class="card-desc">Creates and manipulates the bone structure (rig) of a model for animation. The set_ik action is deprecated; use set_ik_controller for Blockbench's null-object IK (source, target, pole).</p>
+      <p class="card-desc">Creates and manipulates the bone structure (rig) of a model for animation. Each action is one undoable edit (create with ik_enabled records the IK controller as a second one); undoing delete brings back child bones, elements and their keyframes. mirror duplicates the bone with its descendants and flips the copy like Blockbench's Flip action. The set_ik action is deprecated; use set_ik_controller for Blockbench's null-object IK (source, target, pole).</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -903,7 +943,7 @@
         </div>
       </div>
       <p class="card-title">Batch Keyframe Operations</p>
-      <p class="card-desc">Edits keyframes in the active animation atomically; all includes hidden animators. Numeric value edits use native transform values. Bake samples continuous numeric curves within selected channel spans, caps output at 10000 samples, and restores the playhead. Expressions, step/pre-post curves and effect channels require native baking.</p>
+      <p class="card-desc">Edits keyframes in the active animation atomically; all includes hidden animators. Numeric value edits use native transform values. Reverse follows the native Reverse Keyframes action, including the GeckoLib plugin's easing adjustment. Bake samples continuous numeric curves within selected channel spans, caps output at 10000 samples, and restores the playhead. Expressions, step/pre-post curves and effect channels require native baking. Smooth and bake clear GeckoLib easings they replace and report it.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -933,7 +973,7 @@
       <td class="col-name">operation</td>
       <td class="col-type">&quot;offset&quot; | &quot;scale&quot; | &quot;reverse&quot; | &quot;mirror&quot; | &quot;smooth&quot; | &quot;bake&quot;</td>
       <td><span class="param-required">required</span></td>
-      <td class="col-desc">Operation to perform on keyframes.</td>
+      <td class="col-desc">Operation to perform on keyframes. reverse works like Blockbench's Reverse Keyframes action: times flip within the selection, pre/post values and Bezier handles swap, and GeckoLib easings flip direction and move to the key their segment now arrives at, as the GeckoLib plugin does. smooth and bake clear the GeckoLib easings they replace and report it.</td>
     </tr><tr>
       <td class="col-name">parameters</td>
       <td class="col-type">object</td>
@@ -1812,7 +1852,7 @@
         </div>
       </div>
       <p class="card-title">Set Display Transform</p>
-      <p class="card-desc">Writes a Java Edition display slot's transform (translation, rotation, scale, mirror, pivots). Creates the slot if it does not exist yet (seeded from Blockbench's Bedrock item display defaults on bedrock_block projects, identity otherwise) and wraps the change in an undo step. This edits data that ships in the exported model JSON — it changes the deliverable, not just the preview. Requires a format that supports display mode (e.g. Java Block/Item).</p>
+      <p class="card-desc">Writes a Java Edition display slot's transform (translation, rotation, scale, mirror, pivots). Creates the slot if it does not exist yet (seeded from Blockbench's Bedrock item display defaults on bedrock_block projects, identity otherwise) and wraps the change in an undo step. This edits data that ships in the exported model JSON — it changes the deliverable, not just the preview. Values are kept as given, like Blockbench does; outside bedrock_block projects the result warns about those Minecraft Java clamps or ignores (translation beyond ±80, scale beyond ±4, pivots, the embedded slot). Requires a format that supports display mode (e.g. Java Block/Item).</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -1827,12 +1867,12 @@
       <td class="col-name">slot</td>
       <td class="col-type">&quot;thirdperson_righthand&quot; | &quot;thirdperson_lefthand&quot; | &quot;firstperson_righthand&quot; | &quot;firstperson_lefthand&quot; | &quot;ground&quot; | &quot;gui&quot; | &quot;head&quot; | &quot;embedded&quot; | &quot;fixed&quot; | &quot;on_shelf&quot;</td>
       <td><span class="param-required">required</span></td>
-      <td class="col-desc">Display slot to modify.</td>
+      <td class="col-desc">Display slot to modify. embedded is a Bedrock block slot that Minecraft Java ignores.</td>
     </tr><tr>
       <td class="col-name">translation</td>
       <td class="col-type">number[]</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Translation offset as [x, y, z] (Minecraft display units). <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
+      <td class="col-desc">Translation offset as [x, y, z] (Minecraft display units, 1/16 block). Minecraft Java clamps each component to ±80. <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
     </tr><tr>
       <td class="col-name">rotation</td>
       <td class="col-type">number[]</td>
@@ -1842,17 +1882,17 @@
       <td class="col-name">scale</td>
       <td class="col-type">number[]</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Scale factor as [x, y, z]. <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
+      <td class="col-desc">Scale factor as [x, y, z]; a negative component mirrors that axis. Minecraft Java clamps each exported component to ±4. <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
     </tr><tr>
       <td class="col-name">rotation_pivot</td>
       <td class="col-type">number[]</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Rotation pivot point as [x, y, z]. <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
+      <td class="col-desc">Rotation pivot point as [x, y, z]. Only Bedrock reads pivots; Minecraft Java ignores them. <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
     </tr><tr>
       <td class="col-name">scale_pivot</td>
       <td class="col-type">number[]</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Scale pivot point as [x, y, z]. <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
+      <td class="col-desc">Scale pivot point as [x, y, z]. Only Bedrock reads pivots; Minecraft Java ignores them. <span class="param-meta">[minItems: 3, maxItems: 3]</span></td>
     </tr><tr>
       <td class="col-name">mirror</td>
       <td class="col-type">boolean[]</td>
@@ -2045,7 +2085,7 @@
         </div>
       </div>
       <p class="card-title">Duplicate Element</p>
-      <p class="card-desc">Duplicates any outliner element or group (with its children) by ID or name using Blockbench's native duplicate, so every property, face UV, texture and mesh vertex key is preserved. Mesh copies inherit their armature bone vertex weights. Optionally offsets the copy and assigns a new name. Selection is left unchanged.</p>
+      <p class="card-desc">Duplicates any outliner element or group (with its children) by ID or name using Blockbench's native duplicate, so every property, face UV, texture and mesh vertex key is preserved. Mesh copies inherit their armature bone vertex weights, and copied IK null objects point at the copied bones when their chain was duplicated with them. Optionally offsets the copy and assigns a new name. Selection is left unchanged.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -2133,7 +2173,7 @@
       <td class="col-name">name_pattern</td>
       <td class="col-type">string</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Regex pattern to match element names (e.g., '^arm_.*'). Case-sensitive.</td>
+      <td class="col-desc">Regex pattern to match element names (e.g., '^arm_.*'). Case-sensitive. Patterns over 512 characters, with nested quantifiers such as (a+)+, or that do not compile are rejected with an error.</td>
     </tr><tr>
       <td class="col-name">name_contains</td>
       <td class="col-type">string</td>
@@ -2182,7 +2222,7 @@
         </div>
       </div>
       <p class="card-title">Select All of Type</p>
-      <p class="card-desc">Selects all elements of the given type (cube, mesh, or group) in the current project. Optionally restrict to descendants of a parent group, or add to (rather than replace) the current selection.</p>
+      <p class="card-desc">Selects all elements of the given type (cube, mesh, or group) in the current project. Optionally restrict to descendants of a parent group, or add to (rather than replace) the current selection. As in Blockbench, locked nodes are skipped and selecting a group also selects its contents.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -2297,7 +2337,7 @@
         <h3 class="card-name">export_model</h3>
         <div class="card-badges">
           <span class="badge badge-experimental">experimental</span>
-          <span class="badge badge-openworld">open-world</span>
+          <span class="badge badge-destructive">destructive</span><span class="badge badge-openworld">open-world</span>
         </div>
       </div>
       <p class="card-title">Export Model</p>
@@ -2326,7 +2366,12 @@
       <td class="col-name">path</td>
       <td class="col-type">string</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Absolute filesystem path to write the compiled model to. Requires user permission (Blockbench v5.0+ prompts for 'fs' access). If omitted, content is returned in the response only.</td>
+      <td class="col-desc">Absolute filesystem path to write the compiled model to. Requires user permission (Blockbench v5.0+ prompts for 'fs' access). If omitted, content is returned in the response only. Fails if the file exists unless overwrite is true.</td>
+    </tr><tr>
+      <td class="col-name">overwrite</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Replace an existing file at path. Defaults to false so an export never silently replaces another file. <span class="param-meta">(default: <code>false</code>)</span></td>
     </tr><tr>
       <td class="col-name">max_content_length</td>
       <td class="col-type">integer</td>
@@ -2472,7 +2517,7 @@
         </div>
       </div>
       <p class="card-title">Import GeoJSON</p>
-      <p class="card-desc">Imports a model from a GeoJSON file.</p>
+      <p class="card-desc">Imports one Bedrock geometry (.geo.json) into the current project, which keeps its format (one with bones: Bedrock, GeckoLib, generic, ...), as one undoable edit, and returns a screenshot. Adds the bones with their cubes, locators and texture meshes; the texture size, box UV mode and item display transforms it sets are undone with it, while the project's visible bounds can only grow. URLs on this computer or a private network are refused; pass a file path instead.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -2487,7 +2532,12 @@
       <td class="col-name">geojson</td>
       <td class="col-type">string</td>
       <td><span class="param-required">required</span></td>
-      <td class="col-desc">Path to the GeoJSON file or data URL, or the GeoJSON string itself.</td>
+      <td class="col-desc">Bedrock geometry (format 1.12 or later) as inline JSON, an absolute path or file:// URL of a file on this computer (read with Blockbench's file permission), or a public http(s) URL (at most 10 MB).</td>
+    </tr><tr>
+      <td class="col-name">geometry</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Identifier of the geometry to import, such as geometry.robot, when the file holds several. Omit it when the file holds one.</td>
     </tr></tbody>
     </table>
       </div>
@@ -2813,7 +2863,7 @@
         </div>
       </div>
       <p class="card-title">Select Mesh Elements</p>
-      <p class="card-desc">Selects vertices, edges, or faces of a mesh for manipulation.</p>
+      <p class="card-desc">Selects vertices, edges, or faces of a mesh for manipulation. Keys the mesh does not have are rejected, except when removing them from the selection.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -2836,9 +2886,9 @@
       <td class="col-desc">Selection mode.</td>
     </tr><tr>
       <td class="col-name">elements</td>
-      <td class="col-type">string,number[]</td>
+      <td class="col-type">string[]</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Specific elements to select. If not provided, selects all.</td>
+      <td class="col-desc">Keys to select: vertex keys in vertex mode, face keys in face mode, 'vkey1-vkey2' edges in edge mode (from get_mesh_info or the creation tools). If not provided, selects all.</td>
     </tr><tr>
       <td class="col-name">action</td>
       <td class="col-type">&quot;select&quot; | &quot;add&quot; | &quot;remove&quot; | &quot;toggle&quot;</td>
@@ -2857,7 +2907,7 @@
         </div>
       </div>
       <p class="card-title">Move Mesh Vertices</p>
-      <p class="card-desc">Moves selected vertices of a mesh by the specified offset.</p>
+      <p class="card-desc">Moves the given vertex keys, or the mesh's selected vertices, by the specified offset in one undo entry. Unknown keys are rejected before anything moves.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -2935,7 +2985,7 @@
         </div>
       </div>
       <p class="card-title">Merge Mesh Vertices</p>
-      <p class="card-desc">Merges vertices that are within a specified distance of each other.</p>
+      <p class="card-desc">Merges vertices that are within a specified distance of each other, in one undo entry. Each face keeps a surviving vertex once; faces the merge collapses (fewer than three vertices left) are removed.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -2974,7 +3024,7 @@
         </div>
       </div>
       <p class="card-title">Create Mesh Face</p>
-      <p class="card-desc">Creates a new face from selected vertices.</p>
+      <p class="card-desc">Creates a triangle or quad face from 3 or 4 distinct existing vertex keys, with an optional texture, in one undo entry.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -3280,7 +3330,7 @@
         </div>
       </div>
       <p class="card-title">Paint Fill Tool</p>
-      <p class="card-desc">Uses the fill/bucket tool to fill areas with color. In 'face' and 'element' fill modes only the face or element whose UV area contains the given texture pixel is filled. Opacity is 0-255 regardless of Blockbench's opacity range setting.</p>
+      <p class="card-desc">Uses the fill/bucket tool to fill areas with color. In 'face' and 'element' fill modes only the face or element whose UV area contains the given texture pixel is filled, and a pixel no face covers is an error. Seeds outside the texture are rejected, and so are color and color_connected seeds outside the active layer, where the fill reads its seed color. Opacity is 0-255 regardless of Blockbench's opacity range setting.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -3300,12 +3350,12 @@
       <td class="col-name">x</td>
       <td class="col-type">number</td>
       <td><span class="param-required">required</span></td>
-      <td class="col-desc">X coordinate to start fill.</td>
+      <td class="col-desc">Texture pixel X where the fill starts; must lie inside the texture except for 'selection' and 'selected_elements' fills, which ignore it.</td>
     </tr><tr>
       <td class="col-name">y</td>
       <td class="col-type">number</td>
       <td><span class="param-required">required</span></td>
-      <td class="col-desc">Y coordinate to start fill.</td>
+      <td class="col-desc">Texture pixel Y where the fill starts; must lie inside the texture except for 'selection' and 'selected_elements' fills, which ignore it.</td>
     </tr><tr>
       <td class="col-name">color</td>
       <td class="col-type">string</td>
@@ -3463,11 +3513,11 @@
         <h3 class="card-name">color_picker_tool</h3>
         <div class="card-badges">
           <span class="badge badge-experimental">experimental</span>
-          <span class="badge badge-readonly">read-only</span>
+          
         </div>
       </div>
       <p class="card-title">Color Picker Tool</p>
-      <p class="card-desc">Picks colors from textures and sets them as the active color.</p>
+      <p class="card-desc">Picks a texture pixel's color and makes it the primary or secondary color, like Blockbench's color picker. It does not edit the texture, but it changes the active colors, selects the texture, and depending on Blockbench's settings can set the brush opacity or switch the active paint tool.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -3723,7 +3773,7 @@
         </div>
       </div>
       <p class="card-title">Paint with Brush</p>
-      <p class="card-desc">Paints on textures using the brush tool with customizable settings (opacity 0-255, softness 0-100%, optional aspect ratio). Paints on the selected pixel layer; if a layer group is selected, a pixel layer inside it is used.</p>
+      <p class="card-desc">Paints with Blockbench's own brush tool, so blend mode, pixel-perfect drawing, lock alpha and mirror painting apply as when painting by hand. Given brush settings (opacity 0-255, softness 0-100%, hex or named color, shape, blend mode, aspect ratio) are set on the brush first; omitted ones keep the current brush. Paints on the selected pixel layer; if a layer group is selected, a pixel layer inside it is used.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -3748,12 +3798,12 @@
       <td class="col-name">brush_settings</td>
       <td class="col-type">object</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Brush settings to apply. Opacity is 0-255; softness is a 0-100 percentage.</td>
+      <td class="col-desc">Brush settings written to Blockbench's brush before painting. Opacity is 0-255; softness is a 0-100 percentage. Omitted settings keep the current brush.</td>
     </tr><tr>
       <td class="col-name">connect_strokes</td>
       <td class="col-type">boolean</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Whether to interpolate brush samples between coordinates, at no more than one texture pixel per step. <span class="param-meta">(default: <code>true</code>)</span></td>
+      <td class="col-desc">Whether to draw lines between consecutive coordinates, like dragging the brush, as one undo entry. false stamps each coordinate on its own: still one undo entry on Blockbench 5.2 and later, one per coordinate on older versions. <span class="param-meta">(default: <code>true</code>)</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -3895,7 +3945,7 @@
       <td class="col-name">radius</td>
       <td class="col-type">number</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Radius for expand/contract/feather operations.</td>
+      <td class="col-desc">Radius in pixels for expand/contract operations (at most 64). <span class="param-meta">[max: 64]</span></td>
     </tr><tr>
       <td class="col-name">mode</td>
       <td class="col-type">&quot;create&quot; | &quot;add&quot; | &quot;subtract&quot; | &quot;intersect&quot;</td>
@@ -4425,7 +4475,7 @@
       <td class="col-name">data</td>
       <td class="col-type">string</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Path to the image file or data URL.</td>
+      <td class="col-desc">Image data URL, or an absolute path or file:// URL of an image file (desktop only, read with Blockbench's file permission).</td>
     </tr><tr>
       <td class="col-name">group</td>
       <td class="col-type">string</td>
@@ -4440,7 +4490,7 @@
       <td class="col-name">layer_name</td>
       <td class="col-type">string</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Name of the texture layer. Required if fill_color is set.</td>
+      <td class="col-desc">Deprecated and ignored: textures are created without layers. Use texture_layer_management create_layer to add a named layer.</td>
     </tr><tr>
       <td class="col-name">pbr_channel</td>
       <td class="col-type">&quot;color&quot; | &quot;normal&quot; | &quot;height&quot; | &quot;mer&quot;</td>
@@ -4494,7 +4544,7 @@
       <td class="col-name">applyTo</td>
       <td class="col-type">&quot;all&quot; | &quot;blank&quot; | &quot;none&quot;</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Apply texture to element or group. <span class="param-meta">(default: <code>&quot;blank&quot;</code>)</span></td>
+      <td class="col-desc">Faces that receive the texture: all (every face), blank (default; faces without a texture) or none (no face: the call only checks the element and texture and changes nothing). <span class="param-meta">(default: <code>&quot;blank&quot;</code>)</span></td>
     </tr></tbody>
     </table>
       </div>
@@ -5469,7 +5519,7 @@
         </div>
       </div>
       <p class="card-title">Reverse GeckoLib Keyframe Easing</p>
-      <p class="card-desc">Mirrors easing directions the way GeckoLib's own reverse-keyframes handler does: each easeIn becomes easeOut and back, the easings shift one keyframe later in time, and the first keyframe of each channel is cleared. Use after reversing keyframe values.</p>
+      <p class="card-desc">Reverses and shifts easings the way the GeckoLib plugin's handler for Blockbench's Reverse Keyframes action does: each easeIn becomes easeOut and back, every easing moves to the next later keyframe, and the first keyframe of each channel loses its easing. Use it only after keyframe times were reversed by something that left the easings in place, such as times rewritten with manage_keyframes. Do not use it after the native Reverse Keyframes action or batch_keyframe_operations reverse: with the GeckoLib plugin loaded, both already adjust the easings, so this tool would shift them a second time. It is not its own inverse; use undo to revert it.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -5538,11 +5588,11 @@
         <h3 class="card-name">geckolib_export_model</h3>
         <div class="card-badges">
           <span class="badge badge-experimental">experimental</span>
-          <span class="badge badge-openworld">open-world</span>
+          <span class="badge badge-destructive">destructive</span><span class="badge badge-openworld">open-world</span>
         </div>
       </div>
       <p class="card-title">Export GeckoLib Model</p>
-      <p class="card-desc">Compiles the GeckoLib geometry the plugin's model export produces, returning it as JSON and optionally writing it to a path. Set mode='dialog' to trigger the plugin's own export action and its save dialog instead.</p>
+      <p class="card-desc">Compiles the GeckoLib geometry the plugin's model export produces, returning it as JSON and optionally writing it to a path. The text is formatted like Blockbench's own export (its JSON indentation, minify and final-newline settings). Set mode='dialog' to trigger the plugin's own export action and its save dialog instead.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -5562,7 +5612,12 @@
       <td class="col-name">path</td>
       <td class="col-type">string</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode.</td>
+      <td class="col-desc">Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode. Fails if the file exists unless overwrite is true.</td>
+    </tr><tr>
+      <td class="col-name">overwrite</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Replace an existing file at path. Defaults to false so a re-export never silently replaces a reference file. <span class="param-meta">(default: <code>false</code>)</span></td>
     </tr><tr>
       <td class="col-name">max_content_length</td>
       <td class="col-type">integer</td>
@@ -5577,11 +5632,11 @@
         <h3 class="card-name">geckolib_export_animations</h3>
         <div class="card-badges">
           <span class="badge badge-experimental">experimental</span>
-          <span class="badge badge-openworld">open-world</span>
+          <span class="badge badge-destructive">destructive</span><span class="badge badge-openworld">open-world</span>
         </div>
       </div>
       <p class="card-title">Export GeckoLib Animations</p>
-      <p class="card-desc">Compiles the project's animations into GeckoLib animation-file JSON, including the easing and easingArgs the plugin writes, and optionally writes it to a path. Reports which host API compiled it, since only the plugin-patched route stamps geckolib_format_version. Set mode='dialog' to trigger the plugin's own animation export action instead.</p>
+      <p class="card-desc">Compiles the project's animations into GeckoLib animation-file JSON, including the easing and easingArgs the plugin writes, and optionally writes it to a path. The text is formatted like Blockbench's own export (its JSON indentation, minify and final-newline settings). Reports which host API compiled it, since only the plugin-patched route stamps geckolib_format_version. Set mode='dialog' to trigger the plugin's own animation export action instead.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -5601,7 +5656,12 @@
       <td class="col-name">path</td>
       <td class="col-type">string</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode.</td>
+      <td class="col-desc">Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode. Fails if the file exists unless overwrite is true.</td>
+    </tr><tr>
+      <td class="col-name">overwrite</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Replace an existing file at path. Defaults to false so a re-export never silently replaces a reference file. <span class="param-meta">(default: <code>false</code>)</span></td>
     </tr><tr>
       <td class="col-name">max_content_length</td>
       <td class="col-type">integer</td>
@@ -5621,11 +5681,11 @@
         <h3 class="card-name">geckolib_export_display</h3>
         <div class="card-badges">
           <span class="badge badge-experimental">experimental</span>
-          <span class="badge badge-openworld">open-world</span>
+          <span class="badge badge-destructive">destructive</span><span class="badge badge-openworld">open-world</span>
         </div>
       </div>
       <p class="card-title">Export GeckoLib Display Settings</p>
-      <p class="card-desc">Builds the Java item/block display-settings JSON for GeckoLib Item and Block models: parent model, texture size, GUI light, per-perspective display transforms and the namespaced particle texture. Reports when the active model type would not normally ship one. Set mode='dialog' to trigger the plugin's own display export action instead.</p>
+      <p class="card-desc">Builds the Java item/block display-settings JSON for GeckoLib Item and Block models: parent model, texture size, GUI light, per-perspective display transforms and the namespaced particle texture. The text is two-space JSON, as the plugin's own display export writes it. The parent defaults to the plugin's builtin/entity, which Minecraft Java 1.21.4 and later no longer have; the result then warns, and parent picks another. Reports when the active model type would not normally ship one. Set mode='dialog' to trigger the plugin's own display export action instead.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -5645,12 +5705,22 @@
       <td class="col-name">path</td>
       <td class="col-type">string</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode.</td>
+      <td class="col-desc">Absolute filesystem path to write the compiled content to. Requires Blockbench filesystem permission. Only used in compile mode. Fails if the file exists unless overwrite is true.</td>
+    </tr><tr>
+      <td class="col-name">overwrite</td>
+      <td class="col-type">boolean</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Replace an existing file at path. Defaults to false so a re-export never silently replaces a reference file. <span class="param-meta">(default: <code>false</code>)</span></td>
     </tr><tr>
       <td class="col-name">max_content_length</td>
       <td class="col-type">integer</td>
       <td><span class="param-optional">optional</span></td>
       <td class="col-desc">Maximum characters of content to return. Use 0 to omit the content and only report its size. <span class="param-meta">(default: <code>100000</code>) [min: 0, max: 2000000]</span></td>
+    </tr><tr>
+      <td class="col-name">parent</td>
+      <td class="col-type">string</td>
+      <td><span class="param-optional">optional</span></td>
+      <td class="col-desc">Parent model to write, compile mode only. Omit to keep the project's parent, which the GeckoLib plugin sets to builtin/entity for Item models and uses as its default, so files match the plugin's own export. Minecraft Java 1.21.4 and later have no builtin/entity model (the result then carries a warning): when targeting them, pass another parent such as minecraft:item/handheld, or an empty string to write none.</td>
     </tr></tbody>
     </table>
       </div>
@@ -6146,7 +6216,7 @@
       </div>
       <p class="card-title">Blockbench Nodes</p>
       <p class="uri-template">nodes://{id}</p>
-      <p class="card-desc">Returns the current 3D nodes in the editor. List URIs use slugified names (e.g. `nodes://head`) when unique, with `~&lt;uuid-prefix&gt;` on collision. Reads accept UUID, exact name, or slug.</p>
+      <p class="card-desc">Returns the current 3D nodes in the editor. List URIs use slugified names (e.g. `nodes://head`) when unique, with `~&lt;uuid-prefix&gt;` on collision. Reads accept UUID, exact name, or slug, and return the node as Blockbench saves it in a .bbmodel (its `getSaveCopy()`), plus uuid, name, type, parent (`root` or a UUID) and child UUIDs: a cube's `from`, `to` and `origin` in Blockbench units, `rotation` in degrees, faces and UVs; a mesh's vertices and faces; a group's origin and rotation. Fields Blockbench leaves out at their default are missing, such as a cube's zero rotation.</p>
     </div>
 <div class="card">
       <div class="card-header">
@@ -6231,7 +6301,7 @@
       </section>
 
       <footer class="page-footer">
-        Generated 2026-09-27T15:36:12.722Z from Zod schemas
+        Generated 2026-10-01T02:48:30.688Z from Zod schemas
       </footer>
     </main>
   </div>
