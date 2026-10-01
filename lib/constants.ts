@@ -66,6 +66,8 @@ export const SCRATCHPAD_MODE_ID = "ai_scratchpad";
 export const SETTING_SCRATCHPAD_ENABLED = "mcp_ai_scratchpad_enabled";
 /** Setting toggle (Settings > General) that stamps AI usage onto projects edited through MCP tools. */
 export const SETTING_DISCLOSE_AI_USAGE = "mcp_disclose_ai_usage";
+/** Setting toggle (Settings > General) that publishes `risky_eval`; off hides the tool and refuses calls. */
+export const SETTING_RISKY_EVAL_ENABLED = "mcp_risky_eval_enabled";
 /** `ModelProject` boolean property set once any MCP tool writes to the project. */
 export const AI_USED_PROPERTY = "ai_used";
 /** `ModelProject` string property listing the distinct MCP client names that wrote to the project. */

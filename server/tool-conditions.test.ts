@@ -46,6 +46,8 @@ useGlobals(() => ({
   Dialog: { stack: [] },
   BarItems: Object.fromEntries(strokeTools.map(id => [id, { condition: { modes: ["paint"] } }])),
   Condition: evaluateHostCondition,
+  // Settings > General values; none stored means every toggle keeps its default.
+  Settings: { get: () => undefined },
 }));
 
 /** Evaluates a named public specification using the same native entry point as the factory. */
@@ -115,6 +117,15 @@ describe("native tool availability contracts", () => {
     ["capture_app_screenshot", "save_material_config", "import_texture_set", "emulate_clicks"]
       .forEach(name => expect(available(name)).toBe(false));
     expect(available("knife_tool")).toBe(false);
+  });
+
+  test("risky_eval follows its setting and stays published when none is stored", () => {
+    expect(available("risky_eval")).toBe(true);
+    Object.assign(globalThis, { Settings: { get: (id: string) => id === "mcp_risky_eval_enabled" ? false : undefined } });
+    expect(available("risky_eval")).toBe(false);
+    expect(available("trigger_action")).toBe(true);
+    Object.assign(globalThis, { Settings: { get: (id: string) => id === "mcp_risky_eval_enabled" ? true : undefined } });
+    expect(available("risky_eval")).toBe(true);
   });
 
   test("Hytale availability changes with plugin enablement and active format", () => {

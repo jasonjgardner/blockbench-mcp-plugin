@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { createTool, type IToolSpec } from "@/lib/factories";
 import { captureAppScreenshot } from "@/lib/util";
-import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
+import { SETTING_RISKY_EVAL_ENABLED, STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
 import { mouseButtonEnum, coordinateSchema } from "@/lib/zodObjects";
 import { parseObjectJSON, toFormValues, toMouseEventInit } from "@/server/tools/ui/json-input";
 
@@ -87,6 +87,12 @@ export const fillDialogParametersSchema = z.object({
     ),
 });
 
+/** Whether the user left `risky_eval` enabled in Settings > General; hosts without settings keep it. */
+function isRiskyEvalEnabled(): boolean {
+  if (typeof Settings === "undefined") return true;
+  return Settings.get(SETTING_RISKY_EVAL_ENABLED) !== false;
+}
+
 // ============================================================================
 // UI Tool Docs
 // ============================================================================
@@ -111,6 +117,7 @@ export const uiToolDocs: IToolSpec[] = [
   },
   {
     name: "risky_eval",
+    condition: isRiskyEvalEnabled,
     description:
       "Evaluates JavaScript and returns its JSON result. Does not create an Undo entry. Mutating code must manage its own correctly scoped Undo transaction; read-only evaluation leaves history unchanged.",
     annotations: {

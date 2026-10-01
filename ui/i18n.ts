@@ -74,6 +74,8 @@ const en: Record<string, string> = {
   "mcp.settings.scratchpad_desc": "Adds an AI Scratchpad mode where agents can model without the format's guardrails (cube size limits, rotation limits and snapping, integer sizes). Guardrails are restored when leaving the mode; existing geometry is not clamped.",
   "mcp.settings.disclose_ai_name": "Disclose AI Usage",
   "mcp.settings.disclose_ai_desc": "Stamps ai_used and ai_agents onto a project the first time an MCP tool writes to it, so saved .bbmodel files record which AI clients edited them.",
+  "mcp.settings.risky_eval_name": "Enable risky_eval",
+  "mcp.settings.risky_eval_desc": "Publishes the risky_eval tool, which runs any JavaScript an MCP client sends with this plugin's permissions. Disable to hide it from clients and refuse its calls.",
 
   // Panel toolbar
   "mcp.toolbar.show_experimental": "Show Experimental",
@@ -188,6 +190,8 @@ const de: Record<string, string> = {
   "mcp.settings.session_timeout_desc": "MCP-Sitzungen nach dieser Anzahl von Minuten Inaktivität trennen. Niedrigere Werte geben Ressourcen schneller frei; höhere Werte tolerieren inaktive Clients.",
   "mcp.settings.sse_heartbeat_name": "SSE-Heartbeat-Intervall (Sekunden)",
   "mcp.settings.sse_heartbeat_desc": "Sendet Keep-Alive-Kommentare auf Streaming-Antworten, um zu verhindern, dass Proxys/Firewalls inaktive Verbindungen schließen. Auf 0 setzen zum Deaktivieren.",
+  "mcp.settings.risky_eval_name": "risky_eval aktivieren",
+  "mcp.settings.risky_eval_desc": "Stellt das Werkzeug risky_eval bereit, das beliebiges JavaScript eines MCP-Clients mit den Berechtigungen dieses Plugins ausführt. Deaktivieren, um es vor Clients zu verbergen und Aufrufe abzulehnen.",
 
   // Tool test dialog
   "mcp.dialog.result_title": "Ergebnis: %0",
@@ -287,6 +291,8 @@ const ja: Record<string, string> = {
   "mcp.settings.session_timeout_desc": "この分数の非アクティブ後にMCPセッションを切断します。値が小さいほどリソースを早く解放し、大きいほどアイドルクライアントを許容します。",
   "mcp.settings.sse_heartbeat_name": "SSEハートビート間隔 (秒)",
   "mcp.settings.sse_heartbeat_desc": "ストリーミング応答にキープアライブコメントを送信し、プロキシ/ファイアウォールがアイドル接続を閉じるのを防ぎます。0に設定すると無効になります。",
+  "mcp.settings.risky_eval_name": "risky_evalを有効化",
+  "mcp.settings.risky_eval_desc": "MCPクライアントが送信した任意のJavaScriptをこのプラグインの権限で実行するrisky_evalツールを公開します。無効にするとクライアントから隠され、呼び出しは拒否されます。",
 
   // Tool test dialog
   "mcp.dialog.result_title": "結果: %0",
@@ -386,6 +392,8 @@ const zh: Record<string, string> = {
   "mcp.settings.session_timeout_desc": "在非活动指定分钟数后断开 MCP 会话。较低的值更快释放资源；较高的值容忍空闲客户端。",
   "mcp.settings.sse_heartbeat_name": "SSE 心跳间隔（秒）",
   "mcp.settings.sse_heartbeat_desc": "在流式响应上发送保活注释，防止代理/防火墙关闭空闲连接。设为 0 表示禁用。",
+  "mcp.settings.risky_eval_name": "启用 risky_eval",
+  "mcp.settings.risky_eval_desc": "提供 risky_eval 工具，它会以本插件的权限运行 MCP 客户端发送的任意 JavaScript。禁用后该工具对客户端隐藏，调用会被拒绝。",
 
   // Tool test dialog
   "mcp.dialog.result_title": "结果: %0",

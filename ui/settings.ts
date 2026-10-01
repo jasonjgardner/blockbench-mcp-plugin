@@ -1,4 +1,5 @@
-import { SETTING_DISCLOSE_AI_USAGE, SETTING_SCRATCHPAD_ENABLED } from "@/lib/constants";
+import { SETTING_DISCLOSE_AI_USAGE, SETTING_RISKY_EVAL_ENABLED, SETTING_SCRATCHPAD_ENABLED } from "@/lib/constants";
+import { refreshToolAvailability } from "@/lib/factories";
 import { onScratchpadSettingChanged } from "@/lib/scratchpad-mode";
 
 const settings: Setting[] = [];
@@ -91,6 +92,16 @@ export function settingsSetup() {
       value: true,
       category,
       icon: "verified_user",
+    }),
+    new Setting(SETTING_RISKY_EVAL_ENABLED, {
+      name: tl("mcp.settings.risky_eval_name"),
+      description: tl("mcp.settings.risky_eval_desc"),
+      type: "toggle",
+      value: true,
+      category,
+      icon: "code",
+      // Connected clients get tools/list_changed right away instead of on the next editor refresh.
+      onChange: () => refreshToolAvailability(),
     })
   );
 }
