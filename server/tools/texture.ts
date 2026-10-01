@@ -67,7 +67,7 @@ export const createTextureParameters = z
       .string()
       .optional()
       .describe(
-        "Name of the texture layer. Required if fill_color is set."
+        "Deprecated and ignored: textures are created without layers. Use texture_layer_management create_layer to add a named layer."
       ),
     pbr_channel: pbrChannelEnum
       .optional()
@@ -93,11 +93,6 @@ export const createTextureParameters = z
     message:
       "The 'data' and 'fill_color' properties cannot both be defined.",
     path: ["data", "fill_color"],
-  })
-  .refine((params) => !(params.fill_color && !params.layer_name), {
-    message:
-      "The 'layer_name' property is required when 'fill_color' is set.",
-    path: ["layer_name", "fill_color"],
   })
   .refine(
     ({ pbr_channel, group }) => (pbr_channel && group) || !pbr_channel,
