@@ -93,15 +93,39 @@ export function morphSelection(before: boolean[], width: number, height: number,
   });
 }
 
+/** Reads `key` from `value` when it is an object. */
+function field(value: unknown, key: string): unknown {
+  return typeof value === "object" && value !== null ? Reflect.get(value, key) : undefined;
+}
+
+/** Explains why a selection change is missing from the undo history; shown to the caller. */
+export const SELECTION_NOT_RECORDED_NOTE =
+  "Not added to the undo history: Blockbench's selection undo only covers the texture shown in the UV editor. " +
+  "Switch to Paint mode with this texture showing to make selection changes undoable.";
+
 /**
  * Runs `edit` as one selection history entry, like the UV editor's own Select All and Invert.
  *
  * A texture selection is selection state, not bitmap content: Undo restores it from
- * `Undo.initSelection({ texture_selection: true })`, which saves `UVEditor.texture.selection`. A bitmap edit
- * would copy the image twice and leave the selection in place on Ctrl+Z. When the user has turned off
- * "Undo selections", Blockbench records nothing, as it does natively.
+ * `Undo.initSelection({ texture_selection: true })`. A bitmap edit would copy the image twice and leave the
+ * selection in place on Ctrl+Z. When the user has turned off "Undo selections", Blockbench records nothing,
+ * as it does natively.
+ *
+ * Blockbench saves and restores only `UVEditor.texture.selection`, and `Texture#select()` refreshes the UV
+ * editor only in Paint mode. For another texture (in Edit mode right after `create_texture`, for example)
+ * the before and after saves would match and the entry be dropped silently, so the next Ctrl+Z would undo
+ * the previous edit instead; recording it with the UV editor pointed at the texture would not help either,
+ * because Undo would restore nothing. The change is then applied without an entry and reported.
+ *
+ * @param texture - The texture whose selection `edit` changes.
+ * @returns {@link SELECTION_NOT_RECORDED_NOTE} when the change could not be recorded, otherwise `undefined`.
  */
-function recordTextureSelection(label: string, edit: () => void): void {
+function recordTextureSelection(texture: Texture, label: string, edit: () => void): string | undefined {
+  const recordsSelections = field(field(Reflect.get(globalThis, "settings"), "undo_selections"), "value") === true;
+  if (recordsSelections && field(Reflect.get(globalThis, "UVEditor"), "texture") !== texture) {
+    edit();
+    return SELECTION_NOT_RECORDED_NOTE;
+  }
   const save: unknown = Undo.initSelection({ texture_selection: true });
   try {
     edit();
@@ -110,6 +134,7 @@ function recordTextureSelection(label: string, edit: () => void): void {
     throw error;
   }
   Undo.finishSelection(label);
+  return undefined;
 }
 
 /** Checks the inputs an action needs before any edit is opened. */
@@ -142,7 +167,7 @@ export function registerTextureSelectionTool(): void {
         const selection = texture.selection as unknown as ISelectionMatrix;
         const { width, height } = texture;
 
-        recordTextureSelection("Texture selection", () => {
+        const note = recordTextureSelection(texture, "Texture selection", () => {
           if (action === "select_all") {
             selection.setOverride(true);
             return;
@@ -189,7 +214,8 @@ export function registerTextureSelectionTool(): void {
         const update: unknown = typeof vue === "object" && vue !== null ? Reflect.get(vue, "updateTexture") : undefined;
         if (typeof update === "function") update.call(vue);
 
-        return `Applied ${action} to texture "${texture.name}"`;
+        const applied = `Applied ${action} to texture "${texture.name}"`;
+        return note ? `${applied}. ${note}` : applied;
       },
     },
     paintToolDocs[10].status
