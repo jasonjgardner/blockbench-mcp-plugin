@@ -3,7 +3,8 @@
  *
  * Renders happen in separate Node processes, so they never block other tool
  * calls or the Blockbench editor. Images are returned inline as PNG content and
- * also kept on disk.
+ * also kept on disk. The renderer reads a copy of the model whose textures only
+ * hold image data from the model or the workspace (see `../render/input`).
  *
  * @module
  */
@@ -13,6 +14,7 @@ import { basename, join } from "node:path";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { RENDER_PRESETS, RENDER_VIEWS, type IRenderRequest, type RenderView } from "../render/bb-render";
+import { writeRenderInput } from "../render/input";
 import { defineTool, fileParam, type IHeadlessContext, type IRegistrableTool } from "../tool";
 
 const clipParams = {
@@ -59,8 +61,9 @@ const renderTool = defineTool({
   async execute(args, context) {
     const { path } = await context.store.read(args.file);
     const output = await outputPath(context, path, args.view, args.output, args.overwrite);
+    const input = await writeRenderInput(context.store, path, context.scratchDir);
     const request: IRenderRequest = {
-      input: path,
+      input: input.path,
       output,
       view: args.view,
       preset: args.preset,
@@ -71,10 +74,11 @@ const renderTool = defineTool({
       lighting: args.lighting,
       ...(args.clip === undefined ? {} : { clip: args.clip, time: args.time }),
     };
-    const outcome = await context.renderer.render(request);
+    const outcome = await context.renderer.render(request).finally(() => input.dispose());
+    const warnings = input.warnings.length > 0 ? { warnings: input.warnings } : {};
     return {
       content: [
-        { type: "text", text: JSON.stringify({ path: outcome.output, view: args.view, milliseconds: outcome.milliseconds }) },
+        { type: "text", text: JSON.stringify({ path: outcome.output, view: args.view, milliseconds: outcome.milliseconds, ...warnings }) },
         await imageContent(outcome.output),
       ],
     };
@@ -99,11 +103,12 @@ const contactSheetTool = defineTool({
   readOnly: true,
   async execute(args, context) {
     const { path } = await context.store.read(args.file);
+    const input = await writeRenderInput(context.store, path, context.scratchDir);
     const renders = await Promise.all(
       args.views.map(async (view) => {
         const output = await outputPath(context, path, view, undefined);
         const outcome = await context.renderer.render({
-          input: path,
+          input: input.path,
           output,
           view,
           width: args.size,
@@ -114,11 +119,12 @@ const contactSheetTool = defineTool({
         });
         return { view, outcome };
       }),
-    );
+    ).finally(() => input.dispose());
     const content = await Promise.all(
       renders.map(async ({ view, outcome }) => [{ type: "text" as const, text: `${view}: ${outcome.output}` }, await imageContent(outcome.output)]),
     );
-    return { content: content.flat() };
+    const warnings = input.warnings.length > 0 ? [{ type: "text" as const, text: JSON.stringify({ warnings: input.warnings }) }] : [];
+    return { content: [...content.flat(), ...warnings] };
   },
 });
 
