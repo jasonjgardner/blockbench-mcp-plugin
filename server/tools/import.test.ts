@@ -2,7 +2,15 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { importGeoModel, parseGeoJson, readGeoJsonSource, selectGeometry, type IBedrockGeometry } from "@/server/tools/import";
+import {
+  MAX_GEOJSON_BYTES,
+  importGeoModel,
+  parseGeoJson,
+  readGeoJsonSource,
+  readLimitedText,
+  selectGeometry,
+  type IBedrockGeometry,
+} from "@/server/tools/import";
 import { useGlobals } from "@/tests/helpers/globals";
 import { createUndoHost } from "@/tests/helpers/undo-host";
 
@@ -41,6 +49,8 @@ interface IParseCall {
 
 const scene: { elements: ITestNode[]; groups: ITestNode[] } = { elements: [], groups: [] };
 let fetches: IFetchCall[] = [];
+/** Response the fetch double returns instead of the default small geometry. */
+let nextResponse: (() => Response) | undefined;
 let reads: IFileRead[] = [];
 let parses: IParseCall[] = [];
 let editAspects: IImportAspects | undefined;
@@ -78,6 +88,7 @@ beforeEach(() => {
   scene.elements = [{ name: "existing" }];
   scene.groups = [];
   fetches = [];
+  nextResponse = undefined;
   reads = [];
   parses = [];
   editAspects = undefined;
@@ -105,7 +116,7 @@ useGlobals(() => ({
   autoParseJSON,
   fetch: async (url: string, init?: RequestInit): Promise<Response> => {
     fetches.push({ url, init });
-    return new Response('{"format_version":"1.12.0"}');
+    return nextResponse ? nextResponse() : new Response('{"format_version":"1.12.0"}');
   },
   requireNativeModule: (name: string, options?: { message?: string }): unknown => {
     if (name === "url") return { fileURLToPath };
@@ -149,6 +160,32 @@ describe("readGeoJsonSource", () => {
     expect(fetches.map((fetched) => [fetched.url, fetched.init?.redirect])).toEqual([["https://example.com/robot.geo.json", "error"]]);
     call.abort();
     expect(fetches[0]?.init?.signal?.aborted).toBe(true);
+  });
+
+  test("refuses a fetched file that declares more than the size limit", async () => {
+    nextResponse = () => new Response("{}", { headers: { "content-length": String(MAX_GEOJSON_BYTES + 1) } });
+    await expect(readGeoJsonSource("https://example.com/huge.geo.json")).rejects.toThrow("more than the");
+  });
+
+  test("reads the body within the limit and stops a longer one as soon as it passes the limit", async () => {
+    expect(await readLimitedText(new Response("{\"a\":1}"), 7, "geometry")).toBe("{\"a\":1}");
+    expect(await readLimitedText(new Response("x".repeat(9), { headers: { "content-length": "9" } }), 8, "geometry").catch((e: Error) => e.message))
+      .toBe("geometry is 9 bytes, more than the 8-byte limit.");
+
+    let pulls = 0;
+    let cancelled = false;
+    const endless = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulls++;
+        controller.enqueue(new TextEncoder().encode("abc"));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    await expect(readLimitedText(new Response(endless), 8, "geometry")).rejects.toThrow("geometry is more than the 8-byte limit.");
+    expect(cancelled).toBe(true);
+    expect(pulls).toBeLessThanOrEqual(4);
   });
 
   test("reads absolute paths and file URLs of local files through Blockbench's file permission", async () => {

@@ -12,7 +12,7 @@ export const fromGeoJsonParameters = z.object({
   geojson: z
     .string()
     .describe(
-      "Bedrock geometry (format 1.12 or later) as inline JSON, an absolute path or file:// URL of a file on this computer (read with Blockbench's file permission), or a public http(s) URL."
+      "Bedrock geometry (format 1.12 or later) as inline JSON, an absolute path or file:// URL of a file on this computer (read with Blockbench's file permission), or a public http(s) URL (at most 10 MB)."
     ),
   geometry: z
     .string()
@@ -36,6 +36,46 @@ export const importToolDocs: IToolSpec[] = [
 
 /** Longest wait for a remote geometry file. */
 const FETCH_TIMEOUT_MS = 30_000;
+
+/** Largest remote geometry file read; a model file is usually well under a megabyte. */
+export const MAX_GEOJSON_BYTES = 10 * 1024 * 1024;
+
+/**
+ * Reads a response body as UTF-8 text without buffering more than `limit` bytes. A declared
+ * `Content-Length` above the limit is refused before reading; without one (or with a wrong one),
+ * the read stops and the stream is cancelled as soon as the limit is passed.
+ *
+ * @param label - What is being read, for the error message.
+ * @throws {Error} When the body is larger than `limit`.
+ */
+export async function readLimitedText(res: Response, limit: number, label: string): Promise<string> {
+  const declared = Number(res.headers.get("content-length") ?? "");
+  if (Number.isFinite(declared) && declared > limit) {
+    await res.body?.cancel().catch(() => undefined);
+    throw new Error(`${label} is ${declared} bytes, more than the ${limit}-byte limit.`);
+  }
+  if (!res.body) return res.text();
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > limit) {
+      await reader.cancel().catch(() => undefined);
+      throw new Error(`${label} is more than the ${limit}-byte limit.`);
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}
 
 /** One geometry of a Bedrock geometry file, in the shape the codec's `parseGeometry` takes. */
 export interface IBedrockGeometry {
@@ -74,7 +114,7 @@ async function fetchGeoJson(url: URL, signal?: AbortSignal): Promise<string> {
   if (!res.ok) {
     throw new Error(`Failed to fetch GeoJSON from "${url.href}": ${res.status} ${res.statusText}`);
   }
-  return res.text();
+  return readLimitedText(res, MAX_GEOJSON_BYTES, `GeoJSON from "${url.href}"`);
 }
 
 /**
