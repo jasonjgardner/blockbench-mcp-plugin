@@ -10,7 +10,7 @@
  */
 
 import { z } from "zod";
-import { MAX_AGENT_NAME_LENGTH } from "@/lib/ai-disclosure";
+import { mergeAgents, sanitizeAgentName, UNKNOWN_AGENT } from "@/lib/ai-disclosure";
 import {
   CUBE_FACES,
   type CubeFaceName,
@@ -695,12 +695,13 @@ export function applyOperations(doc: IBBModel, operations: readonly Operation[])
 
 /**
  * Records AI involvement the way the desktop plugin does: `ai_used: true` and the
- * client name appended to the comma-separated `ai_agents` list.
+ * client name merged into the comma-separated `ai_agents` list with the plugin's
+ * {@link mergeAgents}, so the name is sanitized and repeated writes add nothing.
+ * A name with nothing printable left is recorded as {@link UNKNOWN_AGENT}, like
+ * the plugin's `resolveAgentName`.
  */
 export function stampAiUsage(doc: IBBModel, agent: string): IBBModel {
-  const name = agent.slice(0, MAX_AGENT_NAME_LENGTH);
-  const existing = typeof doc.ai_agents === "string" && doc.ai_agents ? doc.ai_agents.split(", ") : [];
-  const agents = existing.includes(name) ? existing : [...existing, name];
-  return { ...doc, ai_used: true, ai_agents: agents.join(", ") };
+  const name = sanitizeAgentName(agent) ?? UNKNOWN_AGENT;
+  return { ...doc, ai_used: true, ai_agents: mergeAgents(typeof doc.ai_agents === "string" ? doc.ai_agents : undefined, [name]) };
 }
 

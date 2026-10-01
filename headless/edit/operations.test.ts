@@ -3,7 +3,7 @@ import { creatureModel } from "../test-fixtures";
 import { isCube } from "../document/schema";
 import { emptyModel } from "../tools/edit";
 import { matchesName } from "../tools/inspect";
-import { applyOperations, operationSchema } from "./operations";
+import { applyOperations, operationSchema, stampAiUsage } from "./operations";
 
 const ops = (list: unknown[]) => operationSchema.array().parse(list);
 
@@ -69,6 +69,20 @@ describe("texture images", () => {
     const replaced = applyOperations(renamed, ops([{ op: "update_texture", target: "hide", source: replacement, width: 2, height: 4 }])).doc;
     expect(replaced.textures[0]).toMatchObject({ name: "hide", source: replacement, width: 2, height: 4, path: "", relative_path: "", internal: true, saved: false, layers_enabled: false });
     expect(replaced.textures[0]).not.toHaveProperty("layers");
+  });
+});
+
+describe("AI usage stamp", () => {
+  test("a client is listed once however often it writes, even when its name contains the list separator", () => {
+    const once = stampAiUsage(creatureModel(), "Claude, Code");
+    expect(once).toMatchObject({ ai_used: true, ai_agents: "Claude Code" });
+    expect(stampAiUsage(stampAiUsage(once, "Claude, Code"), "Claude, Code").ai_agents).toBe("Claude Code");
+    expect(stampAiUsage(once, "other").ai_agents).toBe("Claude Code, other");
+  });
+
+  test("a client name with nothing printable is recorded as the unknown client, like the plugin does", () => {
+    expect(stampAiUsage(creatureModel(), " ,\u0000, ").ai_agents).toBe("Unknown MCP client");
+    expect(stampAiUsage({ ...creatureModel(), ai_agents: "Claude Code" }, "").ai_agents).toBe("Claude Code, Unknown MCP client");
   });
 });
 
