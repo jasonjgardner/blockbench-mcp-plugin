@@ -110,6 +110,17 @@ export const viewRefSchema = z
 /** Orthographic side views a camera can lock to. */
 export const lockedAngleEnum = z.enum(["top", "bottom", "north", "south", "east", "west"]);
 
+/** Encodings a tool can return an image in. */
+export const imageFormatEnum = z.enum(["png", "jpeg", "webp"]);
+
+/** Optional size and encoding of an image a tool returns; leaving both out keeps the full-size PNG. */
+export const imageOutputShape = {
+  max_size: z.number().int().min(16).max(8192).optional()
+    .describe("Longest side of the returned image in pixels; larger images are scaled down proportionally. Omit for full size."),
+  format: imageFormatEnum.optional()
+    .describe('Encoding of the returned image: "png" (default, lossless), or the smaller "jpeg" (no transparency: transparent pixels become white) or "webp".'),
+};
+
 /** Agent-chosen identifier for a plugin-owned offscreen view. */
 export const offscreenViewIdSchema = z
   .string()
