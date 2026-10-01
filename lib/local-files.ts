@@ -23,7 +23,7 @@ function describeError(error: unknown): string {
 }
 
 /** The path without control and formatting characters (line breaks, bidirectional overrides), for messages. */
-function displayPath(path: string): string {
+export function displayPath(path: string): string {
   return path.replace(/[\p{Cc}\p{Cf}]/gu, "");
 }
 
