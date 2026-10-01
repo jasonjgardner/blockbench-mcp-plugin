@@ -64,6 +64,14 @@ interface ISessionEntry {
 
 export type SessionTransports = Map<string, ISessionEntry>
 
+/** What a response needs from the request it answers. */
+interface IAnsweredRequest {
+  /** The request's `Connection` header; `close` ends the connection after the response. */
+  connection?: string
+  /** A HEAD request: the response carries headers only. */
+  head?: boolean
+}
+
 function getStatusText (status: number): string {
   const texts: Record<number, string> = {
     200: 'OK',
@@ -78,6 +86,7 @@ function getStatusText (status: number): string {
     409: 'Conflict',
     413: 'Payload Too Large',
     415: 'Unsupported Media Type',
+    431: 'Request Header Fields Too Large',
     500: 'Internal Server Error',
     501: 'Not Implemented',
     503: 'Service Unavailable'
@@ -88,8 +97,11 @@ function getStatusText (status: number): string {
 /** Largest request body accepted; larger requests are refused before being buffered. */
 const MAX_BODY_BYTES = 16 * 1024 * 1024
 
+/** Largest request line plus header section accepted; larger ones are refused with 431. */
+const MAX_HEADER_BYTES = 64 * 1024
+
 /** Bytes a connection may queue while its current request is answered: about one more request. */
-const MAX_QUEUED_BYTES = MAX_BODY_BYTES + 64 * 1024
+const MAX_QUEUED_BYTES = MAX_BODY_BYTES + MAX_HEADER_BYTES
 
 /**
  * Validates the framing headers of one request. `Content-Length` must be
@@ -311,6 +323,8 @@ export default function createNetServer (
     let socketEnded = false
     /** `processHttpRequests` is running; it reads bytes that arrive meanwhile once its request is answered. */
     let processing = false
+    /** `100 Continue` was already sent for the request at the head of the buffer, waiting for its body. */
+    let continueSent = false
 
     // Configure TCP keep-alive for connection health
     if (keepAliveConfig.enabled) {
@@ -351,7 +365,7 @@ export default function createNetServer (
               500,
               { 'content-type': 'application/json' },
               JSON.stringify({ error: 'Internal server error' }),
-              undefined
+              {}
             )
           } catch (sendErr) {
             console.error('[MCP] Failed to send error response:', sendErr)
@@ -377,6 +391,23 @@ export default function createNetServer (
       buffer = Buffer.alloc(0)
     })
 
+    /** Answers `status` and closes the connection: the rest of the stream cannot be framed. */
+    function refuseAndClose (status: number, reason: string): void {
+      console.warn(`[MCP] Rejected request: ${reason}`)
+      buffer = Buffer.alloc(0)
+      sendResponse(
+        socket,
+        status,
+        { 'content-type': 'application/json' },
+        JSON.stringify({
+          jsonrpc: '2.0',
+          error: { code: -32600, message: reason },
+          id: null
+        }),
+        { connection: 'close' }
+      )
+    }
+
     async function processHttpRequests () {
       while (true) {
         // Stop processing if socket is no longer writable
@@ -384,13 +415,17 @@ export default function createNetServer (
           return
         }
 
-        // Look for end of HTTP headers
+        // Look for end of HTTP headers; an endless header section must not grow the buffer forever
         const headerEnd = buffer.indexOf('\r\n\r\n')
+        if (headerEnd > MAX_HEADER_BYTES || (headerEnd === -1 && buffer.length > MAX_HEADER_BYTES)) {
+          refuseAndClose(431, `Request header section exceeds ${MAX_HEADER_BYTES} bytes`)
+          return
+        }
         if (headerEnd === -1) return
 
         const headerSection = buffer.subarray(0, headerEnd).toString()
         const lines = headerSection.split('\r\n')
-        const [method, path] = lines[0].split(' ')
+        const [method, path, version] = lines[0].split(' ')
 
         // Parse headers
         const headers: Record<string, string> = {}
@@ -402,34 +437,32 @@ export default function createNetServer (
             headers[key] = value
           }
         }
+        const answered: IAnsweredRequest = { connection: headers['connection'], head: method === 'HEAD' }
 
         // Calculate body boundaries; malformed framing closes the connection
         const bodyStart = headerEnd + 4
         const framing = readBodyLength(headers)
         if ('status' in framing) {
-          console.warn(`[MCP] Rejected request: ${framing.reason}`)
-          buffer = Buffer.alloc(0)
-          sendResponse(
-            socket,
-            framing.status,
-            { 'content-type': 'application/json' },
-            JSON.stringify({
-              jsonrpc: '2.0',
-              error: { code: -32600, message: framing.reason },
-              id: null
-            }),
-            'close'
-          )
+          refuseAndClose(framing.status, framing.reason)
           return
         }
         const contentLength = framing.length
         const requestEnd = bodyStart + contentLength
 
         // Wait for complete request body
-        if (buffer.length < requestEnd) return
+        if (buffer.length < requestEnd) {
+          // A client that sent `Expect: 100-continue` may hold the body back
+          // until it gets this interim response (RFC 9110, section 10.1.1).
+          if (!continueSent && version === 'HTTP/1.1' && headers['expect']?.toLowerCase() === '100-continue') {
+            continueSent = true
+            socket.write('HTTP/1.1 100 Continue\r\n\r\n')
+          }
+          return
+        }
 
         const body = buffer.subarray(bodyStart, requestEnd).toString()
         buffer = buffer.subarray(requestEnd)
+        continueSent = false
 
         // Refuse requests another website could send through the user's browser
         // (cross-origin pages and DNS rebinding) before any routing happens.
@@ -445,7 +478,7 @@ export default function createNetServer (
               error: { code: -32000, message: `Forbidden: ${check.reason}` },
               id: null
             }),
-            headers['connection']
+            answered
           )
           continue
         }
@@ -485,7 +518,7 @@ export default function createNetServer (
             200,
             { 'content-type': 'application/json' },
             JSON.stringify(healthStatus),
-            headers['connection']
+            answered
           )
           continue
         }
@@ -497,7 +530,7 @@ export default function createNetServer (
             200,
             { 'content-type': 'application/json' },
             JSON.stringify({ ready: true }),
-            headers['connection']
+            answered
           )
           continue
         }
@@ -513,7 +546,7 @@ export default function createNetServer (
             404,
             { 'content-type': 'text/plain' },
             'Not Found',
-            headers['connection']
+            answered
           )
           continue
         }
@@ -543,7 +576,7 @@ export default function createNetServer (
                 },
                 id: null
               }),
-              headers['connection']
+              answered
             )
             continue
           }
@@ -566,7 +599,7 @@ export default function createNetServer (
                 },
                 id: null
               }),
-              headers['connection']
+              answered
             )
             continue
           }
@@ -590,7 +623,7 @@ export default function createNetServer (
                   },
                   id: null
                 }),
-                headers['connection']
+                answered
               )
               continue
             }
@@ -759,7 +792,7 @@ export default function createNetServer (
               webResponse.status,
               responseHeaders,
               responseBody,
-              headers['connection']
+              answered
             )
           }
         } catch (error) {
@@ -769,7 +802,7 @@ export default function createNetServer (
             500,
             { 'content-type': 'application/json' },
             JSON.stringify({ error: String(error) }),
-            headers['connection']
+            answered
           )
         }
       }
@@ -808,7 +841,7 @@ export default function createNetServer (
       status: number,
       headers: Record<string, string>,
       body: string,
-      connection?: string
+      request: IAnsweredRequest = {}
     ): boolean {
       // Don't write to an already-ended socket
       if (socketEnded || sock.destroyed || !sock.writable) {
@@ -823,7 +856,7 @@ export default function createNetServer (
 
       // Set connection header based on client request. HTTP/1.1 defaults to
       // keep-alive unless the client explicitly opted out with `close`.
-      const keepAlive = connection?.toLowerCase() !== 'close'
+      const keepAlive = request.connection?.toLowerCase() !== 'close'
       headers['connection'] = keepAlive ? 'keep-alive' : 'close'
 
       // Tell the client how long we'll hold an idle connection. Helps clients
@@ -842,7 +875,8 @@ export default function createNetServer (
         response += `${key}: ${value}\r\n`
       }
       response += '\r\n'
-      response += body
+      // A HEAD response has no body; its Content-Length describes the GET response.
+      if (!request.head) response += body
 
       // Write response and wait for it to be flushed before closing
       if (!keepAlive) {

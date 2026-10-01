@@ -52,20 +52,25 @@ interface IHttpResponse {
   body: string;
 }
 
-/** Splits the bytes a connection received into consecutive responses framed by Content-Length. */
-function splitResponses(raw: string): IHttpResponse[] {
+/**
+ * Splits the bytes a connection received into consecutive final responses framed by
+ * Content-Length. `methods` lists the requests' methods in order: a HEAD response has no
+ * body whatever its Content-Length says. Interim `100 Continue` responses are skipped.
+ */
+function splitResponses(raw: string, methods: readonly string[] = []): IHttpResponse[] {
   const responses: IHttpResponse[] = [];
   let offset = 0;
   while (offset < raw.length) {
     const headEnd = raw.indexOf("\r\n\r\n", offset);
     if (headEnd === -1) break;
     const [statusLine = "", ...fields] = raw.slice(offset, headEnd).split("\r\n");
+    const status = Number(statusLine.split(" ", 2)[1]);
     const headers = Object.fromEntries(fields.map((field) => {
       const colon = field.indexOf(":");
       return [field.slice(0, colon).trim().toLowerCase(), field.slice(colon + 1).trim()];
     }));
-    const length = Number(headers["content-length"] ?? 0);
-    responses.push({ status: Number(statusLine.split(" ", 2)[1]), headers, body: raw.slice(headEnd + 4, headEnd + 4 + length) });
+    const length = status === 100 || methods[responses.length] === "HEAD" ? 0 : Number(headers["content-length"] ?? 0);
+    if (status !== 100) responses.push({ status, headers, body: raw.slice(headEnd + 4, headEnd + 4 + length) });
     offset = headEnd + 4 + length;
   }
   return responses;
@@ -426,5 +431,105 @@ describe("createNetServer session lifecycle", () => {
       removeTool("net_test_busy");
       sessionManager.configure({ maxSessions: DEFAULT_MAX_SESSIONS });
     }
+  });
+});
+
+/** Resolves once `condition` holds, polling every few milliseconds. */
+async function until(condition: () => boolean): Promise<void> {
+  while (!condition()) await Bun.sleep(5);
+}
+
+describe("createNetServer HTTP framing", () => {
+  test("answers HEAD with headers only", async () => {
+    const [server] = await start("127.0.0.1");
+    const port = portOf(server);
+    const response = await request(port, ["HEAD /bb-mcp/health HTTP/1.1", `Host: localhost:${port}`]);
+    expect(response.status).toBe(200);
+    expect(Number(response.headers["content-length"])).toBeGreaterThan(0);
+    expect(response.body).toBe("");
+  });
+
+  test("sends 100 Continue before a body the client holds back", async () => {
+    const [server] = await start("127.0.0.1");
+    const port = portOf(server);
+    const body = JSON.stringify({ probe: true });
+    const connection = rawConnection(port);
+    connection.socket.write([
+      "POST /bb-mcp/ready HTTP/1.1",
+      `Host: localhost:${port}`,
+      "Content-Type: application/json",
+      "Expect: 100-continue",
+      "Connection: close",
+      `Content-Length: ${Buffer.byteLength(body)}`,
+    ].join("\r\n") + "\r\n\r\n");
+    await until(() => connection.received().length > 0);
+    expect(connection.received()).toBe("HTTP/1.1 100 Continue\r\n\r\n");
+
+    connection.socket.write(body);
+    await connection.closed;
+    const final = connection.received().slice("HTTP/1.1 100 Continue\r\n\r\n".length);
+    expect(final.startsWith("HTTP/1.1 200 OK\r\n")).toBe(true);
+    expect(final).toContain('{"ready":true}');
+  });
+
+  test("refuses an endless header section with 431 and closes the connection", async () => {
+    const [server] = await start("127.0.0.1");
+    const port = portOf(server);
+    const connection = rawConnection(port);
+    connection.socket.write(`GET /bb-mcp/ready HTTP/1.1\r\nX-Filler: ${"a".repeat(70 * 1024)}`);
+    await connection.closed;
+    expect(connection.received().startsWith("HTTP/1.1 431 Request Header Fields Too Large\r\n")).toBe(true);
+  });
+
+  test("a HEAD pipelined behind a pending POST leaves the POST its body and has none itself", async () => {
+    const tool = registerWaitingTool("net_test_wait_head");
+    try {
+      const [server] = await start("127.0.0.1");
+      const port = portOf(server);
+      const sessionId = await initialize(port);
+      const connection = rawConnection(port);
+      connection.socket.write(rawRequest(mcpPost(port, sessionId), toolCall(6, "net_test_wait_head")));
+      await tool.started;
+      connection.socket.write(rawRequest(["HEAD /bb-mcp/health HTTP/1.1", `Host: localhost:${port}`, "Connection: close"]));
+      await Bun.sleep(50);
+
+      tool.release();
+      await connection.closed;
+      const [call, health] = splitResponses(connection.received(), ["POST", "HEAD"]);
+      expect(JSON.parse(call?.body ?? "")).toMatchObject({ id: 6, result: { content: [{ type: "text", text: "released" }] } });
+      expect(health?.status).toBe(200);
+      expect(Number(health?.headers["content-length"])).toBeGreaterThan(0);
+      expect(connection.received().endsWith("\r\n\r\n")).toBe(true);
+    } finally {
+      removeTool("net_test_wait_head");
+    }
+  });
+
+  test("each pipelined request that expects 100-continue gets its own interim response, in order", async () => {
+    const [server] = await start("127.0.0.1");
+    const port = portOf(server);
+    const body = JSON.stringify({ probe: true });
+    const head = (close: boolean): string => [
+      "POST /bb-mcp/ready HTTP/1.1",
+      `Host: localhost:${port}`,
+      "Content-Type: application/json",
+      "Expect: 100-continue",
+      ...(close ? ["Connection: close"] : []),
+      `Content-Length: ${Buffer.byteLength(body)}`,
+    ].join("\r\n") + "\r\n\r\n";
+    // A status line can follow a body directly, so find them anywhere.
+    const statuses = (): string[] => connection.received().match(/HTTP\/1\.1 \d{3} [^\r]*/g) ?? [];
+    const connection = rawConnection(port);
+
+    connection.socket.write(head(false));
+    await until(() => statuses().length === 1);
+    connection.socket.write(body + head(true));
+    await until(() => statuses().length === 3);
+    expect(statuses()).toEqual(["HTTP/1.1 100 Continue", "HTTP/1.1 200 OK", "HTTP/1.1 100 Continue"]);
+
+    connection.socket.write(body);
+    await connection.closed;
+    expect(statuses()).toEqual(["HTTP/1.1 100 Continue", "HTTP/1.1 200 OK", "HTTP/1.1 100 Continue", "HTTP/1.1 200 OK"]);
+    expect(splitResponses(connection.received()).map((response) => response.body)).toEqual(['{"ready":true}', '{"ready":true}']);
   });
 });
