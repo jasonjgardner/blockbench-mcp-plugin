@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { createTool, type IToolSpec } from "@/lib/factories";
 import { captureAppScreenshot } from "@/lib/util";
-import { STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
+import { SETTING_RISKY_EVAL_ENABLED, STATUS_EXPERIMENTAL, STATUS_STABLE } from "@/lib/constants";
 import { mouseButtonEnum, coordinateSchema } from "@/lib/zodObjects";
 import { parseObjectJSON, toFormValues, toMouseEventInit } from "@/server/tools/ui/json-input";
 
@@ -87,6 +87,12 @@ export const fillDialogParametersSchema = z.object({
     ),
 });
 
+/** Whether the user left `risky_eval` enabled in Settings > General; hosts without settings keep it. */
+function isRiskyEvalEnabled(): boolean {
+  if (typeof Settings === "undefined") return true;
+  return Settings.get(SETTING_RISKY_EVAL_ENABLED) !== false;
+}
+
 // ============================================================================
 // UI Tool Docs
 // ============================================================================
@@ -111,6 +117,7 @@ export const uiToolDocs: IToolSpec[] = [
   },
   {
     name: "risky_eval",
+    condition: isRiskyEvalEnabled,
     description:
       "Evaluates JavaScript and returns its JSON result. Does not create an Undo entry. Mutating code must manage its own correctly scoped Undo transaction; read-only evaluation leaves history unchanged.",
     annotations: {
@@ -194,14 +201,35 @@ async function triggerAction({ action, confirmEvent, confirmDialog }: z.infer<ty
   );
 }
 
-/** Evaluates code in the plugin context and serializes a defined result as JSON. */
+/** Reply for code that ran but returned something JSON cannot encode; callers must not run it again. */
+function executedWithoutJson(reason: string): string {
+  return `(Code executed successfully, but its result could not be converted to JSON: ${reason}. Return plain data instead, for example the fields you need.)`;
+}
+
+/**
+ * Evaluates code in the plugin context and serializes a defined result as JSON.
+ * Evaluation and serialization fail separately: code that ran (with its side
+ * effects) but returned something JSON cannot encode, such as a Cube, a cyclic
+ * object or a function, is reported as executed, so callers do not retry it.
+ */
 async function evaluateCode({ code }: z.infer<typeof riskyEvalParametersSchema>): Promise<string> {
+  let result: unknown;
   try {
-    const result: unknown = await eval(code.trim());
-    return result === undefined ? NO_RESULT_MESSAGE : JSON.stringify(result);
+    result = await eval(code.trim());
   } catch (error) {
     throw new Error(`Error executing code: ${error}`, { cause: error });
   }
+  if (result === undefined) return NO_RESULT_MESSAGE;
+  let json: string | undefined;
+  try {
+    json = JSON.stringify(result);
+  } catch (error) {
+    return executedWithoutJson(String(error));
+  }
+  // JSON.stringify returns undefined without throwing for functions, symbols and
+  // values whose toJSON returns undefined; returning that would make the SDK
+  // answer -32602 "Invalid tools/call result" although the code already ran.
+  return json ?? executedWithoutJson(`a ${typeof result} has no JSON form`);
 }
 
 /** Dispatches a press and release, or a press/move/release drag, then captures the app. */

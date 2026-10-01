@@ -58,7 +58,7 @@ export const createTextureParameters = z
     data: z
       .string()
       .optional()
-      .describe("Path to the image file or data URL."),
+      .describe("Image data URL, or an absolute path or file:// URL of an image file (desktop only, read with Blockbench's file permission)."),
     group: z.string().optional(),
     fill_color: colorSchema
       .optional()
