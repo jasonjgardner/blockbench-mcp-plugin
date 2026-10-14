@@ -283,6 +283,19 @@ describe.each<RegistrationMode>(["initial", "session"])("%s registration", (mode
     expect(JSON.stringify(inputSchema)).not.toContain('"additionalProperties":{}');
   });
 
+  test("publishes create_texture fill_color without duplicate string branches", async () => {
+    createTool("create_texture", {
+      description: "Create a texture.",
+      parameters: createTextureParameters,
+      execute: async () => "created",
+    });
+    const client = await connectClient(mode);
+    const inputSchema = (await client.listTools()).tools[0]?.inputSchema;
+    const fillColor = (inputSchema?.properties as Record<string, { anyOf: { type?: string }[] }>)?.fill_color;
+
+    expect(fillColor?.anyOf.map(({ type }) => type)).toEqual(["array", "string"]);
+  });
+
   test("rejects every texture cross-field refinement before execution", async () => {
     const execute = mock(async () => "created");
     createTool("create_texture", {

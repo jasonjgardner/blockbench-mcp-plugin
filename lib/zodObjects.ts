@@ -224,10 +224,9 @@ export const colorSchema = z.union([
   z
     .string()
     .regex(
-      /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$/,
-      "Hex color #RRGGBB or #RRGGBBAA"
+      /^(?:#(?:[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})|[a-z]{3,20})$/,
+      "Hex color #RRGGBB or #RRGGBBAA, or named color"
     ),
-  z.string().regex(/^[a-z]{3,20}$/, "Named color"),
 ]);
 
 /** Hex color string */
