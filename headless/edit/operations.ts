@@ -11,6 +11,7 @@
 
 import { z } from "zod";
 import { mergeAgents, sanitizeAgentName, UNKNOWN_AGENT } from "@/lib/ai-disclosure";
+import { fixedArray } from "@/lib/fixed-array";
 import {
   CUBE_FACES,
   type CubeFaceName,
@@ -115,8 +116,8 @@ export const addTextureOp = z.object({
 export const addMaterialOp = z.object({
   op: z.literal("add_material"),
   name: z.string().min(1),
-  color_value: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional().describe("Uniform RGBA 0-255, used when no color texture is assigned."),
-  mer_value: z.tuple([z.number(), z.number(), z.number()]).optional().describe("Uniform metalness, emissive, roughness 0-255, used when no MER texture is assigned."),
+  color_value: fixedArray(z.number(), 4).optional().describe("Uniform RGBA 0-255, used when no color texture is assigned."),
+  mer_value: fixedArray(z.number(), 3).optional().describe("Uniform metalness, emissive, roughness 0-255, used when no MER texture is assigned."),
   subsurface_value: z.number().min(0).max(255).optional(),
   uuid: z.string().uuid().optional(),
 });
@@ -126,8 +127,8 @@ export const updateMaterialOp = z.object({
   op: z.literal("update_material"),
   target: z.string().min(1).describe("Material UUID or name."),
   name: z.string().min(1).optional(),
-  color_value: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional(),
-  mer_value: z.tuple([z.number(), z.number(), z.number()]).optional(),
+  color_value: fixedArray(z.number(), 4).optional(),
+  mer_value: fixedArray(z.number(), 3).optional(),
   subsurface_value: z.number().min(0).max(255).optional(),
 });
 
@@ -174,7 +175,7 @@ export const setKeyframeOp = z.object({
   bone: nodeRef.describe("Group UUID or name."),
   channel: z.enum(["rotation", "position", "scale"]),
   time: z.number().min(0),
-  value: z.tuple([keyValue, keyValue, keyValue]).describe("Numbers or Molang strings. Rotation in degrees, 5.0 sign convention."),
+  value: fixedArray(keyValue, 3).describe("Numbers or Molang strings. Rotation in degrees, 5.0 sign convention."),
   interpolation: z.enum(["linear", "step", "catmullrom", "bezier"]).default("linear"),
 });
 

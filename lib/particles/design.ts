@@ -11,6 +11,7 @@
  */
 
 import { z } from "zod";
+import { fixedArray } from "@/lib/fixed-array";
 import { FACING_CAMERA_MODES, PARTICLE_MATERIALS, PARTICLE_SPRITE_NAMES } from "./catalog";
 
 /** `namespace:name`, lowercase, the form Bedrock resolves particle identifiers in. */
@@ -28,14 +29,14 @@ const molang = z.union([z.number().finite(), z.string().min(1)]);
 /** A number, a Molang string, or a [min, max] pair that becomes a random value per particle. */
 export const rangeSchema = z.union([
   z.number().finite(),
-  z.tuple([z.number().finite(), z.number().finite()]),
+  fixedArray(z.number().finite(), 2),
   z.string().min(1),
 ]);
 
 /** A value that may be fixed, random between two bounds, or Molang. */
 export type ParticleRange = z.infer<typeof rangeSchema>;
 
-const vec3 = z.tuple([molang, molang, molang]);
+const vec3 = fixedArray(molang, 3);
 
 /** `#RRGGBB` or `#RRGGBBAA` (CSS order; converted to Bedrock's form on build). */
 export const hexColorSchema = z
@@ -56,7 +57,7 @@ export const emitterShapeSchema = z
 
 /** A particle's sprite sheet animation for a custom texture. */
 export const flipbookDesignSchema = z.object({
-  frame_size: z.tuple([z.number().int().positive(), z.number().int().positive()]).describe("Pixel width and height of one frame."),
+  frame_size: fixedArray(z.number().int().positive(), 2).describe("Pixel width and height of one frame."),
   frames: z.number().int().min(2).describe("Frame count."),
   axis: z.enum(["vertical", "horizontal"]).default("vertical").describe("Direction frames are stacked in the image; Blockbench flipbook textures are vertical."),
   fps: z.number().positive().optional().describe("Playback rate. Omit to stretch the frames over each particle's lifetime."),
@@ -68,7 +69,7 @@ export const particleDesignShape = {
   material: z.enum(PARTICLE_MATERIALS).optional().describe("particles_alpha: cutout, cheapest. particles_blend: soft translucency (smoke, glow). particles_add: additive light (fire, magic, sparks). particles_opaque: solid."),
   sprite: z.enum(PARTICLE_SPRITE_NAMES).optional().describe("Built-in sprite; sets the texture and UVs. See list_particle_presets for descriptions."),
   texture: z.string().min(1).optional().describe("Custom Bedrock texture path without .png, such as textures/particle/leaf. Overrides sprite."),
-  texture_size: z.tuple([z.number().int().positive(), z.number().int().positive()]).optional().describe("Pixel size of the custom texture. Tools fill it from the PNG when they copy one."),
+  texture_size: fixedArray(z.number().int().positive(), 2).optional().describe("Pixel size of the custom texture. Tools fill it from the PNG when they copy one."),
   flipbook: flipbookDesignSchema.optional().describe("Animate a custom texture as a sprite sheet."),
   rate: z.number().positive().optional().describe("Steady emission, particles per second. Mutually exclusive with burst."),
   burst: z.number().int().positive().optional().describe("Emit this many particles at once when the emitter starts. Mutually exclusive with rate."),
@@ -83,7 +84,7 @@ export const particleDesignShape = {
   speed: rangeSchema.optional().describe("Initial speed in blocks per second; [min, max] randomizes it."),
   acceleration: vec3.optional().describe("Blocks per second squared, e.g. [0, -9.8, 0] for gravity or [0, 0.5, 0] for rising smoke."),
   drag: z.number().nonnegative().optional().describe("Linear drag coefficient; 1-3 slows bursts naturally."),
-  size: z.union([z.number().positive(), z.tuple([z.number().nonnegative(), z.number().nonnegative()])]).optional().describe("Billboard half-width in blocks (Bedrock sizes are half extents: 0.5 spans a whole block), or [start, end] to grow or shrink over life. Vanilla smoke is 0.1."),
+  size: z.union([z.number().positive(), fixedArray(z.number().nonnegative(), 2)]).optional().describe("Billboard half-width in blocks (Bedrock sizes are half extents: 0.5 spans a whole block), or [start, end] to grow or shrink over life. Vanilla smoke is 0.1."),
   size_variation: z.number().min(0).max(1).optional().describe("Random size spread per particle, 0-1 (0.3 means +/-15%)."),
   spin: z.object({ initial: rangeSchema.optional(), rate: rangeSchema.optional() }).optional().describe("Billboard rotation in degrees and degrees per second."),
   color: z.union([hexColorSchema, z.array(hexColorSchema).min(2).max(8)]).optional().describe("Tint as #RRGGBB/#RRGGBBAA, or 2-8 colors spread evenly over the particle's life. White keeps a sprite's own colors."),
