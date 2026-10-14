@@ -16,15 +16,16 @@
  */
 
 import { z } from "zod";
+import { fixedArray } from "@/lib/fixed-array";
 
 /** `[x, y, z]` in model units (1 unit = 1 pixel = 1/16 block). */
-export const vec3Schema = z.tuple([z.number(), z.number(), z.number()]);
+export const vec3Schema = fixedArray(z.number(), 3);
 
 /** `[u, v]` in texture pixels. */
-export const vec2Schema = z.tuple([z.number(), z.number()]);
+export const vec2Schema = fixedArray(z.number(), 2);
 
 /** `[u1, v1, u2, v2]` face UV rectangle. */
-export const uvRectSchema = z.tuple([z.number(), z.number(), z.number(), z.number()]);
+export const uvRectSchema = fixedArray(z.number(), 4);
 
 /** A 3D vector. */
 export type Vec3 = z.infer<typeof vec3Schema>;

@@ -63,6 +63,41 @@ describe("headless MCP server", () => {
     expect(tools.find((tool) => tool.name === "bbmodel_edit")?.annotations?.readOnlyHint).toBe(false);
   });
 
+  test("publishes tuple schemas in a 2020-12-compatible form", async () => {
+    const { client } = await connect(root, "schema-lister");
+    const { tools } = await client.listTools();
+    const invalidItems: string[] = [];
+    const fixedArrays = new Map<string, unknown>();
+    const inspect = (value: unknown, path: string): void => {
+      if (Array.isArray(value)) {
+        value.forEach((item, index) => inspect(item, `${path}[${index}]`));
+        return;
+      }
+      if (typeof value !== "object" || value === null) return;
+      if (path === "bbmodel_edit.properties.operations.items.anyOf[0].properties.origin" || path === "bbmodel_particle_effect.properties.design.properties.texture_size") {
+        fixedArrays.set(path, value);
+      }
+      Object.entries(value).forEach(([key, nested]) => {
+        if (key === "items" && Array.isArray(nested)) invalidItems.push(`${path}.${key}`);
+        inspect(nested, `${path}.${key}`);
+      });
+    };
+    tools.forEach((tool) => inspect(tool.inputSchema, tool.name));
+    expect(invalidItems).toEqual([]);
+    expect(fixedArrays.get("bbmodel_edit.properties.operations.items.anyOf[0].properties.origin")).toMatchObject({
+      type: "array",
+      items: { type: "number" },
+      minItems: 3,
+      maxItems: 3,
+    });
+    expect(fixedArrays.get("bbmodel_particle_effect.properties.design.properties.texture_size")).toMatchObject({
+      type: "array",
+      items: { type: "integer", exclusiveMinimum: 0 },
+      minItems: 2,
+      maxItems: 2,
+    });
+  });
+
   test("annotations disclose destructive writes and the render engine's install", async () => {
     const { client } = await connect(root, "lister");
     const { tools } = await client.listTools();
