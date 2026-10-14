@@ -1,6 +1,6 @@
 {
   "version": "1.10.0",
-  "generatedAt": "2026-10-14T01:42:02.102Z",
+  "generatedAt": "2026-10-14T01:59:30.638Z",
   "tools": [
     {
       "name": "place_cube",
@@ -7874,16 +7874,9 @@
                   },
                   {
                     "type": "string",
-                    "pattern": "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$",
+                    "pattern": "^(?:#(?:[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})|[a-z]{3,20})$",
                     "errorMessage": {
-                      "pattern": "Hex color #RRGGBB or #RRGGBBAA"
-                    }
-                  },
-                  {
-                    "type": "string",
-                    "pattern": "^[a-z]{3,20}$",
-                    "errorMessage": {
-                      "pattern": "Named color"
+                      "pattern": "Hex color #RRGGBB or #RRGGBBAA, or named color"
                     }
                   }
                 ],
