@@ -231,9 +231,9 @@ export function openPromptPreviewDialog(promptName: string) {
           const content = result.messages
             .map((msg) => {
               const roleLabel = msg.role === "user" ? tl("mcp.dialog.role_user") : tl("mcp.dialog.role_assistant");
-              const text = typeof msg.content === "string"
-                ? msg.content
-                : msg.content.text;
+              const text = msg.content.type === "text"
+                ? msg.content.text
+                : JSON.stringify(msg.content, null, 2);
               return `[${roleLabel}]\n${text}`;
             })
             .join("\n\n---\n\n");

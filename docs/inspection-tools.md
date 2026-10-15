@@ -26,6 +26,8 @@ Detailed feature values are `true`, `false`, or `null` when the host does not de
 
 ## Inspect existing mesh geometry
 
+`list_outline` includes the complete runtime hierarchy: groups, armatures, armature bones, geometry, and markers. Each node reports its runtime `type`, name, and UUID. Set both `include_cubes` and `include_meshes` to `false` to omit geometry leaves while preserving armatures and other structural nodes. `max_depth` bounds traversal and reports truncated parents.
+
 Call `get_mesh_info` with a UUID/name from `list_outline` or `find_elements_by_criteria`:
 
 ```json

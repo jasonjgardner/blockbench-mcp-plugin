@@ -41,6 +41,8 @@ To publish an existing Blockbench `Action` instead, call `mcp.exposeAction("my_a
 - Wrap edits in `mcp.runUndoableEdit(aspects, label, edit)` so a failing call reverts cleanly and the write counts toward AI usage disclosure like a built-in tool.
 - `condition` uses Blockbench's native rules (`modes`, `formats`, `features`, `project`, `method`), so an unavailable tool is hidden without running your code.
 - Return a string for text, or `mcp.createJsonResult({...})` for structured content.
+- MCP requests and the panel's tool test dialog both parse inputs through the complete Zod schema, including defaults, transforms, and asynchronous refinements, before calling `execute`.
+- Use the execution context's `reportProgress({ progress, total })` for long-running tools. MCP progress notifications go only to the requesting client when it supplied a progress token; calls without one and panel tests do not emit protocol progress.
 - Reloading the MCP plugin re-runs queued entries. `{ plugin, setup }` entries are dropped when your plugin unloads; a bare function entry should check that your plugin is still loaded before registering.
 
 The [Havok Physics Animations plugin](https://github.com/jasonjgardner/blockbench-plugins) is a complete example; it registers `havok_simulate_physics` this way.

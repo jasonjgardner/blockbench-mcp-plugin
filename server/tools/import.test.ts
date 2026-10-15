@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -13,6 +13,7 @@ import {
 } from "@/server/tools/import";
 import { useGlobals } from "@/tests/helpers/globals";
 import { createUndoHost } from "@/tests/helpers/undo-host";
+import { loadToolDefinitions, type IToolFixture } from "@/tests/helpers/tool-fixture";
 
 /** Outliner node double; identity is all the undo model needs. */
 interface ITestNode {
@@ -50,11 +51,20 @@ interface IParseCall {
 const scene: { elements: ITestNode[]; groups: ITestNode[] } = { elements: [], groups: [] };
 let fetches: IFetchCall[] = [];
 /** Response the fetch double returns instead of the default small geometry. */
-let nextResponse: (() => Response) | undefined;
+let nextResponse: (() => Response | Promise<Response>) | undefined;
 let reads: IFileRead[] = [];
 let parses: IParseCall[] = [];
 let editAspects: IImportAspects | undefined;
 let parseFails = false;
+let tools: IToolFixture;
+
+beforeAll(async () => {
+  tools = await loadToolDefinitions({
+    entries: ["server/tools/import.ts"],
+    register: ["registerImportTools"],
+    shims: { "lib/util.ts": 'export async function captureAppScreenshot() { return "screenshot"; }' },
+  });
+});
 
 /** Like Blockbench's `loadSave`: nodes the replaced state tracked and the restored state lacks are removed. */
 const undo = createUndoHost<ISceneSnapshot, IImportAspects>({
@@ -97,6 +107,7 @@ beforeEach(() => {
 });
 
 useGlobals(() => ({
+  Project: { uuid: "original-project" },
   Outliner: { get elements() { return scene.elements; } },
   Group: { get all() { return scene.groups; } },
   Undo: undo,
@@ -129,6 +140,30 @@ useGlobals(() => ({
     };
   },
 }));
+
+describe("from_geo_json project identity", () => {
+  test.each([{}, undefined])("refuses to mutate after switching or closing the project (%p)", async nextProject => {
+    let release: (response: Response) => void = () => {};
+    let started: () => void = () => {};
+    const fetching = new Promise<void>(resolve => { started = resolve; });
+    nextResponse = () => new Promise<Response>(resolve => { release = resolve; started(); });
+    const pending = tools.call("from_geo_json", { geojson: "https://example.com/robot.geo.json" });
+    await fetching;
+    Reflect.set(globalThis, "Project", nextProject);
+    release(new Response(JSON.stringify({ "minecraft:geometry": [robot] })));
+    await expect(pending).rejects.toThrow("active project changed");
+    expect(parses).toEqual([]);
+    expect(undo.starts).toBe(0);
+    expect(scene.elements).toEqual([{ name: "existing" }]);
+  });
+
+  test("imports into the unchanged project and preserves the screenshot result", async () => {
+    nextResponse = () => new Response(JSON.stringify({ "minecraft:geometry": [robot] }));
+    expect(await tools.call("from_geo_json", { geojson: "https://example.com/robot.geo.json" })).toBe("screenshot");
+    expect(parses).toHaveLength(1);
+    expect(undo.finishes).toBe(1);
+  });
+});
 
 describe("readGeoJsonSource", () => {
   test("returns inline JSON without reading or fetching", async () => {

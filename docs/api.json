@@ -1,6 +1,6 @@
 {
-  "version": "1.9.3",
-  "generatedAt": "2026-10-01T02:48:30.688Z",
+  "version": "1.10.0",
+  "generatedAt": "2026-10-15T21:27:49.261Z",
   "tools": [
     {
       "name": "place_cube",
@@ -3206,7 +3206,7 @@
     {
       "name": "list_outline",
       "title": "List Outline",
-      "description": "Returns the project outline as a hierarchical tree. Each node reports { name, uuid, type (cube|mesh|group), children? }. Groups contain child cubes, meshes, and sub-groups. Use `include_cubes=false` to get a group-only skeleton when you just need structure, or `max_depth` to bound very deep trees.",
+      "description": "Returns the project outline as a hierarchical tree. Each node reports { name, uuid, type, children? }, including groups, armatures, armature bones, cubes, meshes and markers. Parent nodes retain their descendants. Use include_cubes=false and include_meshes=false to omit geometry leaves, or max_depth to bound very deep trees.",
       "status": "stable",
       "category": "Elements",
       "annotations": {
@@ -3221,8 +3221,8 @@
               "include_cubes": {
                 "type": "boolean",
                 "default": true,
-                "description": "If true, include cubes as leaves. If false, return groups only.",
-                "markdownDescription": "If true, include cubes as leaves. If false, return groups only."
+                "description": "If true, include cubes as leaves. If false, omit cubes while retaining other node types.",
+                "markdownDescription": "If true, include cubes as leaves. If false, omit cubes while retaining other node types."
               },
               "include_meshes": {
                 "type": "boolean",
@@ -3733,7 +3733,7 @@
     {
       "name": "from_geo_json",
       "title": "Import GeoJSON",
-      "description": "Imports one Bedrock geometry (.geo.json) into the current project, which keeps its format (one with bones: Bedrock, GeckoLib, generic, ...), as one undoable edit, and returns a screenshot. Adds the bones with their cubes, locators and texture meshes; the texture size, box UV mode and item display transforms it sets are undone with it, while the project's visible bounds can only grow. URLs on this computer or a private network are refused; pass a file path instead.",
+      "description": "Imports one Bedrock geometry (.geo.json) into the current project, which keeps its format (one with bones: Bedrock, GeckoLib, generic, ...), as one undoable edit, and returns a screenshot. Adds the bones with their cubes, locators and texture meshes; the texture size, box UV mode and item display transforms it sets are undone with it, while the project's visible bounds can only grow. If the active project changes while loading, the import is rejected without modifying the new project. URLs on this computer or a private network are refused; pass a file path instead.",
       "status": "stable",
       "category": "Import/Export",
       "annotations": {
@@ -6332,18 +6332,12 @@
                   },
                   "texture_size": {
                     "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
                     "minItems": 2,
                     "maxItems": 2,
-                    "items": [
-                      {
-                        "type": "integer",
-                        "exclusiveMinimum": 0
-                      },
-                      {
-                        "type": "integer",
-                        "exclusiveMinimum": 0
-                      }
-                    ],
                     "description": "Pixel size of the custom texture. Tools fill it from the PNG when they copy one.",
                     "markdownDescription": "Pixel size of the custom texture. Tools fill it from the PNG when they copy one."
                   },
@@ -6352,18 +6346,12 @@
                     "properties": {
                       "frame_size": {
                         "type": "array",
+                        "items": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0
+                        },
                         "minItems": 2,
                         "maxItems": 2,
-                        "items": [
-                          {
-                            "type": "integer",
-                            "exclusiveMinimum": 0
-                          },
-                          {
-                            "type": "integer",
-                            "exclusiveMinimum": 0
-                          }
-                        ],
                         "description": "Pixel width and height of one frame.",
                         "markdownDescription": "Pixel width and height of one frame."
                       },
@@ -6455,43 +6443,19 @@
                       },
                       "offset": {
                         "type": "array",
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          ]
+                        },
                         "minItems": 3,
                         "maxItems": 3,
-                        "items": [
-                          {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "string",
-                                "minLength": 1
-                              }
-                            ]
-                          },
-                          {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "string",
-                                "minLength": 1
-                              }
-                            ]
-                          },
-                          {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "string",
-                                "minLength": 1
-                              }
-                            ]
-                          }
-                        ],
                         "description": "Spawn center offset from the emitter, in blocks.",
                         "markdownDescription": "Spawn center offset from the emitter, in blocks."
                       },
@@ -6510,43 +6474,19 @@
                       },
                       "half_dimensions": {
                         "type": "array",
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          ]
+                        },
                         "minItems": 3,
                         "maxItems": 3,
-                        "items": [
-                          {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "string",
-                                "minLength": 1
-                              }
-                            ]
-                          },
-                          {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "string",
-                                "minLength": 1
-                              }
-                            ]
-                          },
-                          {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "string",
-                                "minLength": 1
-                              }
-                            ]
-                          }
-                        ],
                         "description": "Box half extents in blocks.",
                         "markdownDescription": "Box half extents in blocks."
                       },
@@ -6562,43 +6502,19 @@
                           },
                           {
                             "type": "array",
+                            "items": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              ]
+                            },
                             "minItems": 3,
-                            "maxItems": 3,
-                            "items": [
-                              {
-                                "anyOf": [
-                                  {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "string",
-                                    "minLength": 1
-                                  }
-                                ]
-                              },
-                              {
-                                "anyOf": [
-                                  {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "string",
-                                    "minLength": 1
-                                  }
-                                ]
-                              },
-                              {
-                                "anyOf": [
-                                  {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "string",
-                                    "minLength": 1
-                                  }
-                                ]
-                              }
-                            ]
+                            "maxItems": 3
                           }
                         ],
                         "description": "Disc facing; y (the default) lays it flat.",
@@ -6628,43 +6544,19 @@
                       },
                       {
                         "type": "array",
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          ]
+                        },
                         "minItems": 3,
-                        "maxItems": 3,
-                        "items": [
-                          {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "string",
-                                "minLength": 1
-                              }
-                            ]
-                          },
-                          {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "string",
-                                "minLength": 1
-                              }
-                            ]
-                          },
-                          {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "string",
-                                "minLength": 1
-                              }
-                            ]
-                          }
-                        ]
+                        "maxItems": 3
                       }
                     ],
                     "description": "Initial direction: away from or toward the shape center, or a vector such as [0, 1, 0] (up). Molang allowed, e.g. ['math.random(-0.2,0.2)', 1, 0].",
@@ -6682,16 +6574,11 @@
                       },
                       {
                         "type": "array",
+                        "items": {
+                          "type": "number"
+                        },
                         "minItems": 2,
-                        "maxItems": 2,
-                        "items": [
-                          {
-                            "type": "number"
-                          },
-                          {
-                            "type": "number"
-                          }
-                        ]
+                        "maxItems": 2
                       },
                       {
                         "type": "string",
@@ -6708,16 +6595,11 @@
                       },
                       {
                         "type": "array",
+                        "items": {
+                          "type": "number"
+                        },
                         "minItems": 2,
-                        "maxItems": 2,
-                        "items": [
-                          {
-                            "type": "number"
-                          },
-                          {
-                            "type": "number"
-                          }
-                        ]
+                        "maxItems": 2
                       },
                       {
                         "type": "string",
@@ -6729,43 +6611,19 @@
                   },
                   "acceleration": {
                     "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      ]
+                    },
                     "minItems": 3,
                     "maxItems": 3,
-                    "items": [
-                      {
-                        "anyOf": [
-                          {
-                            "type": "number"
-                          },
-                          {
-                            "type": "string",
-                            "minLength": 1
-                          }
-                        ]
-                      },
-                      {
-                        "anyOf": [
-                          {
-                            "type": "number"
-                          },
-                          {
-                            "type": "string",
-                            "minLength": 1
-                          }
-                        ]
-                      },
-                      {
-                        "anyOf": [
-                          {
-                            "type": "number"
-                          },
-                          {
-                            "type": "string",
-                            "minLength": 1
-                          }
-                        ]
-                      }
-                    ],
                     "description": "Blocks per second squared, e.g. [0, -9.8, 0] for gravity or [0, 0.5, 0] for rising smoke.",
                     "markdownDescription": "Blocks per second squared, e.g. [0, -9.8, 0] for gravity or [0, 0.5, 0] for rising smoke."
                   },
@@ -6783,18 +6641,12 @@
                       },
                       {
                         "type": "array",
+                        "items": {
+                          "type": "number",
+                          "minimum": 0
+                        },
                         "minItems": 2,
-                        "maxItems": 2,
-                        "items": [
-                          {
-                            "type": "number",
-                            "minimum": 0
-                          },
-                          {
-                            "type": "number",
-                            "minimum": 0
-                          }
-                        ]
+                        "maxItems": 2
                       }
                     ],
                     "description": "Billboard half-width in blocks (Bedrock sizes are half extents: 0.5 spans a whole block), or [start, end] to grow or shrink over life. Vanilla smoke is 0.1.",
@@ -6817,16 +6669,11 @@
                           },
                           {
                             "type": "array",
+                            "items": {
+                              "type": "number"
+                            },
                             "minItems": 2,
-                            "maxItems": 2,
-                            "items": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "number"
-                              }
-                            ]
+                            "maxItems": 2
                           },
                           {
                             "type": "string",
@@ -6841,16 +6688,11 @@
                           },
                           {
                             "type": "array",
+                            "items": {
+                              "type": "number"
+                            },
                             "minItems": 2,
-                            "maxItems": 2,
-                            "items": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "number"
-                              }
-                            ]
+                            "maxItems": 2
                           },
                           {
                             "type": "string",
@@ -7100,18 +6942,12 @@
                   },
                   "texture_size": {
                     "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
                     "minItems": 2,
                     "maxItems": 2,
-                    "items": [
-                      {
-                        "type": "integer",
-                        "exclusiveMinimum": 0
-                      },
-                      {
-                        "type": "integer",
-                        "exclusiveMinimum": 0
-                      }
-                    ],
                     "description": "Pixel size of the custom texture. Tools fill it from the PNG when they copy one.",
                     "markdownDescription": "Pixel size of the custom texture. Tools fill it from the PNG when they copy one."
                   },
@@ -7120,18 +6956,12 @@
                     "properties": {
                       "frame_size": {
                         "type": "array",
+                        "items": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0
+                        },
                         "minItems": 2,
                         "maxItems": 2,
-                        "items": [
-                          {
-                            "type": "integer",
-                            "exclusiveMinimum": 0
-                          },
-                          {
-                            "type": "integer",
-                            "exclusiveMinimum": 0
-                          }
-                        ],
                         "description": "Pixel width and height of one frame.",
                         "markdownDescription": "Pixel width and height of one frame."
                       },
@@ -7223,43 +7053,19 @@
                       },
                       "offset": {
                         "type": "array",
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          ]
+                        },
                         "minItems": 3,
                         "maxItems": 3,
-                        "items": [
-                          {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "string",
-                                "minLength": 1
-                              }
-                            ]
-                          },
-                          {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "string",
-                                "minLength": 1
-                              }
-                            ]
-                          },
-                          {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "string",
-                                "minLength": 1
-                              }
-                            ]
-                          }
-                        ],
                         "description": "Spawn center offset from the emitter, in blocks.",
                         "markdownDescription": "Spawn center offset from the emitter, in blocks."
                       },
@@ -7278,43 +7084,19 @@
                       },
                       "half_dimensions": {
                         "type": "array",
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          ]
+                        },
                         "minItems": 3,
                         "maxItems": 3,
-                        "items": [
-                          {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "string",
-                                "minLength": 1
-                              }
-                            ]
-                          },
-                          {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "string",
-                                "minLength": 1
-                              }
-                            ]
-                          },
-                          {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "string",
-                                "minLength": 1
-                              }
-                            ]
-                          }
-                        ],
                         "description": "Box half extents in blocks.",
                         "markdownDescription": "Box half extents in blocks."
                       },
@@ -7330,43 +7112,19 @@
                           },
                           {
                             "type": "array",
+                            "items": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              ]
+                            },
                             "minItems": 3,
-                            "maxItems": 3,
-                            "items": [
-                              {
-                                "anyOf": [
-                                  {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "string",
-                                    "minLength": 1
-                                  }
-                                ]
-                              },
-                              {
-                                "anyOf": [
-                                  {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "string",
-                                    "minLength": 1
-                                  }
-                                ]
-                              },
-                              {
-                                "anyOf": [
-                                  {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "string",
-                                    "minLength": 1
-                                  }
-                                ]
-                              }
-                            ]
+                            "maxItems": 3
                           }
                         ],
                         "description": "Disc facing; y (the default) lays it flat.",
@@ -7396,43 +7154,19 @@
                       },
                       {
                         "type": "array",
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          ]
+                        },
                         "minItems": 3,
-                        "maxItems": 3,
-                        "items": [
-                          {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "string",
-                                "minLength": 1
-                              }
-                            ]
-                          },
-                          {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "string",
-                                "minLength": 1
-                              }
-                            ]
-                          },
-                          {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "string",
-                                "minLength": 1
-                              }
-                            ]
-                          }
-                        ]
+                        "maxItems": 3
                       }
                     ],
                     "description": "Initial direction: away from or toward the shape center, or a vector such as [0, 1, 0] (up). Molang allowed, e.g. ['math.random(-0.2,0.2)', 1, 0].",
@@ -7450,16 +7184,11 @@
                       },
                       {
                         "type": "array",
+                        "items": {
+                          "type": "number"
+                        },
                         "minItems": 2,
-                        "maxItems": 2,
-                        "items": [
-                          {
-                            "type": "number"
-                          },
-                          {
-                            "type": "number"
-                          }
-                        ]
+                        "maxItems": 2
                       },
                       {
                         "type": "string",
@@ -7476,16 +7205,11 @@
                       },
                       {
                         "type": "array",
+                        "items": {
+                          "type": "number"
+                        },
                         "minItems": 2,
-                        "maxItems": 2,
-                        "items": [
-                          {
-                            "type": "number"
-                          },
-                          {
-                            "type": "number"
-                          }
-                        ]
+                        "maxItems": 2
                       },
                       {
                         "type": "string",
@@ -7497,43 +7221,19 @@
                   },
                   "acceleration": {
                     "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      ]
+                    },
                     "minItems": 3,
                     "maxItems": 3,
-                    "items": [
-                      {
-                        "anyOf": [
-                          {
-                            "type": "number"
-                          },
-                          {
-                            "type": "string",
-                            "minLength": 1
-                          }
-                        ]
-                      },
-                      {
-                        "anyOf": [
-                          {
-                            "type": "number"
-                          },
-                          {
-                            "type": "string",
-                            "minLength": 1
-                          }
-                        ]
-                      },
-                      {
-                        "anyOf": [
-                          {
-                            "type": "number"
-                          },
-                          {
-                            "type": "string",
-                            "minLength": 1
-                          }
-                        ]
-                      }
-                    ],
                     "description": "Blocks per second squared, e.g. [0, -9.8, 0] for gravity or [0, 0.5, 0] for rising smoke.",
                     "markdownDescription": "Blocks per second squared, e.g. [0, -9.8, 0] for gravity or [0, 0.5, 0] for rising smoke."
                   },
@@ -7551,18 +7251,12 @@
                       },
                       {
                         "type": "array",
+                        "items": {
+                          "type": "number",
+                          "minimum": 0
+                        },
                         "minItems": 2,
-                        "maxItems": 2,
-                        "items": [
-                          {
-                            "type": "number",
-                            "minimum": 0
-                          },
-                          {
-                            "type": "number",
-                            "minimum": 0
-                          }
-                        ]
+                        "maxItems": 2
                       }
                     ],
                     "description": "Billboard half-width in blocks (Bedrock sizes are half extents: 0.5 spans a whole block), or [start, end] to grow or shrink over life. Vanilla smoke is 0.1.",
@@ -7585,16 +7279,11 @@
                           },
                           {
                             "type": "array",
+                            "items": {
+                              "type": "number"
+                            },
                             "minItems": 2,
-                            "maxItems": 2,
-                            "items": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "number"
-                              }
-                            ]
+                            "maxItems": 2
                           },
                           {
                             "type": "string",
@@ -7609,16 +7298,11 @@
                           },
                           {
                             "type": "array",
+                            "items": {
+                              "type": "number"
+                            },
                             "minItems": 2,
-                            "maxItems": 2,
-                            "items": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "number"
-                              }
-                            ]
+                            "maxItems": 2
                           },
                           {
                             "type": "string",
@@ -8190,16 +7874,9 @@
                   },
                   {
                     "type": "string",
-                    "pattern": "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$",
+                    "pattern": "^(?:#(?:[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})|[a-z]{3,20})$",
                     "errorMessage": {
-                      "pattern": "Hex color #RRGGBB or #RRGGBBAA"
-                    }
-                  },
-                  {
-                    "type": "string",
-                    "pattern": "^[a-z]{3,20}$",
-                    "errorMessage": {
-                      "pattern": "Named color"
+                      "pattern": "Hex color #RRGGBB or #RRGGBBAA, or named color"
                     }
                   }
                 ],

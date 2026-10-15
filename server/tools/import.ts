@@ -24,7 +24,7 @@ export const importToolDocs: IToolSpec[] = [
   {
     name: "from_geo_json",
     condition: { project: true, features: ["bone_rig"], method: () => !Blockbench.isWeb && bedrockCodec() !== undefined },
-    description: "Imports one Bedrock geometry (.geo.json) into the current project, which keeps its format (one with bones: Bedrock, GeckoLib, generic, ...), as one undoable edit, and returns a screenshot. Adds the bones with their cubes, locators and texture meshes; the texture size, box UV mode and item display transforms it sets are undone with it, while the project's visible bounds can only grow. URLs on this computer or a private network are refused; pass a file path instead.",
+    description: "Imports one Bedrock geometry (.geo.json) into the current project, which keeps its format (one with bones: Bedrock, GeckoLib, generic, ...), as one undoable edit, and returns a screenshot. Adds the bones with their cubes, locators and texture meshes; the texture size, box UV mode and item display transforms it sets are undone with it, while the project's visible bounds can only grow. If the active project changes while loading, the import is rejected without modifying the new project. URLs on this computer or a private network are refused; pass a file path instead.",
     annotations: {
       title: "Import GeoJSON",
       destructiveHint: true,
@@ -219,7 +219,12 @@ export function registerImportTools() {
   createTool(importToolDocs[0].name, {
     ...importToolDocs[0],
     async execute({ geojson, geometry }, context) {
+      const project = Project;
       const model = parseGeoJson(await readGeoJsonSource(geojson, context?.signal));
+      if (!project || Project !== project) {
+        throw new Error("The active project changed while loading geometry. Select the intended project and import again.");
+      }
+      context?.signal?.throwIfAborted();
       importGeoModel(selectGeometry(model, geometry));
 
       return new Promise((resolve, reject) => {
