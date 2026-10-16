@@ -11,7 +11,7 @@
     <nav class="sidebar">
       <div class="sidebar-brand">
         <h1>Blockbench MCP</h1>
-        <p>v1.10.0 — API Reference</p>
+        <p>v1.10.1 — API Reference</p>
       </div>
 
       <input id="search" type="text" placeholder="Search tools..." class="search-input" />
@@ -52,7 +52,7 @@
     <main class="main">
       <header class="page-header">
         <h1>Blockbench MCP Plugin</h1>
-        <p class="subtitle">API Reference — v1.10.0</p>
+        <p class="subtitle">API Reference — v1.10.1</p>
         <nav class="stats">
           <a href="#tools"><strong>147</strong> tools (44 stable, 103 experimental)</a>
           <a href="#prompts"><strong>6</strong> prompts</a>
@@ -2046,7 +2046,7 @@
         </div>
       </div>
       <p class="card-title">List Outline</p>
-      <p class="card-desc">Returns the project outline as a hierarchical tree. Each node reports { name, uuid, type (cube|mesh|group), children? }. Groups contain child cubes, meshes, and sub-groups. Use `include_cubes=false` to get a group-only skeleton when you just need structure, or `max_depth` to bound very deep trees.</p>
+      <p class="card-desc">Returns the project outline as a hierarchical tree. Each node reports { name, uuid, type, children? }, including groups, armatures, armature bones, cubes, meshes and markers. Parent nodes retain their descendants. Use include_cubes=false and include_meshes=false to omit geometry leaves, or max_depth to bound very deep trees.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -2061,7 +2061,7 @@
       <td class="col-name">include_cubes</td>
       <td class="col-type">boolean</td>
       <td><span class="param-optional">optional</span></td>
-      <td class="col-desc">If true, include cubes as leaves. If false, return groups only. <span class="param-meta">(default: <code>true</code>)</span></td>
+      <td class="col-desc">If true, include cubes as leaves. If false, omit cubes while retaining other node types. <span class="param-meta">(default: <code>true</code>)</span></td>
     </tr><tr>
       <td class="col-name">include_meshes</td>
       <td class="col-type">boolean</td>
@@ -2517,7 +2517,7 @@
         </div>
       </div>
       <p class="card-title">Import GeoJSON</p>
-      <p class="card-desc">Imports one Bedrock geometry (.geo.json) into the current project, which keeps its format (one with bones: Bedrock, GeckoLib, generic, ...), as one undoable edit, and returns a screenshot. Adds the bones with their cubes, locators and texture meshes; the texture size, box UV mode and item display transforms it sets are undone with it, while the project's visible bounds can only grow. URLs on this computer or a private network are refused; pass a file path instead.</p>
+      <p class="card-desc">Imports one Bedrock geometry (.geo.json) into the current project, which keeps its format (one with bones: Bedrock, GeckoLib, generic, ...), as one undoable edit, and returns a screenshot. Adds the bones with their cubes, locators and texture meshes; the texture size, box UV mode and item display transforms it sets are undone with it, while the project's visible bounds can only grow. If the active project changes while loading, the import is rejected without modifying the new project. URLs on this computer or a private network are refused; pass a file path instead.</p>
       <div class="overflow-x">
         <table class="param-table">
       <thead>
@@ -6301,7 +6301,7 @@
       </section>
 
       <footer class="page-footer">
-        Generated 2026-10-14T01:59:30.638Z from Zod schemas
+        Generated 2026-10-16T23:01:44.375Z from Zod schemas
       </footer>
     </main>
   </div>
