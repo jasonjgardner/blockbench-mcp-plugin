@@ -419,7 +419,9 @@ describe("remove_element", () => {
         children: [{ name: "rig", uuid: armature.uuid, type: "armature" }],
       }]);
       expect(limited.truncated_at_max_depth).toEqual(["rig"]);
-      expect((await callJson("list_outline", { max_depth: 2 })).truncated_at_max_depth).toEqual(["spine"]);
+      const depthTwo = await callJson("list_outline", { max_depth: 2 });
+      expect(depthTwo.truncated_at_max_depth).toBeUndefined();
+      expect(depthTwo.roots[0].children[0].children[0].children).toEqual([]);
     });
   });
 });

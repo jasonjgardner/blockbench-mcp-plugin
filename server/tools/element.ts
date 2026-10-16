@@ -610,25 +610,31 @@ export function registerElementTools() {
       const truncated: string[] = [];
 
       const nodeFor = (el: OutlinerNode, depth: number): IOutlineNode | null => {
-        if (el instanceof Cube && !include_cubes) return null;
-        if (el instanceof Mesh && !include_meshes) return null;
+        if (el instanceof Cube && !include_cubes || el instanceof Mesh && !include_meshes) return null;
+
         const node: IOutlineNode = {
           name: el.name,
           uuid: el.uuid,
           type: el instanceof Group ? "group" : el.type,
         };
+
         if (Array.isArray((el as IPositionedNode).children)) {
           node.children = [];
-          if (depth >= max_depth) {
-            truncated.push(el.name);
-            delete node.children;
-            return node;
+          
+          const children = childrenOf(el);
+          
+          if (depth >= max_depth && children.length > 0) {
+              truncated.push(el.name);
+              delete node.children;
+              return node;
           }
-          for (const child of childrenOf(el)) {
+
+          for (const child of children) {
             const childNode = nodeFor(child, depth + 1);
             if (childNode) node.children!.push(childNode);
           }
         }
+
         return node;
       };
 
