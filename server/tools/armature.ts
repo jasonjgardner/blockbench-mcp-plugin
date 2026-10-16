@@ -583,9 +583,14 @@ export function registerArmatureTools() {
       const armature = findArmatureOrThrow(id);
       const name = armature.name;
 
-      Undo.initEdit({ outliner: true, elements: [] });
-      armature.remove();
-      Undo.finishEdit("Agent removed armature");
+      const elements: OutlinerElement[] = [armature];
+      armature.forEachChild(child => elements.push(child));
+      runUndoableEdit(
+        { outliner: true, elements },
+        "Agent removed armature",
+        () => armature.remove(),
+        { outliner: true, elements: [] },
+      );
       Canvas.updateAll();
 
       return `Removed armature "${name}"`;
@@ -742,18 +747,19 @@ export function registerArmatureTools() {
       const bone = findArmatureBoneOrThrow(id);
       const name = bone.name;
 
-      Undo.initEdit({ outliner: true, elements: [] });
-
-      if (!remove_children && bone.children.length > 0) {
-        // Re-parent children to bone's parent
-        const parent = bone.parent;
-        for (const child of [...bone.children]) {
-          child.addTo(parent);
-        }
-      }
-
-      bone.remove();
-      Undo.finishEdit("Agent removed armature bone");
+      const elements: OutlinerElement[] = [bone];
+      const keptChildren: OutlinerElement[] = remove_children ? [] : [...bone.children];
+      if (remove_children) bone.forEachChild(child => elements.push(child));
+      else elements.push(...keptChildren);
+      runUndoableEdit(
+        { outliner: true, elements },
+        "Agent removed armature bone",
+        () => {
+          for (const child of keptChildren) child.addTo(bone.parent);
+          bone.remove();
+        },
+        { outliner: true, elements: keptChildren },
+      );
       Canvas.updateAll();
 
       return `Removed bone "${name}"`;

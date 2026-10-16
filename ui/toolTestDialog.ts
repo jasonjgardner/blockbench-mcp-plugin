@@ -320,7 +320,8 @@ export function openToolTestDialog(toolName: string) {
         Blockbench.showQuickMessage(tl("mcp.dialog.running_tool"), 1000);
 
         try {
-          const result = await toolDef.execute(args);
+          const validatedArgs = await toolDef.parameterSchema.parseAsync(args);
+          const result = await toolDef.execute(validatedArgs);
 
           // Format result for display
           let displayResult: unknown;

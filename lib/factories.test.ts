@@ -2,10 +2,14 @@ import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { z } from "zod";
-import { ToolListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js";
+import { ProgressNotificationSchema, ToolListChangedNotificationSchema, type ProgressNotification } from "@modelcontextprotocol/sdk/types.js";
 import {
   createTool,
+  createPrompt,
   getAllToolDefinitions,
+  getAllPromptDefinitions,
+  prompts,
+  registerPromptsOnServer,
   registerToolsOnServer,
   refreshToolAvailability,
   tools,
@@ -32,6 +36,8 @@ beforeEach(() => {
   Object.keys(tools).forEach((name) => delete tools[name]);
   const definitions = getAllToolDefinitions();
   Object.keys(definitions).forEach((name) => delete definitions[name]);
+  Object.keys(prompts).forEach(name => delete prompts[name]);
+  Object.keys(getAllPromptDefinitions()).forEach(name => delete getAllPromptDefinitions()[name]);
   const server = createServer();
   servers = [server];
   setServer(server);
@@ -45,6 +51,8 @@ afterEach(async () => {
   Object.keys(tools).forEach((name) => delete tools[name]);
   const definitions = getAllToolDefinitions();
   Object.keys(definitions).forEach((name) => delete definitions[name]);
+  Object.keys(prompts).forEach(name => delete prompts[name]);
+  Object.keys(getAllPromptDefinitions()).forEach(name => delete getAllPromptDefinitions()[name]);
   setServer(originalServer);
   if (originalCondition) {
     Object.defineProperty(globalThis, "Condition", originalCondition);
@@ -58,6 +66,7 @@ async function connectClient(mode: RegistrationMode): Promise<Client> {
   if (mode === "session") {
     servers.push(server);
     registerToolsOnServer(server);
+    registerPromptsOnServer(server);
   }
 
   const client = new Client({ name: "factory-regression-test", version: "1.0.0" });
@@ -69,6 +78,91 @@ async function connectClient(mode: RegistrationMode): Promise<Client> {
 }
 
 describe.each<RegistrationMode>(["initial", "session"])("%s registration", (mode) => {
+  test("registers typed prompt arguments and SDK prompt results", async () => {
+    const argsSchema = z.object({ name: z.string().describe("Name to greet.") });
+    createPrompt("greeting", {
+      description: "Greet a name.",
+      argsSchema,
+      generate: ({ name }) => ({ messages: [{ role: "user", content: { type: "text", text: `Hello ${name}` } }] }),
+    });
+    const client = await connectClient(mode);
+    expect(prompts.greeting?.arguments).toEqual(argsSchema.shape);
+    expect((await client.listPrompts()).prompts).toEqual([
+      expect.objectContaining({ name: "greeting", arguments: [{ name: "name", description: "Name to greet.", required: true }] }),
+    ]);
+    expect((await client.getPrompt({ name: "greeting", arguments: { name: "Alex" } })).messages).toEqual([
+      { role: "user", content: { type: "text", text: "Hello Alex" } },
+    ]);
+    await expect(client.getPrompt({ name: "greeting", arguments: {} })).rejects.toThrow();
+  });
+
+  test.each([0, "mesh-progress"])("reports progress using token %p only to the calling client", async token => {
+    createTool("progress", {
+      description: "Report progress.",
+      parameters: z.object({}),
+      execute: async (_args, context) => {
+        context?.reportProgress({ progress: 1, total: 2 });
+        await Promise.resolve();
+        context?.reportProgress({ progress: 2, total: 2 });
+        return "done";
+      },
+    });
+    const client = await connectClient(mode);
+    const otherClient = await connectClient("session");
+    const progress = mock((_notification: ProgressNotification) => {});
+    const otherProgress = mock(() => {});
+    client.setNotificationHandler(ProgressNotificationSchema, progress);
+    otherClient.setNotificationHandler(
+      ProgressNotificationSchema,
+      otherProgress,
+    );
+    const result = await client.callTool(
+      { name: "progress", arguments: {}, _meta: { progressToken: token } },
+      undefined,
+    );
+    expect(result.isError).not.toBe(true);
+    expect(progress.mock.calls.map(([notification]) => notification.params)).toEqual([
+      { progressToken: token, progress: 1, total: 2 },
+      { progressToken: token, progress: 2, total: 2 },
+    ]);
+    expect(otherProgress).not.toHaveBeenCalled();
+    expect((await client.callTool({ name: "progress", arguments: {} })).isError).not.toBe(true);
+    expect(progress).toHaveBeenCalledTimes(2);
+  });
+
+  test("preserves keyword-named properties and literal default data in published schemas", async () => {
+    const literal = { definitions: { items: ["keep", "these"] }, additionalItems: 5, $ref: "#/definitions/literal" };
+    const parameters = z.object({
+      definitions: z.string(),
+      additionalItems: z.number(),
+      items: z.object({ definitions: z.tuple([z.string(), z.number()]) }),
+      additionalProperties: z.object({ additionalItems: z.boolean() }),
+      config: z.unknown().default(literal),
+      choice: z.literal("#/definitions/not-a-reference"),
+    });
+    createTool("keyword_properties", { description: "Preserve property names.", parameters, execute: async () => "done" });
+    const client = await connectClient(mode);
+    const listed = (await client.listTools()).tools[0]?.inputSchema;
+    expect(listed).toMatchObject({
+      properties: {
+        definitions: { type: "string" },
+        additionalItems: { type: "number" },
+        items: {
+          properties: { definitions: { type: "array", prefixItems: [{ type: "string" }, { type: "number" }] } },
+          required: ["definitions"],
+        },
+        additionalProperties: { properties: { additionalItems: { type: "boolean" } } },
+        config: { default: literal },
+        choice: { const: "#/definitions/not-a-reference" },
+      },
+      required: ["definitions", "additionalItems", "items", "additionalProperties", "choice"],
+    });
+    expect((await client.callTool({
+      name: "keyword_properties",
+      arguments: { definitions: "value", additionalItems: 1, items: { definitions: ["a", 2] }, additionalProperties: { additionalItems: true }, choice: "#/definitions/not-a-reference" },
+    })).isError).not.toBe(true);
+  });
+
   test("mode switching enables dependent tools in every connected session", async () => {
     interface IHostMode {
       id: string;

@@ -165,6 +165,7 @@ class HostNullObject extends HostElement {
 
 class HostArmatureBone extends HostElement {
   override readonly type: string = "armature_bone";
+  children: HostArmatureBone[] = [];
   static all: HostArmatureBone[] = [];
   getVertexWeight(): number {
     return 0;
@@ -373,6 +374,55 @@ describe("remove_element", () => {
     expect(elements).toEqual([]);
     undo.undo();
     expect(elements.map((element) => element.uuid).toSorted()).toEqual([armature.uuid, bone.uuid].toSorted());
+  });
+
+  describe("list_outline", () => {
+    test("retains armature trees, nested bones, meshes and markers with their runtime types", async () => {
+      const armature = new HostArmature("rig").init();
+      const bone = new HostArmatureBone("spine");
+      const child = new HostArmatureBone("head");
+      const mesh = new HostMesh("body");
+      const marker = new HostNullObject("controller");
+      bone.children.push(child);
+      armature.children.push(bone, mesh, marker);
+      elements.push(bone, child, mesh, marker);
+      expect((await callJson("list_outline", {})).roots).toEqual([{
+        name: "rig", uuid: armature.uuid, type: "armature",
+        children: [
+          { name: "spine", uuid: bone.uuid, type: "armature_bone", children: [
+            { name: "head", uuid: child.uuid, type: "armature_bone", children: [] },
+          ] },
+          { name: "body", uuid: mesh.uuid, type: "mesh" },
+          { name: "controller", uuid: marker.uuid, type: "null_object" },
+        ],
+      }]);
+    });
+
+    test("keeps parent nodes when geometry is filtered and applies max_depth to bones", async () => {
+      const group = new HostGroup("group").init();
+      const armature = new HostArmature("rig").init().addTo(group);
+      const bone = new HostArmatureBone("spine");
+      const mesh = new HostMesh("body");
+      armature.children.push(bone, mesh);
+      elements.push(bone, mesh);
+      new HostCube("cube").init().addTo(group);
+      const filtered = await callJson("list_outline", { include_cubes: false, include_meshes: false });
+      expect(filtered.roots).toEqual([{
+        name: "group", uuid: group.uuid, type: "group",
+        children: [{ name: "rig", uuid: armature.uuid, type: "armature", children: [
+          { name: "spine", uuid: bone.uuid, type: "armature_bone", children: [] },
+        ] }],
+      }]);
+      const limited = await callJson("list_outline", { max_depth: 1, include_cubes: false });
+      expect(limited.roots).toEqual([{
+        name: "group", uuid: group.uuid, type: "group",
+        children: [{ name: "rig", uuid: armature.uuid, type: "armature" }],
+      }]);
+      expect(limited.truncated_at_max_depth).toEqual(["rig"]);
+      const depthTwo = await callJson("list_outline", { max_depth: 2 });
+      expect(depthTwo.truncated_at_max_depth).toBeUndefined();
+      expect(depthTwo.roots[0].children[0].children[0].children).toEqual([]);
+    });
   });
 });
 

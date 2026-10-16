@@ -2,7 +2,8 @@ import { z } from "zod";
 import type { IMCPTool, IMCPPrompt, IMCPResource, StatusType } from "@/types";
 import { getServer } from "@/server/server";
 import { ResourceTemplate, type McpServer, type RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { ListToolsRequestSchema, type CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { ListToolsRequestSchema, type CallToolResult, type GetPromptResult, type ServerRequest, type ServerNotification } from "@modelcontextprotocol/sdk/types.js";
+import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import type { ToolCondition } from "@/server/tool-conditions";
 import { withResourceErrors } from "@/lib/resourceErrors";
@@ -225,6 +226,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+const schemaMaps = new Set(["properties", "patternProperties", "definitions", "$defs", "dependentSchemas"]);
+const schemaValues = new Set([
+  "items", "additionalItems", "additionalProperties", "allOf", "anyOf", "oneOf",
+  "not", "if", "then", "else", "contains", "propertyNames", "prefixItems",
+  "unevaluatedItems", "unevaluatedProperties", "contentSchema",
+]);
+
 /**
  * Produces the constrained JSON Schema subset accepted by GitHub Copilot.
  * Runtime tool calls continue through the full Zod parser, so tuple constraints
@@ -234,9 +242,15 @@ function normalizePublishedSchema(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(normalizePublishedSchema);
   if (!isRecord(value)) return value;
 
-  const normalized = Object.fromEntries(
-    Object.entries(value).map(([key, child]) => [key, normalizePublishedSchema(child)]),
-  );
+  const normalized = Object.fromEntries(Object.entries(value).map(([key, child]) => {
+    if ((schemaMaps.has(key) || key === "dependencies") && isRecord(child)) {
+      return [key, Object.fromEntries(Object.entries(child).map(([name, schema]) => [
+        name,
+        key === "dependencies" && Array.isArray(schema) ? schema : normalizePublishedSchema(schema),
+      ]))];
+    }
+    return [key, schemaValues.has(key) ? normalizePublishedSchema(child) : child];
+  }));
   const ref = normalized.$ref;
   const { additionalItems, definitions, ...unmappedSchema } = normalized;
   const schema: Record<string, unknown> = {
@@ -362,7 +376,7 @@ function registerToolOnServer(server: McpServer, name: string, definition: ITool
   const register = server.registerTool.bind(server) as unknown as (
     toolName: string,
     config: { title: string; description: string; inputSchema: z.ZodType; annotations?: IToolAnnotations },
-    callback: (args: Record<string, unknown>, extra?: { sessionId?: string; signal?: AbortSignal }) => Promise<CallToolResult>
+    callback: (args: Record<string, unknown>, extra: RequestHandlerExtra<ServerRequest, ServerNotification>) => Promise<CallToolResult>
   ) => RegisteredTool;
   const registration = register(name, {
     title: definition.title,
@@ -370,7 +384,18 @@ function registerToolOnServer(server: McpServer, name: string, definition: ITool
     inputSchema: definition.parameterSchema,
     annotations: definition.annotations,
   }, async (args, extra) => {
-    const result = await definition.execute(args, { reportProgress: () => {}, sessionId: extra?.sessionId, signal: extra?.signal });
+    const result = await definition.execute(args, {
+      reportProgress: progress => {
+        const progressToken = extra._meta?.progressToken;
+        if (progressToken === undefined || extra.signal.aborted) return;
+        void extra.sendNotification({
+          method: "notifications/progress",
+          params: { progressToken, ...progress },
+        }).catch(error => console.error(`[MCP] Failed to report progress for tool "${name}":`, error));
+      },
+      sessionId: extra.sessionId,
+      signal: extra.signal,
+    });
     if (typeof result === "string") return { content: [{ type: "text", text: result }] };
     return result;
   });
@@ -623,12 +648,7 @@ interface IPromptDefinition {
   title: string;
   description: string;
   argsSchema?: Record<string, z.ZodType>;
-  generate: (args: Record<string, unknown>) => Promise<{
-    messages: Array<{
-      role: "user" | "assistant";
-      content: { type: string; text: string };
-    }>;
-  }>;
+  generate: (args: Record<string, unknown>) => Promise<GetPromptResult>;
 }
 
 const promptDefinitions: Record<string, IPromptDefinition> = {};
@@ -653,19 +673,7 @@ export function createPrompt<T extends z.ZodRawShape = Record<string, never>>(
     argsSchema?: z.ZodObject<T>;
     generate?: (
       args: z.infer<z.ZodObject<T>>
-    ) =>
-      | {
-      messages: Array<{
-        role: "user" | "assistant";
-        content: { type: string; text: string };
-      }>;
-    }
-      | Promise<{
-          messages: Array<{
-            role: "user" | "assistant";
-            content: { type: string; text: string };
-          }>;
-        }>;
+    ) => GetPromptResult | Promise<GetPromptResult>;
   },
   status: IMCPPrompt["status"] = "stable",
   enabled: boolean = true
@@ -690,15 +698,7 @@ export function createPrompt<T extends z.ZodRawShape = Record<string, never>>(
     promptDefinitions[name] = promptDef;
 
     // Register with the singleton server
-    getServer().registerPrompt(
-      name,
-      {
-        title: promptDef.title,
-        description: promptDef.description,
-        argsSchema: promptDef.argsSchema,
-      },
-      promptDef.generate
-    );
+    registerPromptOnServer(getServer(), promptDef);
   }
 
   prompts[name] = {
@@ -712,6 +712,24 @@ export function createPrompt<T extends z.ZodRawShape = Record<string, never>>(
   return prompts[name];
 }
 
+function registerPromptOnServer(server: McpServer, promptDef: IPromptDefinition): void {
+  // Avoid recursive Zod 3/4 SDK inference at this Zod 3 registration boundary.
+  const register = server.registerPrompt.bind(server) as (
+    name: string,
+    config: { title: string; description: string; argsSchema?: z.ZodRawShape },
+    callback: IPromptDefinition["generate"]
+  ) => void;
+  register(
+    promptDef.name,
+    {
+      title: promptDef.title,
+      description: promptDef.description,
+      argsSchema: promptDef.argsSchema,
+    },
+    promptDef.generate
+  );
+}
+
 /**
  * Gets all prompt definitions for server reconstruction
  */
@@ -723,33 +741,6 @@ export function getAllPromptDefinitions() {
  * Registers all prompts on a server instance
  * Used to set up new session servers with the same prompts
  */
-export function registerPromptsOnServer(server: unknown) {
-  const typedServer = server as {
-    registerPrompt: (
-      promptName: string,
-      definition: {
-        title: string;
-        description: string;
-        argsSchema?: Record<string, z.ZodType>;
-      },
-      callback: (args: Record<string, unknown>) => Promise<{
-        messages: Array<{
-          role: "user" | "assistant";
-          content: { type: string; text: string };
-        }>;
-      }>
-    ) => void;
-  };
-
-  for (const [name, promptDef] of Object.entries(promptDefinitions)) {
-    typedServer.registerPrompt(
-      name,
-      {
-        title: promptDef.title,
-        description: promptDef.description,
-        argsSchema: promptDef.argsSchema,
-      },
-      promptDef.generate
-    );
-  }
+export function registerPromptsOnServer(server: McpServer): void {
+  Object.values(promptDefinitions).forEach(promptDef => registerPromptOnServer(server, promptDef));
 }

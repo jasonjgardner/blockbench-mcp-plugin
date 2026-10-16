@@ -131,7 +131,7 @@ export const listOutlineParameters = z.object({
     .boolean()
     .optional()
     .default(true)
-    .describe("If true, include cubes as leaves. If false, return groups only."),
+    .describe("If true, include cubes as leaves. If false, omit cubes while retaining other node types."),
   include_meshes: z
     .boolean()
     .optional()
@@ -191,7 +191,7 @@ export const elementToolDocs: IToolSpec[] = [
     name: "list_outline",
     condition: { project: true },
     description:
-      "Returns the project outline as a hierarchical tree. Each node reports { name, uuid, type (cube|mesh|group), children? }. Groups contain child cubes, meshes, and sub-groups. Use `include_cubes=false` to get a group-only skeleton when you just need structure, or `max_depth` to bound very deep trees.",
+      "Returns the project outline as a hierarchical tree. Each node reports { name, uuid, type, children? }, including groups, armatures, armature bones, cubes, meshes and markers. Parent nodes retain their descendants. Use include_cubes=false and include_meshes=false to omit geometry leaves, or max_depth to bound very deep trees.",
     annotations: {
       title: "List Outline",
       readOnlyHint: true,
@@ -603,40 +603,39 @@ export function registerElementTools() {
       interface IOutlineNode {
         name: string;
         uuid: string;
-        type: "cube" | "mesh" | "group";
+        type: string;
         children?: IOutlineNode[];
       }
 
       const truncated: string[] = [];
 
-      const nodeFor = (el: unknown, depth: number): IOutlineNode | null => {
-        if (el instanceof Group) {
-          const node: IOutlineNode = {
-            name: el.name,
-            uuid: el.uuid,
-            type: "group",
-            children: [],
-          };
-          if (depth >= max_depth) {
-            truncated.push(el.name);
-            delete node.children;
-            return node;
+      const nodeFor = (el: OutlinerNode, depth: number): IOutlineNode | null => {
+        if (el instanceof Cube && !include_cubes || el instanceof Mesh && !include_meshes) return null;
+
+        const node: IOutlineNode = {
+          name: el.name,
+          uuid: el.uuid,
+          type: el instanceof Group ? "group" : el.type,
+        };
+
+        if (Array.isArray((el as IPositionedNode).children)) {
+          node.children = [];
+          
+          const children = childrenOf(el);
+          
+          if (depth >= max_depth && children.length > 0) {
+              truncated.push(el.name);
+              delete node.children;
+              return node;
           }
-          for (const child of el.children ?? []) {
+
+          for (const child of children) {
             const childNode = nodeFor(child, depth + 1);
             if (childNode) node.children!.push(childNode);
           }
-          return node;
         }
-        if (el instanceof Cube) {
-          if (!include_cubes) return null;
-          return { name: el.name, uuid: el.uuid, type: "cube" };
-        }
-        if (el instanceof Mesh) {
-          if (!include_meshes) return null;
-          return { name: el.name, uuid: el.uuid, type: "mesh" };
-        }
-        return null;
+
+        return node;
       };
 
       const roots = Outliner.root
