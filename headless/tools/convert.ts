@@ -13,6 +13,7 @@ import { compileJavaBlockModel, importJavaBlockModel } from "../formats/java-blo
 import { JAVA_BLOCK_VERSIONS } from "../formats/java-block-shared";
 import { buildWebAppFileLinks, type IWebAppOptions, linkOrNote, webAppField } from "../app/web-link";
 import { compileBedrockGeometry } from "../formats/bedrock";
+import { compileBedrockAnimations } from "../formats/bedrock-animation";
 import { downgradeToV410 } from "../document/legacy";
 import { compileModdedEntity, DEFAULT_MODDED_ENTITY_TEMPLATE, MODDED_ENTITY_TEMPLATE_IDS, MODDED_ENTITY_TEMPLATE_LIST } from "../formats/modded-entity";
 import { defineTool, fileParam, type IRegistrableTool } from "../tool";
@@ -63,6 +64,29 @@ const bedrockTool = defineTool({
     await store.writeFile(target, text, overwrite);
     // Links come after the write, so a refused output path leaves no launcher behind.
     return { path: target, skipped, ...(await geometryLinks(text, basename(target), webApp, target)) };
+  },
+});
+
+const bedrockAnimationTool = defineTool({
+  name: "bbmodel_export_bedrock_animation",
+  title: "Export Bedrock Animation",
+  description:
+    "Compiles .bbmodel animations to Bedrock animation JSON (format_version 1.8.0), mirroring position X and rotation X/Y like Blockbench's Bedrock animation codec. Select animations by name or UUID; defaults to all. Returns JSON inline when no output path is given.",
+  parameters: {
+    file: fileParam,
+    output: outputParam.optional().describe("Output .json path inside the workspace; omit to return the animation JSON inline."),
+    animations: z.array(z.string().min(1)).default([]).describe("Animation names or UUIDs; defaults to all animations."),
+    overwrite: z.boolean().default(false),
+  },
+  readOnly: false,
+  destructive: true,
+  async execute({ file, output, animations, overwrite }, { store }) {
+    const { doc } = await store.read(file);
+    const { animation, names } = compileBedrockAnimations(doc, { animations });
+    if (output === undefined) return animation;
+    const target = store.resolvePath(output, [".json"]);
+    await store.writeFile(target, JSON.stringify(animation, null, "\t"), overwrite);
+    return { path: target, animations: names };
   },
 });
 
@@ -176,4 +200,4 @@ const javaImportTool = defineTool({
 });
 
 /** Conversion tools. */
-export const convertTools: readonly IRegistrableTool[] = [legacyTool, bedrockTool, javaExportTool, javaImportTool, moddedEntityTool];
+export const convertTools: readonly IRegistrableTool[] = [legacyTool, bedrockTool, bedrockAnimationTool, javaExportTool, javaImportTool, moddedEntityTool];

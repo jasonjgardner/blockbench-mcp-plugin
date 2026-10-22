@@ -75,6 +75,7 @@ bun run headless/call.ts --root ./models bbmodel_edit @ops.json
 | `bbmodel_validate_animations` | Samples each clip and flags parts sinking into the ground or limbs detaching from their parent |
 | `bbmodel_convert_legacy` | Writes a copy Blockbench 4.x can open |
 | `bbmodel_export_bedrock_geometry` | Compiles Bedrock `.geo.json` with the same conventions as Blockbench's exporter |
+| `bbmodel_export_bedrock_animation` | Compiles Bedrock animation JSON with Blockbench's coordinate and keyframe conventions |
 | `bbmodel_export_java_block`, `bbmodel_import_java_block` | Java Edition block/item model `.json` out and in, ported from Blockbench's Java Block/Item codec |
 | `bbmodel_export_modded_entity` | Java entity model class from Blockbench's Modded Entity templates (Forge 1.7–1.17+, Fabric Yarn) |
 | `bbmodel_render`, `bbmodel_contact_sheet` | Render one view, or several views at once, to PNG |
