@@ -8,6 +8,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { ModelStore } from "./document/store";
 import { BbRenderer, buildRenderArgs, Semaphore } from "./render/bb-render";
 import { createHeadlessServer, HEADLESS_TOOLS } from "./server";
+import { creatureModel } from "./test-fixtures";
 
 const ONE_PIXEL_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
@@ -159,6 +160,41 @@ describe("headless MCP server", () => {
 
     const saved = JSON.parse(await Bun.file(join(root, "chair.bbmodel")).text()) as { ai_agents: string };
     expect(saved.ai_agents).toBe("builder-agent");
+  });
+
+  test("exports selected Bedrock animations inline and writes JSON with overwrite protection", async () => {
+    const session = await connect(root, "animation-exporter");
+    const doc = creatureModel(true);
+    const animation = doc.animations?.[0];
+    expect(animation).toBeDefined();
+    if (!animation) return;
+    await Bun.write(join(root, "creature.bbmodel"), JSON.stringify(doc));
+
+    const inline = await session.json<{ format_version: string; animations: Record<string, unknown> }>("bbmodel_export_bedrock_animation", {
+      file: "creature.bbmodel",
+      animations: [animation.uuid],
+    });
+    expect(inline.format_version).toBe("1.8.0");
+    expect(Object.keys(inline.animations)).toEqual([animation.name]);
+
+    const written = await session.json<{ path: string; animations: string[] }>("bbmodel_export_bedrock_animation", {
+      file: "creature.bbmodel",
+      output: "creature.animation.json",
+    });
+    expect(written.animations).toEqual([animation.name]);
+    expect(JSON.parse(await Bun.file(written.path).text())).toEqual(inline);
+
+    const refused = await session.call("bbmodel_export_bedrock_animation", {
+      file: "creature.bbmodel",
+      output: "creature.animation.json",
+    });
+    expect(refused.isError).toBe(true);
+    const overwritten = await session.json<{ path: string }>("bbmodel_export_bedrock_animation", {
+      file: "creature.bbmodel",
+      output: "creature.animation.json",
+      overwrite: true,
+    });
+    expect(overwritten.path).toBe(written.path);
   });
 
   test("two agents editing one file: a stale revision is refused, not merged silently", async () => {
