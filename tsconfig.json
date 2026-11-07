@@ -17,7 +17,8 @@
         "forceConsistentCasingInFileNames": true,
         "skipLibCheck": true,
         "types": [
-            "blockbench-types"
+            "blockbench-types",
+            "webmcp-types"
         ],
         "paths": {
             "@/*": [

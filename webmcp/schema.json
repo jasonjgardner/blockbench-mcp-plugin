@@ -1,0 +1,540 @@
+{
+    "tools": [
+        {
+            "name": "get_project_summary",
+            "description": "Returns active project metadata, format capabilities, editor mode, texture resolution, and element counts. Use when inspecting the open model or checking format limits before editing.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "include_formats": {
+                        "type": "boolean",
+                        "description": "Include the list of available Blockbench model format IDs (optional)"
+                    }
+                }
+            },
+            "annotations": {
+                "readOnlyHint": true,
+                "untrustedContentHint": true
+            }
+        },
+        {
+            "name": "create_project",
+            "description": "Opens a new Blockbench project tab for a target model type, leaving any current project open. Use when starting a fresh model from scratch.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "project_name": {
+                        "type": "string",
+                        "description": "Display name for the new model project"
+                    },
+                    "format_id": {
+                        "type": "string",
+                        "description": "Model format ID such as bedrock, bedrock_block, java_block, free, or modded_entity; list them with get_project_summary"
+                    }
+                },
+                "required": [
+                    "project_name",
+                    "format_id"
+                ]
+            }
+        },
+        {
+            "name": "list_outliner_items",
+            "description": "Lists and filters outliner elements and bone groups with pagination and facet summaries. Use when browsing the model hierarchy, locating nodes by keyword, or resolving references.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "types": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "cube",
+                                "mesh",
+                                "group"
+                            ]
+                        },
+                        "description": "Filter by outliner entity types; omit to include all types"
+                    },
+                    "query": {
+                        "type": "string",
+                        "description": "Case-insensitive keyword filter matched against element or bone names"
+                    },
+                    "parent_group": {
+                        "type": "string",
+                        "description": "Parent bone group name or UUID to scope results to its descendants"
+                    },
+                    "selected_only": {
+                        "type": "boolean",
+                        "description": "Return only currently selected outliner nodes"
+                    },
+                    "page": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "1-based page number for paginated results (default 1)"
+                    },
+                    "page_size": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 25,
+                        "description": "Maximum items per page, up to 25 (default 12)"
+                    }
+                }
+            },
+            "annotations": {
+                "readOnlyHint": true,
+                "untrustedContentHint": true
+            }
+        },
+        {
+            "name": "mutate_outliner_items",
+            "description": "Creates, moves, groups, or removes cubes, meshes, and bone groups in one undoable batch. Use when building geometry, organizing bone rigs, or adjusting element transforms.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "operation": {
+                        "type": "string",
+                        "enum": [
+                            "create_cubes",
+                            "create_group",
+                            "create_sphere",
+                            "create_cylinder",
+                            "transform",
+                            "remove"
+                        ],
+                        "description": "Batch modeling action to execute inside a single undo entry"
+                    },
+                    "parent_group": {
+                        "type": "string",
+                        "description": "Target parent bone group name, UUID, or 'root' (default 'root')"
+                    },
+                    "group_name": {
+                        "type": "string",
+                        "description": "Name for a newly created bone group or mesh primitive"
+                    },
+                    "cubes": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {
+                                    "type": "string",
+                                    "description": "Cube label in the outliner"
+                                },
+                                "from": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "number"
+                                    },
+                                    "minItems": 3,
+                                    "maxItems": 3,
+                                    "description": "Minimum corner coordinates [x, y, z]"
+                                },
+                                "to": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "number"
+                                    },
+                                    "minItems": 3,
+                                    "maxItems": 3,
+                                    "description": "Maximum corner coordinates [x, y, z]"
+                                },
+                                "origin": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "number"
+                                    },
+                                    "minItems": 3,
+                                    "maxItems": 3,
+                                    "description": "Pivot point [x, y, z] (optional)"
+                                },
+                                "rotation": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "number"
+                                    },
+                                    "minItems": 3,
+                                    "maxItems": 3,
+                                    "description": "Euler rotation in degrees [x, y, z] (optional)"
+                                }
+                            },
+                            "required": [
+                                "name",
+                                "from",
+                                "to"
+                            ]
+                        },
+                        "description": "Cube definitions when creating cubes in batch"
+                    },
+                    "primitive": {
+                        "type": "object",
+                        "properties": {
+                            "position": {
+                                "type": "array",
+                                "items": {
+                                    "type": "number"
+                                },
+                                "minItems": 3,
+                                "maxItems": 3,
+                                "description": "Center position [x, y, z]"
+                            },
+                            "diameter": {
+                                "type": "number",
+                                "description": "Sphere or cylinder diameter in model units"
+                            },
+                            "height": {
+                                "type": "number",
+                                "description": "Cylinder height along local Y axis"
+                            },
+                            "sides": {
+                                "type": "integer",
+                                "minimum": 3,
+                                "maximum": 64,
+                                "description": "Radial segment count (default 12)"
+                            }
+                        },
+                        "description": "Dimensions for sphere or cylinder mesh creation"
+                    },
+                    "target_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Element or bone UUIDs/names to move, reparent into a new group, or remove"
+                    },
+                    "offset": {
+                        "type": "array",
+                        "items": {
+                            "type": "number"
+                        },
+                        "minItems": 3,
+                        "maxItems": 3,
+                        "description": "Translation delta [dx, dy, dz] applied during transform"
+                    },
+                    "rotation": {
+                        "type": "array",
+                        "items": {
+                            "type": "number"
+                        },
+                        "minItems": 3,
+                        "maxItems": 3,
+                        "description": "Euler rotation [rx, ry, rz] in degrees applied during group creation or transform"
+                    }
+                },
+                "required": [
+                    "operation"
+                ]
+            }
+        },
+        {
+            "name": "manage_history",
+            "description": "Undoes or redoes recent edits, saves named undo markers, or lists history entries. Use when reverting mistakes, stepping forward, or marking a safe modeling state.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "enum": [
+                            "undo",
+                            "redo",
+                            "checkpoint",
+                            "list"
+                        ],
+                        "description": "History operation to run on the active project"
+                    },
+                    "steps": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 50,
+                        "description": "Number of undo or redo steps to apply (default 1)"
+                    },
+                    "checkpoint_name": {
+                        "type": "string",
+                        "description": "Label for a saved checkpoint marker in the undo stack"
+                    },
+                    "page": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "1-based page number when listing history entries (default 1)"
+                    }
+                },
+                "required": [
+                    "action"
+                ]
+            }
+        },
+        {
+            "name": "list_textures",
+            "description": "Lists project textures and material groups with dimensions, channels, and pagination. Use when checking available textures or materials before painting or assigning UVs.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "channel_filter": {
+                        "type": "string",
+                        "enum": [
+                            "color",
+                            "normal",
+                            "height",
+                            "mer"
+                        ],
+                        "description": "Filter textures by assigned PBR channel"
+                    },
+                    "page": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "1-based page number for texture list pagination (default 1)"
+                    },
+                    "page_size": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 25,
+                        "description": "Maximum textures per page, up to 25 (default 12)"
+                    }
+                }
+            },
+            "annotations": {
+                "readOnlyHint": true,
+                "untrustedContentHint": true
+            }
+        },
+        {
+            "name": "manage_textures",
+            "description": "Creates blank textures, paints solid fills, assigns a texture to elements, or places a texture in a PBR material channel. Use when texturing surfaces or configuring materials.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "operation": {
+                        "type": "string",
+                        "enum": [
+                            "create_texture",
+                            "paint_fill",
+                            "assign_texture",
+                            "configure_material"
+                        ],
+                        "description": "Texturing, UV assignment, or material configuration action"
+                    },
+                    "texture_ref": {
+                        "type": "string",
+                        "description": "Texture name, ID, or UUID to create, paint on, or assign"
+                    },
+                    "width": {
+                        "type": "integer",
+                        "minimum": 16,
+                        "maximum": 4096,
+                        "description": "Pixel width when creating a texture (default 16)"
+                    },
+                    "height": {
+                        "type": "integer",
+                        "minimum": 16,
+                        "maximum": 4096,
+                        "description": "Pixel height when creating a texture (default 16)"
+                    },
+                    "fill_color": {
+                        "type": "string",
+                        "description": "CSS hex or color string (e.g. '#4a90e2') for texture creation or fill"
+                    },
+                    "rect": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "minItems": 4,
+                        "maxItems": 4,
+                        "description": "Optional pixel rectangle [x, y, width, height] for partial fill"
+                    },
+                    "target_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Element or bone group names/UUIDs receiving the texture assignment"
+                    },
+                    "pbr_channel": {
+                        "type": "string",
+                        "enum": [
+                            "color",
+                            "normal",
+                            "height",
+                            "mer"
+                        ],
+                        "description": "PBR channel role when configuring a material group"
+                    },
+                    "material_name": {
+                        "type": "string",
+                        "description": "Material group name or UUID to create or update"
+                    }
+                },
+                "required": [
+                    "operation"
+                ]
+            }
+        },
+        {
+            "name": "switch_editor_mode",
+            "description": "Switches the active Blockbench workspace tab between Edit, Paint, Animate, Display, or AI Scratchpad. Use when transitioning the UI before tab-specific tasks.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "target_mode": {
+                        "type": "string",
+                        "enum": [
+                            "edit",
+                            "paint",
+                            "animate",
+                            "display",
+                            "ai_scratchpad"
+                        ],
+                        "description": "Workspace mode tab to activate in Blockbench"
+                    }
+                },
+                "required": [
+                    "target_mode"
+                ]
+            }
+        },
+        {
+            "name": "manage_animations",
+            "description": "Creates animations, sets bone keyframes, or controls timeline playback in one undoable step. Use when authoring walk cycles, idle poses, or previewing motion.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "operation": {
+                        "type": "string",
+                        "enum": [
+                            "list",
+                            "create",
+                            "set_keyframes",
+                            "playback"
+                        ],
+                        "description": "Animation operation to perform in the active project"
+                    },
+                    "animation_name": {
+                        "type": "string",
+                        "description": "Target animation clip name or UUID"
+                    },
+                    "duration": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 600,
+                        "description": "Animation clip length in seconds (default 1.0)"
+                    },
+                    "loop_mode": {
+                        "type": "string",
+                        "enum": [
+                            "once",
+                            "loop",
+                            "hold"
+                        ],
+                        "description": "Playback loop behavior for created animations (default 'loop')"
+                    },
+                    "bone_name": {
+                        "type": "string",
+                        "description": "Target bone group name or UUID when setting keyframes"
+                    },
+                    "channel": {
+                        "type": "string",
+                        "enum": [
+                            "rotation",
+                            "position",
+                            "scale"
+                        ],
+                        "description": "Transform channel for keyframe placement"
+                    },
+                    "keyframes": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "time": {
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "description": "Keyframe timestamp in seconds"
+                                },
+                                "values": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "number"
+                                    },
+                                    "minItems": 3,
+                                    "maxItems": 3,
+                                    "description": "Channel value vector [x, y, z]"
+                                },
+                                "interpolation": {
+                                    "type": "string",
+                                    "enum": [
+                                        "linear",
+                                        "catmullrom",
+                                        "bezier",
+                                        "step"
+                                    ],
+                                    "description": "Interpolation curve mode (default 'linear')"
+                                }
+                            },
+                            "required": [
+                                "time",
+                                "values"
+                            ]
+                        },
+                        "description": "Keyframes to insert or update on the bone channel"
+                    },
+                    "playback_state": {
+                        "type": "string",
+                        "enum": [
+                            "play",
+                            "pause",
+                            "stop"
+                        ],
+                        "description": "Timeline playback action when operation is 'playback'"
+                    },
+                    "page": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "1-based page number when listing animations (default 1)"
+                    }
+                },
+                "required": [
+                    "operation"
+                ]
+            }
+        },
+        {
+            "name": "export_project_model",
+            "description": "Lists available export codecs, compiles the model to bounded text, or opens the browser download dialog. Use when exporting or inspecting compiled output in the web app.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "enum": [
+                            "list_codecs",
+                            "compile_preview",
+                            "initiate_download"
+                        ],
+                        "description": "Codec discovery, bounded text compilation, or browser file download hand-off"
+                    },
+                    "codec_id": {
+                        "type": "string",
+                        "description": "Export codec ID (e.g. 'project', 'bedrock', 'java_block', 'gltf', 'obj'); defaults to project codec"
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Character offset for paging through compiled model output (default 0)"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "minimum": 100,
+                        "maximum": 1000,
+                        "description": "Maximum characters of compiled output per page (default 800); shrinks further if needed to fit the output budget"
+                    }
+                },
+                "required": [
+                    "action"
+                ]
+            },
+            "annotations": {
+                "untrustedContentHint": true
+            }
+        }
+    ]
+}

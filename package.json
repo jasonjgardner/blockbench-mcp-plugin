@@ -31,6 +31,7 @@
     "dev": "bun run prompts:build && bun run ./build --sourcemap",
     "dev:watch": "bun run prompts:build && bun run dev --watch",
     "build": "bun run prompts:build && bun run ./build --minify",
+    "build:webmcp": "bun build webmcp/index.ts --target browser --format cjs --external three --external tinycolor2 --outfile dist/webmcp/mcp_web.js",
     "headless": "bun run headless/index.ts",
     "build:headless": "bun build headless/index.ts --target bun --outfile dist/headless/blockbench-mcp-headless.js",
     "docs:build": "bun run ./build/docs.ts",
@@ -49,6 +50,7 @@
     "replicate": "^1.4.0",
     "tinycolor2": "^1.6.0",
     "typescript": "^5.9.3",
+    "webmcp-types": "^0.1.10",
     "zod-to-json-schema": "^3.25.1"
   },
   "bin": {

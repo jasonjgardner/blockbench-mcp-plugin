@@ -1,0 +1,296 @@
+[
+    {
+        "name": "Goal 1: Inspect active project summary",
+        "messages": [
+            {
+                "role": "user",
+                "type": "message",
+                "content": "What project is currently open in Blockbench and what formats can I use?"
+            }
+        ],
+        "expectedCall": [
+            {
+                "functionName": "get_project_summary",
+                "arguments": {
+                    "include_formats": true
+                }
+            }
+        ]
+    },
+    {
+        "name": "Goal 1: Create a new project with a looked-up format ID",
+        "messages": [
+            {
+                "role": "user",
+                "type": "message",
+                "content": "Start a new free-form model called Lantern."
+            }
+        ],
+        "expectedCall": [
+            {
+                "functionName": "create_project",
+                "arguments": {
+                    "project_name": "Lantern",
+                    "format_id": "free"
+                }
+            }
+        ]
+    },
+    {
+        "name": "Goal 1: Recover from a missing project by creating one before listing",
+        "messages": [
+            {
+                "role": "user",
+                "type": "message",
+                "content": "List the cubes in my model."
+            },
+            {
+                "role": "model",
+                "type": "functioncall",
+                "name": "list_outliner_items",
+                "arguments": {
+                    "types": [
+                        "cube"
+                    ]
+                }
+            },
+            {
+                "role": "user",
+                "type": "functionresponse",
+                "name": "list_outliner_items",
+                "response": {
+                    "result": {
+                        "error": "Tool \"list_outliner_items\" is unavailable in the current editor state.",
+                        "code": "PREREQUISITE_STATE",
+                        "retryable": true,
+                        "suggestion": "Check get_project_summary or create_project before calling this tool."
+                    }
+                }
+            }
+        ],
+        "expectedCall": [
+            {
+                "functionName": "get_project_summary",
+                "arguments": {}
+            }
+        ]
+    },
+    {
+        "name": "Goal 1: Chained outliner listing and coreference transform ('the second cube')",
+        "messages": [
+            {
+                "role": "user",
+                "type": "message",
+                "content": "List the cubes in the body group, then move the second cube up by 4 units."
+            }
+        ],
+        "expectedCall": [
+            {
+                "functionName": "list_outliner_items",
+                "arguments": {
+                    "types": {
+                        "$contains": "cube"
+                    },
+                    "parent_group": "body"
+                },
+                "mockOutput": {
+                    "page": 1,
+                    "page_size": 12,
+                    "total_count": 2,
+                    "total_pages": 1,
+                    "results": [
+                        {
+                            "id": "cube-torso-1",
+                            "name": "torso_lower",
+                            "type": "cube",
+                            "parent": "body"
+                        },
+                        {
+                            "id": "cube-torso-2",
+                            "name": "torso_upper",
+                            "type": "cube",
+                            "parent": "body"
+                        }
+                    ],
+                    "available_facets": {
+                        "types": {
+                            "cube": 2,
+                            "mesh": 0,
+                            "group": 1
+                        }
+                    }
+                }
+            },
+            {
+                "functionName": "mutate_outliner_items",
+                "arguments": {
+                    "operation": "transform",
+                    "target_ids": {
+                        "$contains": "cube-torso-2"
+                    },
+                    "offset": [
+                        0,
+                        4,
+                        0
+                    ]
+                }
+            }
+        ]
+    },
+    {
+        "name": "Goal 2: Create texture and assign to elements in Paint mode",
+        "messages": [
+            {
+                "role": "user",
+                "type": "message",
+                "content": "Switch to the Paint tab, create a 32x32 texture named 'armor_plate' filled with #3b82f6, and assign it to the chestplate cube."
+            }
+        ],
+        "expectedCall": [
+            {
+                "functionName": "switch_editor_mode",
+                "arguments": {
+                    "target_mode": "paint"
+                },
+                "mockOutput": {
+                    "status": "switched",
+                    "previous_mode": "edit",
+                    "current_mode": "paint"
+                }
+            },
+            {
+                "ordered": [
+                    {
+                        "functionName": "manage_textures",
+                        "arguments": {
+                            "operation": "create_texture",
+                            "texture_ref": "armor_plate",
+                            "width": 32,
+                            "height": 32,
+                            "fill_color": {
+                                "$pattern": "^#?[0-9a-fA-F]{6}$"
+                            }
+                        },
+                        "mockOutput": {
+                            "status": "created",
+                            "texture_id": "tex-armor-01",
+                            "name": "armor_plate",
+                            "width": 32,
+                            "height": 32
+                        }
+                    },
+                    {
+                        "functionName": "manage_textures",
+                        "arguments": {
+                            "operation": "assign_texture",
+                            "texture_ref": {
+                                "$pattern": "^(armor_plate|tex-armor-01)$"
+                            },
+                            "target_ids": {
+                                "$contains": "chestplate"
+                            }
+                        }
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "Goal 3: Mid-chain failure recovery when setting keyframes outside Animate mode",
+        "messages": [
+            {
+                "role": "user",
+                "type": "message",
+                "content": "Create a 1.5-second looping walk animation and animate the right_leg bone rotating on X."
+            },
+            {
+                "role": "model",
+                "type": "functioncall",
+                "name": "manage_animations",
+                "arguments": {
+                    "operation": "create",
+                    "animation_name": "animation.model.walk",
+                    "duration": 1.5,
+                    "loop_mode": "loop"
+                }
+            },
+            {
+                "role": "user",
+                "type": "functionresponse",
+                "name": "manage_animations",
+                "response": {
+                    "result": {
+                        "error": "Animation tools require the Animate workspace tab to be active (current mode: 'edit').",
+                        "code": "PREREQUISITE_MODE",
+                        "retryable": true,
+                        "suggestion": "Call switch_editor_mode with target_mode='animate' first, then retry manage_animations."
+                    }
+                }
+            }
+        ],
+        "expectedCall": [
+            {
+                "functionName": "switch_editor_mode",
+                "arguments": {
+                    "target_mode": "animate"
+                },
+                "mockOutput": {
+                    "status": "switched",
+                    "previous_mode": "edit",
+                    "current_mode": "animate"
+                }
+            },
+            {
+                "functionName": "manage_animations",
+                "arguments": {
+                    "operation": "create",
+                    "animation_name": "animation.model.walk",
+                    "duration": 1.5,
+                    "loop_mode": "loop"
+                },
+                "mockOutput": {
+                    "status": "created",
+                    "animation_id": "anim-walk-01",
+                    "name": "animation.model.walk",
+                    "duration": 1.5,
+                    "loop_mode": "loop"
+                }
+            },
+            {
+                "functionName": "manage_animations",
+                "arguments": {
+                    "operation": "set_keyframes",
+                    "animation_name": {
+                        "$pattern": "^(animation\\.model\\.walk|anim-walk-01)$"
+                    },
+                    "bone_name": "right_leg",
+                    "channel": "rotation",
+                    "keyframes": {
+                        "$type": "array"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "Goal 3: Browser export download hand-off",
+        "messages": [
+            {
+                "role": "user",
+                "type": "message",
+                "content": "Download the compiled Bedrock geometry file in my browser."
+            }
+        ],
+        "expectedCall": [
+            {
+                "functionName": "export_project_model",
+                "arguments": {
+                    "action": "initiate_download",
+                    "codec_id": {
+                        "$pattern": "^bedrock"
+                    }
+                }
+            }
+        ]
+    }
+]
