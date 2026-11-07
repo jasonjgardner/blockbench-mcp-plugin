@@ -62,6 +62,20 @@ Then import and call the registration function in `server/tools.ts`.
 - Naming: Tools are registered with the name you provide (no automatic prefix).
 - Validate inputs with `zod`. Avoid blocking UI during execution.
 
+### Undo transactions
+Use `runUndoableEdit()` from `lib/undo.ts` for model/bitmap mutations, and
+`runUndoableTextureSelection()` from `lib/texture-selection-undo.ts` for texture
+pixel masks. The latter snapshots the texture by UUID, so Undo/Redo works in
+Edit mode even when the UV editor is empty or shows another texture. It relies
+on Blockbench's `UndoSystem.selectionSave` and mirrors native selection-history
+bookkeeping and events. It records nothing when Undo Selection is disabled,
+during an Edit Session, or while a selection save is loading or already pending.
+
+To verify in Blockbench: enable Settings > Edit > Undo Selection, create a
+texture in Edit mode, and call `texture_selection` with a rectangle. Undo must
+clear the mask without removing the texture; Redo must restore it. Repeat in
+Paint mode and with Undo Selection disabled (no selection entry expected).
+
 ### From another Blockbench plugin
 Other plugins register tools at runtime through the `MCP` global and the `MCP_QUEUE` bootstrap array; see the README section "Extending from another plugin" for the author-facing guide. The contract is `lib/mcp-api.d.ts` (copied to `dist/blockbench-mcp-api.d.ts` and published with releases), the runtime is `lib/plugin-api.ts`, and `lib/plugin-api.test.ts` covers load order, ownership cleanup, live-session propagation and validation. Keep the `.d.ts` and the runtime in step: `lib/plugin-api.ts` imports its types from the `.d.ts`, so a drift fails `tsc`.
 
